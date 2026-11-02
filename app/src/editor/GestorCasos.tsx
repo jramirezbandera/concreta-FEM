@@ -1,6 +1,6 @@
 /**
  * El gestor de casos de carga (GE2, `docs/fem3d/gestores.md` §3.4): la lista con quién usa cada
- * uno y, en «Nuevo», los típicos del CTE con un clic y las «Hipótesis típicas» de una vez. La ficha
+ * uno y, en «Nuevo», los típicos del CTE con un clic y los «Casos típicos» de una vez. La ficha
  * de un caso es su formulario (el del inspector, con las columnas de la tabla Casos).
  *
  * Lo que decide (los típicos, reutilizar uno con la misma acción, los ids libres) sale de
@@ -101,7 +101,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
   const crearJuego = () => {
     if (!delJuego.ok) return setError(delJuego.mensaje);
     if (!delJuego.nuevos.length) return setAviso(`Ya están todos: ${delJuego.reutilizados.join(", ")}.`);
-    if (!terminar(delJuego.nuevos[0]!, delJuego.operaciones, `Hipótesis típicas: ${delJuego.nuevos.join(", ")}`)) return;
+    if (!terminar(delJuego.nuevos[0]!, delJuego.operaciones, `Casos típicos: ${delJuego.nuevos.join(", ")}`)) return;
     setAviso(`Creados ${delJuego.nuevos.join(", ")}${delJuego.reutilizados.length ? `; ya estaban ${delJuego.reutilizados.join(", ")}` : ""}.`);
   };
 
@@ -164,7 +164,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
               {!pedido.alElegir && (
                 <>
                   <p className="dlg-et" style={{ marginTop: 0 }}>
-                    Hipótesis típicas: el juego de una vez
+                    Casos típicos: el juego de una vez
                   </p>
                   <p className="ges-para">Crea de una vez los casos que pide casi cualquier edificio, con su acción y sus ψ del CTE. Los que ya estén se reutilizan.</p>
                   <div className="ges-cuerpo">
@@ -186,7 +186,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
                       </div>
                       <label className="campo">
                         <span>uso</span>
-                        <select className="sel" aria-label="Uso de las hipótesis" value={juego.uso ?? ""} onChange={(e) => poner({ uso: (e.target.value || null) as CategoriaUso | null })}>
+                        <select className="sel" aria-label="Uso de los casos típicos" value={juego.uso ?? ""} onChange={(e) => poner({ uso: (e.target.value || null) as CategoriaUso | null })}>
                           <option value="">(sin sobrecarga de uso)</option>
                           {USOS.map((u) => (
                             <option key={u} value={u}>
@@ -197,7 +197,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
                       </label>
                       <label className="campo">
                         <span>nieve</span>
-                        <select className="sel" aria-label="Nieve de las hipótesis" value={juego.nieve ?? ""} onChange={(e) => poner({ nieve: (e.target.value || null) as JuegoCasos["nieve"] })}>
+                        <select className="sel" aria-label="Nieve de los casos típicos" value={juego.nieve ?? ""} onChange={(e) => poner({ nieve: (e.target.value || null) as JuegoCasos["nieve"] })}>
                           <option value="">(sin nieve)</option>
                           <option value="hasta-1000">hasta 1000 m de altitud</option>
                           <option value="mas-de-1000">más de 1000 m de altitud</option>
@@ -211,7 +211,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
                           : `${delJuego.nuevos.length ? `Se crean ${delJuego.nuevos.join(", ")}.` : "No se crea ninguno."}${delJuego.reutilizados.length ? ` Ya están: ${delJuego.reutilizados.join(", ")}.` : ""}`}
                       </p>
                       <button type="button" className="btn btn-p mt-2" disabled={!delJuego.ok || !delJuego.nuevos.length} onClick={crearJuego}>
-                        Crear las hipótesis
+                        Crear los casos
                       </button>
                     </div>
                   </div>

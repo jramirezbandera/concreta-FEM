@@ -303,7 +303,11 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     const g = hoja("pilares");
     const filas = g.querySelectorAll("tbody tr");
     const jx = DEF_TABLAS.pilares.columnas.findIndex((c) => c.clave === "x");
-    fireEvent.mouseDown(filas[filas.length - 1]!.querySelectorAll("td")[jx + 1]!);
+    const celdaX = filas[filas.length - 1]!.querySelectorAll("td")[jx + 1]!;
+    fireEvent.mouseDown(celdaX);
+    // C-17: la hoja anuncia su celda activa
+    expect(g.getAttribute("aria-activedescendant")).toBe(celdaX.id);
+    expect(celdaX.getAttribute("aria-selected")).toBe("true");
     fireEvent.paste(g, { clipboardData: { getData: () => "6\t0\tCim\tN1\tP30\n0\t5\tCim\tN1\tP30\n6\t5\tCim\tN1\tP30\n" } });
 
     elegirTabla("vigas");

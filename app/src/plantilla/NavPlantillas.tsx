@@ -44,7 +44,8 @@ export function NavPlantillas({ pl, herramienta, error }: Props) {
   const cambiar = (t: PlantillaDxf, nueva: PlantillaDxf, etiqueta: string) => ed.editar({ op: "plantillas", plantillas: lista.map((x) => (x.nombre === t.nombre ? nueva : x)) }, etiqueta);
   return (
     <Seccion titulo="Plantillas DXF" valor={lista.length || undefined}>
-      {!lista.length && <p className="nota">Un plano DXF en gris detrás de la planta, para calcar con sus enganches: «Plantilla DXF» en la barra.</p>}
+      {/* M-23: vacía, lo justo */}
+      {!lista.length && <p className="nota">Ninguna. Un plano DXF en gris detrás de la planta, para calcar: «Plantilla DXF» en la barra.</p>}
       {error && <p className="nota text-state-fail">{error}</p>}
       {lista.map((t) => (
         <Ficha key={t.nombre} t={t} abierta={abierta === t.nombre} alternar={() => setAbierta(abierta === t.nombre ? null : t.nombre)} pl={pl} cambiar={(n, e) => cambiar(t, n, e)} quitar={() => ed.editar({ op: "plantillas", plantillas: lista.filter((x) => x.nombre !== t.nombre) }, `Quitar la plantilla «${t.nombre}»`)} herramienta={(h) => herramienta(h, t.nombre)} />
@@ -67,6 +68,7 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
     cambiar(n.length ? { ...resto, ocultas: [...n] } : resto, `Capas de la plantilla «${t.nombre}»`);
   };
   const [aviso, setAviso] = useState<string | null>(null);
+  const fichero = useRef<HTMLInputElement>(null);
 
   /** El fichero elegido otra vez: si es el mismo, se vuelve a leer; si no, la plantilla pasa a él. */
   const elegirFichero = async (f: File) => {
@@ -112,10 +114,10 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-text-secondary">Capas (las que se ven y enganchan)</span>
-                <button type="button" className="ib-chip ml-auto" style={{ width: "auto", padding: "0 6px" }} disabled={!ocultas.size} onClick={() => ponerOcultas([])}>
+                <button type="button" className="ib-chip ib-texto ml-auto" disabled={!ocultas.size} onClick={() => ponerOcultas([])}>
                   Todas
                 </button>
-                <button type="button" className="ib-chip" style={{ width: "auto", padding: "0 6px" }} disabled={visibles === 0} onClick={() => ponerOcultas(conEntidades.map((c) => c.nombre))}>
+                <button type="button" className="ib-chip ib-texto" disabled={visibles === 0} onClick={() => ponerOcultas(conEntidades.map((c) => c.nombre))}>
                   Ninguna
                 </button>
               </div>
@@ -134,10 +136,15 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
             <span className="mono truncate" title={`sha256 ${t.sha256}`}>
               {t.fichero}
             </span>
-            <label className="ib-chip" style={{ cursor: "pointer", width: "auto", padding: "0 6px" }} title="Elegir el fichero DXF (el mismo, si falta, u otra versión del plano)">
+            {/* C-21: un botón (con Tab y su foco) que abre el input oculto, como «Plantilla DXF» de la barra */}
+            <button type="button" className="ib-chip ib-texto" aria-label={`Elegir el fichero de la plantilla ${t.nombre}`} title="Elegir el fichero DXF (el mismo, si falta, u otra versión del plano)" onClick={() => fichero.current?.click()}>
               Elegir…
-              <input type="file" accept=".dxf" hidden aria-label={`Elegir el fichero de la plantilla ${t.nombre}`} onChange={(x) => x.target.files?.[0] && void elegirFichero(x.target.files[0])} />
-            </label>
+            </button>
+            <input ref={fichero} type="file" accept=".dxf" hidden tabIndex={-1} aria-hidden="true" onChange={(x) => {
+              const f = x.target.files?.[0];
+              x.target.value = "";
+              if (f) void elegirFichero(f);
+            }} />
           </Linea>
           {est?.tipo === "falta" && <p className="nota">No está en este navegador ni junto al proyecto: elíjalo.</p>}
           {est?.tipo === "error" && <p className="nota text-state-fail">{est.mensaje}</p>}

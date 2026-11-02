@@ -6,7 +6,7 @@
  *   ?proyecto=<url del proyecto en el servidor local>   (se vigila, como una carpeta)
  *   ?ejemplo=<nombre>                                    (uno de EJEMPLOS)
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, Download, FilePlus, FolderOpen, History, Trash2, Upload } from "lucide-react";
 import { leerProyecto } from "../../src/agente/proyecto.ts";
 import { proyectoNuevo } from "../../src/editor/plantilla.ts";
@@ -53,13 +53,16 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
   const [borrando, setBorrando] = useState<string | null>(null);
   const [versionesDe, setVersionesDe] = useState<Ficha | null>(null);
   const [persiste, setPersiste] = useState<boolean | null>(null);
+  /** C-13: creando o importando en el navegador (la ref, para el segundo envío del mismo instante). */
+  const [creando, setCreando] = useState(false);
+  const creandoRef = useRef(false);
   const ocupado = proyecto.fase === "abriendo" || proyecto.fase === "calculando";
   const almacen = hayAlmacen();
 
   const releer = useCallback(() => {
     if (!almacen) return;
     listar().then(setMios, (e: unknown) => setError(`No se pudo leer la lista de proyectos del navegador: ${mensaje(e)}`));
-    void persistente().then(setPersiste);
+    persistente().then(setPersiste, () => setPersiste(null));
   }, [almacen]);
   useEffect(releer, [releer]);
 
@@ -81,38 +84,74 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
 
   /** Proyecto nuevo, en el navegador; sin IndexedDB (algún modo privado), se abre y guardar lo descarga. */
   const crearNuevo = async () => {
-    if (nuevo === null) return;
+    // C-13: un doble clic en «Crear» (o Intro dos veces) creaba dos proyectos
+    if (nuevo === null || creandoRef.current) return;
     const nombre = nuevo.trim() || "Proyecto nuevo";
     const texto = serializar(proyectoNuevo(nombre));
     // Lo primero de una obra nueva son sus plantas: el gestor se abre en cuanto el editor lo esté
     abrirGestor({ coleccion: "plantas", inicio: true });
     if (!almacen) return proyecto.abrirTexto(texto, nombreFichero(nombre));
+    creandoRef.current = true;
+    setCreando(true);
     try {
       abrir(await crear(texto));
     } catch (e) {
       cerrarGestor();
       setError(`No se pudo crear el proyecto en el navegador: ${mensaje(e)}`);
+    } finally {
+      creandoRef.current = false;
+      setCreando(false);
     }
   };
 
   /** Importar: un proyecto válido pasa al navegador; uno que no pasa el esquema se abre sin guardar, con sus errores. */
   const importar = async (f: File | undefined) => {
-    if (!f) return;
+    if (!f || creandoRef.current) return;
     setError(null);
-    const texto = await f.text();
-    const l = leerProyecto(texto);
-    if (!l.valido || !almacen) return proyecto.abrirTexto(texto, f.name);
+    creandoRef.current = true;
+    setCreando(true);
     try {
+      const texto = await f.text();
+      const l = leerProyecto(texto);
+      if (!l.valido || !almacen) return proyecto.abrirTexto(texto, f.name);
       // Se guarda el texto canónico (el mismo contenido y la misma huella)
       abrir(await crear(serializar(l.proyecto), f.name.replace(/\.json$/i, "")));
     } catch (e) {
       setError(`No se pudo importar ${f.name}: ${mensaje(e)}`);
+    } finally {
+      creandoRef.current = false;
+      setCreando(false);
     }
   };
 
+  // C-11: las acciones de la lista dicen por qué fallan (IndexedDB, el ejemplo sin conexión); antes el botón no hacía nada
   const exportar = async (x: Ficha) => {
-    const l = await leer(x.id);
-    if (l) descargar(l.texto, nombreFichero(x.nombre));
+    try {
+      const l = await leer(x.id);
+      if (l) descargar(l.texto, nombreFichero(x.nombre));
+      else setError(`No se pudo exportar ${x.nombre}: ya no está en este navegador.`);
+    } catch (e) {
+      setError(`No se pudo exportar ${x.nombre}: ${mensaje(e)}`);
+    }
+  };
+  const borrarProyecto = (x: Ficha) =>
+    borrar(x.id).then(
+      () => {
+        setBorrando(null);
+        releer();
+      },
+      (e: unknown) => {
+        setBorrando(null);
+        setError(`No se pudo borrar ${x.nombre}: ${mensaje(e)}`);
+      },
+    );
+  const duplicarProyecto = (x: Ficha) => duplicar(x.id).then(releer, (e: unknown) => setError(`No se pudo duplicar ${x.nombre}: ${mensaje(e)}`));
+  const abrirEjemplo = (k: string, e: { cargar: () => Promise<string> }) => {
+    setError(null);
+    e.cargar().then(
+      (t) => proyecto.abrirTexto(t, `${k}.json`),
+      (x: unknown) => setError(`No se pudo cargar el ejemplo (¿sin conexión?): ${mensaje(x)}`),
+    );
   };
 
   return (
@@ -142,12 +181,20 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
 
         <div className="flex flex-col gap-2 px-5 py-4">
           <div className="flex gap-2">
-            <button type="button" className="btn btn-p flex-1" style={{ height: 34 }} onClick={() => setNuevo(nuevo === null ? "" : null)} disabled={ocupado}>
+            <button type="button" className="btn btn-p btn-grande flex-1" onClick={() => setNuevo(nuevo === null ? "" : null)} disabled={ocupado}>
               <FilePlus size={15} /> Proyecto nuevo…
             </button>
-            <label className={`btn flex-1 ${ocupado ? "opacity-50" : ""}`} style={{ height: 34, justifyContent: "center" }}>
+            {/* C-21: el foco está en el input (sr-only); el anillo lo pinta `.btn:has(> input:focus-visible)` */}
+            <label className={`btn btn-grande flex-1 ${ocupado || creando ? "opacity-50" : ""}`}>
               <Upload size={15} /> Importar un proyecto.json (o arrastrarlo aquí)…
-              <input type="file" accept=".json,application/json" className="sr-only" onChange={(e) => void importar(e.target.files?.[0])} disabled={ocupado} />
+              <input type="file" accept=".json,application/json" className="sr-only" onChange={(e) => {
+                  // Vaciado, para que volver a elegir el mismo fichero tras un error lo vuelva a leer (C-37)
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  void importar(f);
+                }}
+                disabled={ocupado || creando}
+              />
             </label>
           </div>
           {nuevo !== null && (
@@ -160,8 +207,8 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
             >
               <span className="text-[12px] text-text-secondary">{almacen ? "Nombre:" : "Este navegador no guarda proyectos (¿modo privado?): guardar lo descargará. Nombre:"}</span>
               <input className="sel flex-1" autoFocus aria-label="Nombre del proyecto" placeholder="Proyecto nuevo" value={nuevo} onChange={(e) => setNuevo(e.target.value)} />
-              <button type="submit" className="btn btn-p">
-                Crear
+              <button type="submit" className="btn btn-p" disabled={creando}>
+                {creando ? "Creando…" : "Crear"}
               </button>
             </form>
           )}
@@ -183,7 +230,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
             {mios?.length === 0 && <p className="mt-1 text-[12px] text-text-secondary">Aún no hay ninguno en este navegador. Empiece uno nuevo, importe un proyecto.json o abra un ejemplo.</p>}
             <ul className="mt-1 list-none p-0">
               {mios?.map((x) => (
-                <li key={x.id} className="flex items-center gap-2 border-t border-border-sub first:border-t-0">
+                <li key={x.id} className="flex min-h-10 items-center gap-2 border-t border-border-sub first:border-t-0">
                   {borrando === x.id ? (
                     <>
                       <span className="min-w-0 flex-1 py-1.5 text-[12px]">
@@ -192,12 +239,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
                       <button
                         type="button"
                         className="btn btn-peligro"
-                        onClick={() =>
-                          void borrar(x.id).then(() => {
-                            setBorrando(null);
-                            releer();
-                          })
-                        }
+                        onClick={() => void borrarProyecto(x)}
                       >
                         Borrar
                       </button>
@@ -207,19 +249,19 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
                     </>
                   ) : (
                     <>
-                      <button type="button" className="min-w-0 flex-1 truncate py-1.5 text-left text-[13px] text-accent hover:underline disabled:opacity-50" disabled={ocupado} onClick={() => abrir(x)} title={`Abrir ${x.nombre}`}>
+                      <button type="button" className="min-w-0 flex-1 truncate py-2 text-left text-[13px] font-medium text-text-primary hover:text-accent hover:underline disabled:opacity-50" disabled={ocupado} onClick={() => abrir(x)} title={`Abrir ${x.nombre}`}>
                         {x.nombre}
                       </button>
                       <span className="mono shrink-0 text-[11px] text-text-secondary">{fechaCorta(x.modificado)}</span>
                       <span className="mono w-14 shrink-0 text-right text-[11px] text-text-muted">{tamano(x.tamano)}</span>
                       <span className="flex shrink-0">
-                        <button type="button" className="ib" aria-label={`Exportar ${x.nombre}`} title="Exportar el proyecto.json" onClick={() => void exportar(x)}>
+                        <button type="button" className="ib" aria-label={`Exportar ${x.nombre}`} title={`Exportar: descarga «${nombreFichero(x.nombre)}»`} onClick={() => void exportar(x)}>
                           <Download size={15} />
                         </button>
                         <button type="button" className="ib" aria-label={`Versiones de ${x.nombre}`} title="Versiones anteriores" onClick={() => setVersionesDe(x)}>
                           <History size={15} />
                         </button>
-                        <button type="button" className="ib" aria-label={`Duplicar ${x.nombre}`} title="Duplicar" onClick={() => void duplicar(x.id).then(releer)}>
+                        <button type="button" className="ib" aria-label={`Duplicar ${x.nombre}`} title="Duplicar" onClick={() => void duplicarProyecto(x)}>
                           <Copy size={15} />
                         </button>
                         <button type="button" className="ib" aria-label={`Borrar ${x.nombre}`} title="Borrar" onClick={() => setBorrando(x.id)}>
@@ -236,10 +278,11 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
 
         <div className="border-t border-border-sub px-5 py-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Ejemplos del repositorio · se abren sin guardar</div>
-          <ul className="mt-1 list-none p-0">
+          {/* D-29: tarjetas pequeñas en el color del texto; el azul, sólo al pasar */}
+          <ul className="mt-2 grid list-none grid-cols-1 gap-1.5 p-0 sm:grid-cols-2">
             {Object.entries(EJEMPLOS).map(([k, e]) => (
-              <li key={k}>
-                <button type="button" className="w-full py-1 text-left text-accent hover:underline disabled:opacity-50" disabled={ocupado} onClick={() => void e.cargar().then((t) => proyecto.abrirTexto(t, `${k}.json`))}>
+              <li key={k} className="flex">
+                <button type="button" className="w-full rounded-md border border-border-sub bg-bg-primary px-2.5 py-2 text-left text-[12px] leading-snug text-text-primary hover:border-accent hover:text-accent disabled:opacity-50" disabled={ocupado} onClick={() => abrirEjemplo(k, e)}>
                   {e.titulo}
                 </button>
               </li>
@@ -251,6 +294,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">En el disco, para trabajar con el agente</div>
           <p className="mt-1">
             El agente y la CLI leen el proyecto.json del disco. Para trabajar los dos sobre el mismo fichero, ábralo desde su carpeta (se recarga solo cuando el agente lo cambia) o con <span className="mono">bun run visor proyecto.json</span>.
+            {/* P-28: lo exportado lleva el nombre del proyecto (varios en Descargas no se pisan) */} Exportar descarga el proyecto con su nombre («Nave.json»): la CLI y el visor lo leen igual con ese nombre, o renómbrelo a proyecto.json.
           </p>
           <button type="button" className="btn mt-2" onClick={() => void carpeta()} disabled={!hayCarpetas() || ocupado} title={hayCarpetas() ? undefined : "Hace falta Chrome o Edge"}>
             <FolderOpen size={15} /> Abrir una carpeta…

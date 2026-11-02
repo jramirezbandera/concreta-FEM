@@ -43,7 +43,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import type { Capa, EscenaPreparada } from "../../../src/visor/escena.ts";
-import { pintura } from "../lienzo/pintura.ts";
+import { pintura, rellenoTema } from "../lienzo/pintura.ts";
 import type { Theme } from "../tema/types.ts";
 
 /** De x, y por vértice a x, y, z (z = 0). */
@@ -166,7 +166,8 @@ export class Capas2D {
 
   private rellenar(c: Capa, tema: Theme, orden: { n: number }): void {
     const p = pintura(c.estilo, tema);
-    const color = c.relleno ?? p.fill;
+    // R-28: los datos (bandas, zonas), aclarados en el tema oscuro
+    const color = c.relleno ? rellenoTema(c.relleno, tema) : p.fill;
     if (color && color !== "none") for (const m of relleno(c.abanicos, c.caja, color, p.opacity ?? 1, orden, this.mat)) this.grupo.add(m);
   }
 
@@ -174,7 +175,7 @@ export class Capas2D {
     const p = pintura(c.estilo, tema);
     if (c.forma !== "trazo" && conRelleno) this.rellenar(c, tema, orden);
     // Las bandas, con un trazo de su color que tapa las juntas del antialias (como el SVG de V1)
-    const color = c.forma === "region" ? c.relleno : p.stroke;
+    const color = c.forma === "region" ? c.relleno && rellenoTema(c.relleno, tema) : p.stroke;
     const grosor = c.forma === "region" ? 0.6 : (p.sw ?? 1);
     if (!color) return;
     const l = trazo(c.segmentos, color, grosor, orden, this.mat, raya(p.dash));

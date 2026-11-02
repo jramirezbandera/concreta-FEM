@@ -14,7 +14,7 @@
  * Cada celda se lee y se escribe con las funciones puras de `src/editor/` (`tablas.ts`,
  * `edicion.ts`): lo que se ve es lo que se guarda, y un dato que no vale no entra (se dice por qué).
  */
-import { memo, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, ClipboardCopy, CopyPlus, Layers, Plus, Trash2 } from "lucide-react";
 import type { Fila as FilaTexto } from "../../../src/editor/celdas.ts";
 import { escribirTsv } from "../../../src/editor/celdas.ts";
@@ -28,7 +28,8 @@ import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import { useVisor } from "../contexto.ts";
 import { DialogoBorrar, DialogoCopiar } from "./Dialogos.tsx";
 import { abrirGestor, esDelGestor, OpcionesGestor, pedidoCampo, type ColeccionGestor } from "./referencia.tsx";
-import { textoApp } from "../fmt.ts";
+import { plural, textoApp } from "../fmt.ts";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 type Mensaje = { tono: "fail" | "ok" | "neu"; texto: string } | null;
 
@@ -180,6 +181,7 @@ const FilaHoja = memo(function FilaHoja({
   onMarca,
   onEditar,
   onValor,
+  idCelda,
 }: {
   vista: FilaVista;
   indice: number;
@@ -205,14 +207,16 @@ const FilaHoja = memo(function FilaHoja({
   /** `desplegar`: con el desplegable, si la columna lo tiene. */
   onEditar: (f: number, c: number, inicial?: string, desplegar?: boolean) => void;
   onValor: (v: string) => void;
+  /** C-17: el id de la celda (f, c), para el `aria-activedescendant` de la hoja. */
+  idCelda: (f: number, c: number) => string;
 }) {
   return (
-    <tr data-sel={sel} data-elegido={elegido} data-id={vista.id} data-pendiente={!!faltan}>
-      <td className={`marca ${diag?.sev ?? ""}`} title={diag ? diag.textos.join("\n") : `Fila ${indice + 1}`} onClick={(e) => onMarca(indice, e.shiftKey)}>
+    <tr role="row" aria-selected={sel} data-sel={sel} data-elegido={elegido} data-id={vista.id} data-pendiente={!!faltan}>
+      <td role="rowheader" className={`marca ${diag?.sev ?? ""}`} title={diag ? diag.textos.join("\n") : `Fila ${indice + 1}`} onClick={(e) => onMarca(indice, e.shiftKey)}>
         {diag ? (diag.sev === "f" ? "!" : "·") : indice + 1}
       </td>
       {claves.map((k, c) => (
-        <td key={k} className={calculadas[c] ? "calc" : faltan?.has(k) ? "falta" : aplica && !vista.fila[k] && !aplica(k, vista.fila) ? "na" : undefined} data-activa={activa === c && !error} data-error={activa === c && error} title={vista.fila[k] || undefined} onMouseDown={(e) => onCelda(indice, c, e.shiftKey)} onDoubleClick={() => onEditar(indice, c, undefined, true)}>
+        <td key={k} id={idCelda(indice, c)} role="gridcell" aria-selected={activa === c} aria-invalid={activa === c && error ? true : undefined} className={calculadas[c] ? "calc" : faltan?.has(k) ? "falta" : aplica && !vista.fila[k] && !aplica(k, vista.fila) ? "na" : undefined} data-activa={activa === c && !error} data-error={activa === c && error} title={vista.fila[k] || undefined} onMouseDown={(e) => onCelda(indice, c, e.shiftKey)} onDoubleClick={() => onEditar(indice, c, undefined, true)}>
           {contenidoCelda({
             texto: vista.fila[k] ?? "",
             editando: activa === c ? editando : null,
@@ -293,6 +297,9 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
   const [mensaje, setMensaje] = useState<Mensaje>(null);
   const [dialogo, setDialogo] = useState<{ tipo: "borrar" | "copiar"; ids: string[] } | null>(null);
   const hoja = useRef<HTMLDivElement>(null);
+  // C-17: ids de las celdas (estables, para que `FilaHoja` siga memorizada)
+  const prefijoId = useId();
+  const idCelda = useMemo(() => (f: number, c: number) => `${prefijoId}-${f}-${c}`, [prefijoId]);
   const nBorrador = filas.length;
   const f0 = Math.min(cursor.f, nBorrador);
   const c0 = Math.min(cursor.c, cols.length - 1);
@@ -589,8 +596,8 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
       return;
     }
     const n = t.operacion.op === "lote" ? t.operacion.operaciones.length : 1;
-    const r = ed.editar(t.operacion, `Pegar ${n} fila${n === 1 ? "" : "s"} en ${def.titulo.toLowerCase()}`);
-    setMensaje(r.ok ? { tono: "ok", texto: `Pegadas ${n} filas.` } : { tono: "fail", texto: `No se pegó nada: ${r.errores.map((x) => x.mensaje).join(" ")}` });
+    const r = ed.editar(t.operacion, `Pegar ${plural(n, "fila")} en ${def.titulo.toLowerCase()}`);
+    setMensaje(r.ok ? { tono: "ok", texto: `${n === 1 ? "Pegada" : "Pegadas"} ${plural(n, "fila")}.` } : { tono: "fail", texto: `No se pegó nada: ${r.errores.map((x) => x.mensaje).join(" ")}` });
   };
 
   const alCopiar = (e: ClipboardEvent<HTMLDivElement>) => {
@@ -600,13 +607,13 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     else {
       const fs = filas.slice(rango[0], Math.min(rango[1], nBorrador - 1) + 1);
       e.clipboardData.setData("text/plain", escribirTsv([claves, ...fs.map((x) => claves.map((k) => x.fila[k] ?? ""))]));
-      setMensaje({ tono: "ok", texto: `Copiadas ${fs.length} filas con su cabecera: péguelas en Excel, o aquí para cambiarlas por su id.` });
+      setMensaje({ tono: "ok", texto: `${fs.length === 1 ? "Copiada" : "Copiadas"} ${plural(fs.length, "fila")} con su cabecera: ${fs.length === 1 ? "péguela" : "péguelas"} en Excel, o aquí para cambiarlas por su id.` });
     }
   };
 
   const copiarTabla = () => {
     void navigator.clipboard.writeText(escribirTsv([claves, ...filas.map((x) => claves.map((k) => x.fila[k] ?? ""))])).then(
-      () => setMensaje({ tono: "ok", texto: `Tabla copiada (${filas.length} filas, con cabecera).` }),
+      () => setMensaje({ tono: "ok", texto: `Tabla copiada (${plural(filas.length, "fila")}, con cabecera).` }),
       () => setMensaje({ tono: "fail", texto: "El navegador no dejó copiar al portapapeles." }),
     );
   };
@@ -634,6 +641,26 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
   };
 
   const diag = useMemo(() => diagnosticosPorObjeto(proyecto.estado?.diagnosticos ?? []), [proyecto.estado]);
+
+  // C-39: lo que las filas llaman, con la versión de este render pero estable entre renders, para que
+  // `FilaHoja` siga memorizada al escribir (antes cada tecla rehacía `onCelda` y repintaba todas las filas)
+  const manejar = useRef<{ celda: (f: number, c: number, mayus: boolean) => void; marca: (f: number, mayus: boolean) => void; editar: typeof empezar } | null>(null);
+  useLayoutEffect(() => {
+    manejar.current = {
+      celda: (f, c, mayus) => {
+        if (editando !== null && !(f === f0 && c === c0)) {
+          if (desplegado) cerrar();
+          else confirmar(0, 0);
+        }
+        mover(f, c, mayus);
+      },
+      marca: (f, mayus) => mover(f, c0, mayus),
+      editar: empezar,
+    };
+  });
+  const onCeldaFila = useCallback((f: number, c: number, mayus: boolean) => manejar.current?.celda(f, c, mayus), []);
+  const onMarcaFila = useCallback((f: number, mayus: boolean) => manejar.current?.marca(f, mayus), []);
+  const onEditarFila = useCallback((f: number, c: number, inicial?: string, desplegar?: boolean) => manejar.current?.editar(f, c, inicial, desplegar), []);
   const col = cols[c0]!;
   const faltanBorrador = useMemo(() => {
     if (Object.values(borrador).every((x) => x.trim() === "")) return new Set<string>();
@@ -646,13 +673,13 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-border-main bg-bg-primary" aria-label="Tablas del modelo">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-sub bg-bg-surface px-2 py-1.5">
-        <div className="seg max-w-full" style={{ overflowX: "auto" }} role="tablist" aria-label="Tabla">
+        <Grupo rol="tablist" etiqueta="Tabla" className="seg max-w-full" style={{ overflowX: "auto" }}>
           {TABLAS.map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={t === tabla} data-on={t === tabla} onClick={() => setTabla(t)}>
+            <button key={t} type="button" role="tab" aria-selected={t === tabla} aria-controls={t === tabla ? `${prefijoId}-hoja` : undefined} data-on={t === tabla} onClick={() => setTabla(t)}>
               {DEF_TABLAS[t].titulo} <span className="mono text-[11px] text-text-muted">{contar(t)}</span>
             </button>
           ))}
-        </div>
+        </Grupo>
         {POR_PLANTA.has(tabla) && (
           <label className="chk" style={{ padding: 0 }}>
             <input type="checkbox" checked={soloPlanta} onChange={(e) => setSoloPlanta(e.target.checked)} /> sólo {planta ?? "la planta activa"}
@@ -677,10 +704,10 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         </button>
         {CON_ORDEN.has(tabla) && (
           <>
-            <button type="button" className="btn" style={{ width: 28, padding: 0 }} onClick={() => moverOrden(-1)} disabled={f0 === 0 || f0 >= nBorrador} aria-label="Subir">
+            <button type="button" className="btn btn-cuadrado" onClick={() => moverOrden(-1)} disabled={f0 === 0 || f0 >= nBorrador} aria-label="Subir">
               <ArrowUp size={13} />
             </button>
-            <button type="button" className="btn" style={{ width: 28, padding: 0 }} onClick={() => moverOrden(1)} disabled={f0 >= nBorrador - 1} aria-label="Bajar">
+            <button type="button" className="btn btn-cuadrado" onClick={() => moverOrden(1)} disabled={f0 >= nBorrador - 1} aria-label="Bajar">
               <ArrowDown size={13} />
             </button>
           </>
@@ -698,20 +725,21 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         </button>
       </div>
 
-      <div ref={hoja} className="min-h-0 flex-1 overflow-auto outline-none" tabIndex={0} onKeyDown={teclas} onPaste={alPegar} onCopy={alCopiar} role="grid" aria-label={`Tabla de ${def.titulo.toLowerCase()}`} aria-rowcount={filas.length + 1}>
-        <table className="hoja">
-          <thead>
-            <tr>
-              <th className="marca" />
+      <div ref={hoja} id={`${prefijoId}-hoja`} className="min-h-0 flex-1 overflow-auto outline-none" tabIndex={0} onKeyDown={teclas} onPaste={alPegar} onCopy={alCopiar} role="grid" aria-label={`Tabla de ${def.titulo.toLowerCase()}`} aria-rowcount={filas.length + 1} aria-activedescendant={idCelda(f0, c0)}>
+        {/* C-17: la tabla es la rejilla del div (con el foco): filas y celdas con su rol, y la activa por `aria-activedescendant` */}
+        <table className="hoja" role="presentation">
+          <thead role="presentation">
+            <tr role="row">
+              <th role="columnheader" className="marca" aria-label="Fila" />
               {cols.map((c) => (
-                <th key={c.clave} title={c.ayuda} className={c.clave === "nu" ? "nu" : undefined}>
+                <th key={c.clave} role="columnheader" title={c.ayuda} className={c.clave === "nu" ? "nu" : undefined}>
                   {c.titulo}
                   <small>{c.unidad ?? " "}</small>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody role="presentation">
             {filas.map((v, i) => (
               <FilaHoja
                 key={v.id}
@@ -729,25 +757,23 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
                 desplegable={i === f0 ? desplegable : null}
                 error={i === f0 && error}
                 diag={diag.get(v.id)}
-                onCelda={(f, c, mayus) => {
-                  if (editando !== null && !(f === f0 && c === c0)) {
-                    if (desplegado) cerrar();
-                    else confirmar(0, 0);
-                  }
-                  mover(f, c, mayus);
-                }}
-                onMarca={(f, mayus) => mover(f, c0, mayus)}
-                onEditar={empezar}
+                onCelda={onCeldaFila}
+                onMarca={onMarcaFila}
+                onEditar={onEditarFila}
                 onValor={setEditando}
+                idCelda={idCelda}
               />
             ))}
-            <tr className="borrador" data-sel={f0 === nBorrador}>
-              <td className="marca" title="Fila nueva: el objeto se crea cuando tiene lo que necesita">
+            <tr role="row" aria-selected={f0 === nBorrador} className="borrador" data-sel={f0 === nBorrador}>
+              <td role="rowheader" className="marca" title="Fila nueva: el objeto se crea cuando tiene lo que necesita">
                 +
               </td>
               {cols.map((c, j) => (
                 <td
                   key={c.clave}
+                  id={idCelda(nBorrador, j)}
+                  role="gridcell"
+                  aria-selected={f0 === nBorrador && c0 === j}
                   className={`${c.calculada ? "calc" : ""} ${faltanBorrador.has(c.clave) ? "falta" : ""} ${def.aplica && !borrador[c.clave] && !def.aplica(c.clave, borrador) ? "na" : ""}`}
                   data-activa={f0 === nBorrador && c0 === j && !error}
                   data-error={f0 === nBorrador && c0 === j && error}

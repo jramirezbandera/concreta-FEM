@@ -13,6 +13,14 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { FormularioObjeto, tablaDe } from "../editor/Formulario.tsx";
 import { objetosTabla } from "../../../src/editor/tablas.ts";
 
+/** La longitud de una polilínea del proyecto, m, y su número de tramos; null si no lo es. */
+function longitudPolilinea(ps: unknown): { L: number; n: number } | null {
+  if (!Array.isArray(ps) || ps.length < 2 || !ps.every((p) => Array.isArray(p) && typeof p[0] === "number" && typeof p[1] === "number")) return null;
+  let L = 0;
+  for (let i = 1; i < ps.length; i++) L += Math.hypot(ps[i][0] - ps[i - 1][0], ps[i][1] - ps[i - 1][1]);
+  return { L, n: ps.length - 1 };
+}
+
 /** El tipo de un objeto como lo llama la app: losas y paños son forjados, con su tipo (la tabla Forjados). */
 export function etiquetaTipo(o: { tipo: string; datos: Record<string, unknown> }): string {
   if (o.tipo === "losa") return `forjado · ${o.datos.reticular ? "reticular" : "losa maciza"}`;
@@ -55,6 +63,9 @@ export function Inspector({ id }: { id: string }) {
   const plantasIds = e.plantas.map((p) => p.id);
   const ed = proyecto.edicion;
   const tabla = ed ? tablaDe(ed.proyecto.modelo, id) : null;
+  // M-32: la longitud de una viga, un muro o un apoyo lineal y sus tramos, en la cabecera («puntos» es un texto)
+  const local = ed && tabla ? objetosTabla(ed.proyecto.modelo, tabla).find((x) => x.id === id) : undefined;
+  const largo = longitudPolilinea(((local ?? o?.datos) as { puntos?: unknown } | undefined)?.puntos);
 
   /** Planta donde mirar el objeto: la suya o, en un pilar o un muro, la actual si la atraviesa (si no, la de arriba). */
   const localizar = () => {
@@ -72,7 +83,7 @@ export function Inspector({ id }: { id: string }) {
 
   return (
     <>
-      <Cabecera icono={(o && ICONO_TIPO[o.tipo]) ?? Box} tipo={o ? etiquetaTipo(o) : "objeto"} titulo={id} mono>
+      <Cabecera icono={(o && ICONO_TIPO[o.tipo]) ?? Box} tipo={o ? etiquetaTipo(o) : "objeto"} titulo={id} mono detalle={largo ? `${fmt(largo.L, 2)} m${largo.n > 1 ? ` en ${largo.n} tramos` : ""}` : undefined}>
         <button type="button" className="btn" onClick={localizar} disabled={!o && !tabla} title="Ir a la planta del objeto">
           <Crosshair size={14} />
           Localizar

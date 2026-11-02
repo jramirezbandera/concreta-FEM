@@ -682,6 +682,10 @@
   - **UI-32:** firmar en la web, con el nombre y «He revisado el informe»; cada firma lleva `NOTA_VALIDACION` (periodo en sombra). `Origen.escribirFichero` también deja `proyecto.json.bak` antes de sobrescribir.
   - **UI-41, M-15, UI-49, D-19 y D-22:** retícula de ejes por luces, plantilla de Hueco por grupos, chip de la herramienta en una línea, versiones con lo que cambió, plantas en Renumerar, escala de letra de cinco tamaños, gestores con la misma cabecera.
   - **Quedan:** el modelo de confirmar de los gestores y los bajos de §3.3. Los bancos de Chrome no se han pasado.
+- **2026-11-02: los gestores y los bajos de la auditoría de la interfaz** (`auditoria-ui.md` §7):
+  - **D-19 (decisión del usuario):** todos los gestores confirman con «Aplicar», en un paso de deshacer y preguntando antes de tirar lo escrito; Casos y los datos de una planta, con `FormularioObjeto` `diferido`. La fila de un caso sin nombre, en una línea.
+  - **Bajos de §3.3:** casi todos hechos; a medias R-27, R-33, M-32, C-35, D-24, D-26, D-28 y D-29. Lo que más cambia: progreso y «Cancelar» del cálculo (R-25), el informe empieza por el Veredicto (P-31: cambia su sha256), el aviso `sensatez/lejos` (M-26), pestañas y radios con teclado (`Grupo.tsx`) y «Casos típicos» y «Supuestos del cálculo» en los textos (C-30).
+  - Los bancos de Chrome no se han pasado.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

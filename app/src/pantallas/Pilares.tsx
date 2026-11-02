@@ -24,8 +24,8 @@ import { IcPilares } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
-import { fmt } from "../fmt.ts";
-import { usePedido } from "../sesion/usePedido.ts";
+import { fmt, plural } from "../fmt.ts";
+import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
@@ -43,7 +43,9 @@ function PlantaPilares({ planta, eleccion, id, malla }: { planta: string; elecci
   const filas = d.datos?.filas;
   const clic = async (p: Vec2, radio: number) => {
     if (!proyecto.cliente) return;
-    const r = await proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
+    // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
+    const r = await sinObsoleto(proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio }));
+    if (!r) return;
     const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
     setSeleccion(o && filas?.some((f) => f.pilar === o) ? o : null);
   };
@@ -106,7 +108,10 @@ function GraficoAxil({ filas }: { filas: FilaPilar[] }) {
             </text>
             <rect x={50} y={2} width={w} height={11} fill={pasa ? "var(--color-tint-warn)" : "var(--color-bg-elevated)"} stroke={pasa ? "var(--color-state-warn)" : "var(--color-border-main)"} />
             <text x={54 + w} y={11} fontSize={11} fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
-              {fmt(ns[i]!, 0)}
+              {/* R-21: con un decimal, como el rótulo de la planta y las ternas */}
+              {fmt(ns[i]!, 1)}
+              {/* C-22: el aviso de ν, también escrito (no sólo el color de la barra) */}
+              {pasa ? ` · ν > ${fmt(LIMITE_NU, 2)}` : ""}
             </text>
           </g>
         );
@@ -184,7 +189,7 @@ export function ModoPilares() {
   );
 
   const cuadro = (
-    <Seccion titulo={`Cuadro bajo ${planta}`} valor={`${filas.length} tramos · ternas concomitantes`}>
+    <Seccion titulo={`Cuadro bajo ${planta}`} valor={`${plural(filas.length, "tramo")} · ternas concomitantes`}>
       <TablaTernas
         filas={filas}
         cabecera="Pilar"
@@ -203,7 +208,7 @@ export function ModoPilares() {
 
   const propiedades = (
     <>
-      <Cabecera icono={IcPilares} tipo={`Pilares · bajo ${planta ?? "—"}`} titulo={id ?? `${filas.length} tramos`} mono={!!id} detalle={id ? "Todos sus tramos, abajo." : "Elija un pilar para ver todos sus tramos."} />
+      <Cabecera icono={IcPilares} tipo={`Pilares · bajo ${planta ?? "—"}`} titulo={id ?? plural(filas.length, "tramo")} mono={!!id} detalle={id ? "Todos sus tramos, abajo." : "Elija un pilar para ver todos sus tramos."} />
       <Seccion titulo={`Tramos bajo ${planta}`} valor={filas.length}>
         <div className="fila">
           <span>ν &gt; {fmt(LIMITE_NU, 2)}</span>
@@ -212,7 +217,7 @@ export function ModoPilares() {
         <p className="nota">ν = Nd/(Ac·fcd), fcd = fck/1,5, en los tramos de hormigón: el aviso de A3 (orden de magnitud). La comprobación de norma es la del módulo de pilares de Concreta. El cuadro de la planta, abajo.</p>
       </Seccion>
       {id && pilar.datos && (
-            <Seccion titulo={`Pilar ${id}`} valor={`${pilar.datos.filas.length} tramos`}>
+            <Seccion titulo={`Pilar ${id}`} valor={plural(pilar.datos.filas.length, "tramo")}>
               {!filas.some((f) => f.pilar === id) && <p className="nota">No llega a {planta}: su cuadro completo, aquí.</p>}
               <GraficoAxil filas={pilar.datos.filas} />
               <TablaTernas

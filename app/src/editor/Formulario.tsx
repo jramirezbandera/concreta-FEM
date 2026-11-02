@@ -395,7 +395,8 @@ export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: N
                       {c.referencia && !diferido && <OpcionesGestor coleccion={c.referencia} valor={valor} />}
                     </select>
                   ) : (
-                    <span className="unidad" data-unidad={c.unidad} style={c.unidad ? ({ "--u": c.unidad.length } as CSSProperties) : undefined}>
+                    // R-27: vacío con un valor por defecto en palabras («todo el forjado»), sin la unidad suelta detrás
+                    <span className="unidad" data-unidad={!valor.trim() && estado?.defecto && !/\d/.test(estado.defecto) ? undefined : c.unidad} style={c.unidad ? ({ "--u": c.unidad.length } as CSSProperties) : undefined}>
                     <input
                       value={valor}
                       placeholder={c.calculada ? undefined : estado?.obligatorio ? "obligatorio" : (estado?.defecto ?? "—")}

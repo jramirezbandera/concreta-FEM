@@ -202,7 +202,7 @@ describe("A3: revisar y firmar", () => {
     // Sólo el borde sin viga: la retícula no lleva zunchos
     expect(j.avisos).toBe(1);
     expect(j.comprobaciones.find((c) => c.codigo === "sensatez/borde-sin-viga")?.estado).toBe("avisos");
-    expect(j.comprobaciones.length).toBe(21);
+    expect(j.comprobaciones.length).toBe(22); // M-26: «Objetos lejos del resto»
     const md = readFileSync(join(ruta, "..", ".fem", j.huella, "informe.md"), "utf8");
     expect(md).toContain(j.huella);
     expect(md).toContain("# Informe de revisión: Retícula");

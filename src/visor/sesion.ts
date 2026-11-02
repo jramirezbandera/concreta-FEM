@@ -476,11 +476,14 @@ export class Sesion {
     return { ok: true };
   }
 
-  /** Calcula (el núcleo ya iniciado). No válido: el modelo no compila o el cálculo falló (sin equilibrio, mecanismo…). */
-  async calcular(): Promise<{ ok: true; cabecera: CabeceraResultados; bytes: Uint8Array } | { ok: false; diagnosticos: Diagnostico[] }> {
+  /**
+   * Calcula (el núcleo ya iniciado). No válido: el modelo no compila o el cálculo falló (sin equilibrio, mecanismo…).
+   * `alProgreso`, el del motor: cada fase que termina, con su duración (R-25: la app dice por dónde va).
+   */
+  async calcular(opciones: { alProgreso?: (fase: string, ms: number) => void } = {}): Promise<{ ok: true; cabecera: CabeceraResultados; bytes: Uint8Array } | { ok: false; diagnosticos: Diagnostico[] }> {
     const c = this.compilacion;
     if (!c.valido) return { ok: false, diagnosticos: c.diagnosticos.filter((d) => d.severidad === "error") };
-    const r = calcular(c.modelo);
+    const r = calcular(c.modelo, opciones.alProgreso ? { alProgreso: opciones.alProgreso } : {});
     const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
     if (!r.valido) return { ok: false, diagnosticos: ordenSeveridad(diags) };
     const { cabecera, bytes } = empaquetarResultados(c.huella, r.casos, r.estadisticas, diags);

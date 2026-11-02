@@ -20,7 +20,7 @@
 import { useEffect, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { EscalaMapa } from "../../../src/agente/render/isovalores.ts";
-import type { Campo, Envolvente } from "../../../src/agente/render/resultados.ts";
+import { DECIMALES_CAMPO, type Campo, type Envolvente } from "../../../src/agente/render/resultados.ts";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { ValorPunto } from "../../../src/visor/datos.ts";
 import type { SuperficiesMapa } from "../../../src/visor/isovalores3d.ts";
@@ -32,7 +32,7 @@ import { escalaDe, SeccionEscala, type EscalaElegida } from "../componentes/esca
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, mm, textoApp, coma } from "../fmt.ts";
-import { usePedido } from "../sesion/usePedido.ts";
+import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import type { Marca } from "../vistas/vista2d.ts";
@@ -114,17 +114,20 @@ const SUPERFICIES: { id: SuperficiesMapa; nombre: string; title: string }[] = [
   { id: "todas", nombre: "Losas y muros", title: "Las losas y los muros, con una escala común" },
 ];
 
-const CAMPOS: { id: Campo; nombre: string; dec: number }[] = [
-  { id: "uz", nombre: "uz", dec: 2 },
-  { id: "m11", nombre: "M11", dec: 1 },
-  { id: "m22", nombre: "M22", dec: 1 },
-  { id: "m12", nombre: "M12", dec: 1 },
-  { id: "v13", nombre: "V13", dec: 1 },
-  { id: "v23", nombre: "V23", dec: 1 },
-  { id: "f11", nombre: "F11", dec: 1 },
-  { id: "f22", nombre: "F22", dec: 1 },
-  { id: "f12", nombre: "F12", dec: 1 },
-];
+/** R-21: los decimales, los del extremo rotulado en el mapa (`DECIMALES_CAMPO`), para que digan el mismo número. */
+const CAMPOS: { id: Campo; nombre: string; dec: number }[] = (
+  [
+    ["uz", "uz"],
+    ["m11", "M11"],
+    ["m22", "M22"],
+    ["m12", "M12"],
+    ["v13", "V13"],
+    ["v23", "V23"],
+    ["f11", "F11"],
+    ["f22", "F22"],
+    ["f12", "F12"],
+  ] as const
+).map(([id, nombre]) => ({ id, nombre, dec: DECIMALES_CAMPO[id] }));
 
 export function ModoLosas() {
   const { proyecto, planta } = useVisor();
@@ -167,7 +170,9 @@ export function ModoLosas() {
 
   const clic = async (p: Vec2, pl: string) => {
     if (!proyecto.cliente) return;
-    const r = await proyecto.cliente.pedir({ tipo: "valor-punto", planta: pl, campo, combinaciones: eleccion, envolvente, x: p[0], y: p[1], ...(escala ? { escala } : {}) });
+    // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
+    const r = await sinObsoleto(proyecto.cliente.pedir({ tipo: "valor-punto", planta: pl, campo, combinaciones: eleccion, envolvente, x: p[0], y: p[1], ...(escala ? { escala } : {}) }));
+    if (!r) return;
     setPunto({ p, v: r.ok ? (r.valor as ValorPunto | null) : null, planta: pl, clave: claveDe(pl) });
   };
 
@@ -320,6 +325,8 @@ export function ModoLosas() {
               ))}
               {!x.escena.extremos.length && <p className="nota">{textoApp(x.escena.notas.join(" "))}</p>}
             </Seccion>
+            {/* R-34: las flechas, sólo con uz (con M11 o V13 empujaban lo que se lee) */}
+            {campo === "uz" && (
             <Seccion titulo="Flechas" valor={x.combinacionesFlechas.descripcion}>
               {x.flechas.length ? (
                 <table className="tb">
@@ -354,6 +361,7 @@ export function ModoLosas() {
               )}
               <p className="nota">Hacia abajo, positivas. Relativa: a las esquinas de su recuadro de pilares (losas) o a los extremos del vano (paños).</p>
             </Seccion>
+            )}
           </>
         )}
         <Equilibrio estado={e} />

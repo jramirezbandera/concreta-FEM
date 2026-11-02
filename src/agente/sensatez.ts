@@ -77,6 +77,9 @@ export const UMBRALES = {
   desplome: 1 / 250,
   /** Nd / (Ac·fcd). */
   axilReducido: 0.65,
+  /** M-26: un objeto a más de estas veces la extensión del resto (con la extensión mínima, m) está lejos. */
+  lejos: 5,
+  lejosExtension: 10,
 } as const;
 
 /** Acciones que no son gravitatorias: no entran en la «gravedad» ni en las cargas por uso. */
@@ -917,6 +920,59 @@ function bordes(f: ModeloFisico, P: Plantas, eps: number): Registro[] {
   return [reg];
 }
 
+// ─── Objetos lejos del resto ────────────────────────────────────────────────────────────────────
+
+/**
+ * M-26 (`auditoria-ui.md`): un objeto muy lejos del resto (un pilar tecleado a 1 km en vez de a 10 m)
+ * entraba sin aviso. En planta, con la caja de cada objeto (no los ejes de replanteo ni las cargas, que
+ * son de su pieza): avisa del que queda a más de `lejos` veces la extensión del resto (como poco
+ * `lejosExtension`). El resto, sin recorrer todo por cada objeto: en cada lado de la caja de todos, el
+ * objeto que lo da y el segundo. Dos objetos lejos juntos no se avisan uno al otro (son un grupo).
+ */
+function lejanos(f: ModeloFisico): Registro[] {
+  const U = UMBRALES;
+  const reg = new Registro("sensatez/lejos", "Objetos lejos del resto", `a más de ${num(U.lejos)} veces la extensión del resto en planta (como poco, ${num(U.lejos * U.lejosExtension)} m)`);
+  type Caja = { id: string; c: [number, number, number, number] };
+  const cajas: Caja[] = [];
+  const de = (id: string, ps: readonly (readonly [number, number])[]) => {
+    if (!ps.length) return;
+    const c: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, y] of ps) {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      c[0] = Math.min(c[0], x);
+      c[1] = Math.min(c[1], y);
+      c[2] = Math.max(c[2], x);
+      c[3] = Math.max(c[3], y);
+    }
+    cajas.push({ id, c });
+  };
+  for (const p of f.pilares ?? []) de(p.id, [[p.x, p.y]]);
+  for (const v of f.vigas ?? []) de(v.id, v.puntos);
+  for (const w of f.muros ?? []) de(w.id, w.puntos);
+  for (const l of [...(f.losas ?? []), ...(f.panos ?? [])]) de(l.id, l.contorno);
+  for (const a of f.apoyos ?? []) de(a.id, [[a.x, a.y]]);
+  for (const a of f.apoyosLineales ?? []) de(a.id, a.puntos);
+  for (const b of f.barras ?? []) de(b.id, [[b.inicio.x, b.inicio.y], [b.fin.x, b.fin.y]]);
+  if (cajas.length < 3) return [reg];
+  reg.aplica();
+  // Por lado (x0, y0 hacia abajo; x1, y1 hacia arriba): el objeto que lo da y el segundo
+  const extremos = ([0, 1, 2, 3] as const).map((k) => {
+    const signo = k < 2 ? 1 : -1;
+    const orden = [...cajas].sort((a, b) => signo * (a.c[k] - b.c[k]));
+    return [orden[0]!, orden[1]!] as const;
+  });
+  for (const o of cajas) {
+    const r = extremos.map(([a, b], k) => (a === o ? b : a).c[k]!) as [number, number, number, number];
+    const L = Math.max(U.lejosExtension, r[2] - r[0], r[3] - r[1]);
+    const dx = Math.max(0, r[0] - o.c[2], o.c[0] - r[2]);
+    const dy = Math.max(0, r[1] - o.c[3], o.c[1] - r[3]);
+    const d = Math.hypot(dx, dy);
+    reg.peor(d / L, `${o.id}: a ${num(d)} m del resto (que mide ${num(L)} m)`);
+    if (d > U.lejos * L) reg.aviso(`${o.id} está a ${num(d)} m del resto del modelo, que mide ${num(L)} m en planta: ¿se tecleó mal una coordenada (en cm, o un cero de más)?`, [o.id], { distancia: d, extension: L });
+  }
+  return [reg];
+}
+
 // ─── Entrada ────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -928,7 +984,7 @@ function bordes(f: ModeloFisico, P: Plantas, eps: number): Registro[] {
 export function sensatezPrevia(f: ModeloFisico, opciones?: OpcionesCompilacion): Comprobacion[] {
   const P = new Plantas(f);
   const eps = opciones?.epsSnap ?? 0.05;
-  return [...datos(f), ...cargas(f), ...pilares(f, P, eps), ...bordes(f, P, eps)].map((r) => r.c);
+  return [...datos(f), ...lejanos(f), ...cargas(f), ...pilares(f, P, eps), ...bordes(f, P, eps)].map((r) => r.c);
 }
 
 export interface SensatezModelo {
@@ -944,8 +1000,8 @@ export function sensatezModelo(f: ModeloFisico, opciones: OpcionesCompilacion | 
   const P = new Plantas(f);
   const pp = pesoPropio(f, P, opciones);
   const eps = opciones?.epsSnap ?? 0.05;
-  const regs = [...datos(f), ...cargas(f), ...cargasPorM2(f, P, res), ...pilares(f, P, eps), ...bordes(f, P, eps), pp.registro];
-  // El mismo orden que en el informe: datos, cargas, cargas por planta, pilares, bordes y peso propio
+  const regs = [...datos(f), ...lejanos(f), ...cargas(f), ...cargasPorM2(f, P, res), ...pilares(f, P, eps), ...bordes(f, P, eps), pp.registro];
+  // El mismo orden que en el informe: datos, objetos lejos, cargas, cargas por planta, pilares, bordes y peso propio
   return { comprobaciones: regs.map((r) => r.c), pesoPropio: pp.desglose };
 }
 

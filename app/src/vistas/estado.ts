@@ -152,6 +152,25 @@ function desdeGuardada(v: EstadoVista, g: VistaGuardada): EstadoVista {
   };
 }
 
+/**
+ * R-30: al pasar a más vistas, las que se destapan no repiten un 3D (o una planta de la misma
+ * planta) que ya se ve: toman el tipo que falta (planta, 3D, alzado). Salían dos 3D iguales en 2×2
+ * cuando un modo había llevado la primera vista al 3D. Los alzados sin eje se reparten los ejes al
+ * dibujarse (`ejePorDefecto`).
+ */
+export function sinRepetir(vistas: readonly EstadoVista[], antes: number, despues: number): EstadoVista[] {
+  const r = [...vistas];
+  for (let k = antes; k < despues; k++) {
+    const v = r[k]!;
+    const repite = r.slice(0, k).some((w) => w.tipo === v.tipo && (v.tipo === "3d" || (v.tipo === "planta" && w.planta === v.planta)));
+    if (!repite) continue;
+    const falta = (["planta", "3d", "alzado"] as const).find((t) => !r.slice(0, k).some((w) => w.tipo === t));
+    // Con los tres ya a la vista, un alzado más (por otro eje)
+    r[k] = { ...v, tipo: falta ?? "alzado" };
+  }
+  return r;
+}
+
 /** El estado de las vistas de un proyecto (`clave`: su nombre o su fichero). */
 export function useEstadoVistas(clave: string): Vistas {
   const [e, setE] = useState<EstadoVistas>(() => leer(clave) ?? POR_DEFECTO);
@@ -162,7 +181,7 @@ export function useEstadoVistas(clave: string): Vistas {
   }
   useEffect(() => escribir(clave, e), [clave, e]);
   const poner = useCallback((i: number, c: Partial<EstadoVista>) => setE((x) => ({ ...x, vistas: x.vistas.map((v, k) => (k === i ? { ...v, ...c } : v)) })), []);
-  const setDisposicion = useCallback((d: Disposicion) => setE((x) => ({ ...x, disposicion: d, activa: Math.min(x.activa, vistasDe(d) - 1) })), []);
+  const setDisposicion = useCallback((d: Disposicion) => setE((x) => ({ ...x, disposicion: d, vistas: sinRepetir(x.vistas, vistasDe(x.disposicion), vistasDe(d)), activa: Math.min(x.activa, vistasDe(d) - 1) })), []);
   const activar = useCallback((i: number) => setE((x) => (x.activa === i ? x : { ...x, activa: i })), []);
   const irATipo = useCallback(
     (t: TipoVista) =>

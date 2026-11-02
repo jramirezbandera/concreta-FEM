@@ -99,6 +99,8 @@ describe("comprobaciones previas (sin calcular)", () => {
       ["caso vacío", (f) => (f.casos = [...f.casos, { id: "VACIO" }]), "sensatez/caso-vacio"],
       ["pilar que arranca arriba", (f) => ((f.pilares![0] as { desde: string }).desde = "N1"), "sensatez/pilar-arranque"],
       ["pilar interrumpido", (f) => ((f.pilares!.find((p) => p.x === 6 && p.y === 5) as { hasta: string }).hasta = "N1"), "sensatez/pilar-interrumpido"],
+      // M-26: un pilar tecleado a 1 km
+      ["pilar a 1 km", (f) => ((f.pilares![0] as { x: number }).x = 1000), "sensatez/lejos"],
     ];
     for (const [nombre, mutar, codigo] of casos) {
       const f = copia(base);

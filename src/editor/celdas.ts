@@ -113,7 +113,9 @@ export class Lector {
   opcion<T extends string>(c: string, valores: readonly T[], o: { obligatorio?: boolean } = {}): T | undefined {
     const t = this.texto(c, o);
     if (t === undefined) return undefined;
-    const v = valores.find((x) => x.toLowerCase() === t.toLowerCase());
+    // Sin distinguir mayúsculas ni tildes: «sótano» es el «sotano» del fichero (C-29).
+    const llano = (x: string) => x.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+    const v = valores.find((x) => llano(x) === llano(t));
     return v ?? this.mal(c, `«${t}» no vale: tiene que ser ${valores.map((x) => `«${x}»`).join(", ")}`);
   }
 

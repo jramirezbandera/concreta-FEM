@@ -12,8 +12,9 @@
 import { useEffect, useState } from "react";
 import { MULTIPLICADORES, rigidezAligerado, textoMultiplicadores, type RigidezAligerado } from "../../../src/editor/ficha.ts";
 import { desglosePesoFila, ppObligatorio, type Contexto } from "../../../src/editor/tablas.ts";
-import type { Fila } from "../../../src/editor/celdas.ts";
+import { leerNumero, type Fila } from "../../../src/editor/celdas.ts";
 import type { MultiplicadoresLamina } from "../../../src/elementos/lamina.ts";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 /** Un número a la española con `d` decimales como mucho («0,126», «25»). */
 const n = (v: number, d = 3) => String(Number(v.toFixed(d))).replace(".", ",");
@@ -59,7 +60,7 @@ export function PesoForjado({ fila, ctx, escribir }: Props) {
       )}
       {escrito !== undefined && Number.isFinite(escrito) && (
         <p className="mt-1">
-          Manda el escrito, {n(escrito, 2)} kN/m²{tipo === "reticular" ? ", en toda la losa con los ábacos" : ""}.{" "}
+          Manda el escrito, {n(escrito, 2)} kN/m²{tipo === "reticular" ? ", en todo el forjado con los ábacos" : ""}.{" "}
           <button type="button" className="text-accent hover:underline" onClick={() => escribir("pp", "")}>
             Usar el calculado
           </button>
@@ -82,14 +83,14 @@ export function RigidezAligeradoPanel({ fila, ctx, escribir, errores, rigidez }:
   const mia = r.modo === "dada";
   return (
     <div className="mx-3.5 mb-2" data-testid="rigidez-aligerado">
-      <div className="seg mb-1.5" role="radiogroup" aria-label="Rigidez del aligerado">
+      <Grupo rol="radiogroup" etiqueta="Rigidez del aligerado" className="seg mb-1.5">
         <button type="button" role="radio" aria-checked={!mia} data-on={!mia} onClick={() => mia && escribir("multiplicadores", "")}>
           Calculada
         </button>
         <button type="button" role="radio" aria-checked={mia} data-on={mia} onClick={() => !mia && escribir("multiplicadores", textoMultiplicadores(r.calculados))}>
           La mía
         </button>
-      </div>
+      </Grupo>
       <p className="text-[12px] leading-snug text-text-secondary mb-1.5">
         Cada número multiplica la rigidez de la losa maciza del mismo canto (1 = maciza).
         {mia ? " Cambie el que quiera; vacío o 1 es la maciza." : " Para cambiar alguno, pase a «La mía»: empieza con éstos."}
@@ -149,7 +150,8 @@ function CeldaMultiplicador({ clave, r, escribir }: { clave: keyof Multiplicador
   const [texto, setTexto] = useState<string | null>(null);
   useEffect(() => setTexto(null), [actual]);
   const mostrado = texto ?? (actual === undefined ? "" : n(actual, 4));
-  const v = mostrado.trim() === "" ? 1 : Number(mostrado.trim().replace(",", "."));
+  const leido = mostrado.trim() === "" ? 1 : leerNumero(mostrado);
+  const v = typeof leido === "number" ? leido : NaN;
   const mal = !(v > 0 && v <= 100);
   const poner = () => {
     if (texto === null || mal) return;
@@ -163,7 +165,7 @@ function CeldaMultiplicador({ clave, r, escribir }: { clave: keyof Multiplicador
       data-error={mal}
       aria-label={`multiplicador ${clave}`}
       aria-invalid={mal}
-      title={mal ? "Un número en (0, 100]" : undefined}
+      title={mal ? (typeof leido === "string" ? `${leido}: un número en (0, 100]` : "Un número en (0, 100]") : undefined}
       onChange={(e) => setTexto(e.target.value)}
       onBlur={poner}
       onKeyDown={(e) => {

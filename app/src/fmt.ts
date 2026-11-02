@@ -46,6 +46,9 @@ export function fechaCorta(ms: number, ahora = Date.now()): string {
 /** Tamaño de un texto (caracteres ≈ bytes): «12 kB», «1,4 MB». */
 export const tamano = (n: number): string => (n < 1e6 ? `${fmt(Math.max(1, Math.round(n / 1e3)), 0)} kB` : `${fmt(n / 1e6, 1)} MB`);
 
+/** «1 fila», «3 filas»: el número con la palabra que concuerda (C-31); sin `varios`, el singular con «s». */
+export const plural = (n: number, uno: string, varios = `${uno}s`): string => `${n} ${n === 1 ? uno : varios}`;
+
 /** Un código interno de la investigación o de una fase (C1-d, RV-a, H43, E5, D4, CY3, fase LV…). */
 export const CODIGO_INTERNO = /^(?:fase\s+)?(?:[A-Z]{1,3}\d{0,2}-[a-z0-9]{1,2}|H\d{2}|E[1-7]|D[1-9]|CY\d|LV\d?|AU-\d+|SP-\d+)$/;
 
@@ -88,3 +91,15 @@ export function textoApp(t: string): string {
 
 /** Un texto con números en punto decimal (las combinaciones, «0.8·G + 1.5·Q»), con coma (UI-44). */
 export const coma = (t: string): string => t.replace(/(\d)\.(\d)/g, "$1,$2");
+
+/** R-32: lo que es la acción de un caso, en palabras (la de su código, «S», no le dice nada a quien lee). */
+export const NOMBRE_ACCION: Readonly<Record<string, string>> = { G: "permanente", Q: "uso", S: "nieve", W: "viento", T: "temperatura", E: "sismo", A: "accidental", N: "nocional" };
+
+/**
+ * R-32: un caso en una lista: su id y su nombre o, sin nombre, lo que es su acción («Q · uso»), sin
+ * repetir el código («G · G · peso propio»); con `pp`, «con peso propio» si lo lleva.
+ */
+export function textoCaso(c: { id: string; nombre?: string; accion?: string; pesoPropio?: boolean }, pp = true): string {
+  const que = c.nombre ?? (c.accion ? NOMBRE_ACCION[c.accion] : undefined);
+  return `${c.id}${que && que !== c.id ? ` · ${que}` : ""}${pp && c.pesoPropio ? " · con peso propio" : ""}`;
+}

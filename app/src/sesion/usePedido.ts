@@ -21,6 +21,19 @@ export interface Pedido_<K extends TipoPedido> {
 
 const enCurso = new WeakMap<ClienteSesion, Map<string, Promise<unknown>>>();
 
+/**
+ * C-12: un pedido de un clic (elegir, el valor de un punto). Si una edición cerró el cliente entre
+ * el clic y la respuesta, da null en vez de rechazar (era ruido en la consola); lo demás se lanza.
+ */
+export async function sinObsoleto<T>(p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof ErrorObsoleto) return null;
+    throw e;
+  }
+}
+
 /** El pedido `clave` al cliente, o el que ya está en curso con esa misma clave. */
 function pedirCompartido<K extends TipoPedido>(cliente: ClienteSesion, clave: string): ReturnType<ClienteSesion["pedir"]> {
   let m = enCurso.get(cliente);

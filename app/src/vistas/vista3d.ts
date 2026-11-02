@@ -67,6 +67,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { rotulo } from "../../../src/agente/render/escena.ts";
+import { fmt } from "../fmt.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Solido } from "../../../src/visor/solido.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
@@ -76,7 +77,7 @@ import { SIN_BANDA, type Pilares3D } from "../../../src/visor/pilares3d.ts";
 import { COLOR_REACCION, type Reacciones3D } from "../../../src/visor/reacciones3d.ts";
 import { CLASES_CARGA, COLOR_CARGA, type Cargas3D } from "../../../src/visor/cargas3d.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
-import { pintura } from "../lienzo/pintura.ts";
+import { pintura, rellenoTema } from "../lienzo/pintura.ts";
 import { CAJA_VACIA, Degradado, Suelo3D } from "./fondo.ts";
 import { fuente, textoConHalo, Vista, type Entorno } from "./motor.ts";
 import { MATERIALES_3D } from "./renderer.ts";
@@ -384,7 +385,9 @@ export class Vista3D extends Vista {
     if (a) this.fijarOrigen(a.origen);
     this.construirCaja();
     this.aplicarFiltro();
-    if (!this.encuadrada) this.encuadrar();
+    // M-29: con el encuadre automático (nadie ha movido la cámara, UI-46), el modelo nuevo se encuadra
+    // entero: la cámara recordada, o la del sitio vacío mientras se abría, dejaba las bases cortadas
+    if (!this.encuadrada || (this.ajustada && !!a?.objeto.length)) this.encuadrar();
     this.entorno.pintar();
   }
 
@@ -987,7 +990,8 @@ export class Vista3D extends Vista {
         const g = new BufferGeometry();
         g.setAttribute("position", new BufferAttribute(i.triangulos, 3));
         const col = new Float32Array(i.triangulos.length);
-        const cs = i.colores.map((x) => new Color(x));
+        // R-28: en el tema oscuro, la rampa aclarada (como en la planta)
+        const cs = i.colores.map((x) => new Color(rellenoTema(x, this.entorno.tema())));
         for (let t = 0; t < i.banda.length; t++) {
           const c = cs[i.banda[t]!]!;
           for (let v = 0; v < 3; v++) col.set([c.r, c.g, c.b], 9 * t + 3 * v);
@@ -1760,7 +1764,8 @@ export class Vista3D extends Vista {
     const T = this.T;
     const o = this.origen;
     if (!o) return null;
-    return `3D · mirando a x ${rotulo(T.x + o[0], 4)} · y ${rotulo(T.y + o[1], 4)} · z ${rotulo(T.z + o[2], 4)} m`;
+    // R-24: con decimales fijos (con cifras significativas salía «x 2,73 · y 7,835»)
+    return `3D · mirando a x ${fmt(T.x + o[0], 2)} · y ${fmt(T.y + o[1], 2)} · z ${fmt(T.z + o[2], 2)} m`;
   }
 
   // ─── ViewCube ───────────────────────────────────────────────────────────────────────────────
@@ -1886,6 +1891,7 @@ export class Vista3D extends Vista {
       this.colores();
       this.construirElegidos();
       if (this.carg) this.construirCargas(false);
+      if (this.iso) this.construirIsovalores();
     }
     this.degradado.pintar(r, this.entorno.colores().fondo, this.entorno.tema());
     if (!this.alamb && !this.geo && !this.diag && !this.iso && !this.pil && !this.reac && !this.carg && !this.sol) return;
@@ -2092,7 +2098,7 @@ export class Vista3D extends Vista {
       for (const e of this.extremosDef) {
         const k = this.escalaU * (this.animar ? this.fase : 1);
         const n = 3 * e.nudo;
-        r.push({ p: [e.punto[0] + k * this.u[n]!, e.punto[1] + k * this.u[n + 1]!, e.punto[2] + k * this.u[n + 2]!], texto: `${e.que} ${rotulo(e.valor)} mm${e.objeto ? ` · ${e.objeto}` : ""}`, signo: e.que === "menor uz" ? -1 : 0, prioridad: 100 });
+        r.push({ p: [e.punto[0] + k * this.u[n]!, e.punto[1] + k * this.u[n + 1]!, e.punto[2] + k * this.u[n + 2]!], texto: `${e.que === "mayor |u|" ? "desplazamiento total máx." : "uz mínimo"} ${fmt(e.valor, 2)} mm${e.objeto ? ` · ${e.objeto}` : ""}`, signo: e.que === "menor uz" ? -1 : 0, prioridad: 100 }); // R-21: con su nombre y los decimales del chip
       }
     return r.sort((a, b) => b.prioridad - a.prioridad);
   }

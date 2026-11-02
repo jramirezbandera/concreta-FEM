@@ -71,6 +71,34 @@ export function pintura(estilo: Estilo, tema: Theme): Pintura {
   return (tema === "dark" ? OSCURO[estilo] : undefined) ?? ESTILOS[estilo];
 }
 
+const cacheOscuro = new Map<string, string>();
+
+/**
+ * R-28: el color de un dato (una banda de un mapa, una zona) en el tema: en el claro, el de
+ * `fem render`; en el oscuro, con la luminosidad subida de L a 0,3 + 0,7·L (mismo tono y
+ * saturación, el mismo orden): los extremos de la rampa (#67001f, #053061) se perdían en el fondo
+ * casi negro. Sólo los colores en hexadecimal de 6 cifras; los demás, tal cual.
+ */
+export function rellenoTema(color: string, tema: Theme): string {
+  if (tema !== "dark" || !/^#[0-9a-f]{6}$/i.test(color)) return color;
+  const ya = cacheOscuro.get(color);
+  if (ya) return ya;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const [mx, mn] = [Math.max(r, g, b), Math.min(r, g, b)];
+  const l = (mx + mn) / 2;
+  const d = mx - mn;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  const h = d === 0 ? 0 : mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  const l2 = 0.3 + 0.7 * l;
+  const c = (1 - Math.abs(2 * l2 - 1)) * sat;
+  const x = c * (1 - Math.abs((h % 2) - 1));
+  const m = l2 - c / 2;
+  const [r1, g1, b1] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+  const t = `#${[r1, g1, b1].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, "0")).join("")}`;
+  cacheOscuro.set(color, t);
+  return t;
+}
+
 /** Atributos SVG (de React) de una pintura; `relleno` sustituye al del estilo. */
 export function atributos(p: Pintura, relleno?: string): Record<string, string | number> {
   const fill = relleno ?? p.fill;

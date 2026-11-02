@@ -12,7 +12,7 @@ import { deshacer, hacer, historial } from "../historial.ts";
 import { aplicar, type Operacion } from "../operaciones.ts";
 import { proyectoNuevo } from "../plantilla.ts";
 import { serializar } from "../serializar.ts";
-import { apuntar, bajoCursor, cruce, enganchar, indiceEnganches, ortogonal, RADIO_ENGANCHE } from "./enganches.ts";
+import { apuntar, bajoCursor, cruce, enganchar, indiceEnganches, ortogonal, RADIO_ENGANCHE, rotuloEnganche } from "./enganches.ts";
 import { alinearACara, ESTADO_INICIAL, ejeNuevo, operacionProponerEjes, paso, type ContextoHerramienta, type EstadoHerramienta, type Evento, type NombreHerramienta, type Plantillas } from "./herramientas.ts";
 import { leerEntrada, resolverEntrada } from "./teclado.ts";
 
@@ -111,6 +111,16 @@ describe("enganches (criterio 2)", () => {
     const libre = enganchar(ix, [8.1, 0.03], 0.05)!;
     expect(libre.tipo).toBe("cercano");
     expect(libre.p).toEqual([8.1, 0]);
+  });
+
+  it("M-22: el cruce de dos ejes nombra los dos, y el punto medio de una viga gana al del borde de la losa", () => {
+    expect(rotuloEnganche(enganchar(ix, [10.04, 6.3], 0.05)!)).toBe("Cruce B-3");
+    expect(rotuloEnganche(enganchar(ix, [2.51, 0.02], 0.05)!)).toBe("Punto medio (V1-N1)".replace("V1-N1", p0.modelo.vigas![0]!.id));
+    // Una losa con un lado por el eje de la viga, con su punto medio 1 cm más cerca del cursor
+    const conLosa = conTabla(p0, "forjados", { planta: "N1", contorno: "0 0; 4,98 0; 4,98 6,3; 0 6,3", espesor: "0,25", material: "HA-30" });
+    const e = enganchar(indiceEnganches(conLosa.modelo, "N1"), [2.49, 0.02], 0.05)!;
+    expect(e.tipo).toBe("medio");
+    expect(e.objeto).toBe(conLosa.modelo.vigas![0]!.id);
   });
 
   it("el cruce de dos ejes paralelos a X y a Y tiene sus números, bit a bit", () => {

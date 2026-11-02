@@ -248,7 +248,8 @@ function conZunchos(ctx: ContextoHerramienta, op: Operacion, etiqueta: string, l
   const losas = m.losas ?? [];
   const m2: ModeloFisico = { ...m, losas: losas.some((x) => x.id === losa.id) ? losas.map((x) => (x.id === losa.id ? losa : x)) : [...losas, losa] };
   const p = proponerVigasBorde(m2, losa.id, ancho ?? ANCHO_ZUNCHO, losa.espesor, undefined, anillos);
-  if ("error" in p) return { estado: ESTADO_INICIAL, hecho: { operacion: op, etiqueta, avisos: [`Sin zunchos: ${p.error}`] } };
+  // P-20: sin lados libres no hay zunchos que poner, y no es un aviso (salía en color de aviso, como un fallo)
+  if ("error" in p) return p.cerrada ? hecho(op, etiqueta) : { estado: ESTADO_INICIAL, hecho: { operacion: op, etiqueta, avisos: [`Sin zunchos: ${p.error}`] } };
   const z = operacionVigasBorde(m2, p);
   if (!z || z.op !== "lote") return hecho(op, etiqueta);
   const avisos = p.avisos;

@@ -62,7 +62,7 @@ function corte(P: Vec2, u: Vec2, Q: Vec2, v: Vec2): Vec2 | null {
  * conexión (ε_snap). `anillos`: sólo los lados de esos anillos (0, el contorno; i, el hueco i − 1),
  * como el hueco recién dibujado con «Con zunchos»; los demás quedan como están.
  */
-export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h: number, eps = 0.05, anillos?: ReadonlySet<number>): PropuestaVigasBorde | { error: string } {
+export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h: number, eps = 0.05, anillos?: ReadonlySet<number>): PropuestaVigasBorde | { error: string; cerrada?: true } {
   const l = (m.losas ?? []).find((x) => x.id === losaId) as Losa | undefined;
   if (!l) return { error: `No hay ninguna losa «${losaId}».` };
   if (!(b > 0 && h > 0)) return { error: "La viga tiene que tener el ancho y el canto mayores que 0." };
@@ -262,7 +262,8 @@ export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h
   }
   const sinLargo = grupos.filter((x) => Math.hypot(x.viga.puntos[1][0] - x.viga.puntos[0][0], x.viga.puntos[1][1] - x.viga.puntos[0][1]) < 1e-9);
   if (sinLargo.length) return { error: `En ${losaId}, ${sinLargo.length} viga${sinLargo.length > 1 ? "s se quedan" : " se queda"} sin largo: algún lado es más corto que la distancia de su borde al eje.` };
-  if (!grupos.length) return { error: `${losaId} ya tiene todos sus bordes sobre una viga, un muro, un apoyo lineal u otro forjado.` };
+  // P-20: `cerrada`, no es un fallo: no hay nada que poner (la herramienta Forjado no lo dice en rojo)
+  if (!grupos.length) return { error: `${losaId} ya tiene todos sus bordes sobre una viga, un muro, un apoyo lineal u otro forjado.`, cerrada: true };
   // Los ejes de las vigas de los huecos, dentro de los del contorno
   for (const [i, hq] of nuevos.slice(1).entries())
     if (hq.some((q) => !puntoEnPoligono(q, nuevos[0]!))) return { error: `Los ejes de las vigas del hueco ${i + 1} de ${losaId} se salen de los del contorno.` };

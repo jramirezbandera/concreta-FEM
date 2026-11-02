@@ -4,9 +4,10 @@
  * la lista de tipos (con el símbolo que se pinta en la planta) y de dónde se engancha (el modelo y la
  * plantilla DXF, F3). El estado es el del controlador: el mismo en todas las vistas.
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { ChevronUp, Magnet } from "lucide-react";
 import { FUENTES_ENGANCHE, NOMBRE_ENGANCHE, TIPOS_ENGANCHE, type FuenteEnganche, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
+import { useDesplegado } from "../componentes/desplegado.ts";
 import type { ControladorDibujo } from "./controlador.ts";
 
 const NOMBRE_FUENTE: Record<FuenteEnganche, string> = { modelo: "Modelo", plantilla: "Plantilla DXF" };
@@ -37,23 +38,8 @@ export function BarraEnganches({ ctrl }: { ctrl: ControladorDibujo }) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLDivElement>(null);
 
-  // Se cierra con Esc o con un clic fuera
-  useEffect(() => {
-    if (!abierto) return;
-    const fuera = (x: PointerEvent) => !caja.current?.contains(x.target as Node) && setAbierto(false);
-    const esc = (x: KeyboardEvent) => {
-      if (x.key !== "Escape") return;
-      // Sólo cierra la lista: la herramienta sigue
-      x.stopImmediatePropagation();
-      setAbierto(false);
-    };
-    window.addEventListener("pointerdown", fuera, true);
-    window.addEventListener("keydown", esc, true);
-    return () => {
-      window.removeEventListener("pointerdown", fuera, true);
-      window.removeEventListener("keydown", esc, true);
-    };
-  }, [abierto]);
+  // Se cierra con Esc (sólo la lista: la herramienta sigue) o con un clic fuera
+  useDesplegado(abierto, () => setAbierto(false), [caja]);
 
   const n = foto.enganchar ? foto.activos.size : 0;
   return (

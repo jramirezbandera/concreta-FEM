@@ -191,7 +191,7 @@ try {
 
   // ─── 8. Exportar ────────────────────────────────────────────────────────────────────────────
   const final = await pagina<string>(`return await __c.bd("textos", ${JSON.stringify(id)});`);
-  await pagina(`document.querySelector('[aria-label="Exportar el proyecto.json"]').click();`);
+  await pagina(`document.querySelector('[aria-label="Exportar el proyecto (.json)"]').click();`);
   let exportado = "";
   for (let i = 0; i < 100 && !exportado; i++) {
     await new Promise((r) => setTimeout(r, 100));

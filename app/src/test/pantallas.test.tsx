@@ -22,6 +22,7 @@ import { ModoLosas, textoValor } from "../pantallas/Losas.tsx";
 import { lineasTramo, ModoPilares } from "../pantallas/Pilares.tsx";
 import { lineasReaccion, ModoReacciones } from "../pantallas/Reacciones.tsx";
 import { lineasEstacion } from "../pantallas/Vigas.tsx";
+import { LIMITE_NU } from "../pantallas/Ternas.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
@@ -108,7 +109,8 @@ describe("V1 · DOM", () => {
           const desde = (k === 0 && j === 0 ? 1 : 0) + (j === 0 ? 1 : 0);
           if (k === 0 && j === 0) {
             expect(celdas[0]!.textContent).toBe(`${f.pilar}${f.tramo.seccion}`);
-            expect(celdas.at(-1)!.textContent).toBe(f.nu ? `${fmt(f.nu.nu, 2)}${f.nu.comb}` : "—");
+            // C-22: lo que pasa del aviso lleva «!» además del color
+            expect(celdas.at(-1)!.textContent).toBe(f.nu ? `${fmt(f.nu.nu, 2)}${f.nu.nu > LIMITE_NU ? " !" : ""}${f.nu.comb}` : "—");
           }
           if (j === 0) expect(celdas[desde - 1]!.textContent).toBe(ex === "cabeza" ? "Cabeza" : "Pie");
           // N, My y Mz de la misma combinación: la del pésimo

@@ -10,6 +10,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { FilaPilar } from "../../../src/visor/datos.ts";
 import { fmt } from "../fmt.ts";
+import { filaElegible } from "../componentes/comunes.tsx";
 
 /** El aviso del axil reducido de A3 (`UMBRALES.axilReducido`). */
 export const LIMITE_NU = 0.65;
@@ -33,8 +34,10 @@ export const NOTA_TERNAS = "Cada fila, los N, My y Mz concomitantes de una combi
 function CeldaNu({ f, rowSpan }: { f: FilaPilar; rowSpan: number }) {
   if (!f.nu) return <td rowSpan={rowSpan}>—</td>;
   return (
-    <td rowSpan={rowSpan} className={f.nu.nu > LIMITE_NU ? "w" : undefined}>
+    <td rowSpan={rowSpan} className={f.nu.nu > LIMITE_NU ? "w" : undefined} title={f.nu.nu > LIMITE_NU ? `Pasa de ${fmt(LIMITE_NU, 2)}, el aviso del axil reducido` : undefined}>
       {fmt(f.nu.nu, 2)}
+      {/* C-22: el aviso, también con un signo (no sólo el color) */}
+      {f.nu.nu > LIMITE_NU && <span aria-label={`, más de ${fmt(LIMITE_NU, 2)}`}> !</span>}
       <small>{f.nu.comb}</small>
     </td>
   );
@@ -68,12 +71,13 @@ export function TablaTernas({ filas, titulo, cabecera, activa, onFila, compacta 
         {filas.map((f) => (
           <Fragment key={`${f.pilar}@${f.planta}`}>
             {compacta && (
-              <tr className={`grupo${onFila ? " clic" : ""}`} data-on={activa?.(f) || undefined} onClick={onFila ? () => onFila(f) : undefined}>
+              <tr className={`grupo${onFila ? " clic" : ""}`} data-on={activa?.(f) || undefined} {...(onFila ? filaElegible(() => onFila(f), !!activa?.(f)) : {})}>
                 <td className="et" colSpan={5}>
                   {titulo(f)}
                   {f.nu && (
                     <small className={f.nu.nu > LIMITE_NU ? "text-state-warn" : undefined}>
-                      ν {fmt(f.nu.nu, 2)} · {f.nu.comb}
+                      ν {fmt(f.nu.nu, 2)}
+                      {f.nu.nu > LIMITE_NU ? ` > ${fmt(LIMITE_NU, 2)} !` : ""} · {f.nu.comb}
                     </small>
                   )}
                 </td>
@@ -84,7 +88,8 @@ export function TablaTernas({ filas, titulo, cabecera, activa, onFila, compacta 
                 const x = f.tramo[ex.k][t.k];
                 const primera = !compacta && i === 0 && j === 0;
                 return (
-                  <tr key={`${ex.k}${t.k}`} className={onFila ? "clic" : undefined} data-on={activa?.(f) || undefined} data-terna={`${ex.k} ${t.k}`} onClick={onFila ? () => onFila(f) : undefined}>
+                  // C-19: con el teclado, una parada por tramo (su primera fila; en la compacta, la del título)
+                  <tr key={`${ex.k}${t.k}`} className={onFila ? "clic" : undefined} data-on={activa?.(f) || undefined} data-terna={`${ex.k} ${t.k}`} {...(onFila ? (!compacta && i === 0 && j === 0 ? filaElegible(() => onFila(f), !!activa?.(f)) : { onClick: () => onFila(f) }) : {})}>
                     {primera && (
                       <td className="et" rowSpan={n}>
                         {titulo(f)}

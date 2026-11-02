@@ -72,16 +72,8 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
   const nAvisos = conAvisos.reduce((s, c) => s + c.avisos.length, 0);
   const otros = d.diagnosticos.filter((x) => x.severidad !== "info");
 
+  // P-31: el veredicto, lo primero; la huella y el núcleo, al final (Identidad), que al ingeniero no le dicen nada al abrirlo
   titulo(1, `Informe de revisión${d.proyecto.nombre ? `: ${d.proyecto.nombre}` : ""}`);
-  b.push({
-    tipo: "lista",
-    items: [
-      `Huella del modelo: ${d.huella}`,
-      `Esquema: ${d.proyecto.esquema}. Núcleo de cálculo: sha256 ${d.motor.slice(0, 16)}…`,
-      "Este informe vale sólo para esta huella: si el proyecto cambia, la huella cambia y hay que volver a revisarlo.",
-      "Las comprobaciones de sensatez son avisos de orden de magnitud sobre el modelo, no comprobaciones de norma. Un aviso puede ser legítimo (una transición, un voladizo): el ingeniero lo revisa y decide.",
-    ],
-  });
 
   titulo(2, "Veredicto");
   const eq = Math.max(0, ...d.equilibrio.map((e) => Math.max(e.fuerzas, e.momentos)));
@@ -95,6 +87,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
   });
 
   titulo(2, "Comprobaciones de sensatez");
+  parrafo("Son avisos de orden de magnitud sobre el modelo, no comprobaciones de norma. Un aviso puede ser legítimo (una transición, un voladizo): el ingeniero lo revisa y decide.");
   parrafo(`Casos gravitatorios: ${d.resultados.gravedad.join(", ") || "ninguno"}. Combinaciones: flechas, ${d.resultados.combinaciones.flechas}; desplomes, ${d.resultados.combinaciones.desplomes}; axil reducido, ${d.resultados.combinaciones.axil}.`);
   b.push({ tipo: "tabla", cabecera: ["Comprobación", "Avisa si", "Estado", "Lo peor"], filas: comprobaciones.map((c) => [c.titulo, c.umbral, c.estado === "avisos" ? `${ESTADO.avisos} (${c.avisos.length})` : ESTADO[c.estado], c.peor ?? "—"]) });
   if (conAvisos.length) {
@@ -260,6 +253,16 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
     }
     b.push({ tipo: "lista", items });
   }
+
+  titulo(2, "Identidad");
+  b.push({
+    tipo: "lista",
+    items: [
+      `Huella del modelo: ${d.huella}`,
+      `Esquema: ${d.proyecto.esquema}. Núcleo de cálculo: sha256 ${d.motor.slice(0, 16)}…`,
+      "Este informe vale sólo para esta huella: si el proyecto cambia, la huella cambia y hay que volver a revisarlo.",
+    ],
+  });
 
   titulo(2, "Firma");
   parrafo(`El ingeniero firma este informe con «fem firmar <proyecto> --por "<nombre>"», que guarda en ${d.ficheroFirmas}, junto al proyecto, la huella ${d.huella.slice(0, 16)}…, quién firma, la fecha y el sha256 de este informe. El agente nunca firma.`);

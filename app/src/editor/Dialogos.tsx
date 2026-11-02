@@ -10,9 +10,11 @@ import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
 import { operacionVigasBorde, proponerVigasBorde, vigasDelBorde } from "../../../src/editor/vigasBorde.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
+import { leerNumero } from "../../../src/editor/celdas.ts";
 import { PREFIJOS, propuestaPlantas, renumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
 import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { useVisor } from "../contexto.ts";
+import { plural } from "../fmt.ts";
 
 const total = (m: ModeloFisico) => COLECCIONES.reduce((n, c) => n + lista(m, c).length, 0);
 
@@ -67,8 +69,11 @@ function useFocoDialogo(caja: React.RefObject<HTMLDivElement | null>) {
  * `pendiente` (UI-30): lo que se perdería al cerrar (los cambios de una ficha sin aplicar). Con él,
  * cerrar (Esc, la cruz o el fondo) pregunta antes. `fondoCierra: false`, un clic en el fondo no
  * cierra (los gestores: se perdía lo escrito con un clic fuera).
+ *
+ * `alConfirmar` (C-36): la acción del botón primario, que también hace Intro en un campo del
+ * cuerpo (no en un botón, un desplegable o un texto de varias líneas, ni si el campo ya lo usa).
  */
-export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = null, fondoCierra = true }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void; clase?: string; pendiente?: string | null; fondoCierra?: boolean }) {
+export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = null, fondoCierra = true, alConfirmar }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void; clase?: string; pendiente?: string | null; fondoCierra?: boolean; alConfirmar?: () => void }) {
   const fondo = useRef<HTMLDivElement>(null);
   const caja = useRef<HTMLDivElement>(null);
   const [preguntando, setPreguntando] = useState(false);
@@ -97,7 +102,17 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = nu
             <X size={16} />
           </button>
         </div>
-        <div className="dialogo-cuerpo">{children}</div>
+        <div
+          className="dialogo-cuerpo"
+          onKeyDown={(e) => {
+            const t = e.target as HTMLElement;
+            if (!alConfirmar || e.key !== "Enter" || e.defaultPrevented || e.shiftKey || e.ctrlKey || e.altKey || t.tagName !== "INPUT" || ["button", "submit", "file"].includes((t as HTMLInputElement).type)) return;
+            e.preventDefault();
+            alConfirmar();
+          }}
+        >
+          {children}
+        </div>
         {preguntando && pendiente ? (
           <div className="pie pie-pregunta" role="alertdialog" aria-label="Cambios sin aplicar">
             <span className="mr-auto text-[13px]">{pendiente} Si cierra, se pierden.</span>
@@ -159,7 +174,7 @@ export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCe
     const r = ed.editar(op, `Borrar ${ids.length > 3 ? `${ids.length} objetos` : ids.join(", ")}`);
     if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
     if (seleccion && !indiceIds(r.proyecto.modelo).has(seleccion)) setSeleccion(null);
-    onCerrar(usos.length === 0 || modo === "reasignar" ? `Borrado ${ids.join(", ")}.` : `Borrado ${ids.join(", ")} y ${(cascada ?? ids.length) - ids.length} objetos que lo usaban.`);
+    onCerrar(usos.length === 0 || modo === "reasignar" ? `Borrado ${ids.join(", ")}.` : `Borrado ${ids.join(", ")} y ${plural((cascada ?? ids.length) - ids.length, "objeto")} que lo usaba${(cascada ?? ids.length) - ids.length === 1 ? "" : "n"}.`);
   };
 
   const porObjeto = new Map<string, string[]>();
@@ -175,7 +190,7 @@ export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCe
             Cancelar
           </button>
           <button type="button" className="btn btn-peligro" autoFocus={usos.length === 0} onClick={hacer} disabled={usos.length > 0 && (modo === null || (modo === "reasignar" && usados.some((u) => candidatos(u).length === 0)))}>
-            {usos.length > 0 && modo === "borrar" && cascada !== null ? `Borrar ${cascada} objetos` : "Borrar"}
+            {usos.length > 0 && modo === "borrar" && cascada !== null ? `Borrar ${plural(cascada, "objeto")}` : "Borrar"}
           </button>
         </>
       }
@@ -209,7 +224,7 @@ export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCe
             <input type="radio" name="modo" checked={modo === "borrar"} onChange={() => setModo("borrar")} />
             <span>
               Borrarlos también
-              {cascada !== null && <small>En total se borran {cascada} objetos; de un pilar con varios tramos, sólo el tramo que lo usa.</small>}
+              {cascada !== null && <small>En total se {cascada === 1 ? "borra" : "borran"} {plural(cascada, "objeto")}; de un pilar con varios tramos, sólo el tramo que lo usa.</small>}
             </span>
           </label>
           <label className="opcion">
@@ -248,20 +263,23 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
   const copiar = entera ? todos : ids;
   // Lo que hará, antes de pulsar: cuántos crea y lo que se salta porque ya está (UI-6)
   const prueba = useMemo(() => (destinos.size && copiar.length ? copiarAPlantas(m, copiar, [...destinos]) : null), [m, copiar, destinos]);
+  // P-21: el error de «Copiar» era de las opciones de antes: se quita al cambiarlas
+  useEffect(() => setError(null), [entera, destinos]);
   const n = prueba?.ok ? (prueba.operacion.op === "lote" ? prueba.operacion.operaciones.length : 1) : 0;
 
   const hacer = () => {
     if (!prueba) return;
     if (!prueba.ok) return setError(prueba.errores.map((e) => e.mensaje).join(" "));
-    const r = ed.editar(prueba.operacion, `Copiar ${copiar.length} objetos a ${[...destinos].join(", ")}`);
+    const r = ed.editar(prueba.operacion, `Copiar ${plural(copiar.length, "objeto")} a ${[...destinos].join(", ")}`);
     if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
-    onCerrar(`Creados ${n} objetos en ${[...destinos].join(", ")}.${prueba.avisos ? ` ${prueba.avisos.join(" ")}` : ""}`);
+    onCerrar(`${n === 1 ? "Creado" : "Creados"} ${plural(n, "objeto")} en ${[...destinos].join(", ")}.${prueba.avisos ? ` ${prueba.avisos.join(" ")}` : ""}`);
   };
 
   return (
     <Dialogo
       titulo="Copiar a otras plantas"
       onCerrar={() => onCerrar()}
+      alConfirmar={() => prueba?.ok && hacer()}
       pie={
         <>
           <button type="button" className="btn" onClick={() => onCerrar()}>
@@ -283,12 +301,12 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
       <label className="opcion">
         <input type="radio" name="copiar-que" checked={entera} onChange={() => setEntera(true)} disabled={!planta} />
         <span>
-          Toda la planta {planta} <span className="mono text-text-secondary">· {todos.length} objetos</span>
-          <small>Vigas, losas, paños, apoyos, apoyos lineales y sus cargas.</small>
+          Toda la planta {planta} <span className="mono text-text-secondary">· {plural(todos.length, "objeto")}</span>
+          <small>Vigas, forjados, apoyos, apoyos lineales y sus cargas.</small>
         </span>
       </label>
       <div className="dlg-et">A las plantas</div>
-      <div className="fichas">
+      <div className="fichas-plantas">
         {m.plantas.map((x) => (
           <label key={x.id} className="ficha" title={x.nombre}>
             <input
@@ -306,7 +324,7 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
           </label>
         ))}
       </div>
-      <p className="dlg-nota">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga, su losa o su paño, o a la pieza igual que ya esté en el mismo sitio. Lo que ya está no se duplica. Los pilares y los muros no se copian: se alargan con su «desde» y su «hasta».</p>
+      <p className="dlg-nota">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga o su forjado, o a la pieza igual que ya esté en el mismo sitio. Lo que ya está no se duplica. Los pilares y los muros no se copian: se alargan con su «desde» y su «hasta».</p>
       {prueba && !prueba.ok && <p className="mt-2 text-state-fail">{prueba.errores.map((e) => e.mensaje).join(" ")}</p>}
       {prueba?.ok && prueba.avisos && <p className="dlg-nota">{prueba.avisos.join(" ")}</p>}
       {error && <p className="mt-2 text-state-fail">{error}</p>}
@@ -336,7 +354,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
     const nuevo = (id: string) => mapa.get(id) ?? id;
     if (elegidos.length) setElegidos(elegidos.map(nuevo));
     else if (seleccion) setSeleccion(nuevo(seleccion));
-    onCerrar(mapa.size ? `Renumerados ${mapa.size} objetos.` : "Pilares ordenados.");
+    onCerrar(mapa.size ? `${mapa.size === 1 ? "Renumerado" : "Renumerados"} ${plural(mapa.size, "objeto")}.` : "Pilares ordenados.");
   };
 
   return (
@@ -355,7 +373,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
       }
     >
       <p>
-        Pilares <span className="mono">{PREFIJOS.pilares}1…</span>, vigas <span className="mono">{PREFIJOS.vigas}1…</span>, barras <span className="mono">{PREFIJOS.barras}1…</span>, losas <span className="mono">{PREFIJOS.losas}1…</span>, paños <span className="mono">{PREFIJOS.panos}1…</span> y muros <span className="mono">{PREFIJOS.muros}1…</span>, por filas de arriba abajo y de izquierda a derecha (las vigas, barras, losas, paños y muros, por plantas de abajo arriba). La tabla de pilares queda en ese orden.
+        Pilares <span className="mono">{PREFIJOS.pilares}1…</span>, vigas <span className="mono">{PREFIJOS.vigas}1…</span>, barras <span className="mono">{PREFIJOS.barras}1…</span>, forjados <span className="mono">{PREFIJOS.losas}1…</span> (los unidireccionales, <span className="mono">{PREFIJOS.panos}1…</span>) y muros <span className="mono">{PREFIJOS.muros}1…</span>, por filas de arriba abajo y de izquierda a derecha (las vigas, barras, forjados y muros, por plantas de abajo arriba). La tabla de pilares queda en ese orden.
       </p>
       {hayPlantas && (
         <label className="mt-2 flex items-start gap-2">
@@ -390,7 +408,16 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
 
 
 const coma = (x: number) => String(Math.round(x * 1000) / 1000).replace(".", ",");
-const numero = (s: string) => Number(s.trim().replace(",", "."));
+/**
+ * Un número de un campo de estos diálogos (C-35): con coma o punto y espacios entre las cifras, como
+ * en la hoja; vacío es «falta», no 0. El texto, si no vale.
+ */
+const numero = (s: string): number | string => (s.trim() === "" ? "falta" : leerNumero(s));
+/** Lo que falla de los campos (`[nombre, leído]`), en una frase; null si todos son números. */
+const malos = (campos: [string, number | string][]): string | null => {
+  const m = campos.filter((c): c is [string, string] => typeof c[1] === "string");
+  return m.length ? m.map(([k, e]) => `${k}: ${e}.`).join(" ") : null;
+};
 
 /**
  * Ábacos en los pilares de un forjado reticular (decisión del usuario, 2026-10-13): dice qué crea
@@ -406,20 +433,26 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
   const [a, setA] = useState("2,4");
   const [b, setB] = useState("2,4");
   const [error, setError] = useState<string | null>(null);
-  const p = useMemo(() => (losa ? proponerAbacos(m, losa, numero(a), numero(b)) : { error: "No hay ningún forjado reticular." }), [m, losa, a, b]);
+  const [na, nb] = [numero(a), numero(b)];
+  const p = useMemo(() => {
+    const mal = malos([["Según los nervios", na], ["En perpendicular", nb]]);
+    if (!losa) return { error: "No hay ningún forjado reticular." };
+    return mal || typeof na === "string" || typeof nb === "string" ? { error: mal ?? "" } : proponerAbacos(m, losa, na, nb);
+  }, [m, losa, na, nb]);
   const op = "error" in p ? null : operacionAbacos(m, p);
 
   const hacer = () => {
     if (!op || "error" in p) return;
     const r = ed.editar(op, `Ábacos en los pilares de ${losa}`);
     if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
-    onCerrar(`${p.nuevos.length} ábacos en ${losa}.`);
+    onCerrar(`${plural(p.nuevos.length, "ábaco")} en ${losa}.`);
   };
 
   return (
     <Dialogo
       titulo="Ábacos en los pilares"
       onCerrar={() => onCerrar()}
+      alConfirmar={hacer}
       pie={
         <>
           <button type="button" className="btn" onClick={() => onCerrar()}>
@@ -447,15 +480,15 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
               ))}
             </select>
             <label htmlFor="abacos-a">Según los nervios (m)</label>
-            <input id="abacos-a" className="sel mono" value={a} onChange={(e) => setA(e.target.value)} />
+            <input id="abacos-a" className="sel mono" value={a} inputMode="decimal" aria-invalid={typeof na === "string"} data-error={typeof na === "string"} onChange={(e) => setA(e.target.value)} />
             <label htmlFor="abacos-b">En perpendicular (m)</label>
-            <input id="abacos-b" className="sel mono" value={b} onChange={(e) => setB(e.target.value)} />
+            <input id="abacos-b" className="sel mono" value={b} inputMode="decimal" aria-invalid={typeof nb === "string"} data-error={typeof nb === "string"} onChange={(e) => setB(e.target.value)} />
           </div>
           {"error" in p ? (
             <p className="mt-3 text-state-fail">{p.error}</p>
           ) : (
             <ul className="mt-3 list-disc pl-5" aria-label="Lo que se va a hacer">
-              <li>{p.nuevos.length ? `${p.nuevos.length} ábacos nuevos: ${p.nuevos.map((x) => x.pilar).join(", ")}.` : "Ningún ábaco nuevo."}</li>
+              <li>{p.nuevos.length ? `${plural(p.nuevos.length, "ábaco nuevo", "ábacos nuevos")}: ${p.nuevos.map((x) => x.pilar).join(", ")}.` : "Ningún ábaco nuevo."}</li>
               {p.conAbaco.length > 0 && <li>Ya tienen ábaco, y se dejan: {p.conAbaco.join(", ")}.</li>}
               {p.solapados.length > 0 && <li className="text-state-warn">Se solaparían con otro, y no se crean: {p.solapados.join(", ")}.</li>}
               {p.fuera.length > 0 && <li className="text-text-secondary">Se salen del forjado (cuenta lo de dentro): {p.fuera.join(", ")}.</li>}
@@ -480,7 +513,12 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
   const [b, setB] = useState("0,30");
   const [h, setH] = useState(() => String(inicial?.espesor ?? 0.3).replace(".", ","));
   const [error, setError] = useState<string | null>(null);
-  const p = useMemo(() => (losa ? proponerVigasBorde(m, losa, numero(b), numero(h)) : { error: "No hay ninguna losa." }), [m, losa, b, h]);
+  const [nb, nh] = [numero(b), numero(h)];
+  const p = useMemo(() => {
+    const mal = malos([["Ancho b", nb], ["Canto h", nh]]);
+    if (!losa) return { error: "No hay ningún forjado macizo ni reticular." };
+    return mal || typeof nb === "string" || typeof nh === "string" ? { error: mal ?? "" } : proponerVigasBorde(m, losa, nb, nh);
+  }, [m, losa, nb, nh]);
   const op = "error" in p ? null : operacionVigasBorde(m, p);
   const cuenta = (regla: string) => ("error" in p ? 0 : p.vigas.filter((v) => v.regla === regla).length);
 
@@ -488,13 +526,14 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
     if (!op || "error" in p) return;
     const r = ed.editar(op, `Vigas de borde de ${losa}`);
     if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
-    onCerrar(`${p.vigas.length} vigas de borde en ${losa}.`);
+    onCerrar(`${plural(p.vigas.length, "viga")} de borde en ${losa}.`);
   };
 
   return (
     <Dialogo
       titulo="Vigas de borde"
       onCerrar={() => onCerrar()}
+      alConfirmar={hacer}
       pie={
         <>
           <button type="button" className="btn" onClick={() => onCerrar()}>
@@ -507,11 +546,11 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
       }
     >
       {losas.length === 0 ? (
-        <p>No hay ninguna losa.</p>
+        <p>No hay ningún forjado macizo ni reticular: los zunchos de un unidireccional se dibujan como vigas.</p>
       ) : (
         <>
           <p>
-            Un zuncho en cada lado del borde (contorno y huecos) que no va sobre una viga, un muro, un apoyo lineal u otro forjado. Su eje va por el de los pilares del lado; sin pilares, enrasado por fuera. La losa no se toca: el cálculo lleva a la viga lo que cae en su ancho y en la franja de hasta su ancho que quede entre su cara de fuera y el borde del forjado.
+            Un zuncho en cada lado del borde (contorno y huecos) que no va sobre una viga, un muro, un apoyo lineal u otro forjado. Su eje va por el de los pilares del lado; sin pilares, enrasado por fuera. El forjado no se toca: el cálculo lleva a la viga lo que cae en su ancho y en la franja de hasta su ancho que quede entre su cara de fuera y el borde del forjado.
           </p>
           <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
             <label htmlFor="vb-losa">Forjado</label>
@@ -524,20 +563,20 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
               ))}
             </select>
             <label htmlFor="vb-b">Ancho b (m)</label>
-            <input id="vb-b" className="sel mono" value={b} onChange={(e) => setB(e.target.value)} />
+            <input id="vb-b" className="sel mono" value={b} inputMode="decimal" aria-invalid={typeof nb === "string"} data-error={typeof nb === "string"} onChange={(e) => setB(e.target.value)} />
             <label htmlFor="vb-h">Canto h (m)</label>
-            <input id="vb-h" className="sel mono" value={h} onChange={(e) => setH(e.target.value)} />
+            <input id="vb-h" className="sel mono" value={h} inputMode="decimal" aria-invalid={typeof nh === "string"} data-error={typeof nh === "string"} onChange={(e) => setH(e.target.value)} />
           </div>
           {"error" in p ? (
             <p className="mt-3 text-state-fail">{p.error}</p>
           ) : (
             <ul className="mt-3 list-disc pl-5" aria-label="Lo que se va a hacer">
               <li>
-                {p.vigas.length} vigas {p.seccion.id}
+                {plural(p.vigas.length, "viga")} {p.seccion.id}
                 {p.nueva ? " (sección nueva)" : ""}: {cuenta("pilares")} por el eje de los pilares, {cuenta("enrasada")} enrasadas
                 {cuenta("continua") ? ` y ${cuenta("continua")} que siguen la viga que ya ata el lado` : ""}.
               </li>
-              <li>Su eje queda a {coma(Math.max(...p.vigas.map((v) => v.retranqueo)))} m del borde como mucho; la losa y sus cargas no cambian.</li>
+              <li>Su eje queda a {coma(Math.max(...p.vigas.map((v) => v.retranqueo)))} m del borde como mucho; el forjado y sus cargas no cambian.</li>
               {p.avisos.map((a) => (
                 <li key={a} className="text-state-warn">
                   {a}

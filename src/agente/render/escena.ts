@@ -400,3 +400,14 @@ export function rotulo(x: number, cifras = 3): string {
   const t = Number(x.toFixed(Math.min(d, 6)));
   return (Object.is(t, -0) ? 0 : t).toString().replace(".", ",");
 }
+
+/**
+ * Número con `dec` decimales fijos, coma decimal y el signo menos tipográfico (R-21): el formato
+ * de los paneles de la app (`fmt` de `app/src/fmt.ts`, sin el espacio de miles), para que el
+ * extremo rotulado en el dibujo y el de la tabla digan lo mismo.
+ */
+export function numeroFijo(x: number, dec: number): string {
+  if (!Number.isFinite(x)) return String(x);
+  const t = Math.abs(x).toFixed(dec);
+  return `${x < 0 && Number(t) !== 0 ? "−" : ""}${t.replace(".", ",")}`;
+}

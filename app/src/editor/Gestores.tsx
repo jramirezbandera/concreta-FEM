@@ -35,18 +35,20 @@ import {
   type FormaSeccion,
   type UsoSeccion,
 } from "../../../src/editor/gestores.ts";
+import { leerNumero } from "../../../src/editor/celdas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import type { Objeto } from "../../../src/editor/referencias.ts";
 import { enCatalogo, perfilDeCatalogo, PERFILES, SERIES_PERFILES, type SeriePerfil } from "../../../src/secciones/perfiles.ts";
 import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
-import { fmt } from "../fmt.ts";
+import { fmt, plural } from "../fmt.ts";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
 import { GestorCasos } from "./GestorCasos.tsx";
 import { GestorPlantas } from "./GestorPlantas.tsx";
 import { cerrarGestor, useGestor, type PedidoGestor } from "./referencia.tsx";
 import "./gestores.css";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 /** El gestor abierto, si hay pedido (va una vez en `App`). */
 export function GestorAbierto() {
@@ -69,7 +71,12 @@ export function GestorAbierto() {
 // ─── Números ────────────────────────────────────────────────────────────────────────────────────
 
 /** Lo escrito en un campo: null si está vacío, NaN si no es un número. */
-const leer = (t: string | undefined): number | null => (t === undefined || t.trim() === "" ? null : Number(t.trim().replace(",", ".")));
+/** Un número escrito, como en la hoja (`leerNumero`: coma o punto, espacios entre cifras; C-35); vacío, null; mal, NaN. */
+const leer = (t: string | undefined): number | null => {
+  if (t === undefined || t.trim() === "") return null;
+  const v = leerNumero(t);
+  return typeof v === "number" ? v : NaN;
+};
 /** Un número para un campo, sin el ruido de la coma flotante. */
 const escrito = (v: number | undefined, factor = 1): string => (v === undefined ? "" : String(Number((v * factor).toPrecision(12))).replace(".", ","));
 /** Con n cifras significativas. */
@@ -365,7 +372,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
             </p>
           )}
           {!actual && (
-            <div className="ges-tipos" role="radiogroup" aria-label="Tipo de sección">
+            <Grupo rol="radiogroup" etiqueta="Tipo de sección" className="ges-tipos">
               {TIPOS.map((t) => (
                 <button key={t.forma} type="button" role="radio" aria-checked={form.forma === t.forma} className="ges-tipo" onClick={() => setForm({ ...nuevaPropuesta(t.forma), id: form.id })}>
                   <DibujoSeccion datos={seccionPropuesta(t.forma, uso, "")} mini />
@@ -373,7 +380,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
                   <small>{t.grupo}</small>
                 </button>
               ))}
-            </div>
+            </Grupo>
           )}
           <div className="ges-cuerpo">
             <div className="ges-datos">
@@ -665,14 +672,14 @@ export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir,
           {x.texto ? (
             <>
               <span className="ges-texto">{x.texto}</span>
-              <span className="ges-n" title={x.n ? `${x.n} objetos la usan` : "Sin usar"}>
+              <span className="ges-n" title={x.n ? `${plural(x.n, "objeto")} la ${x.n === 1 ? "usa" : "usan"}` : "Sin usar"}>
                 {x.detalle}
                 {x.n ? ` · ${x.n}` : " · sin usar"}
               </span>
             </>
           ) : (
             // D-19: sin texto (un caso sin nombre), el detalle va en la línea del id, no debajo de ella
-            <span className="ges-texto" title={x.n ? `${x.n} objetos lo usan` : "Sin usar"}>
+            <span className="ges-texto" title={x.n ? `${plural(x.n, "objeto")} lo ${x.n === 1 ? "usa" : "usan"}` : "Sin usar"}>
               {x.detalle}
               {x.n ? ` · ${x.n}` : " · sin usar"}
             </span>
@@ -694,7 +701,8 @@ interface FormMaterial {
 function formMaterial(x: Material): FormMaterial {
   if (x.tipo === "hormigon") return { tipo: x.tipo, id: x.id, campos: { fck: escrito(x.fck), nu: escrito(x.nu), peso: escrito(x.peso) } };
   if (x.tipo === "acero") return { tipo: x.tipo, id: x.id, campos: { E: escrito(x.E), peso: escrito(x.peso) } };
-  return { tipo: x.tipo, id: x.id, campos: { E: escrito(x.E), G: escrito(x.G), peso: escrito(x.peso) } };
+  // E y G de un material general van en kN/m² en el fichero y en MPa aquí, como en los otros dos (C-32)
+  return { tipo: x.tipo, id: x.id, campos: { E: escrito(x.E, 1 / 1000), G: escrito(x.G, 1 / 1000), peso: escrito(x.peso) } };
 }
 
 /** Lo rellenado como material, o los errores por campo. */
@@ -704,6 +712,10 @@ function materialDe(f: FormMaterial, id: string): { ok: true; material: Material
     const v = leer(f.campos[k]);
     if (v === null) {
       if (o.obligatorio) errores[k] = "falta";
+      return undefined;
+    }
+    if (Number.isNaN(v)) {
+      errores[k] = `«${f.campos[k]!.trim()}» no es un número`;
       return undefined;
     }
     if (!Number.isFinite(v) || (o.mayorQue !== undefined && !(v > o.mayorQue)) || (o.min !== undefined && v < o.min) || (o.max !== undefined && v > o.max)) {
@@ -716,7 +728,10 @@ function materialDe(f: FormMaterial, id: string): { ok: true; material: Material
   let material: Material;
   if (f.tipo === "hormigon") material = { id, tipo: "hormigon", fck: num("fck", { obligatorio: true, mayorQue: 0 })!, ...opc("nu", num("nu", { min: 0, max: 0.5 })), ...opc("peso", num("peso", { min: 0 })) };
   else if (f.tipo === "acero") material = { id, tipo: "acero", ...opc("E", num("E", { mayorQue: 0 })), ...opc("peso", num("peso", { min: 0 })) };
-  else material = { id, tipo: "general", E: num("E", { obligatorio: true, mayorQue: 0 })!, G: num("G", { obligatorio: true, mayorQue: 0 })!, peso: num("peso", { obligatorio: true, min: 0 })! };
+  else {
+    const kN = (v: number | undefined) => (v === undefined ? v : Number((v * 1000).toPrecision(15)));
+    material = { id, tipo: "general", E: kN(num("E", { obligatorio: true, mayorQue: 0 }))!, G: kN(num("G", { obligatorio: true, mayorQue: 0 }))!, peso: num("peso", { obligatorio: true, min: 0 })! };
+  }
   if (!id) errores.id = "falta";
   return Object.keys(errores).length ? { ok: false, errores } : { ok: true, material };
 }
@@ -732,8 +747,8 @@ const CAMPOS_MATERIAL: Record<Material["tipo"], readonly [string, string, string
     ["peso", "kN/m³", "peso específico; vacío, 78,5"],
   ],
   general: [
-    ["E", "kN/m²", "módulo de elasticidad"],
-    ["G", "kN/m²", "módulo de cortante"],
+    ["E", "MPa", "módulo de elasticidad"],
+    ["G", "MPa", "módulo de cortante"],
     ["peso", "kN/m³", "peso específico"],
   ],
 };
@@ -903,7 +918,7 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
               )}
               <label className="campo">
                 <span>
-                  id <Ayuda texto="El nombre con que lo eligen secciones y losas. Vacío, el propuesto (HA-30 para un hormigón de fck 30)." />
+                  id <Ayuda texto="El nombre con que lo eligen las secciones, los forjados y los muros. Vacío, el propuesto (HA-30 para un hormigón de fck 30)." />
                 </span>
                 <input value={form.id} placeholder={propuesto} aria-label="id del material" data-error={!!errores.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
                 {renombrar && !hay.has(renombrar) && (
@@ -917,15 +932,15 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
               </label>
               <div className="campo">
                 <span>
-                  tipo <Ayuda texto="Hormigón: E sale de fck (el Ecm del Código Estructural). Acero: E = 210 000 MPa; el grado sólo da el nombre, porque el cálculo es elástico. General: E, ν y γ a mano." />
+                  tipo <Ayuda texto="Hormigón: E sale de fck (el Ecm del Código Estructural). Acero: E = 210 000 MPa; el grado sólo da el nombre, porque el cálculo es elástico. General: E, G y γ a mano." />
                 </span>
-                <div className="seg" role="radiogroup" aria-label="Tipo de material">
+                <Grupo rol="radiogroup" etiqueta="Tipo de material" className="seg">
                   {(["hormigon", "acero", "general"] as const).map((t) => (
                     <button key={t} type="button" role="radio" aria-checked={form.tipo === t} data-on={form.tipo === t} onClick={() => setForm(t === form.tipo ? form : { ...vacio(t), id: form.id })}>
                       {NOMBRE_TIPO[t]}
                     </button>
                   ))}
-                </div>
+                </Grupo>
               </div>
               {CAMPOS_MATERIAL[form.tipo].map(([k, u, a]) => (
                 <label key={k} className="campo">

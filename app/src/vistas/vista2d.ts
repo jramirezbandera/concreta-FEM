@@ -14,9 +14,10 @@
  * y sus textos en el lienzo 2D, si miden al menos `TEXTO_MINIMO` px.
  */
 import { BufferAttribute, BufferGeometry, Color, Group, LineSegments, OrthographicCamera, Scene, type WebGLRenderer } from "three";
-import { rotulo, type Texto, type Vec2 } from "../../../src/agente/render/escena.ts";
+import type { Texto, Vec2 } from "../../../src/agente/render/escena.ts";
 import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import { RADIO_CLIC, type Eleccion, type EscenaPreparada, type Glifo } from "../../../src/visor/escena.ts";
+import { fmt } from "../fmt.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
 import { CAJA_VACIA, ENCUADRE_MINIMO, iconoEjes, MATERIAL_LINEAS, Rejilla2D } from "./fondo.ts";
@@ -65,6 +66,12 @@ export interface Camara2D {
   ajustada?: boolean;
 }
 
+/** M-26: cuántas veces tiene que crecer la escena para que la vista ajustada no la siga. */
+const SALTO_ENCUADRE = 5;
+
+/** El lado mayor de una caja (con el encuadre mínimo), m. */
+const lado = (c: readonly [number, number, number, number]) => Math.max(ENCUADRE_MINIMO, c[2] - c[0], c[3] - c[1]);
+
 /** Márgenes del encuadre completo, px: el carril de plantas, la cabecera y la barra de la vista. */
 export interface Margenes {
   izq: number;
@@ -105,7 +112,8 @@ export class Vista2D extends Vista {
   /** V2c: lo que dibuja con el ratón (sólo en las plantas editables). */
   dibujo: Dibujo2D | null = null;
   /** Texto del cursor para la barra de estado (planta: x, y; alzado: u, z). */
-  formatoCursor: (q: Vec2) => string = (q) => `x ${rotulo(q[0], 4)} · y ${rotulo(q[1], 4)} m`;
+  // R-24: decimales fijos, al mm (lo enganchado puede no ser de cm redondos; con cifras significativas salían mezclados)
+  formatoCursor: (q: Vec2) => string = (q) => `x ${fmt(q[0], 3)} · y ${fmt(q[1], 3)} m`;
   /** Rótulos que no cupieron en el último fotograma. */
   omitidos = 0;
   private temaCapas: string | null = null;
@@ -147,9 +155,14 @@ export class Vista2D extends Vista {
     if (e === this.escena) return;
     // Lo primero que se dibuja en una planta vacía no mueve la vista (si se ve)
     const veniaVacia = !!this.escena && escenaVacia(this.escena);
+    const antes = this.escena;
     this.escena = e;
     this.reconstruir();
     if (!e) return this.entorno.pintar();
+    // M-26: un objeto muy lejos (un pilar tecleado a 1 km) no reencuadra la vista ajustada: el edificio
+    // se quedaba en unos píxeles, y al deshacer volvía a saltar. La vista se queda donde estaba (deja de
+    // ser el encuadre automático: F encuadra todo) y la sensatez del modelo avisa del objeto lejano.
+    if (this.ajustada && antes && !veniaVacia && !escenaVacia(e) && lado(e.caja) > SALTO_ENCUADRE * lado(antes.caja)) this.ajustada = false;
     if (!this.encuadrada || this.s <= 0 || (this.ajustada && !veniaVacia)) this.encuadrar();
     else {
       // ¿Se sigue viendo algo de la escena nueva?
@@ -482,7 +495,16 @@ export class Vista2D extends Vista {
       if (m.texto) {
         ctx.font = `600 12px "Geist Mono", ui-monospace, monospace`;
         ctx.textAlign = "left";
-        textoConHalo(ctx, m.texto, x + 9, y - 8, acento, col.fondo);
+        // R-26: sobre una caja del fondo con el borde del acento, como los extremos rotulados (sólo el
+        // halo se perdía sobre las bandas rojas o encima de un eje)
+        const w = ctx.measureText(m.texto).width;
+        const [bx, by, bw, bh] = [x + 6, y - 21, w + 7, 18];
+        ctx.fillStyle = col.fondo;
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = acento;
+        ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+        textoConHalo(ctx, m.texto, x + 9.5, y - 8, acento, col.fondo);
       }
     }
     if (this.dibujo) {

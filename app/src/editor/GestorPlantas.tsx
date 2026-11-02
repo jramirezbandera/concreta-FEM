@@ -22,12 +22,13 @@ import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { insertarPlantas, MAX_PLANTAS_NUEVAS, plantasEdificio, type InsercionPlantas } from "../../../src/editor/plantas.ts";
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
-import { cota, fmt } from "../fmt.ts";
+import { cota, fmt, plural } from "../fmt.ts";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
 import { FormularioObjeto, type ControlFicha } from "./Formulario.tsx";
 import { PreguntaCambios } from "./Gestores.tsx";
 import { cerrarGestor, type PedidoGestor } from "./referencia.tsx";
 import "./gestores.css";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 const leer = (t: string): number => (t.trim() === "" ? NaN : Number(t.trim().replace(",", ".")));
 const TIPOS: readonly [TipoPlanta | "", string][] = [
@@ -40,7 +41,7 @@ type Modo = "inicio" | "anadir" | "datos";
 
 /** Lo que dice el «?» de cada campo (la ayuda en un globo, no un texto debajo). */
 const AYUDA = {
-  plantas: "Cuántas plantas tiene el edificio sobre la cimentación, contando la cubierta. Cada planta es un forjado: sus pilares, vigas, losas y cargas se dibujan en ella.",
+  plantas: "Cuántas plantas tiene el edificio sobre la cimentación, contando la cubierta. Cada planta es un forjado: sus pilares, vigas, forjados y cargas se dibujan en ella.",
   primera: "De la cimentación a la cara superior del primer forjado. La cota de una planta es la cara superior de su forjado.",
   demas: "De cara superior a cara superior de forjado, igual en todas. Con una sola planta no se usa.",
   cuantas: `De 1 a ${MAX_PLANTAS_NUEVAS}, todas con la misma altura y el mismo tipo.`,
@@ -103,7 +104,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
     if (!r.ok) return setError(r.mensaje);
     const texto =
       modo === "inicio"
-        ? `${r.plantas.length - 1} plantas sobre ${r.plantas[r.plantas.length - 1]!.id}`
+        ? `${plural(r.plantas.length - 1, "planta")} sobre ${r.plantas[r.plantas.length - 1]!.id}`
         : `${r.ids.length > 1 ? `Plantas ${r.ids.join(", ")}` : `Planta ${r.ids[0]}`} ${donde} de ${de}`;
     if (!terminar(r.ids[0] ?? de, [r.operacion], texto)) return;
     setError(null);
@@ -209,7 +210,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
         >
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
           {modo !== "inicio" && (
-            <div className="seg mb-3" role="tablist" aria-label="Añadir o ver los datos">
+            <Grupo rol="tablist" etiqueta="Añadir o ver los datos" className="seg mb-3">
               <button type="button" role="tab" aria-selected={modo === "anadir"} data-on={modo === "anadir"} onClick={() => antes(() => (ficha.current?.descartar(), setModo("anadir"), setAviso(null)))}>
                 Añadir plantas
               </button>
@@ -218,7 +219,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                   Datos de {actual.id}
                 </button>
               )}
-            </div>
+            </Grupo>
           )}
           {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), ficha.current?.descartar(), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
@@ -304,13 +305,13 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                   Dónde <Ayuda texto={AYUDA.donde} />
                 </h3>
                 <div className="gp-fila">
-                  <div className="seg gp-seg" role="radiogroup" aria-label="Encima o debajo">
+                  <Grupo rol="radiogroup" etiqueta="Encima o debajo" className="seg gp-seg">
                     {(["encima", "debajo"] as const).map((d) => (
                       <button key={d} type="button" role="radio" aria-checked={donde === d} data-on={donde === d} onClick={() => setDonde(d)}>
                         {d === "encima" ? "Encima de" : "Debajo de"}
                       </button>
                     ))}
-                  </div>
+                  </Grupo>
                   <label className="gp-campo gp-ancho">
                     <select className="sel" value={de} aria-label="Planta de referencia" onChange={(e) => elegir(e.target.value)}>
                       {plantas.map((p, i) => (
@@ -489,7 +490,7 @@ function Alzado({ plantas, nuevas, elegida, onElegir }: { plantas: readonly Plan
         <line className="gp-terreno" x1={X_EDIF[0] - 14} y1={yFin + 6} x2={X_EDIF[1] + 14} y2={yFin + 6} />
       </svg>
       <p className="gp-total">
-        {`${plantas.length} niveles · ${fmt(total, 2)} m de altura`}
+        {`${plural(plantas.length, "planta")} · ${fmt(total, 2)} m de altura`}
         {nuevas.size > 0 && <span>{` · ${nuevas.size} ${nuevas.size === 1 ? "nueva" : "nuevas"}`}</span>}
       </p>
       <table className="sr-only" aria-label="Cómo quedan las plantas">

@@ -13,7 +13,7 @@
  * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, FolderOpen, History, Moon, MoreHorizontal, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
+import { Check, Download, FolderOpen, History, Moon, MoreHorizontal, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2, X } from "lucide-react";
 import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
 import { MenuFlotante, ejeVecino } from "./armazon/Disposicion.tsx";
@@ -70,12 +70,47 @@ function Estado({ p }: { p: ProyectoAbierto }) {
   );
 }
 
+/**
+ * R-25: lo que está haciendo el cálculo, por la última fase que terminó (`alProgreso` del motor, en
+ * su orden: numeración, cargas, patrón, ensamblado, análisis, factorización, resolución, residuo,
+ * refinamiento, solución y recuperación). Sin ninguna aún, se prepara el modelo.
+ */
+const DESPUES_DE: Record<string, string> = {
+  numeracion: "aplicando las cargas",
+  cargas: "ensamblando",
+  patron: "ensamblando",
+  ensamblado: "factorizando",
+  "solucion.analisis": "factorizando",
+  "solucion.factorizacion": "resolviendo los casos",
+  "solucion.resolucion": "comprobando la solución",
+  "solucion.residuo": "comprobando la solución",
+  "solucion.refinamiento": "comprobando la solución",
+  solucion: "recuperando los esfuerzos",
+  recuperacion: "comprobando el equilibrio",
+};
+const textoProgreso = (fase: string | null | undefined): string => (fase ? (DESPUES_DE[fase] ?? "calculando") : "preparando el modelo");
+
+/** R-25: el botón que para un cálculo en curso. */
+function BotonCancelar({ p }: { p: ProyectoAbierto }) {
+  if (p.fase !== "calculando" || !p.cancelar) return null;
+  return (
+    <button type="button" className="btn" onClick={p.cancelar} title="Parar el cálculo: la versión queda sin calcular">
+      <X size={15} /> Cancelar
+    </button>
+  );
+}
+
 function TextoEstado({ p }: { p: ProyectoAbierto }) {
   const e = p.estado;
   if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : p.edicion?.pendiente ? "LEYENDO LO EDITADO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
   // La huella, en el título y en Revisión: en la píldora era un código que no dice nada (UI-43)
   const huella = e ? `Versión del modelo ${e.huella.slice(0, 8)}` : undefined;
-  if (p.fase === "calculando") return <span className="pill warn" title={huella}>CALCULANDO</span>;
+  if (p.fase === "calculando")
+    return (
+      <span className="pill warn" title={huella} data-progreso={p.progreso ?? ""}>
+        CALCULANDO · {textoProgreso(p.progreso)}
+      </span>
+    );
   if (p.fase === "error") return <span className="pill fail" title={p.errores.map((d) => d.mensaje).join(" ") || undefined}>{!e ? "NO SE PUEDE ABRIR" : e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUDO COMPILAR"}</span>;
   if (!e) return null;
   if (e.compilando) return <span className="pill warn" title={`Lo que sólo necesita el modelo ya se dibuja; los diagnósticos, la malla y el cálculo esperan a la compilación. ${huella}`}>COMPILANDO</span>;
@@ -125,6 +160,20 @@ export function App() {
   const clave = espacioValido === "resultados" ? `resultados:${modo}` : espacioValido;
 
   const irA = useCallback((x: Espacio, m?: ModoResultados) => setDonde((d) => ({ espacio: x, modo: m ?? d.modo })), []);
+  // P-27: al acabar un cálculo fuera de Resultados, un aviso con el camino (antes, sólo cambiaba la píldora)
+  const [recienCalculado, setRecienCalculado] = useState(false);
+  const faseAntes = useRef(proyecto.fase);
+  useEffect(() => {
+    const antes = faseAntes.current;
+    faseAntes.current = proyecto.fase;
+    if (antes === "calculando" && proyecto.fase === "listo" && e?.calculado) setRecienCalculado(true);
+    else if (proyecto.fase === "calculando" || !e?.calculado) setRecienCalculado(false);
+  }, [proyecto.fase, e?.calculado]);
+  useEffect(() => {
+    if (!recienCalculado) return;
+    const t = window.setTimeout(() => setRecienCalculado(false), 12_000);
+    return () => window.clearTimeout(t);
+  }, [recienCalculado]);
   const { cambiar } = paneles;
   const setElegidos = useCallback(
     (ids: string[]) => {
@@ -228,7 +277,7 @@ export function App() {
       r.push({ id: "gestor-materiales", grupo: "Modelo", nombre: "Materiales… (gestor)", hacer: () => abrirGestor({ coleccion: "materiales" }) });
       r.push({ id: "gestor-nuevo-material", grupo: "Modelo", nombre: "Nuevo material…", hacer: () => abrirGestor({ coleccion: "materiales", nueva: true }) });
       r.push({ id: "gestor-casos", grupo: "Cargas", nombre: "Casos de carga… (gestor)", hacer: () => abrirGestor({ coleccion: "casos" }) });
-      r.push({ id: "gestor-hipotesis", grupo: "Cargas", nombre: "Nuevo caso… / Hipótesis típicas…", hacer: () => abrirGestor({ coleccion: "casos", nueva: true }) });
+      r.push({ id: "gestor-hipotesis", grupo: "Cargas", nombre: "Nuevo caso… / Casos típicos…", claves: "hipótesis", hacer: () => abrirGestor({ coleccion: "casos", nueva: true }) });
       r.push({ id: "vigas-borde", grupo: "Modelo", nombre: "Vigas de borde… (los zunchos de un forjado ya dibujado)", hacer: () => setVigasBorde(true) });
       r.push({ id: "gestor-plantas", grupo: "Modelo", nombre: "Plantas… / Añadir plantas…", hacer: () => abrirGestor({ coleccion: "plantas", nueva: true, ...(plantaValida ? { planta: plantaValida } : {}) }) });
     }
@@ -237,7 +286,7 @@ export function App() {
       { id: "calcular", grupo: "Proyecto", nombre: e?.calculado ? "Recalcular" : "Calcular", hacer: () => (e?.calculado || !proyecto.calcular ? proyecto.recalcular() : proyecto.calcular()), deshabilitada: !e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado) },
       ...(ed?.modo === "escribir" ? [{ id: "guardar", grupo: "Proyecto", nombre: "Guardar", atajo: "Ctrl S", hacer: () => void ed.guardar(), deshabilitada: !ed.sinGuardar }] : []),
       ...(ed?.modo === "descargar" && hayAlmacen() ? [{ id: "al-navegador", grupo: "Proyecto", nombre: "Guardar en mis proyectos (en este navegador)", atajo: "Ctrl S", hacer: () => void ed.alNavegador() }] : []),
-      { id: "exportar", grupo: "Proyecto", nombre: "Exportar el proyecto.json", hacer: () => ed?.exportar(), deshabilitada: !ed },
+      { id: "exportar", grupo: "Proyecto", nombre: "Exportar el proyecto (.json)", hacer: () => ed?.exportar(), deshabilitada: !ed },
       ...(ed?.modo === "auto" ? [{ id: "versiones", grupo: "Proyecto", nombre: "Versiones anteriores…", hacer: abrirVersiones }] : []),
       { id: "deshacer", grupo: "Proyecto", nombre: ed?.deshacerEtiqueta ? `Deshacer: ${ed.deshacerEtiqueta}` : "Deshacer", atajo: "Ctrl Z", hacer: () => ed?.deshacer(), deshabilitada: !ed?.deshacerEtiqueta },
       { id: "rehacer", grupo: "Proyecto", nombre: ed?.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta}` : "Rehacer", atajo: "Ctrl Y", hacer: () => ed?.rehacer(), deshabilitada: !ed?.rehacerEtiqueta },
@@ -280,12 +329,20 @@ export function App() {
     [m, setSeleccion],
   );
 
+  // P-26: la pestaña y la barra dicen el proyecto con su nombre de ahora (el editado, sin esperar a la
+  // sesión); antes la pestaña era siempre «FEM 3D · Visor» y la barra de estado seguía con el viejo
+  const nombreProyecto = ed?.proyecto.nombre || e?.nombre || (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? ""));
+  const conProyecto = !!e;
+  useEffect(() => {
+    document.title = conProyecto && nombreProyecto ? `${nombreProyecto} · Concreta FEM 3D` : "Concreta FEM 3D";
+  }, [conProyecto, nombreProyecto]);
+
   if (!e && proyecto.fase !== "error") return <Inicio proyecto={proyecto} />;
 
   const pie =
     proyecto.fuente?.tipo === "origen"
       ? proyecto.fuente.origen.navegador
-        ? `${proyecto.fuente.origen.descripcion} · se guarda solo${ed?.guardado.tipo === "guardado" && ed.guardado.ms ? ` (en ${ed.guardado.ms.toFixed(0)} ms)` : ""}`
+        ? `${ed?.proyecto.nombre ? `en este navegador / ${ed.proyecto.nombre}` : proyecto.fuente.origen.descripcion} · se guarda solo${ed?.guardado.tipo === "guardado" && ed.guardado.ms ? ` (en ${ed.guardado.ms.toFixed(0)} ms)` : ""}`
         : `${proyecto.fuente.origen.descripcion} · vigilando cambios${ed?.guardado.tipo === "guardado" ? ` · guardado en ${ed.guardado.ms.toFixed(0)} ms` : ""}`
       : proyecto.fuente
         ? `${proyecto.fuente.nombre} · sin guardar en ningún sitio${hayAlmacen() ? " (Guardar en mis proyectos, o Exportar)" : " (Exportar lo descarga)"}`
@@ -306,8 +363,8 @@ export function App() {
               <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-[18px] w-[18px]" aria-hidden="true" />
               Concreta
             </span>
-            <span className="nombre-proyecto min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={e?.nombre ?? undefined}>
-              {e?.nombre ?? (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? ""))}
+            <span className="nombre-proyecto min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={nombreProyecto || undefined}>
+              {nombreProyecto}
             </span>
             <nav className="espacios" aria-label="Espacios de trabajo">
               {ESPACIOS.map((x) => (
@@ -363,7 +420,7 @@ export function App() {
                     <History size={16} />
                   </button>
                 )}
-                <button type="button" className="ib ancho-1100" onClick={ed.exportar} aria-label="Exportar el proyecto.json" title="Exportar el proyecto.json (descargarlo)">
+                <button type="button" className="ib ancho-1100" onClick={ed.exportar} aria-label="Exportar el proyecto (.json)" title="Exportar el proyecto: descarga su .json, con el nombre del proyecto">
                   <Download size={16} />
                 </button>
               </>
@@ -373,6 +430,7 @@ export function App() {
               </span>
             )}
             <Estado p={proyecto} />
+            <BotonCancelar p={proyecto} />
             {ed && e?.compila && !e.calculado && !proyecto.desactualizado ? (
               <button type="button" className="btn btn-p" onClick={proyecto.calcular} disabled={proyecto.fase === "calculando"} title="Calcular esta versión del proyecto">
                 <Play size={15} /> {proyecto.fase === "calculando" ? "Calculando…" : "Calcular"}
@@ -461,6 +519,26 @@ export function App() {
               }}
             />
           )}
+          {recienCalculado && espacioValido !== "resultados" && espacioValido !== "revision" && e?.calculado && (
+            <div className="banda ok" role="status">
+              <span className="min-w-0 flex-1">
+                <strong>Calculado{e.origen !== "guardados" && proyecto.tiempos.calcular !== undefined ? ` en ${fmt(proyecto.tiempos.calcular, 1)} s` : ""}.</strong> Los resultados de esta versión ya se pueden ver.
+              </span>
+              <button
+                type="button"
+                className="btn btn-p"
+                onClick={() => {
+                  setRecienCalculado(false);
+                  irA("resultados");
+                }}
+              >
+                Ver resultados →
+              </button>
+              <button type="button" className="ib" aria-label="Cerrar el aviso" title="Cerrar" onClick={() => setRecienCalculado(false)}>
+                <X size={15} />
+              </button>
+            </div>
+          )}
           {ed?.guardado.tipo === "error" && (
             <div className="banda fail" role="alert">
               <span className="min-w-0 flex-1">
@@ -481,7 +559,7 @@ export function App() {
                   <>
                     {" "}
                     {[...new Set(proyecto.errores.flatMap((d) => d.ids ?? []))].slice(0, 8).map((id) => (
-                      <button key={id} type="button" className="btn ml-1" style={{ height: 22, padding: "0 6px", fontSize: 11 }} onClick={() => setElegidos([id])}>
+                      <button key={id} type="button" className="btn btn-sm ml-1" onClick={() => setElegidos([id])}>
                         {id}
                       </button>
                     ))}
@@ -517,8 +595,9 @@ export function App() {
 
           <footer className="barra-estado">
             <span className="shrink-0 whitespace-nowrap mono" data-cursor="" aria-live="off" />
-            <span className="min-w-0 shrink truncate">{pie}</span>
-            <span className="min-w-0 flex-1 truncate">{resultados}</span>
+            {/* R-24: lo que no cabe, entero en el título */}
+            <span className="min-w-0 shrink truncate" title={pie || undefined}>{pie}</span>
+            <span className="min-w-0 flex-1 truncate" title={resultados || undefined}>{resultados}</span>
             <span className="shrink-0">kN · m</span>
             {e?.estadisticas && (
               <span className="shrink-0 whitespace-nowrap">
@@ -551,7 +630,7 @@ function EsperaCalculo({ p, donde, onModelo }: { p: ProyectoAbierto; donde: stri
       <h1>{ocupado ? (p.fase === "calculando" ? "Calculando…" : "Leyendo lo editado…") : !e.compila ? "El modelo no compila" : p.fase === "error" ? "El cálculo falló" : "Los resultados eran de otra versión"}</h1>
       <p>
         {ocupado
-          ? `${donde} sale en cuanto termine.`
+          ? `${p.fase === "calculando" ? `Ahora, ${textoProgreso(p.progreso)}. ` : ""}${donde} sale en cuanto termine.`
           : !e.compila
             ? "Corrija los errores (en Modelo, pestaña Diagnósticos) y calcule de nuevo."
             : p.fase === "error"
@@ -564,6 +643,7 @@ function EsperaCalculo({ p, donde, onModelo }: { p: ProyectoAbierto; donde: stri
             <Play size={15} /> Calcular
           </button>
         )}
+        <BotonCancelar p={p} />
         <button type="button" className="btn" onClick={onModelo}>
           Ir a Modelo
         </button>

@@ -336,6 +336,11 @@ export class Motor {
   quitar(i: number): void {
     const c = this.celdas.get(i);
     if (!c) return;
+    // R-24: el texto del cursor de una vista que se va (el 3D al volver a planta) no se queda en la barra de estado
+    if (this.ultimoCursor?.vista === c.vista) {
+      this.ultimoCursor = null;
+      this.alCursor?.(null);
+    }
     c.quitar();
     this.celdas.delete(i);
     this.pintar();

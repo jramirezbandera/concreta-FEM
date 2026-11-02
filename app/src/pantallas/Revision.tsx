@@ -16,22 +16,58 @@ import { Disposicion, Herramienta, Separador } from "../armazon/Disposicion.tsx"
 import { IcFirma, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
+import { Dialogo } from "../editor/Dialogos.tsx";
 import { useVisor } from "../contexto.ts";
 import { nombreFirmas } from "../sesion/origen.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 
 const ancla = (i: number) => `informe-${i}`;
 
-/** Figura del informe: su SVG (generado por el render de A4) como imagen, sin insertarlo en el DOM. */
+/**
+ * R-33: la letra de la figura. El SVG de `fem render` pide Roboto, que la página no puede darle a
+ * una imagen (salía con serifa, la de por defecto): aquí, una sin serifa del sistema detrás. El
+ * fichero del informe no cambia (su sha256 es el de la firma).
+ */
+const conLetra = (svg: string) => svg.replace(/font-family="Roboto"/, `font-family="Roboto, 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif"`);
+
+/**
+ * Figura del informe: su SVG (generado por el render de A4) como imagen, sin insertarlo en el DOM.
+ * R-33: un clic la abre a toda la pantalla, a su tamaño (en el ancho del informe, los rótulos
+ * quedaban en 6–7 px).
+ */
 function Figura({ svg, titulo }: { svg: string; titulo: string }) {
-  const url = useMemo(() => URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })), [svg]);
+  const url = useMemo(() => URL.createObjectURL(new Blob([conLetra(svg)], { type: "image/svg+xml" })), [svg]);
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const [grande, setGrande] = useState(false);
   return (
     <figure className="my-3">
-      <img src={url} alt={titulo} className="w-full rounded border border-border-sub bg-white" />
-      <figcaption className="mt-1 text-[11px] text-text-muted">{titulo}</figcaption>
+      <button type="button" className="block w-full cursor-zoom-in p-0" style={{ background: "none", border: 0 }} onClick={() => setGrande(true)} title="Ampliar la figura" aria-label={`Ampliar: ${titulo}`}>
+        <img src={url} alt={titulo} className="w-full rounded border border-border-sub bg-white" />
+      </button>
+      <figcaption className="mt-1 text-[11px] text-text-muted">{titulo} · un clic la amplía</figcaption>
+      {grande && (
+        <Dialogo
+          titulo={titulo}
+          clase="dialogo-figura"
+          onCerrar={() => setGrande(false)}
+          pie={
+            <button type="button" className="btn btn-p" onClick={() => setGrande(false)}>
+              Cerrar
+            </button>
+          }
+        >
+          <img src={url} alt={titulo} className="block max-w-none rounded border border-border-sub bg-white" />
+        </Dialogo>
+      )}
     </figure>
   );
+}
+
+/** D-34: el estado de una comprobación en la tabla del informe, con el color de las pastillas de la derecha. */
+function Celda({ c }: { c: string }) {
+  if (c.startsWith("AVISOS")) return <span className="pill warn">{c}</span>;
+  if (c === "bien") return <span className="text-state-ok">{c}</span>;
+  return <>{c}</>;
 }
 
 function Documento({ doc }: { doc: Bloque[] }) {
@@ -81,7 +117,7 @@ function Documento({ doc }: { doc: Bloque[] }) {
                       <tr key={j}>
                         {f.map((c, k) => (
                           <td key={k} className={b.numericas?.includes(k) ? undefined : "txt"} style={b.numericas?.includes(k) ? undefined : { textAlign: "left" }}>
-                            {c}
+                            <Celda c={c} />
                           </td>
                         ))}
                       </tr>
@@ -150,7 +186,7 @@ function FormularioFirma({ huella, informe, avisos, firmas, firmar }: { huella: 
 export function EspacioRevision() {
   const { proyecto } = useVisor();
   const pan = usePaneles("revision", { nav: true, props: true });
-  const [copiada, setCopiada] = useState(false);
+  const [copiada, setCopiada] = useState<"ok" | "fail" | null>(null);
   const e = proyecto.estado!;
   const fichero = proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? "proyecto.json");
   const r = usePedido(proyecto.cliente, { tipo: "revision", firmas: proyecto.firmas, ficheroFirmas: nombreFirmas(fichero) });
@@ -171,14 +207,27 @@ export function EspacioRevision() {
         <>
           <Herramienta
             icono={IcCopiar}
-            nombre={copiada ? "Copiada" : "Orden de firmar"}
+            nombre={copiada === "ok" ? "Copiada" : "Orden de firmar"}
             title={`Copiar la orden: ${orden}`}
             onClick={() => {
-              void navigator.clipboard?.writeText(orden).then(() => setCopiada(true));
-              window.setTimeout(() => setCopiada(false), 1500);
+              // C-11: si el portapapeles se niega (o no lo hay), se dice y se enseña la orden
+              const p = navigator.clipboard?.writeText(orden) ?? Promise.reject(new Error("sin portapapeles"));
+              p.then(
+                () => {
+                  setCopiada("ok");
+                  window.setTimeout(() => setCopiada(null), 1500);
+                },
+                () => setCopiada("fail"),
+              );
             }}
           />
-          <span className="self-center px-2 text-[12px] text-text-muted">Firmar es del ingeniero, en la línea de órdenes, después de leer el informe.</span>
+          {copiada === "fail" ? (
+            <span className="self-center px-2 text-[12px] text-state-fail" role="status">
+              El navegador no dejó copiar al portapapeles. La orden es <span className="mono">{orden}</span>
+            </span>
+          ) : (
+            <span className="self-center px-2 text-[12px] text-text-muted">Firmar es del ingeniero, en la línea de órdenes, después de leer el informe.</span>
+          )}
         </>
       )}
     </>
@@ -283,7 +332,8 @@ export function EspacioRevision() {
               </div>
               <p className="nota">El sha256 es el del informe en Markdown que escribe <span className="mono">fem revisar</span>: el que cubre la firma.</p>
             </Seccion>
-            <Seccion titulo="Comprobaciones" valor={`${x.avisos} aviso${x.avisos === 1 ? "" : "s"}`}>
+            {/* R-29: de sensatez (los del compilador y el cálculo, al final del informe y en Diagnósticos) */}
+            <Seccion titulo="Comprobaciones de sensatez" valor={`${x.avisos} aviso${x.avisos === 1 ? "" : "s"}`}>
               {x.comprobaciones.map((c) => (
                 <a key={c.codigo} href={`#${ancla(x.documento.findIndex((b) => b.tipo === "titulo" && b.texto.includes(c.titulo)))}`} className="flex items-center justify-between gap-2 border-b border-border-sub px-3.5 py-1.5 text-[12px] text-text-secondary hover:bg-bg-elevated">
                   <span className="min-w-0">

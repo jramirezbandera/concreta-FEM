@@ -24,11 +24,12 @@ import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
-import { Desplegable, SelectorEje, SelectorPlanta, useEstrecha } from "../armazon/Disposicion.tsx";
+import { Chip, Desplegable, SelectorEje, SelectorPlanta, useEstrecha } from "../armazon/Disposicion.tsx";
 import { Aviso, AvisoDesactualizado } from "../componentes/comunes.tsx";
+import { useDesplegado } from "../componentes/desplegado.ts";
 import { useVisor } from "../contexto.ts";
-import { atributos, pintura } from "../lienzo/pintura.ts";
-import { usePedido } from "../sesion/usePedido.ts";
+import { atributos, pintura, rellenoTema } from "../lienzo/pintura.ts";
+import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { useTheme } from "../tema/useTheme.ts";
 import type { VistaGuardada } from "../../../src/agente/proyecto.ts";
 import { aGuardada, useVistas, vistasDe, type EstadoVista, type TipoVista } from "./estado.ts";
@@ -36,7 +37,7 @@ import { Motor, type Herramienta, type Vista } from "./motor.ts";
 import { Vista2D, type Dibujo2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
 import type { GeometriaPlantilla } from "../plantilla/plantillas.ts";
 import { TIPOS_FILTRO, Vista3D, type Color3D, type Eventos3D, type FiltroVista, type Modo3D, type Objetivo3D, type Sonda, type TipoFiltro } from "./vista3d.ts";
-import { textoApp } from "../fmt.ts";
+import { fmt, textoApp } from "../fmt.ts";
 
 // ─── La celda y su contexto ─────────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,23 @@ export interface FuentesVistas {
 /** La vista de resultados de una planta con la malla encima si la celda la pide. */
 export const conMalla = <T extends VistaResultadosPlanta>(vista: T, v: EstadoVista): T => (v.malla ? { ...vista, malla: true } : vista);
 
+/**
+ * R-30: el eje de un alzado sin eje elegido, el `k`-ésimo alzado de las vistas: el primero, el
+ * primer eje; el segundo, el primero cuya dirección cruza la del primero (si no hay, el segundo eje).
+ */
+export function ejePorDefecto(ejes: readonly { id: string; desde: Vec2; hasta: Vec2 }[], k: number): string | null {
+  const a = ejes[0];
+  if (!a || k === 0) return a?.id ?? null;
+  const dir = (x: { desde: Vec2; hasta: Vec2 }) => {
+    const [dx, dy] = [x.hasta[0] - x.desde[0], x.hasta[1] - x.desde[1]];
+    const l = Math.hypot(dx, dy) || 1;
+    return [dx / l, dy / l] as const;
+  };
+  const da = dir(a);
+  const otra = ejes.find((x) => Math.abs(dir(x)[0] * da[0] + dir(x)[1] * da[1]) < 0.7);
+  return (otra ?? ejes[Math.min(k, ejes.length - 1)]!).id;
+}
+
 const MARGENES_PLANTA: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
 const MARGENES_ALZADO: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
 
@@ -168,6 +186,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   const [herramienta, setHerramienta] = useState<Herramienta>("elegir");
   const [opciones, setOpciones] = useState(false);
   const [guardar, setGuardar] = useState(false);
+  const botonOpciones = useRef<HTMLButtonElement>(null);
+  const botonGuardar = useRef<HTMLButtonElement>(null);
   const camaras = useRef(v.camaras);
   camaras.current = v.camaras;
   const { poner, activar } = vistas;
@@ -213,7 +233,9 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
 
   // En 3D, la planta resaltada puede no ser ninguna (es lo de por defecto)
   const planta = e.plantas.some((p) => p.id === v.planta) ? v.planta! : tipo === "3d" ? null : (e.plantas[0]?.id ?? null);
-  const eje = e.ejes.some((x) => x.id === v.eje) ? v.eje! : (e.ejes[0]?.id ?? null);
+  // R-30 (M-28): sin eje, el primer alzado va por el primer eje y el segundo por el primero de la otra
+  // dirección (en 2×2 salían dos alzados iguales del eje A)
+  const eje = e.ejes.some((x) => x.id === v.eje) ? v.eje! : ejePorDefecto(e.ejes, vistas.vistas.slice(0, i).filter((x) => x.tipo === "alzado").length);
   const modoAlzado = modoAlzadoVisto(v.modoAlzado, !!fuentes.cabecera3D, e.compila);
   const vv = useMemo(() => ({ ...v, planta, eje, modoAlzado }), [v, planta, eje, modoAlzado]);
   const celda = useMemo(() => ({ i, varias, v: vv, vista }), [i, varias, vv, vista]);
@@ -264,6 +286,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           />
         )}
         {tipo === "alzado" && eje && fuentes.cabeceraAlzado?.(vv, i)}
+        {/* R-30: en un modo de Resultados que no se dibuja en alzado, decirlo (se veía el modelo solo, sin explicación) */}
+        {tipo === "alzado" && eje && !fuentes.alzado && !fuentes.cabeceraAlzado && (fuentes.cabecera3D || fuentes.malla) && <Chip title="Este resultado se ve en planta y en 3D; aquí, sólo el modelo">Este modo no se dibuja en alzado</Chip>}
         {tipo === "3d" && (
           <>
             <Desplegable
@@ -307,7 +331,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             <FileImage size={15} />
           </button>
         )}
-        <button type="button" className="ib" data-on={guardar} aria-expanded={guardar} disabled={!proyecto.edicion && !proyecto.estado?.vistas?.length} title="Vistas guardadas: abrir una aquí o guardar esta con un nombre" aria-label="Guardar la vista" onClick={() => setGuardar((x) => !x)}>
+        <button ref={botonGuardar} type="button" className="ib" data-on={guardar} aria-expanded={guardar} disabled={!proyecto.edicion && !proyecto.estado?.vistas?.length} title="Vistas guardadas: abrir una aquí o guardar esta con un nombre" aria-label="Guardar la vista" onClick={() => setGuardar((x) => !x)}>
           <BookmarkPlus size={15} />
         </button>
         {tipo === "3d" && (
@@ -332,13 +356,13 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             >
               <BoxSelect size={15} />
             </button>
-            <button type="button" className="ib" data-on={opciones} aria-expanded={opciones} title="Opciones de la vista: color, lo que se ve y las plantas" aria-label="Opciones de la vista" onClick={() => setOpciones((x) => !x)}>
+            <button ref={botonOpciones} type="button" className="ib" data-on={opciones} aria-expanded={opciones} title="Opciones de la vista: color, lo que se ve y las plantas" aria-label="Opciones de la vista" onClick={() => setOpciones((x) => !x)}>
               <SlidersHorizontal size={15} />
             </button>
           </>
         )}
       </div>
-      {tipo === "3d" && opciones && <OpcionesVista3D v={v} estado={e} onCambio={(c) => poner(i, c)} onCerrar={() => setOpciones(false)} />}
+      {tipo === "3d" && opciones && <OpcionesVista3D v={v} estado={e} onCambio={(c) => poner(i, c)} onCerrar={() => setOpciones(false)} boton={botonOpciones} />}
       {guardar && (
         <GuardarVista
           v={vv}
@@ -349,6 +373,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             setGuardar(false);
           }}
           onCerrar={() => setGuardar(false)}
+          boton={botonGuardar}
         />
       )}
       <ContextoCelda.Provider value={celda}>{contenido}</ContextoCelda.Provider>
@@ -456,8 +481,10 @@ function ChipsFiltro({ filtro, onCambio }: { filtro: FiltroVista | undefined; on
  * espacio; el navegador sólo las lista en Modelo y Cargas) o guardar esta con un nombre, una
  * operación del editor que se deshace.
  */
-function GuardarVista({ v, camara, onAbrir, onCerrar }: { v: EstadoVista; camara: () => unknown; onAbrir: (g: VistaGuardada) => void; onCerrar: () => void }) {
+function GuardarVista({ v, camara, onAbrir, onCerrar, boton }: { v: EstadoVista; camara: () => unknown; onAbrir: (g: VistaGuardada) => void; onCerrar: () => void; boton: React.RefObject<HTMLButtonElement | null> }) {
   const { proyecto } = useVisor();
+  const caja = useRef<HTMLDivElement>(null);
+  useDesplegado(true, onCerrar, [caja], boton);
   const ed = proyecto.edicion;
   const actuales = ed?.proyecto.vistas ?? proyecto.estado?.vistas ?? [];
   const [nombre, setNombre] = useState(() => {
@@ -474,7 +501,7 @@ function GuardarVista({ v, camara, onAbrir, onCerrar }: { v: EstadoVista; camara
     onCerrar();
   };
   return (
-    <div className="opciones-vista" role="group" aria-label="Guardar la vista">
+    <div ref={caja} className="opciones-vista" role="group" aria-label="Guardar la vista">
       <div className="flex items-center justify-between">
         <span className="font-semibold">Vistas guardadas</span>
         <button type="button" className="ib-chip" aria-label="Cerrar" onClick={onCerrar}>
@@ -511,14 +538,16 @@ function GuardarVista({ v, camara, onAbrir, onCerrar }: { v: EstadoVista; camara
 }
 
 /** Las opciones de un 3D (I3): el color del sólido, los tipos que se ven y el rango de plantas. */
-function OpcionesVista3D({ v, estado, onCambio, onCerrar }: { v: EstadoVista; estado: EstadoSesion; onCambio: (c: Partial<EstadoVista>) => void; onCerrar: () => void }) {
+function OpcionesVista3D({ v, estado, onCambio, onCerrar, boton }: { v: EstadoVista; estado: EstadoSesion; onCambio: (c: Partial<EstadoVista>) => void; onCerrar: () => void; boton: React.RefObject<HTMLButtonElement | null> }) {
+  const caja = useRef<HTMLDivElement>(null);
+  useDesplegado(true, onCerrar, [caja], boton);
   const f = v.filtro ?? {};
   const set = (c: Partial<FiltroVista>) => onCambio({ filtro: { ...f, ...c } });
   const sin = new Set(f.sinTipos ?? []);
   const color = v.color3d ?? "material";
   const plantas = estado.plantas;
   return (
-    <div className="opciones-vista" role="group" aria-label="Opciones de la vista">
+    <div ref={caja} className="opciones-vista" role="group" aria-label="Opciones de la vista">
       <div className="flex items-center justify-between">
         <span className="font-semibold">Opciones de la vista</span>
         <button type="button" className="ib-chip" aria-label="Cerrar las opciones" onClick={onCerrar}>
@@ -662,7 +691,9 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
     () => ({
       clic: async (p, radio, ctrl, doble) => {
         if (!cliente || !fuente) return;
-        const r = await cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
+        // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
+        const r = await sinObsoleto(cliente.pedir({ tipo: "elegir", fuente, punto: p, radio }));
+        if (!r) return;
         const o = r.ok && r.valor ? (r.valor as Eleccion).objeto : null;
         if (doble && o && ejes?.some((x) => x.id === o)) return abrirAlzado(o);
         if (o) anadir([o], ctrl);
@@ -670,11 +701,21 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
       },
       ventana: async (caja, modo, ctrl) => {
         if (!cliente || !fuente) return;
-        const r = await cliente.pedir({ tipo: "ventana", fuente, caja, modo });
-        if (r.ok) anadir(r.valor as string[], ctrl);
+        const r = await sinObsoleto(cliente.pedir({ tipo: "ventana", fuente, caja, modo }));
+        if (!r) return;
+        if (!r.ok) return;
+        let ids = r.valor as string[];
+        // P-25: en Cargas, la ventana coge sólo cargas, como sus herramientas (cogía también ejes y
+        // pilares, y Propiedades dejaba editar sus datos); un clic sigue eligiendo una pieza
+        const cargasModelo = fuente.tipo === "planta" && fuente.vista.vista === "cargas" ? proyecto.edicion?.proyecto.modelo.cargas : undefined;
+        if (cargasModelo) {
+          const sonCargas = new Set(cargasModelo.map((c) => c.id));
+          ids = ids.filter((id) => sonCargas.has(id));
+        }
+        anadir(ids, ctrl);
       },
     }),
-    [cliente, fuente, ejes, abrirAlzado, anadir, setElegidos],
+    [cliente, fuente, ejes, abrirAlzado, anadir, setElegidos, proyecto.edicion],
   );
   const pedido = usePedido(cliente, fuente && elegidos.length ? { tipo: "elegir", fuente, punto: null, radio: 0, objetos: elegidos } : null);
   const resaltado = pedido.datos && elegidos.includes(pedido.datos.objeto) ? pedido.datos : null;
@@ -695,10 +736,14 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
   const { eventos, resaltado } = useEleccionEscena(fu);
   // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
   const resultados = fu?.tipo === "alzado" && !!fu.diagramas;
+  // M-25: la planta del modelo o de las cargas sólo necesita el modelo físico (AL-4): tras editar
+  // con Elegir (estirar, un pinzamiento, Propiedades) no se vela, como al dibujar; sale la nueva en
+  // cuanto el worker la abre. Antes se atenuaba con lo de antes hasta entonces.
+  const fisica = fu?.tipo === "planta" && (fu.vista.vista === "modelo" || fu.vista.vista === "cargas");
   const aviso = resultados && proyecto.desactualizado ? (
     <AvisoDesactualizado />
   ) : proyecto.desactualizado && ed?.pendiente ? (
-    dibujando ? null : <Aviso tono="warn">Compilando la versión editada…</Aviso>
+    dibujando || fisica ? null : <Aviso tono="warn">Compilando la versión editada…</Aviso>
   ) : proyecto.desactualizado ? (
     <AvisoDesactualizado abriendo />
   ) : escena.diagnosticos ? (
@@ -706,11 +751,9 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
   ) : !escena.datos && escena.cargando ? (
     <Aviso>{resultados ? "Preparando los diagramas…" : "Preparando la vista…"}</Aviso>
   ) : null;
-  const cursor = useMemo(() => (fu?.tipo === "alzado" ? (q: Vec2) => `u ${rot(q[0])} · z ${rot(q[1])} m` : undefined), [fu?.tipo]);
+  const cursor = useMemo(() => (fu?.tipo === "alzado" ? (q: Vec2) => `u ${fmt(q[0], 3)} · z ${fmt(q[1], 3)} m` : undefined), [fu?.tipo]);
   return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} dibujo={dibujo} plantilla={plantilla} />;
 }
-
-const rot = (x: number) => (Math.round(x * 1000) / 1000).toString().replace(".", ",");
 
 /** Las vistas de planta de Modelo: la planta con lo que se dibuja (modelo, diagnósticos o malla). */
 export function plantaVista(v: EstadoVista, calculado: boolean): VistaPlanta {
@@ -831,11 +874,10 @@ export function Fuente3DModelo({ deformada, modo, resultados, cargas }: { deform
 
 /**
  * Los trazos que sólo se dibujan sobre las bandas de un mapa (las isolíneas, oscuras): su muestra va
- * sobre una banda clara, como en el mapa; sobre el fondo del tema oscuro no se verían.
+ * sobre `--color-muestra-linea`, que en el tema claro no se ve y en el oscuro es un gris neutro, donde
+ * no se verían. No el color de una banda (D-25: se leía como otra banda).
  */
 const SOBRE_BANDAS: ReadonlySet<Estilo> = new Set<Estilo>(["isolinea", "isolinea-cero"]);
-/** La banda más clara de la paleta de los mapas (`coloresBandas`). */
-const FONDO_BANDA = "#fddbc7";
 
 /** Lo que enseña una leyenda: sus entradas y sus notas (las de una escena o las de un 3D con resultados). */
 export interface ContenidoLeyenda {
@@ -882,10 +924,14 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
               <div key={i} className="flex items-start gap-2 py-[2px] text-text-secondary" title={detalles ? undefined : textoApp(l.texto)}>
                 <svg width={18} height={12} className="mt-[1px] shrink-0" aria-hidden="true">
                   {l.relleno || p.fill ? (
-                    <rect x={0.5} y={0.5} width={17} height={11} {...atributos({ ...p, sw: Math.min(p.sw ?? 1, 1.5) }, l.relleno)} />
+                    <>
+                      <rect x={0.5} y={0.5} width={17} height={11} {...atributos({ ...p, sw: Math.min(p.sw ?? 1, 1.5) }, l.relleno && rellenoTema(l.relleno, tema))} />
+                      {/* R-28: las bandas con un borde, para que las más oscuras no se pierdan en el fondo del panel */}
+                      {l.relleno && <rect x={0.5} y={0.5} width={17} height={11} fill="none" stroke="var(--color-text-muted)" strokeOpacity={0.45} />}
+                    </>
                   ) : (
                     <>
-                      {l.estilo && SOBRE_BANDAS.has(l.estilo) && <rect x={0} y={0} width={18} height={12} rx={2} fill={FONDO_BANDA} />}
+                      {l.estilo && SOBRE_BANDAS.has(l.estilo) && <rect x={0} y={2} width={18} height={8} rx={4} style={{ fill: "var(--color-muestra-linea)" }} />}
                       <path d="M0 6h18" {...atributos(p)} />
                     </>
                   )}

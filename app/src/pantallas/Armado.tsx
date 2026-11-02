@@ -25,12 +25,12 @@ import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/ses
 import { CampoLista, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcBanda } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, filaElegible, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { escalaDe, SeccionEscala, type EscalaElegida } from "../componentes/escala.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
-import { usePedido } from "../sesion/usePedido.ts";
+import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import { useSonda } from "../vistas/sonda.ts";
@@ -593,7 +593,9 @@ export function ModoArmado() {
   const clave = (pl: string) => JSON.stringify([pl, armadura, eleccion, proyecto.version, armado ?? null]);
   const clic = async (p: Vec2, pl: string) => {
     if (!proyecto.cliente) return;
-    const x = await proyecto.cliente.pedir({ tipo: "valor-armado", planta: pl, armadura, combinaciones: eleccion, x: p[0], y: p[1], ...(armado ? { armado } : {}) });
+    // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
+    const x = await sinObsoleto(proyecto.cliente.pedir({ tipo: "valor-armado", planta: pl, armadura, combinaciones: eleccion, x: p[0], y: p[1], ...(armado ? { armado } : {}) }));
+    if (!x) return;
     const v = x.ok ? (x.valor as ValorArmado | null) : null;
     setPunto({ p, v, planta: pl, clave: clave(pl) });
     setSeleccion(v ? v.franja : null);
@@ -671,7 +673,7 @@ export function ModoArmado() {
           </thead>
           <tbody>
             {d.filas.map((f) => (
-              <tr key={f.id} className="clic" data-on={f.id === seleccion} onClick={() => setSeleccion(f.id)}>
+              <tr key={f.id} className="clic" data-on={f.id === seleccion} {...filaElegible(() => setSeleccion(f.id), f.id === seleccion)}>
                 <td>
                   {f.id}
                   <small>
@@ -722,10 +724,10 @@ export function ModoArmado() {
                 key={z.id}
                 className="clic"
                 data-on={z.id === seleccion}
-                onClick={() => {
+                {...filaElegible(() => {
                   setSeleccion(z.id);
                   encuadrarCajaActiva(z.caja);
-                }}
+                }, z.id === seleccion)}
               >
                 <td>
                   {z.id}

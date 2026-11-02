@@ -25,11 +25,11 @@ import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesi
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDiagramas, IcPilar, IcViga } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, filaElegible, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, coma } from "../fmt.ts";
-import { usePedido } from "../sesion/usePedido.ts";
+import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
 import { conMalla, Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
@@ -44,7 +44,9 @@ function PlantaDiagramas({ planta, vista, id, cargando }: { planta: string; vist
   const resaltado = useEleccion(fuente, id);
   const clic = async (p: Vec2, radio: number) => {
     if (!proyecto.cliente) return;
-    const r = await proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
+    // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
+    const r = await sinObsoleto(proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio }));
+    if (!r) return;
     const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
     // Sólo las piezas con diagrama: vigas, viguetas y barras
     const m = proyecto.edicion?.proyecto.modelo;
@@ -177,6 +179,7 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
         {v.tipo === "barra" && <span>desde su inicio</span>}
         {v.esfuerzo === "My" && <span>positivo hacia abajo (tracciones)</span>}
       </div>
+      {/* C-19: el clic es un atajo; con el teclado, la estación es el deslizador de debajo («s =») */}
       <svg width={w} height={H} role="img" aria-label={`Envolvente de ${v.esfuerzo} de ${v.id}`}
         onClick={(e) => {
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
@@ -470,7 +473,7 @@ export function ModoDiagramas() {
                         "—"
                       );
                     return (
-                      <tr key={i} className="clic" onClick={() => setS((va.desde + va.hasta) / 2)}>
+                      <tr key={i} className="clic" {...filaElegible(() => setS((va.desde + va.hasta) / 2), sValida >= va.desde && sValida <= va.hasta)}>
                         <td>
                           {i + 1}
                           <small>

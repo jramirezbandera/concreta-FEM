@@ -127,4 +127,10 @@ export type MensajeDelWorker =
   | { id: number; huella: string | null; ok: true; valor: unknown; ms: number }
   /** Un pedido que no se puede contestar: el modelo, la elección o el estado no lo permiten. */
   | { id: number; huella: string | null; ok: false; diagnosticos: Diagnostico[]; ms: number }
-  | { tipo: "fallo"; mensaje: string };
+  | { tipo: "fallo"; mensaje: string }
+  /**
+   * R-25: una fase del cálculo del pedido `id` que acaba de terminar (las de `alProgreso` del motor:
+   * numeracion, cargas, patron, ensamblado, solucion.analisis, solucion.factorizacion…), con su
+   * duración. Llega mientras el worker calcula; cancelar sigue siendo cerrar el worker.
+   */
+  | { tipo: "progreso"; id: number; fase: string; ms: number };

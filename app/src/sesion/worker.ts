@@ -42,7 +42,8 @@ async function procesar(m: MensajeAlWorker): Promise<void> {
     return;
   }
   try {
-    const r = await at.atender(m.pedido);
+    // R-25: las fases del cálculo, según terminan (el hilo principal las recibe mientras el worker sigue)
+    const r = await at.atender(m.pedido, m.pedido.tipo === "calcular" ? (fase, ms) => ambito.postMessage({ tipo: "progreso", id: m.id, fase, ms }) : undefined);
     const ms = performance.now() - t0;
     if (r.ok) ambito.postMessage({ id: m.id, huella: at.huella, ok: true, valor: r.valor, ms }, TRANSFERIR.has(m.pedido.tipo) ? transferibles(r.valor) : []);
     else ambito.postMessage({ id: m.id, huella: at.huella, ok: false, diagnosticos: r.diagnosticos, ms });

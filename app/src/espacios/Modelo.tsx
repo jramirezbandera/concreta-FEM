@@ -25,7 +25,7 @@
  *   nada, el caso activo en la planta.
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Check, ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { objetosVisibles } from "../../../src/editor/edicion.ts";
@@ -39,7 +39,7 @@ import { useVisor } from "../contexto.ts";
 import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { FormularioVarios, tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
-import { cota, fmt, textoApp, coma } from "../fmt.ts";
+import { cota, fmt, textoApp, coma, plural, NOMBRE_ACCION, textoCaso as textoCasoFmt } from "../fmt.ts";
 import { Inspector } from "../pantallas/Inspector.tsx";
 import { PropiedadesCargas, ResumenCaso, SobrePieza } from "../pantallas/CargasPieza.tsx";
 import { tipoPieza } from "../../../src/editor/cargasPieza.ts";
@@ -75,7 +75,8 @@ let ultimoPedido = 0;
 const enCampo = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || !!(t as HTMLElement | null)?.closest?.("[role=grid], [role=dialog]");
 
 /** Un caso en el selector de la barra: su id, su nombre y si lleva el peso propio. */
-const textoCaso = (c: { id: string; nombre?: string; pesoPropio?: boolean } | undefined) => (c ? `${c.id}${c.nombre ? ` · ${c.nombre}` : ""}${c.pesoPropio ? " · con peso propio" : ""}` : undefined);
+// R-32: sin nombre, lo que es su acción («Q · uso»; antes, «Q» solo)
+const textoCaso = (c: { id: string; nombre?: string; accion?: string; pesoPropio?: boolean } | undefined) => (c ? textoCasoFmt(c) : undefined);
 
 export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const { proyecto, seleccion, setSeleccion, elegidos, tablaPedida, planta } = useVisor();
@@ -121,7 +122,15 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     const a = ed.editar(o, etiqueta);
     return a.ok ? null : a.errores.map((x) => x.mensaje).join(" ");
   };
-  ctrl.aplicar = (h) => editarDibujo(h.operacion, h.etiqueta);
+  // M-31: la herramienta sigue en el acto con el modelo editado; esperaba al render siguiente, y dos
+  // clics en la misma tarea (dos forjados) calculaban el mismo id siguiente («L2» ya es de losa)
+  ctrl.aplicar = (h) => {
+    if (!ed) return "No hay ningún proyecto que editar.";
+    const a = ed.editar(h.operacion, h.etiqueta);
+    if (!a.ok) return a.errores.map((x) => x.mensaje).join(" ");
+    ctrl.ponerModelo(a.proyecto.modelo);
+    return null;
+  };
   ctrl.alSalir = () => ctrl.ponerHerramienta("elegir");
   ctrl.repintar = repintarVistas;
   {
@@ -207,6 +216,24 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   // UI-37: Ctrl+A elige lo que se ve en la planta activa (en Cargas, las cargas del caso activo); antes
   // seleccionaba el texto de la página
   const { setElegidos } = useVisor();
+  // M-30: al cambiar de planta se suelta lo elegido que no pasa por ella (lo que no va por plantas,
+  // como un eje, se queda): Propiedades seguía con la V2 de N3 estando en N1
+  const plantaAntes = useRef(planta);
+  useEffect(() => {
+    if (plantaAntes.current === planta) return;
+    plantaAntes.current = planta;
+    if (!ed || !planta || !elegidos.length) return;
+    const m = ed.proyecto.modelo;
+    const ctx = contexto(m);
+    const queda = elegidos.filter((id) => {
+      const t = tablaDe(m, id);
+      const o = t ? objetosTabla(m, t).find((x) => x.id === id) : undefined;
+      const ps = t && o ? DEF_TABLAS[t].plantas(o, ctx) : null;
+      return ps === null || ps.includes(planta);
+    });
+    if (queda.length !== elegidos.length) setElegidos(queda);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al cambiar de planta
+  }, [planta]);
   useEffect(() => {
     if (!ed || dibujando) return;
     const tecla = (x: KeyboardEvent) => {
@@ -303,12 +330,18 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     setEligiendo(null);
     if (h) setHecho(h);
   };
+  // C-40: los oyentes de la ventana se ponen al cambiar lo que los activa, no en cada render; lo que
+  // leen y cambia en cada uno (lo elegido, la selección), de esta ref
+  const ultimo = useRef({ paraAccion, enTablas, seleccion });
+  useLayoutEffect(() => {
+    ultimo.current = { paraAccion, enTablas, seleccion };
+  });
   useEffect(() => {
     if (!eligiendo) return;
     const puntero = (x: PointerEvent) => void (conCtrl.current = x.ctrlKey || x.metaKey);
     const tecla = (x: KeyboardEvent) => {
       if (x.key === "Escape") setEligiendo(null);
-      else if (x.key === "Enter" && !(x.target as HTMLElement | null)?.closest?.("input, textarea, select, [role=grid], [role=dialog]") && paraAccion(eligiendo).length) setDialogo(eligiendo);
+      else if (x.key === "Enter" && !(x.target as HTMLElement | null)?.closest?.("input, textarea, select, [role=grid], [role=dialog]") && ultimo.current.paraAccion(eligiendo).length) setDialogo(eligiendo);
     };
     window.addEventListener("pointerdown", puntero, true);
     window.addEventListener("keydown", tecla);
@@ -316,17 +349,19 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       window.removeEventListener("pointerdown", puntero, true);
       window.removeEventListener("keydown", tecla);
     };
-  });
+  }, [eligiendo]);
   useEffect(() => {
     if (eligiendo && elegidos !== alEmpezar.current && !conCtrl.current && paraAccion(eligiendo).length) setDialogo(eligiendo);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando cambia lo elegido
   }, [elegidos]);
   // Supr borra lo elegido: si nada más lo usa, en el acto (se deshace con Ctrl+Z); si no, el diálogo
   // de Borrar dice qué lo usa. La hoja tiene su Supr (vaciar celdas) y un diálogo abierto, el suyo.
+  const hayEnTablas = enTablas.length > 0;
   useEffect(() => {
-    if (dibujando || estirando || conAsa || dialogo || !ed || !enTablas.length) return;
+    if (dibujando || estirando || conAsa || dialogo || !ed || !hayEnTablas) return;
     const tecla = (x: KeyboardEvent) => {
       if (x.key !== "Delete" || x.ctrlKey || x.metaKey || x.altKey || x.shiftKey || enCampo(x.target)) return;
+      const { enTablas, seleccion } = ultimo.current;
       x.preventDefault();
       if (!aplicar(ed.proyecto, { op: "borrar", ids: enTablas }).ok) return setDialogo("borrar");
       const r = ed.editar({ op: "borrar", ids: enTablas }, `Borrar ${enTablas.length > 3 ? `${enTablas.length} objetos` : enTablas.join(", ")}`);
@@ -336,7 +371,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  });
+  }, [dibujando, estirando, conAsa, dialogo, ed, hayEnTablas, setSeleccion]);
 
   const abrirTabla = (t: NombreTabla, filaNueva = false, celdas?: Record<string, string>) => {
     setTabla(t);
@@ -367,11 +402,11 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       </Campo>
       {ed && (
         <>
-          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él" />
+          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, los casos típicos de una vez, y la tabla desde él" />
           <Separador />
           <Herramienta icono={IcPuntual} nombre="Puntual" activa={foto.herramienta === "puntual"} onClick={() => elegirHerramienta("puntual")} title="Dibujar cargas puntuales en el caso activo: un clic donde va (F y M en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcLineal} nombre="Lineal" activa={foto.herramienta === "lineal"} onClick={() => elegirHerramienta("lineal")} title="Dibujar cargas lineales en el caso activo: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
-          <Herramienta icono={IcSuperficie} nombre="Superficie" activa={foto.herramienta === "superficie"} onClick={() => elegirHerramienta("superficie")} title="Dibujar cargas de superficie en el caso activo: un clic en una losa o un paño, o una zona (Propiedades). Esc vuelve a Elegir" />
+          <Herramienta icono={IcSuperficie} nombre="Superficie" activa={foto.herramienta === "superficie"} onClick={() => elegirHerramienta("superficie")} title="Dibujar cargas de superficie en el caso activo: un clic en un forjado, o una zona (Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcEnBarra} nombre="En barra" activa={foto.herramienta === "barra"} onClick={() => elegirHerramienta("barra")} title="Dibujar cargas en vigas y pilares en el caso activo: un clic en la pieza, o dos en un tramo de viga (Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcEmpuje} nombre="Empuje" activa={foto.herramienta === "empuje"} onClick={() => elegirHerramienta("empuje")} title="Dibujar empujes en el caso activo: un clic en un muro, del lado del terreno. Esc vuelve a Elegir" />
           <Separador />
@@ -409,7 +444,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcPilar} nombre="Pilar" activa={foto.herramienta === "pilar"} onClick={() => elegirHerramienta("pilar")} title="Dibujar pilares: un clic en su punto fijo, o una ventana para uno en cada cruce de ejes. Esc vuelve a Elegir" />
           <Herramienta icono={IcMuro} nombre="Muro" activa={foto.herramienta === "muro"} onClick={() => elegirHerramienta("muro")} title="Dibujar muros: clic a clic; doble clic o Intro termina, un clic en el primero lo cierra. Esc vuelve a Elegir" />
           <Herramienta icono={IcViga} nombre="Viga" activa={foto.herramienta === "viga"} onClick={() => elegirHerramienta("viga")} title="Dibujar vigas: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
-          <Herramienta icono={IcBarra} nombre="Barra" activa={foto.herramienta === "barraNiveles"} onClick={() => elegirHerramienta("barraNiveles")} title="Dibujar barras entre dos niveles (diagonales, tornapuntas): dos clics en un alzado, en los nudos de los pilares o en las líneas de nivel, o en planta (la planta del fin, en Propiedades). Esc vuelve a Elegir" />
+          <Herramienta icono={IcBarra} nombre="Barra" activa={foto.herramienta === "barraNiveles"} onClick={() => elegirHerramienta("barraNiveles")} title="Dibujar barras entre dos plantas (diagonales, tornapuntas): dos clics en un alzado, en los nudos de los pilares o en las líneas de nivel de las plantas, o en planta (la planta del fin, en Propiedades). Esc vuelve a Elegir" />
           <Separador />
           <Herramienta icono={IcLosa} nombre="Forjado" activa={foto.herramienta === "forjado"} onClick={() => elegirHerramienta("forjado")} title="Dibujar forjados (maciza, reticular o unidireccional, en Propiedades): un clic dentro de un recuadro cerrado, o un polígono. Esc vuelve a Elegir" />
           <Herramienta icono={IcHueco} nombre="Hueco" activa={foto.herramienta === "hueco"} onClick={() => elegirHerramienta("hueco")} title="Dibujar huecos: en un forjado, un rectángulo o un polígono; en un muro, dos clics por su eje. Esc vuelve a Elegir" />
@@ -509,15 +544,21 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const diagnosticos = proyecto.fase === "error" && proyecto.errores.length ? [...proyecto.errores, ...e.diagnosticos] : e.diagnosticos;
   const errores = diagnosticos.filter((d) => d.severidad === "error").length;
   const avisos = diagnosticos.filter((d) => d.severidad === "aviso").length;
+  // R-29: los de sensatez aparte, como los cuenta el informe de Revisión (que suma los que necesitan los resultados)
+  const avisosSensatez = diagnosticos.filter((d) => d.severidad === "aviso" && d.codigo.startsWith("sensatez/")).length;
+  const desglose = `${avisos - avisosSensatez} del compilador y del cálculo, ${avisosSensatez} de sensatez del modelo`;
   const dock: Pestana[] = [
     ...(ed ? [{ id: "tablas", titulo: "Tablas", contenido: <PanelTablas tabla={tabla} setTabla={setTabla} nueva={nueva} plantilla={plantilla} /> }] : []),
     {
       id: "diagnosticos",
       titulo: "Diagnósticos",
-      insignia: e.compilando ? <span className="text-text-secondary">…</span> : errores ? <span className="text-state-fail">{errores} error{errores === 1 ? "" : "es"}</span> : avisos ? <span className="text-state-warn">{avisos} aviso{avisos === 1 ? "" : "s"}</span> : "0",
+      insignia: e.compilando ? <span className="text-text-secondary">…</span> : errores ? <span className="text-state-fail">{errores} error{errores === 1 ? "" : "es"}</span> : avisos ? <span className="text-state-warn" title={`Avisos: ${desglose}`}>{avisos} aviso{avisos === 1 ? "" : "s"}</span> : "0",
       contenido: (
         <>
-          <p className="nota">Lo que se comprueba del modelo al compilarlo y al calcularlo. Un clic en un id lo elige.{e.compilando ? " Compilando: de momento, sólo lo que no necesita la compilación." : ""}</p>
+          <p className="nota">
+            Lo que se comprueba del modelo al compilarlo y al calcularlo. Un clic en un id lo elige.{e.compilando ? " Compilando: de momento, sólo lo que no necesita la compilación." : ""}
+            {avisos > 0 && ` Avisos: ${desglose}; las comprobaciones de sensatez que necesitan los resultados, en Revisión.`}
+          </p>
           <ListaDiagnosticos ds={diagnosticos} onObjeto={setSeleccion} />
         </>
       ),
@@ -560,8 +601,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
             {foto.campo && <CampoTeclado key={foto.campo.n} ctrl={ctrl} campo={foto.campo} />}
             {eligiendo && (
               <span className="chip aviso-herr" data-acento="true" role="status">
-                {eligiendo === "copiar" ? "Copiar a otras plantas: elija las vigas, losas, paños, apoyos o cargas" : "Borrar: elija lo que quiere borrar"} (clic o ventana; con Ctrl+clic, varios e Intro). Esc cancela.
-                {paraAccion(eligiendo).length > 0 && <strong className="font-semibold"> {paraAccion(eligiendo).length} elegidos.</strong>}
+                {eligiendo === "copiar" ? "Copiar a otras plantas: elija las vigas, forjados, apoyos o cargas" : "Borrar: elija lo que quiere borrar"} (clic o ventana; con Ctrl+clic, varios e Intro). Esc cancela.
+                {paraAccion(eligiendo).length > 0 && <strong className="font-semibold"> {plural(paraAccion(eligiendo).length, "elegido")}.</strong>}
               </span>
             )}
           </>
@@ -694,13 +735,15 @@ function Objetos({ tablas }: { tablas: NombreTabla[] }) {
   );
 }
 
+// M-23: «Objetos», lo que más se usa, justo bajo el proyecto; las plantillas DXF y las vistas
+// (casi siempre vacías al empezar, con una línea) debajo
 function NavModelo({ plantillas }: { plantillas: ReactNode }) {
   return (
     <>
       <Proyecto />
-      <NavVistas />
-      {plantillas}
       <Objetos tablas={["pilares", "vigas", "barras", "forjados", "muros", "apoyos", "apoyosLineales", "ejes"]} />
+      {plantillas}
+      <NavVistas />
     </>
   );
 }
@@ -728,8 +771,9 @@ function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => vo
           <button key={c.id} type="button" className="arbol-fila" data-on={c.id === caso} onClick={() => setCaso(c.id)}>
             <span className="mono">{c.id}</span>
             <span className="truncate text-text-secondary">{c.nombre ?? ""}</span>
-            <span className="n">
-              {c.accion ?? "sin acción"}
+            {/* R-32: la acción en palabras («nieve»), no su código junto al id («N … S») */}
+            <span className="n" title={c.accion ? `Acción ${c.accion} (${NOMBRE_ACCION[c.accion] ?? c.accion})${c.pesoPropio ? ", con el peso propio" : ""}` : "Sin acción: fuera de las combinaciones"}>
+              {c.accion ? (NOMBRE_ACCION[c.accion] ?? c.accion) : "sin acción"}
               {c.pesoPropio ? " · pp" : ""}
             </span>
           </button>
@@ -769,8 +813,8 @@ function DatosProyecto() {
   }, [nombre, descripcion]);
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
-      <input className="sel en-sitio w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600 }} aria-label="Nombre del proyecto" title={nombre ?? p.nombre ?? undefined} placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={() => escribir()} onKeyDown={(x) => x.key === "Enter" && escribir()} />
-      <textarea className="sel en-sitio w-full" style={{ height: 56, padding: "5px 6px", fontFamily: "var(--font-sans)", fontSize: 12, lineHeight: 1.45, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={() => escribir()} />
+      <input className="sel en-sitio sel-nombre w-full" aria-label="Nombre del proyecto" title={nombre ?? p.nombre ?? undefined} placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={() => escribir()} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      <textarea className="sel en-sitio sel-descripcion w-full" aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={() => escribir()} />
     </div>
   );
 }
@@ -779,8 +823,11 @@ function DatosProyecto() {
 
 /** Lo elegido, por tipo; un clic deja uno solo (el del inspector). */
 function ListaElegidos() {
-  const { proyecto, elegidos, setSeleccion, setElegidos } = useVisor();
+  const { proyecto, elegidos, setSeleccion, setElegidos, espacio } = useVisor();
   const ed = proyecto.edicion;
+  // P-25: con varios tipos, los datos de cada uno se despliegan aparte (antes, los de los ejes, los
+  // primeros, llenaban el panel como si sólo se hubieran elegido ellos)
+  const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(() => new Set());
   const porTipo = new Map<string, string[]>();
   const tablaDeTipo = new Map<string, NombreTabla>();
   for (const id of elegidos) {
@@ -790,9 +837,13 @@ function ListaElegidos() {
     porTipo.set(nombre, [...(porTipo.get(nombre) ?? []), id]);
   }
   const orden = [...TABLAS.map((t) => DEF_TABLAS[t].titulo), "Otros"].filter((t) => porTipo.has(t));
+  const mezcla = orden.length > 1;
+  // En Cargas sólo se tocan las cargas: lo demás elegido se lista, sin sus datos
+  const editable = (t: string) => !!ed && tablaDeTipo.has(t) && porTipo.get(t)!.length > 1 && (espacio !== "cargas" || tablaDeTipo.get(t) === "cargas");
+  const resumen = orden.map((t) => `${porTipo.get(t)!.length} ${t.toLowerCase()}`).join(" · ");
   return (
     <>
-      <Cabecera icono={MousePointer2} tipo="Selección" titulo={`${elegidos.length} objetos`} detalle="Un clic en uno lo deja solo; Ctrl+clic en el dibujo añade o quita; Esc suelta todo.">
+      <Cabecera icono={MousePointer2} tipo="Selección" titulo={`${elegidos.length} objetos`} detalle={`${mezcla ? `${resumen}. ` : ""}Un clic en uno lo deja solo; Ctrl+clic en el dibujo añade o quita; Esc suelta todo.`}>
         <button type="button" className="btn" onClick={() => setElegidos([])}>
           Soltar todo
         </button>
@@ -808,8 +859,25 @@ function ListaElegidos() {
               ))}
             </div>
           </Seccion>
-          {/* Varios de una tabla: lo que tienen en común, editable en todos a la vez */}
-          {ed && tablaDeTipo.has(t) && porTipo.get(t)!.length > 1 && <FormularioVarios ids={porTipo.get(t)!} tabla={tablaDeTipo.get(t)!} />}
+          {/* Varios de una tabla: lo que tienen en común, editable en todos a la vez; en una mezcla, al desplegarlo */}
+          {editable(t) && mezcla && (
+            <div className="px-3.5 pb-2">
+              <button
+                type="button"
+                className="btn"
+                aria-expanded={abiertos.has(t)}
+                onClick={() => {
+                  const n = new Set(abiertos);
+                  if (!n.delete(t)) n.add(t);
+                  setAbiertos(n);
+                }}
+              >
+                <ChevronRight size={14} style={{ transform: abiertos.has(t) ? "rotate(90deg)" : undefined }} aria-hidden="true" />
+                Datos de los {porTipo.get(t)!.length}
+              </button>
+            </div>
+          )}
+          {editable(t) && (!mezcla || abiertos.has(t)) && <FormularioVarios ids={porTipo.get(t)!} tabla={tablaDeTipo.get(t)!} />}
         </Fragment>
       ))}
     </>
@@ -864,7 +932,7 @@ function ResumenPlanta() {
       )}
       <Equilibrio estado={e} />
       {e.hipotesis.length > 0 && (
-        <Seccion titulo="Hipótesis del cálculo" valor={e.hipotesis.length}>
+        <Seccion titulo="Supuestos del cálculo" valor={e.hipotesis.length}>
           <ol className="m-0 list-decimal py-1 pl-8 pr-3.5 text-[12px] leading-snug text-text-secondary">
             {e.hipotesis.map((h, i) => (
               <li key={i} className="py-0.5">

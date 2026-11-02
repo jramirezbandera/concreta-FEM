@@ -1,11 +1,28 @@
 /** Piezas comunes de los paneles: secciones, filas, combinaciones, diagnósticos y equilibrio. */
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useState, type ComponentType, type KeyboardEvent, type ReactNode } from "react";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion, PropositoVista } from "../../../src/visor/sesion.ts";
 import type { Combinaciones } from "../../../src/visor/datos.ts";
 import { Campo } from "../armazon/Disposicion.tsx";
 import { useVisor } from "../contexto.ts";
-import { fmt, textoApp, coma } from "../fmt.ts";
+import { fmt, textoApp, coma, textoCaso } from "../fmt.ts";
+
+/**
+ * C-19: lo que hace de una fila de tabla algo que se elige con un clic y también con el teclado: una
+ * parada de Tab, Intro o Espacio para elegirla y `aria-selected` con la elegida.
+ */
+export function filaElegible(elegir: () => void, activa: boolean) {
+  return {
+    tabIndex: 0,
+    "aria-selected": activa,
+    onClick: elegir,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      elegir();
+    },
+  };
+}
 
 /**
  * Cabecera de un panel de Propiedades: el icono de lo que es, qué es (en pequeño), cuál (el título),
@@ -106,8 +123,8 @@ export function ComboCombinaciones({ estado, valor, onCambio, proposito, soloUna
         <optgroup label="Un caso">
           {estado.casos.map((c) => (
             <option key={c.id} value={codificar({ tipo: "caso", caso: c.id })}>
-              {c.id}
-              {c.nombre ? ` · ${c.nombre}` : ""}
+              {/* R-32: sin nombre, lo que es («Q · uso») */}
+              {textoCaso(c, false)}
             </option>
           ))}
         </optgroup>
@@ -264,10 +281,33 @@ export function AvisoDesactualizado({ que = "estos resultados", abriendo = false
   return <Aviso tono="warn">{texto}</Aviso>;
 }
 
+/** C-22: lo que pasa del límite lleva «!» y lo dice, además del color. */
+function CeldaEquilibrio({ v }: { v: number }) {
+  const mal = v > 1e-9;
+  return (
+    <td className={mal ? "f" : undefined} title={mal ? "Pasa de 1e-9: no cuadra" : undefined}>
+      {v.toExponential(1).replace(".", ",")}
+      {mal && <span aria-label=", no cuadra"> !</span>}
+    </td>
+  );
+}
+
+/**
+ * R-34: una línea plegable («Equilibrio: bien, máx. 6e-14»): la tabla de cada caso empujaba lo que
+ * se lee en el panel. Abierta si algún caso no cuadra.
+ */
 export function Equilibrio({ estado }: { estado: EstadoSesion }) {
   if (!estado.equilibrio.length) return null;
+  const max = Math.max(...estado.equilibrio.map((e) => Math.max(e.fuerzas, e.momentos)));
+  const mal = estado.equilibrio.filter((e) => e.fuerzas > 1e-9 || e.momentos > 1e-9).length;
   return (
-    <Seccion titulo="Equilibrio por caso" valor="límite 1e-9">
+    <details className="equilibrio" open={mal > 0}>
+      <summary className="sec">
+        <span>Equilibrio por caso</span>
+        <span className={mal ? "text-state-fail" : undefined}>
+          {mal ? `no cuadra en ${mal} caso${mal === 1 ? "" : "s"}` : "bien"}, máx. {max.toExponential(0).replace(".", ",")} (límite 1e-9)
+        </span>
+      </summary>
       <table className="tb">
         <thead>
           <tr>
@@ -280,13 +320,13 @@ export function Equilibrio({ estado }: { estado: EstadoSesion }) {
           {estado.equilibrio.map((e) => (
             <tr key={e.id}>
               <td>{e.id}</td>
-              <td className={e.fuerzas > 1e-9 ? "f" : undefined}>{e.fuerzas.toExponential(1).replace(".", ",")}</td>
-              <td className={e.momentos > 1e-9 ? "f" : undefined}>{e.momentos.toExponential(1).replace(".", ",")}</td>
+              <CeldaEquilibrio v={e.fuerzas} />
+              <CeldaEquilibrio v={e.momentos} />
             </tr>
           ))}
         </tbody>
       </table>
-    </Seccion>
+    </details>
   );
 }
 

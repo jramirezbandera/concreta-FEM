@@ -145,10 +145,16 @@ function rango(m: ModeloFisico, desde: unknown, hasta: unknown): string[] {
   return a < 0 || b < 0 ? [] : ids.slice(Math.min(a, b), Math.max(a, b) + 1);
 }
 
+/**
+ * Lo que se ve en la lista de los valores del fichero que se escriben sin tilde (`auditoria-ui.md`,
+ * C-29). El valor guardado no cambia, y la celda admite las dos formas (`Lector.opcion`).
+ */
+const TEXTO_FIJAS: Readonly<Record<string, string>> = { sotano: "sótano", rigido: "rígido", hormigon: "hormigón", instantanea: "instantánea" };
+
 /** Opciones de una lista cerrada; con `defecto`, la columna es opcional y la vacía va primero. */
 const fijas =
   (valores: readonly string[], defecto?: string) =>
-  (): readonly Opcion[] => [...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]), ...valores.map((valor) => ({ valor }))];
+  (): readonly Opcion[] => [...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]), ...valores.map((valor) => (TEXTO_FIJAS[valor] ? { valor, texto: TEXTO_FIJAS[valor] } : { valor }))];
 
 /** Las plantas, de arriba abajo como en el modelo, con su cota. */
 function opcionesPlantas(ctx: Contexto): Opcion[] {
@@ -169,7 +175,11 @@ const secciones_ = (defecto?: string) =>
 const casos_ = (defecto?: string) =>
   (ctx: Contexto): Opcion[] => [
     ...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]),
-    ...(ctx.modelo.casos ?? []).map((x) => ({ valor: x.id, texto: `${x.id}${x.nombre ? ` · ${x.nombre}` : ""} · ${describirCaso(x)}` })),
+    // R-32: sin repetir el código de la acción cuando es el id («G · G · peso propio» → «G · peso propio»)
+    ...(ctx.modelo.casos ?? []).map((x) => {
+      const d = describirCaso(x);
+      return { valor: x.id, texto: `${x.id}${x.nombre ? ` · ${x.nombre}` : ""} · ${x.accion && x.accion.tipo === x.id ? d.slice(x.id.length + 3) : d}` };
+    }),
   ];
 const materiales_ = (defecto?: string) =>
   (ctx: Contexto): Opcion[] => [...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]), ...ctx.modelo.materiales.map((x) => ({ valor: x.id, texto: `${x.id} · ${describirMaterial(x)}` }))];
@@ -187,10 +197,10 @@ const plantas: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sotano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
+    { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sótano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
     { clave: "altura", titulo: "altura", unidad: "m", ayuda: "la del tramo de debajo: de su forjado al de la planta de debajo, como en un alzado; vacía en la más baja. En una fila nueva, que va abajo del todo, la del tramo que la une a la de encima" },
     { clave: "cota", titulo: "cota", unidad: "m", calculada: true },
-    { clave: "diafragma", titulo: "diafragma", ayuda: "rigido o ninguno; por defecto, rígido salvo en la más baja (C1-d)", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
+    { clave: "diafragma", titulo: "diafragma", ayuda: "rígido o ninguno; por defecto, rígido salvo en la más baja (C1-d)", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
   ],
   fila(o, ctx) {
     const p = o as unknown as Planta;
@@ -241,7 +251,7 @@ const materiales: DefTabla = {
   prefijo: "M",
   columnas: [
     id,
-    { clave: "tipo", titulo: "tipo", ayuda: "hormigon, acero o general", opciones: fijas(["hormigon", "acero", "general"]) },
+    { clave: "tipo", titulo: "tipo", ayuda: "hormigón, acero o general", opciones: fijas(["hormigon", "acero", "general"]) },
     { clave: "fck", titulo: "fck", unidad: "MPa", ayuda: "hormigón: E = 22000·((fck + 8)/10)^0,3 (Código Estructural)" },
     // El modelo físico da el E del acero en MPa y el de un material general en kN/m²: dos columnas, cada una con su unidad
     { clave: "Eacero", titulo: "E acero", unidad: "MPa", ayuda: "sólo acero; por defecto, 210 000" },
@@ -955,7 +965,7 @@ const casos: DefTabla = {
     { clave: "direccion", titulo: "dirección", ayuda: "W, E y N: el eje global en que empuja, X o Y; en sismo, la otra dirección entra al 30 %", opciones: fijas(["X", "Y"], "sin dirección") },
     { clave: "signo", titulo: "signo", ayuda: "W y N: el sentido, hacia +eje (1) o −eje (-1)", opciones: fijas(["1", "-1"], "sin signo") },
     { clave: "derivadoDe", titulo: "deriva de", ayuda: "N: el caso vertical (G, Q o S) cuyo peso la genera; entra con su mismo factor", opciones: casos_("ninguno"), referencia: "casos" },
-    { clave: "duracion", titulo: "duración", ayuda: "clase de duración (DB SE-M, tabla 2.2), sólo para el kmod de la madera: permanente, larga, media, corta o instantanea; por defecto, la de la acción", opciones: fijas(["permanente", "larga", "media", "corta", "instantanea"], "la del tipo") },
+    { clave: "duracion", titulo: "duración", ayuda: "clase de duración (DB SE-M, tabla 2.2), sólo para el kmod de la madera: permanente, larga, media, corta o instantánea; por defecto, la de la acción", opciones: fijas(["permanente", "larga", "media", "corta", "instantanea"], "la del tipo") },
   ],
   // Lo que pide cada acción (`CasoCarga` de `src/combinaciones/generador.ts`); lo que no, la hoja lo apaga
   aplica(clave, f) {
@@ -1046,7 +1056,7 @@ const cargas: DefTabla = {
   columnas: [
     id,
     { clave: "tipo", titulo: "tipo", ayuda: "puntual (en un punto de la planta), viga, pilar o barra (repartida a lo largo de la pieza), superficie (por m² de forjado), lineal (por metro de una línea de la planta) o empuje (del terreno sobre un muro)", opciones: fijas(TIPOS_CARGA) },
-    { clave: "caso", titulo: "caso", ayuda: "la hipótesis en que va: peso, uso, viento…", opciones: casos_(), referencia: "casos" },
+    { clave: "caso", titulo: "caso", ayuda: "el caso de carga en que va: peso, uso, viento…", opciones: casos_(), referencia: "casos" },
     { clave: "planta", titulo: "planta", ayuda: "la planta en que está la carga (en viga, pilar, barra y empuje, la de su pieza)", opciones: (ctx) => [{ valor: "", texto: "(la de la pieza)" }, ...opcionesPlantas(ctx)], referencia: "plantas" },
     {
       clave: "sobre",

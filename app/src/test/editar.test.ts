@@ -139,7 +139,7 @@ describe("pinzamientos", () => {
     vista.pasar([6.05, 0.05], RADIO, false, [0, 0]);
     expect(vista.cursor()!.texto).toContain("Vértice de V1-N1 · clic para moverlo");
     expect(vista.agarrar!([6.05, 0.05], RADIO)).toBe(true);
-    expect(ctrl.instantanea().asa).toBe("un vértice de V1-N1: el punto nuevo (clic, o «x; y», «@dx; dy» e Intro). Esc lo suelta.");
+    expect(ctrl.instantanea().asa).toBe("Un vértice de V1-N1: el punto nuevo (clic, o «x; y», «@dx; dy» e Intro). Esc lo suelta.");
     // Otro clic en el asa no la vuelve a coger: va a dejarla
     expect(vista.agarrar!([6.05, 0.05], RADIO)).toBe(false);
     expect(clic([7, -1])).toBe(true);

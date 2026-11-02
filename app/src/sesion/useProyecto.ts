@@ -108,12 +108,21 @@ export interface ProyectoAbierto {
   recalcular: () => void;
   /** Calcula la versión abierta (tras editar, el worker sólo compila). */
   calcular?: () => void;
+  /**
+   * R-25: la fase del cálculo en curso que acaba de terminar (las de `alProgreso` del motor), o null
+   * si aún no ha terminado ninguna o no se calcula.
+   */
+  progreso?: string | null;
+  /** R-25: para el cálculo en curso (cierra el worker, como lo cancela el motor) y deja la versión sin calcular. */
+  cancelar?: () => void;
   /** null si el fichero no es un proyecto válido (no se puede editar). */
   edicion?: Edicion | null;
 }
 
 /** Cada cuánto se mira si el fichero cambió (criterio 5 de V1: detectarlo en ≤ 2 s). */
 export const VIGILANCIA_MS = 1000;
+/** C-12: fallos seguidos al vigilar antes de avisar (uno suelto, p. ej. el fichero a medio escribir, no). */
+const FALLOS_VIGILANCIA = 3;
 /**
  * Pausa tras un cambio del editor antes de compilar la versión nueva. Corta: una celda se confirma
  * con Intro (no a cada tecla) y un pegado es una sola operación; la pausa sólo junta los cambios
@@ -177,6 +186,7 @@ export function useProyecto(): ProyectoAbierto {
   const [guardado, setGuardado] = useState<EstadoGuardado>({ tipo: "nada" });
   const [conflicto, setConflicto] = useState<string | null>(null);
   const [pendiente, setPendiente] = useState(false);
+  const [progreso, setProgreso] = useState<string | null>(null);
   const gen = useRef(0);
   const clienteRef = useRef<ClienteSesion | null>(null);
   const ultimo = useRef<{ texto: string; sello: string | null; selloFirmas: string | null } | null>(null);
@@ -189,6 +199,8 @@ export function useProyecto(): ProyectoAbierto {
   fuenteRef.current = fuente;
   /** Hay una escritura en curso: la siguiente espera (el autoguardado vuelve a mirar cuando acaba). */
   const escribiendo = useRef(false);
+  /** C-13: «Guardar en mis proyectos» en curso (el segundo envío se ignora). */
+  const creando = useRef(false);
   /** Lo que espera al siguiente commit, cuando ya corrieron los efectos de las vistas (los de los hijos van antes). */
   const alCommit = useRef<(() => void)[]>([]);
   useEffect(() => {
@@ -289,7 +301,8 @@ export function useProyecto(): ProyectoAbierto {
         return;
       }
       const t2 = performance.now();
-      const r = await c.pedir({ tipo: "calcular" });
+      setProgreso(null);
+      const r = await c.pedir({ tipo: "calcular" }, { alProgreso: (fase) => vigente() && setProgreso(fase) });
       if (!vigente()) return;
       setTiempos({ ...t, calcular: (performance.now() - t2) / 1000 });
       if (!r.ok) {
@@ -331,16 +344,26 @@ export function useProyecto(): ProyectoAbierto {
   const abrirOrigen = useCallback(
     (o: Origen) => {
       void (async () => {
-        // AL §3.3: lo que había al abrir queda como versión, antes de cualquier cambio
-        if (o.navegador) await versionar(o.navegador).catch(() => {});
-        const l = await o.leer(o.fichero);
+        // C-12: si leer lanza (IndexedDB, permisos), se dice; antes el clic no hacía nada
+        let l: Awaited<ReturnType<Origen["leer"]>>;
+        let selloFirmas: string | null;
+        const f: Fuente = { tipo: "origen", origen: o };
+        try {
+          // AL §3.3: lo que había al abrir queda como versión, antes de cualquier cambio
+          if (o.navegador) await versionar(o.navegador).catch(() => {});
+          l = await o.leer(o.fichero);
+          selloFirmas = l ? await leerFirmas(f) : null;
+        } catch (e) {
+          setErrores([{ codigo: "visor/fichero", severidad: "error", mensaje: `No se pudo leer ${o.descripcion}: ${e instanceof Error ? e.message : String(e)}` }]);
+          setFase("error");
+          return;
+        }
         if (!l) {
           setErrores([{ codigo: "visor/fichero", severidad: "error", mensaje: `No se pudo leer ${o.descripcion}.` }]);
           setFase("error");
           return;
         }
-        const f: Fuente = { tipo: "origen", origen: o };
-        ultimo.current = { texto: l.texto, sello: l.sello, selloFirmas: await leerFirmas(f) };
+        ultimo.current = { texto: l.texto, sello: l.sello, selloFirmas };
         empezarEdicion(l.texto);
         await cargar(l.texto, f);
       })();
@@ -372,8 +395,9 @@ export function useProyecto(): ProyectoAbierto {
     const g = gen.current;
     setFase("calculando");
     setErrores([]);
+    setProgreso(null);
     const t0 = performance.now();
-    void c.pedir({ tipo: "calcular" }).then(
+    void c.pedir({ tipo: "calcular" }, { alProgreso: (fase) => g === gen.current && setProgreso(fase) }).then(
       (r) => {
         if (g !== gen.current) return;
         setTiempos((t) => ({ ...t, calcular: (performance.now() - t0) / 1000, guardados: undefined }));
@@ -393,6 +417,21 @@ export function useProyecto(): ProyectoAbierto {
       },
     );
   }, []);
+
+  /**
+   * R-25: cancelar el cálculo es cerrar su worker (no hay otra forma: el cálculo es síncrono en él)
+   * y abrir la misma versión en otro, sin calcular. Lo editado no se pierde: se abre lo que se edita.
+   */
+  const cancelar = useCallback(() => {
+    const h = histRef.current;
+    const texto = h ? serializar(h.actual) : ultimo.current?.texto;
+    const f = fuenteRef.current;
+    if (texto === undefined || !f) return;
+    if (h) cargado.current = h.actual;
+    clienteRef.current?.cerrar();
+    setProgreso(null);
+    void cargar(texto, f, { sinCalcular: true });
+  }, [cargar]);
 
   /** Compila la versión editada tras una pausa; los resultados se marcan como desactualizados ya. */
   const programar = useCallback(
@@ -519,6 +558,8 @@ export function useProyecto(): ProyectoAbierto {
     const o = fuente.origen;
     let parado = false;
     let ocupado = false;
+    /** C-12: fallos seguidos al mirar; al tercero se avisa una vez, y un acierto vuelve a contar. */
+    let fallos = 0;
     const mirar = async () => {
       if (ocupado || parado || !ultimo.current) return;
       ocupado = true;
@@ -546,6 +587,11 @@ export function useProyecto(): ProyectoAbierto {
         }
         const sf = await o.sello(nombreFirmas(o.fichero));
         if (sf !== ultimo.current.selloFirmas) ultimo.current = { ...ultimo.current, selloFirmas: await leerFirmas(fuente) };
+        fallos = 0;
+      } catch (e) {
+        if (++fallos === FALLOS_VIGILANCIA && !parado) {
+          setGuardado({ tipo: "error", mensaje: `No se puede vigilar ${o.descripcion} (${e instanceof Error ? e.message : String(e)}): los cambios de fuera no se verán hasta que vuelva a leerse.` });
+        }
       } finally {
         ocupado = false;
       }
@@ -598,13 +644,15 @@ export function useProyecto(): ProyectoAbierto {
   const alNavegador = useCallback(async () => {
     const h = histRef.current;
     const f = fuenteRef.current;
-    if (!h || f?.tipo !== "texto") return;
+    // C-13: un segundo Ctrl+S (o doble clic) antes de que la fuente nueva llegue a `fuenteRef` creaba otro
+    if (!h || f?.tipo !== "texto" || creando.current) return;
     const texto = serializar(h.actual);
     const l = leerProyecto(texto);
     if (!l.valido) {
       setGuardado({ tipo: "error", mensaje: `El proyecto no pasa el esquema: no se guarda (${l.diagnosticos[0]?.mensaje ?? ""}).` });
       return;
     }
+    creando.current = true;
     try {
       const fi = await crear(texto, f.nombre.replace(/\.json$/i, ""));
       ultimo.current = { texto, sello: String(fi.sello), selloFirmas: null };
@@ -612,11 +660,15 @@ export function useProyecto(): ProyectoAbierto {
       setGuardado({ tipo: "guardado", ms: 0 });
       const nf: Fuente = { tipo: "origen", origen: origenNavegador(fi.id, fi.nombre) };
       setFuente(nf);
+      // Ya, sin esperar al render: lo que llegue detrás ve que la fuente es el navegador
+      fuenteRef.current = nf;
       // Lo calculado en esta pestaña, también a la caché
       const c = clienteRef.current;
       if (c?.huella) guardarCalculo(c, nf, c.huella);
     } catch (e) {
       setGuardado({ tipo: "error", mensaje: `No se pudo guardar en el navegador: ${e instanceof Error ? e.message : String(e)}` });
+    } finally {
+      creando.current = false;
     }
   }, []);
 
@@ -677,5 +729,5 @@ export function useProyecto(): ProyectoAbierto {
   );
   const puedeFirmar = fuente?.tipo === "origen" && !!fuente.origen.escribirFichero;
 
-  return { fase, estado, cliente, fuente, desactualizado, errores, motivoGuardados, firmas, tiempos, version, abrirOrigen, abrirTexto, recalcular, calcular, edicion, ...(puedeFirmar ? { firmar } : {}) };
+  return { fase, estado, cliente, fuente, desactualizado, errores, motivoGuardados, firmas, tiempos, version, abrirOrigen, abrirTexto, recalcular, calcular, progreso: fase === "calculando" ? progreso : null, cancelar, edicion, ...(puedeFirmar ? { firmar } : {}) };
 }

@@ -109,7 +109,7 @@ export const CAMPOS_CASO: Record<string, InfoCampo> = {
   nombre: { titulo: "nombre", que: "Una descripción libre para reconocerlo en las listas. No cuenta para el cálculo." },
   pesoPropio: {
     titulo: "peso propio",
-    que: "Con «sí», el peso de pilares, vigas, losas y muros, que se saca del modelo, va a este caso. Sólo uno puede llevarlo; los solados y tabiques van aparte, como cargas.",
+    que: "Con «sí», el peso de pilares, vigas, forjados y muros, que se saca del modelo, va a este caso. Sólo uno puede llevarlo; los solados y tabiques van aparte, como cargas.",
     opciones: [
       ["sí", "este caso lleva el peso de las piezas"],
       ["no", "sólo las cargas que se le pongan"],

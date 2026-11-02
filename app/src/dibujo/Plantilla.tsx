@@ -29,8 +29,9 @@ import { IcApoyo, IcApoyoLineal, IcBarra, IcEjes, IcEmpuje, IcEnBarra, IcHueco, 
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
-import { cota } from "../fmt.ts";
+import { cota, plural } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 /** V2c-3: los iconos de editar, de lucide. */
 export const IcMover: Icono = ({ size }) => <Move size={size} strokeWidth={1.5} aria-hidden="true" />;
@@ -271,13 +272,13 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
             <CampoSeccion modelo={m} valor={t.viga.seccion} tipo="V" editar={editar} onCambio={(s) => setPlantillas({ ...t, viga: { ...t.viga, seccion: s } })} />
             <div className="campo">
               <span>alinear</span>
-              <div className="seg dib-seg" role="radiogroup" aria-label="Alinear">
+              <Grupo rol="radiogroup" etiqueta="Alinear" className="seg dib-seg">
                 {ALINEAR.map((a) => (
                   <button key={a.v} type="button" role="radio" aria-checked={(t.viga.alinear ?? "eje") === a.v} data-on={(t.viga.alinear ?? "eje") === a.v} onClick={() => setPlantillas({ ...t, viga: { ...t.viga, alinear: a.v } })}>
                     {a.texto}
                   </button>
                 ))}
-              </div>
+              </Grupo>
               <p>{ALINEAR.find((a) => a.v === (t.viga.alinear ?? "eje"))!.ayuda}</p>
             </div>
           </div>
@@ -316,7 +317,7 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
                 onCambio={(modo) => setPlantillas({ ...t, hueco: { ...t.hueco, modo } })}
                 ayuda={(t.hueco?.modo ?? "rectangulo") === "rectangulo" ? "Dos esquinas opuestas, en los ejes del ortogonal." : "Clic a clic; Intro o un clic en el primero lo cierra."}
               />
-              <CampoZunchos t={t.hueco ?? {}} poner={(c) => setPlantillas({ ...t, hueco: { ...t.hueco, ...c } })} ayuda="Un zuncho en cada lado del hueco que no va sobre una viga o un muro, con la losa hasta su eje y la carga de la banda en él." />
+              <CampoZunchos t={t.hueco ?? {}} poner={(c) => setPlantillas({ ...t, hueco: { ...t.hueco, ...c } })} ayuda="Un zuncho en cada lado del hueco que no va sobre una viga o un muro. El forjado no se recorta: lo que cae en el ancho del zuncho y entre su cara y el borde va a la viga." />
             </div>
           </Seccion>
           <Seccion titulo="En un muro" valor="para los siguientes">
@@ -469,11 +470,12 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
           {h !== "copiar" && !(h === "simetria" && t.conservar) && <p className="nota">Las vigas no elegidas que acaban en el punto fijo de un pilar que se mueve lo siguen. Con Ctrl en el último clic, no.</p>}
           {h === "copiar" && (
             <>
-              <div className="campo" style={{ alignItems: "start" }}>
+              {/* M-21: las plantas como fichas en línea, como en «A plantas» (las casillas de .campo salían a todo el ancho) */}
+              <div className="campo campo-fichas">
                 <span className="pt-1">plantas</span>
-                <div role="group" aria-label="Plantas de las copias">
+                <div className="fichas-plantas" role="group" aria-label="Plantas de las copias">
                   {m.plantas.map((p, i) => (
-                    <label key={p.id} className="chk">
+                    <label key={p.id} className="ficha" title={p.nombre}>
                       <input
                         type="checkbox"
                         checked={plantas.has(p.id)}
@@ -484,7 +486,9 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
                           poner({ plantas: m.plantas.map((q) => q.id).filter((q) => n.has(q)) });
                         }}
                       />
-                      <span>{`${p.id} · ${cota(cotas[i])}`}</span>
+                      <span>
+                        {p.id} <small>{cota(cotas[i])}</small>
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -603,13 +607,13 @@ export function Segmentado<T extends string>({ etiqueta, valor, opciones, onCamb
   return (
     <div className="campo">
       <span>{etiqueta}</span>
-      <div className="seg dib-seg" role="radiogroup" aria-label={etiqueta}>
+      <Grupo rol="radiogroup" etiqueta={etiqueta} className="seg dib-seg">
         {opciones.map(([v, texto]) => (
           <button key={v} type="button" role="radio" aria-checked={valor === v} data-on={valor === v} onClick={() => onCambio(v)}>
             {texto}
           </button>
         ))}
-      </div>
+      </Grupo>
       {ayuda && <p>{ayuda}</p>}
     </div>
   );
@@ -796,7 +800,7 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
           <>
             {num("espesor", "canto", "m")}
             <CampoMaterial modelo={m} valor={t.material} para="la plantilla de Forjado" editar={editar} onCambio={(material) => poner({ material })} />
-            <CampoZunchos t={t} poner={poner} ayuda="Un zuncho del canto del forjado en cada lado que no va sobre una viga, un muro, un apoyo lineal u otro forjado: su eje, por el de los pilares del lado (o enrasado por fuera), la losa hasta él y la carga de la banda en la viga. Cerrado por vigas, no pone ninguno." />
+            <CampoZunchos t={t} poner={poner} ayuda="Un zuncho del canto del forjado en cada lado que no va sobre una viga, un muro, un apoyo lineal u otro forjado: su eje, por el de los pilares del lado (o enrasado por fuera). El forjado no se recorta: lo que cae en el ancho del zuncho y entre su cara y el borde va a la viga. Cerrado por vigas, no pone ninguno." />
           </>
         )}
         {tipo === "reticular" && (
@@ -845,7 +849,7 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
           tipo === "maciza"
             ? "Vacío: γ·canto."
             : tipo === "reticular"
-              ? "Vacío, sale solo: el hormigón de nervios y capa más el casetón (los ábacos, γ·canto). Lo escrito manda: el medio de toda la losa con los ábacos."
+              ? "Vacío, sale solo: el hormigón de nervios y capa más el casetón (los ábacos, γ·canto). Lo escrito manda: el medio de todo el forjado con los ábacos."
               : "Vacío, sale solo con una vigueta en T: vigueta y capa más la bovedilla. Lo escrito manda.",
         )}
         {num("direccion", "dirección", "°", tipo === "unidireccional" ? "La de las viguetas, desde +X." : tipo === "reticular" ? "La de los nervios, desde +X." : "La del eje 1 de las láminas, desde +X.")}
@@ -893,7 +897,7 @@ function PlantillaCargaPanel({ h, t, poner }: { h: NombreCargaH; t: PlantillaCar
                 ["zona", "Zona"],
               ]}
               onCambio={(modo) => poner({ superficie: { ...t.superficie, modo } })}
-              ayuda={(t.superficie?.modo ?? "forjado") === "forjado" ? "Un clic dentro de una losa o un paño: todo él, sin sus huecos." : "Un polígono; si cae entero en un forjado, la parte de él en la zona."}
+              ayuda={(t.superficie?.modo ?? "forjado") === "forjado" ? "Un clic dentro de un forjado: todo él, sin sus huecos." : "Un polígono; si cae entero en un forjado, la parte de él en la zona."}
             />
             <CampoCarga etiqueta="q" unidad="kN/m²" valor={t.superficie?.q} onCambio={(q) => poner({ superficie: { ...t.superficie, q } })} ayuda="Por m² de forjado: p. ej., 1,5 de solado o 2 de uso." />
           </>
@@ -1005,7 +1009,8 @@ function formasTeclado(h: Instantanea["herramienta"], asa: boolean, alzado: bool
   if (asa) return [abs, ["@dx; dy", "desde donde estaba el vértice"]];
   if (h === "girar") return [["α", "el ángulo en grados, desde +X"], abs];
   if (esEditar(h)) return [abs, ["@dx; dy", "desde el punto base"]];
-  const formas: (readonly [string, string])[] = [abs, ["@dx; dy", "desde el último punto"], ["@L<α", "longitud y ángulo, desde el eje 1"], ["L", "longitud hacia el cursor"]];
+  // M-22: el ángulo es desde +X (la dirección de la losa o del primer eje), no desde el eje de replanteo «1»
+  const formas: (readonly [string, string])[] = [abs, ["@dx; dy", "desde el último punto"], ["@L<α", "longitud y ángulo en grados, antihorario desde +X (en una planta girada, desde su dirección)"], ["L", "longitud hacia el cursor"]];
   if (h === "pilar") formas.push(["Tab", "elige una cota; luego, su distancia"]);
   return formas;
 }
@@ -1074,7 +1079,7 @@ function PanelReticula({ modelo: m, editar }: { modelo: ModeloFisico; editar: (o
   const motivo = !lx.ok ? `En X: ${lx.mensaje}.` : !ly.ok ? `En Y: ${ly.mensaje}.` : !p0 ? "El origen es «x; y»." : !Number.isFinite(g) ? "El giro es un número de grados." : r && !r.ok ? r.mensaje : null;
   return (
     <Seccion titulo="Retícula por luces">
-      <p className="nota">Las luces entre ejes, en m: «5 5 6» o «3×5». Los ejes de X se numeran 1, 2… y los de Y, A, B…{m.ejes?.length ? ` Sustituye a los ${m.ejes.length} ejes del proyecto.` : ""}</p>
+      <p className="nota">Las luces entre ejes, en m: «5 5 6» o «3×5». Los ejes de X se numeran 1, 2… y los de Y, A, B…{m.ejes?.length ? ` Sustituye a ${m.ejes.length === 1 ? "el eje" : `los ${m.ejes.length} ejes`} del proyecto.` : ""}</p>
       <div className="flex flex-col gap-1.5 px-3.5 pb-3">
         <label className="campo">
           <span>luces en X</span>
@@ -1103,7 +1108,7 @@ function PanelReticula({ modelo: m, editar }: { modelo: ModeloFisico; editar: (o
             setError(editar(r.operacion, r.etiqueta));
           }}
         >
-          {r && r.ok ? `Poner ${r.ejes.length} ejes` : "Poner la retícula"}
+          {r && r.ok ? `Poner ${plural(r.ejes.length, "eje")}` : "Poner la retícula"}
         </button>
       </div>
     </Seccion>

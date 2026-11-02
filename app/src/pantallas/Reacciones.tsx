@@ -23,11 +23,11 @@ import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/ses
 import { CampoLista, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcReacciones } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, filaElegible, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
-import { fmt, textoApp } from "../fmt.ts";
-import { usePedido } from "../sesion/usePedido.ts";
+import { fmt, plural, textoApp } from "../fmt.ts";
+import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas } from "../vistas/estado.ts";
 import { useSonda } from "../vistas/sonda.ts";
@@ -62,7 +62,7 @@ function TablaPorCaso({ d, seleccion, onObjeto }: { d: ReaccionesCasos; seleccio
   const i = INDICE[comp];
   const u = COMPONENTES.find((c) => c.id === comp)!.unidad;
   return (
-    <Seccion titulo="Reacciones por caso" valor={`${d.objetos.length} objetos · ${d.casos.length} casos`}>
+    <Seccion titulo="Reacciones por caso" valor={`${plural(d.objetos.length, "objeto")} · ${plural(d.casos.length, "caso")}`}>
       <div className="px-3.5 py-1.5">
         <Segmentado etiqueta="Componente" opciones={COMPONENTES} valor={comp} onCambio={setComp} />
       </div>
@@ -79,7 +79,7 @@ function TablaPorCaso({ d, seleccion, onObjeto }: { d: ReaccionesCasos; seleccio
         </thead>
         <tbody>
           {d.objetos.map((o) => (
-            <tr key={o.id} className="clic" data-on={o.id === seleccion} onClick={() => onObjeto(o.id)}>
+            <tr key={o.id} className="clic" data-on={o.id === seleccion} {...filaElegible(() => onObjeto(o.id), o.id === seleccion)}>
               <td>
                 {o.id}
                 <small>
@@ -130,7 +130,9 @@ function EscenaReacciones({ fuente, objetos }: { fuente: FuenteEscena | null; ob
   const resaltado = useEleccion(fuente, seleccion && objetos?.has(seleccion) ? seleccion : null);
   const clic = async (p: Vec2, radio: number) => {
     if (!proyecto.cliente || !fuente) return;
-    const r = await proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
+    // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
+    const r = await sinObsoleto(proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio }));
+    if (!r) return;
     const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
     setSeleccion(o && objetos?.has(o) ? o : null);
   };
@@ -148,7 +150,7 @@ function PlantasConReacciones({ d, planta, onPlanta }: { d: Reacciones3D | null;
     <>
       <Chip>Sin apoyos aquí</Chip>
       {[...n].map(([p, k]) => (
-        <button key={p} type="button" className="chip" data-acento title={`${k} objetos con reacción`} onClick={() => onPlanta(p)}>
+        <button key={p} type="button" className="chip" data-acento title={`${plural(k, "objeto")} con reacción`} onClick={() => onPlanta(p)}>
           Ir a {p}
         </button>
       ))}
@@ -227,7 +229,7 @@ export function ModoReacciones() {
         </thead>
         <tbody>
           {d.objetos.map((o) => (
-            <tr key={o.id} className="clic" data-on={o.id === seleccion} onClick={() => setSeleccion(o.id)}>
+            <tr key={o.id} className="clic" data-on={o.id === seleccion} {...filaElegible(() => setSeleccion(o.id), o.id === seleccion)}>
               <td>
                 {o.id}
                 <small>

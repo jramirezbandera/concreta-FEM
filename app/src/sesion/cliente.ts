@@ -38,7 +38,7 @@ function bytesNucleo(): Promise<ArrayBuffer> {
 export class ClienteSesion {
   private readonly worker: Worker;
   private siguiente = 1;
-  private readonly pendientes = new Map<number, { resolver: (r: Respuesta<TipoPedido>) => void; rechazar: (e: Error) => void; tipo: TipoPedido }>();
+  private readonly pendientes = new Map<number, { resolver: (r: Respuesta<TipoPedido>) => void; rechazar: (e: Error) => void; tipo: TipoPedido; alProgreso?: (fase: string, ms: number) => void }>();
   private listo: Promise<string>;
   private cerrado = false;
   /** La huella que abrió este cliente (null hasta abrir). */
@@ -56,6 +56,10 @@ export class ClienteSesion {
     this.worker.onmessage = (e: MessageEvent<MensajeDelWorker>) => {
       const m = e.data;
       if ("tipo" in m) {
+        if (m.tipo === "progreso") {
+          this.pendientes.get(m.id)?.alProgreso?.(m.fase, m.ms);
+          return;
+        }
         if (m.tipo === "listo") {
           this.motor = m.motor;
           alListo(m.motor);
@@ -94,12 +98,13 @@ export class ClienteSesion {
     return this.listo;
   }
 
-  async pedir<K extends TipoPedido>(pedido: Extract<Pedido, { tipo: K }>): Promise<Respuesta<K>> {
+  /** `alProgreso` (R-25): las fases del cálculo según terminan, en `calcular`. */
+  async pedir<K extends TipoPedido>(pedido: Extract<Pedido, { tipo: K }>, opciones: { alProgreso?: (fase: string, ms: number) => void } = {}): Promise<Respuesta<K>> {
     await this.listo;
     if (this.cerrado) throw new ErrorObsoleto();
     const id = this.siguiente++;
     return new Promise<Respuesta<K>>((resolver, rechazar) => {
-      this.pendientes.set(id, { resolver: resolver as (r: Respuesta<TipoPedido>) => void, rechazar, tipo: pedido.tipo });
+      this.pendientes.set(id, { resolver: resolver as (r: Respuesta<TipoPedido>) => void, rechazar, tipo: pedido.tipo, ...(opciones.alProgreso ? { alProgreso: opciones.alProgreso } : {}) });
       this.enviar({ id, pedido });
     });
   }

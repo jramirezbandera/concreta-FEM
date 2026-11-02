@@ -38,7 +38,7 @@
  * demás herramientas, un alzado sigue como siempre (elegir).
  */
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
-import { apuntar, bajoCursor, FUENTES_ENGANCHE, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type FuenteEnganche, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
+import { apuntar, bajoCursor, FUENTES_ENGANCHE, indiceEnganches, RADIO_ENGANCHE, rotuloEnganche, TIPOS_ENGANCHE, type Apunte, type FuenteEnganche, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import type { IndicePlantilla } from "../../../src/editor/dibujo/plantilla.ts";
 import { colocar, cotasEn, LADOS, nombreCota, referenciasCotas, type CotaTemporal, type Lado, type ReferenciasCotas } from "../../../src/editor/dibujo/cotas.ts";
 import { PlantaFisica } from "../../../src/agente/render/modelo.ts";
@@ -213,7 +213,9 @@ export class ControladorDibujo {
     const modo = (x: Plantillas) => JSON.stringify([x.forjado?.modo, x.hueco?.modo, x.cargas?.superficie?.modo, x.cargas?.barra?.modo]);
     if (modo(t) !== modo(this.plantillas)) this.estado = ESTADO_INICIAL;
     this.plantillas = t;
-    this.cambiar({});
+    // P-21: el error de la herramienta («Elija en Propiedades la sección del pilar») era de la plantilla
+    // de antes: se quita al cambiarla (seguía en rojo tras crear la sección, hasta el clic siguiente)
+    this.cambiar(this.foto.error ? { error: null } : {});
     this.repintar();
   }
 
@@ -597,7 +599,8 @@ export class ControladorDibujo {
   private textoAsa(): string | null {
     const a = this.asaActiva;
     if (!a) return null;
-    const que = a.coleccion === "pilares" ? `${a.id} (su punto fijo)` : a.ruta[0] === "x" ? a.id : `un vértice de ${a.id}`;
+    // M-22: con mayúscula inicial, como los demás avisos de la herramienta
+    const que = a.coleccion === "pilares" ? `${a.id} (su punto fijo)` : a.ruta[0] === "x" ? a.id : `Un vértice de ${a.id}`;
     return `${que}: el punto nuevo (clic, o «x; y», «@dx; dy» e Intro)${a.coleccion === "pilares" ? "; con Ctrl, sin sus vigas" : ""}. Esc lo suelta.`;
   }
 
@@ -1085,7 +1088,7 @@ export class ControladorDibujo {
     if (planta !== this.planta || !this.cursorQ) return null;
     const a = this.apunte;
     const partes: string[] = [];
-    if (a?.enganche) partes.push(`${NOMBRE_ENGANCHE[a.enganche.tipo]} (${a.enganche.plantilla ? `DXF ${a.enganche.plantilla}` : a.enganche.objeto})`);
+    if (a?.enganche) partes.push(rotuloEnganche(a.enganche));
     else if (a?.orto) partes.push("Ortogonal");
     const c = this.cotaActiva();
     if (c) partes.push(`Cota ${nombreCota(c)}: ${c.texto}`);

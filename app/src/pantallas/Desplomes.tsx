@@ -145,7 +145,8 @@ export function ModoDeformada() {
                 <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}
               </Chip>
               <Chip acento title={deformada.datos?.etiqueta && coma(deformada.datos.etiqueta)}>
-                <span className="mono">{deformada.datos?.comb ?? "—"}</span> · máx. {mm(umax)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
+                {/* R-21: el desplazamiento total del nudo que se rotula en el 3D, con su nombre (decía «máx.» con la mayor componente, otro número) */}
+                <span className="mono">{deformada.datos?.comb ?? "—"}</span> · desplazamiento total máx. {fmt(deformada.datos?.extremos.find((y) => y.que === "mayor |u|")?.valor ?? null, 2)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
               </Chip>
             </>
           ),

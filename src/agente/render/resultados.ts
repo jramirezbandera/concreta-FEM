@@ -27,7 +27,7 @@ import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { diagramaCombinado } from "../consultas.ts";
-import { area, cajaDe, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
+import { area, cajaDe, numeroFijo, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
 import { capaApoyos, ejeSeccion, fondoModelo, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica, type DatosVista } from "./modelo.ts";
@@ -40,6 +40,8 @@ export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-vz", "p
 /** Componente de los campos SPR ([Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy]) de cada campo de láminas. */
 const COMPONENTE: Record<Exclude<Campo, "uz">, number> = { f11: 0, f22: 1, f12: 2, m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };
 const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m", f11: "kN/m", f22: "kN/m", f12: "kN/m" };
+/** R-21: los decimales con que se rotula cada campo (el extremo del dibujo, y en la app el panel, la sonda y el clic). */
+export const DECIMALES_CAMPO: Record<Campo, number> = { uz: 2, m11: 1, m22: 1, m12: 1, v13: 1, v23: 1, f11: 1, f22: 1, f12: 1 };
 const NOMBRE: Record<Campo, string> = {
   uz: "uz, desplazamiento vertical (mm; negativo hacia abajo)",
   m11: "M11 (kN·m/m), flexión según el eje 1 de la losa; positivo tracciona la cara inferior",
@@ -349,14 +351,16 @@ export function envolventeCampo(r: ResultadosRender, planta: string, campo: Camp
  */
 export function extremosMapa(campo: Campo, vmin: number, vmax: number, envolvente: Envolvente | null): { cual: "max" | "min"; que: string; texto: string }[] {
   const u = UNIDAD[campo];
+  // R-21: decimales fijos, los de la app (con cifras significativas, «0,0985» en el dibujo y «0,10» en el panel)
+  const d = DECIMALES_CAMPO[campo];
   const r: { cual: "max" | "min"; que: string; texto: string }[] = [];
   if (campo === "uz") {
-    if (vmin < 0 && envolvente !== "max") r.push({ cual: "min", que: "flecha máxima", texto: `flecha máxima ${rotulo(-vmin)} mm ↓` });
-    if (vmax > 0 && envolvente !== "min") r.push({ cual: "max", que: "levantamiento máximo", texto: `levantamiento máximo ${rotulo(vmax)} mm ↑` });
+    if (vmin < 0 && envolvente !== "max") r.push({ cual: "min", que: "flecha máxima", texto: `flecha máxima ${numeroFijo(-vmin, d)} mm ↓` });
+    if (vmax > 0 && envolvente !== "min") r.push({ cual: "max", que: "levantamiento máximo", texto: `levantamiento máximo ${numeroFijo(vmax, d)} mm ↑` });
     return r;
   }
-  if (envolvente !== "min") r.push({ cual: "max", que: `${campo} máximo`, texto: `máximo ${rotulo(vmax)} ${u}` });
-  if (envolvente !== "max") r.push({ cual: "min", que: `${campo} mínimo`, texto: `mínimo ${rotulo(vmin)} ${u}` });
+  if (envolvente !== "min") r.push({ cual: "max", que: `${campo} máximo`, texto: `máximo ${numeroFijo(vmax, d)} ${u}` });
+  if (envolvente !== "max") r.push({ cual: "min", que: `${campo} mínimo`, texto: `mínimo ${numeroFijo(vmin, d)} ${u}` });
   return r;
 }
 
@@ -728,7 +732,8 @@ export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: Conju
     P.push({
       tipo: "texto",
       p: [px + r, py + r],
-      texto: `${x.id} ${rotulo(n)}`,
+      // R-21: N en kN con un decimal, como el cuadro de pilares de la app
+      texto: `${x.id} ${numeroFijo(n, 1)}`,
       tamano: 11,
       dx: 3,
       dy: -3,

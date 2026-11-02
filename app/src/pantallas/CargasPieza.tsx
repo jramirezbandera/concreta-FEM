@@ -72,9 +72,9 @@ export function PropiedadesCargas({ id, caso, plantillas: t, setPlantillas, edit
   return (
     <>
       <Cabecera icono={ICONO[d.tipo]} tipo={`${NOMBRE[d.tipo]} · sus cargas`} titulo={id} mono detalle={geometria(m, d)}>
-        <button type="button" className="btn" onClick={() => irA("modelo")} title="Su geometría, su sección y su pp, en Modelo">
-          <Pencil size={14} />
-          Editar en Modelo
+        {/* R-27: un icono, para que la cabecera no se parta en cuatro líneas ni corte el id */}
+        <button type="button" className="ib" style={{ width: 28, height: 28 }} onClick={() => irA("modelo")} aria-label="Editar en Modelo" title="Editar en Modelo: su geometría, su sección y su pp">
+          <Pencil size={15} />
         </button>
         <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Soltar (Esc)" onClick={() => setSeleccion(null)}>
           <X size={16} />

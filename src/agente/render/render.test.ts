@@ -19,7 +19,7 @@ import { CamposLaminas } from "../../motor/campos.ts";
 import { calcular } from "../../motor/calcular.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { pieza, resumen, type VanoEnvolvente } from "../consultas.ts";
-import { anchoTexto, area, dentro, rotulo, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
+import { anchoTexto, area, dentro, numeroFijo, rotulo, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
 import { bandaDe, bandas, coloresBandas, escalaDeTexto, isolineas, limitesMapa, limitesRedondos, PRIORIDAD_ISOLINEA, rangoSinPicos, rotulosLineas, SEPARACION_ROTULOS, triangulosCuadrilatero, trozosTriangulo, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { envolventeCampo, envolventePieza, valoresCampo, type Envolvente } from "./resultados.ts";
 import {
@@ -398,8 +398,8 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
           const fs = cj.desplazamientos.factores[cj.desplazamientos.nombres.indexOf(min.comb!)]!;
           const flecha = Math.max(...losas.map((l) => (q.flechas(l.id, fs) as { valido: true; valor: { maxima: { flecha: number } } }).valor.maxima.flecha));
           expect(min.valor, `${nombre}, ${pl.id}`).toBeCloseTo(-flecha * 1000, 9);
-          // Su rótulo, en positivo y hacia abajo
-          expect(e.primitivas.some((p) => p.tipo === "texto" && p.texto.startsWith(`flecha máxima ${rotulo(-min.valor)} mm ↓`))).toBe(true);
+          // Su rótulo, en positivo y hacia abajo, con los decimales del panel de la app (R-21)
+          expect(e.primitivas.some((p) => p.tipo === "texto" && p.texto.startsWith(`flecha máxima ${numeroFijo(-min.valor, 2)} mm ↓`))).toBe(true);
           // Y ninguna otra combinación da más
           for (const g of cj.desplazamientos.factores) for (const l of losas) expect((q.flechas(l.id, g) as { valido: true; valor: { maxima: { flecha: number } } }).valor.maxima.flecha * 1000).toBeLessThanOrEqual(Math.abs(min.valor) + 1e-9);
           // El levantamiento, sólo si algo sube

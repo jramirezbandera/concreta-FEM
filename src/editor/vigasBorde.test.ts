@@ -68,7 +68,7 @@ describe("Vigas de borde en la vivienda", () => {
     expect(c.hipotesis.some((h) => h.includes("fase TB;"))).toBe(true);
     expect(c.diagnosticos.filter((d) => d.codigo === "carga/fuera-de-losa" || d.codigo === "carga/zona-fuera-de-losa")).toEqual([]);
     // Y otra vez, nada que hacer
-    expect(proponerVigasBorde(p.modelo, "L-CUB", 0.3, 0.3)).toEqual({ error: "L-CUB ya tiene todos sus bordes sobre una viga, un muro, un apoyo lineal u otro forjado." });
+    expect(proponerVigasBorde(p.modelo, "L-CUB", 0.3, 0.3)).toEqual({ error: "L-CUB ya tiene todos sus bordes sobre una viga, un muro, un apoyo lineal u otro forjado.", cerrada: true });
   });
 });
 

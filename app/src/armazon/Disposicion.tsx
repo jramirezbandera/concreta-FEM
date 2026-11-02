@@ -3,12 +3,14 @@
  * herramientas, navegador, vista, propiedades y panel inferior. Cada espacio da el contenido de cada
  * hueco; la disposición sólo los coloca, los pliega y recuerda cómo se dejaron (`paneles.ts`).
  */
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
+import { useDesplegado } from "../componentes/desplegado.ts";
 import { cota } from "../fmt.ts";
 import type { Icono } from "./iconos.tsx";
 import type { Paneles } from "./paneles.ts";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 // ─── Barra de herramientas ──────────────────────────────────────────────────────────────────────
 
@@ -35,28 +37,14 @@ export function MenuFlotante({ boton, etiqueta, children, clase = "" }: { boton:
   const ref = useRef<HTMLButtonElement | null>(null);
   const menu = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  useDesplegado(abierto, () => setAbierto(false), [menu], ref);
   useEffect(() => {
     if (!abierto) return;
     const r = ref.current?.getBoundingClientRect();
     if (r) setPos({ x: Math.max(8, Math.min(r.left, window.innerWidth - 240)), y: r.bottom + 4 });
-    const fuera = (e: PointerEvent) => {
-      if (!menu.current?.contains(e.target as Node) && !ref.current?.contains(e.target as Node)) setAbierto(false);
-    };
-    const tecla = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setAbierto(false);
-      ref.current?.focus();
-    };
     const cerrar = () => setAbierto(false);
-    document.addEventListener("pointerdown", fuera, true);
-    document.addEventListener("keydown", tecla, true);
     window.addEventListener("resize", cerrar);
-    return () => {
-      document.removeEventListener("pointerdown", fuera, true);
-      document.removeEventListener("keydown", tecla, true);
-      window.removeEventListener("resize", cerrar);
-    };
+    return () => window.removeEventListener("resize", cerrar);
   }, [abierto]);
   return (
     <>
@@ -204,7 +192,8 @@ export function SelectorPlanta({ estado, planta, onPlanta, ninguna }: { estado: 
   return (
     <span className="chip sel planta-sel">
       <span className="planta-sel-campo">
-        {actual && (actual.errores ? <i className="f" aria-label={`${actual.errores} error${actual.errores === 1 ? "" : "es"}`} /> : actual.avisos ? <i className="w" aria-label={`${actual.avisos} aviso${actual.avisos === 1 ? "" : "s"}`} /> : null)}
+        {/* C-22: el punto es una imagen con su texto (un `<i aria-label>` sin rol se lo saltan los lectores) */}
+        {actual && (actual.errores ? <i className="f" role="img" aria-label={`${actual.errores} error${actual.errores === 1 ? "" : "es"}`} title={`${actual.errores} error${actual.errores === 1 ? "" : "es"}`} /> : actual.avisos ? <i className="w" role="img" aria-label={`${actual.avisos} aviso${actual.avisos === 1 ? "" : "s"}`} title={`${actual.avisos} aviso${actual.avisos === 1 ? "" : "s"}`} /> : null)}
         <select className="sel-chip" value={planta ?? ""} onChange={(x) => onPlanta(x.target.value || null)} aria-label="Planta" title={actual?.nombre ? `${actual.id} · ${actual.nombre}` : undefined}>
           {ninguna !== undefined && <option value="">{ninguna}</option>}
           {estado.plantas.map((p) => (
@@ -338,30 +327,63 @@ export interface Pestana {
   contenido: ReactNode;
 }
 
+/** Lo más bajo del panel inferior abierto, px; lo más alto deja 260 px a la vista. */
+const ALTO_DOCK_MIN = 120;
+/** C-20: lo que sube o baja el panel con cada flecha, px. */
+const PASO_DOCK = 20;
+
 function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
   const activa = pestanas.find((x) => x.id === p.pestana) ?? pestanas[0]!;
-  const arrastre = useRef<{ y: number; alto: number } | null>(null);
+  const arrastre = useRef<{ y: number; alto: number; ahora: number } | null>(null);
+  const seccion = useRef<HTMLElement>(null);
+  const idCuerpo = useId();
   const abierto = p.dock;
+  const maximo = () => Math.max(ALTO_DOCK_MIN, window.innerHeight - 260);
+  const limitar = (a: number) => Math.round(Math.max(ALTO_DOCK_MIN, Math.min(maximo(), a)));
+  /** C-38: al soltar, la altura se guarda una vez (durante el arrastre sólo cambia el estilo). */
+  const soltar = () => {
+    const a = arrastre.current;
+    arrastre.current = null;
+    if (a && a.ahora !== a.alto) p.poner({ alto: a.ahora });
+  };
   return (
-    <section className="dock" aria-label="Panel inferior" style={abierto ? { height: p.alto } : undefined} data-abierto={abierto}>
+    <section ref={seccion} className="dock" aria-label="Panel inferior" style={abierto ? { height: p.alto } : undefined} data-abierto={abierto}>
       {abierto && (
         <div
           className="dock-asa"
           role="separator"
           aria-orientation="horizontal"
           aria-label="Cambiar la altura del panel inferior"
+          // C-20: con el foco, ↑ y ↓ la cambian de 20 en 20 px (Inicio y Fin, al mínimo y al máximo)
+          tabIndex={0}
+          aria-valuenow={p.alto}
+          aria-valuemin={ALTO_DOCK_MIN}
+          aria-valuemax={maximo()}
+          aria-valuetext={`${p.alto} px`}
+          onKeyDown={(e) => {
+            const d = e.key === "ArrowUp" ? PASO_DOCK : e.key === "ArrowDown" ? -PASO_DOCK : null;
+            const alto = d !== null ? limitar(p.alto + d) : e.key === "Home" ? ALTO_DOCK_MIN : e.key === "End" ? maximo() : null;
+            if (alto === null) return;
+            e.preventDefault();
+            if (alto !== p.alto) p.poner({ alto });
+          }}
           onPointerDown={(e) => {
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
-            arrastre.current = { y: e.clientY, alto: p.alto };
+            arrastre.current = { y: e.clientY, alto: p.alto, ahora: p.alto };
           }}
           onPointerMove={(e) => {
             const a = arrastre.current;
-            if (a) p.poner({ alto: Math.max(120, Math.min(window.innerHeight - 260, a.alto + a.y - e.clientY)) });
+            if (!a) return;
+            // C-38: sin `poner` (localStorage y repintar el espacio) en cada movimiento: sólo el alto de la sección
+            a.ahora = limitar(a.alto + a.y - e.clientY);
+            if (seccion.current) seccion.current.style.height = `${a.ahora}px`;
           }}
-          onPointerUp={() => (arrastre.current = null)}
+          onPointerUp={soltar}
+          onPointerCancel={soltar}
+          onLostPointerCapture={soltar}
         />
       )}
-      <div className="dock-tabs" role="tablist" aria-label="Pestañas del panel inferior">
+      <Grupo rol="tablist" etiqueta="Pestañas del panel inferior" className="dock-tabs">
         <button type="button" className="ib" style={{ width: 26, height: 26 }} onClick={() => p.poner({ dock: !abierto })} aria-label={abierto ? "Plegar el panel inferior" : "Abrir el panel inferior"} title={abierto ? "Plegar el panel inferior" : "Abrir el panel inferior"}>
           {abierto ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>
@@ -371,6 +393,7 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
             type="button"
             role="tab"
             aria-selected={abierto && x.id === activa.id}
+            aria-controls={abierto && x.id === activa.id ? idCuerpo : undefined}
             data-on={abierto && x.id === activa.id}
             className="dock-tab"
             onClick={() => (abierto && x.id === activa.id ? p.poner({ dock: false }) : p.poner({ dock: true, pestana: x.id }))}
@@ -379,9 +402,9 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
             {x.insignia !== undefined && <span className="insignia">{x.insignia}</span>}
           </button>
         ))}
-      </div>
+      </Grupo>
       {abierto && (
-        <div className="dock-cuerpo" role="tabpanel" aria-label={activa.titulo}>
+        <div id={idCuerpo} className="dock-cuerpo" role="tabpanel" aria-label={activa.titulo}>
           {activa.contenido}
         </div>
       )}

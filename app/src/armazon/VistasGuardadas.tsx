@@ -30,7 +30,8 @@ export function NavVistas() {
 
   return (
     <Seccion titulo="Vistas" valor={lista.length}>
-      {!lista.length && <p className="nota">Sin vistas guardadas: se guardan, con un nombre, desde la barra de cada vista.</p>}
+      {/* M-23: vacía, una línea */}
+      {!lista.length && <p className="nota">Ninguna: se guardan desde la barra de cada vista.</p>}
       {lista.map((g) =>
         renombrando === g.nombre ? (
           <div key={g.nombre} className="px-3.5 py-1">

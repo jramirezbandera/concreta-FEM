@@ -202,7 +202,7 @@ describe("criterio 2 y la pantalla de inicio", () => {
     expect((await leer(f!.id))!.texto).toBe(CANONICO);
     expect(location.search).toBe(`?local=${f!.id}`);
     expect(screen.getByRole("status", { name: "Estado del guardado" }).textContent).toMatch(/Guardado/);
-    fireEvent.click(screen.getByRole("button", { name: "Exportar el proyecto.json" }));
+    fireEvent.click(screen.getByRole("button", { name: "Exportar el proyecto (.json)" }));
     expect(descargas.length).toBe(1);
     expect(await descargas[0]!.text()).toBe(CANONICO);
   }, 120_000);

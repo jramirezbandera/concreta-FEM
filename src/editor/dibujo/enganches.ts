@@ -82,6 +82,10 @@ export interface PuntoRasgo {
   objeto: string;
   /** BN3, en un alzado. */
   modelo?: PuntoModelo;
+  /** M-22: lo que dice la barra de estado, si no es «tipo (objeto)»: «Cruce A-1». */
+  rotulo?: string;
+  /** M-22: el rasgo de un contorno de losa o paño, que a igual nivel cede ante el de una pieza (el medio de una viga). */
+  secundario?: boolean;
 }
 
 export interface Recta {
@@ -90,6 +94,8 @@ export interface Recta {
   objeto: string;
   /** BN3, en un alzado: la planta de la recta (un nivel) y los (x, y) de a y b. */
   modelo?: { planta: string; a: Vec2; b: Vec2 };
+  /** M-22: un lado de una losa o un paño (su punto medio cede ante el de una pieza). */
+  secundaria?: boolean;
 }
 
 /** Lo que tiene un índice de alzado (BN3, `alzado.ts`) para volver de (u, z) al modelo. */
@@ -237,7 +243,7 @@ export function indiceEnganches(m: ModeloFisico, planta: string): IndiceEnganche
   const caras: Recta[] = [];
   const circulos: IndiceEnganches["circulos"] = [];
   const siluetas: IndiceEnganches["siluetas"] = [];
-  const punto = (p: Vec2, tipo: TipoEnganche, objeto: string) => puntos.push({ p, tipo, objeto });
+  const punto = (p: Vec2, tipo: TipoEnganche, objeto: string, extra: Pick<PuntoRasgo, "rotulo" | "secundario"> = {}) => puntos.push({ p, tipo, objeto, ...extra });
 
   // Pilares: punto fijo, centro de la sección (el eje del tramo) y esquinas o cuadrantes
   for (const { p, seccion } of pl.pilares()) {
@@ -298,23 +304,24 @@ export function indiceEnganches(m: ModeloFisico, planta: string): IndiceEnganche
   }
   const crucesEjes: Vec2[] = [];
   const vistos = new Set<string>();
-  const anadirCruce = (p: Vec2, objeto: string, deEjes: boolean) => {
+  // M-22: el rótulo nombra los dos («Cruce A-1», «Cruce V2 · eje A»); antes decía «Cruce (A)»
+  const anadirCruce = (p: Vec2, objeto: string, deEjes: boolean, rotulo: string) => {
     const k = `${p[0]} ${p[1]}`;
     if (deEjes && !crucesEjes.some((c) => c[0] === p[0] && c[1] === p[1])) crucesEjes.push(p);
     if (vistos.has(k)) return;
     vistos.add(k);
-    punto(p, "cruce", objeto);
+    punto(p, "cruce", objeto, { rotulo });
   };
   for (let i = 0; i < ejes.length; i++)
     for (let j = i + 1; j < ejes.length; j++) {
       const c = cruce(ejes[i]!.desde, ejes[i]!.hasta, ejes[j]!.desde, ejes[j]!.hasta);
-      if (c) anadirCruce(c, ejes[i]!.id, true);
+      if (c) anadirCruce(c, ejes[i]!.id, true, `Cruce ${ejes[i]!.id}-${ejes[j]!.id}`);
     }
   for (const e of ejes)
     for (const x of [...pl.enPlanta(m.vigas), ...muros])
       for (const [a, b] of segmentos(x.puntos, false)) {
         const c = cruce(e.desde, e.hasta, a, b);
-        if (c) anadirCruce(c, x.id, false);
+        if (c) anadirCruce(c, x.id, false, `Cruce ${x.id} · eje ${e.id}`);
       }
 
   // Contornos y huecos de losas y paños
@@ -324,14 +331,14 @@ export function indiceEnganches(m: ModeloFisico, planta: string): IndiceEnganche
       const anillos = [l.contorno, ...(l.huecos ?? [])];
       for (const r of anillos) {
         for (const p of r) punto(p, "vertice", l.id);
-        for (const [a, b] of segmentos(r, true)) rectas.push({ a, b, objeto: l.id });
+        for (const [a, b] of segmentos(r, true)) rectas.push({ a, b, objeto: l.id, secundaria: true });
       }
       const huecos = l.huecos ?? [];
       siluetasLosas.push({ id: l.id, tipo, cerrados: anillos as Vec2[][], abiertos: [], distancia: (q) => (puntoEnPoligono(q, l.contorno) && !huecos.some((h) => puntoEnPoligono(q, h)) ? 0 : Infinity) });
     }
 
   // Puntos medios, después de todo lo demás (su nivel los ordena igual)
-  for (const r of rectas) punto([(r.a[0] + r.b[0]) / 2, (r.a[1] + r.b[1]) / 2], "medio", r.objeto);
+  for (const r of rectas) punto([(r.a[0] + r.b[0]) / 2, (r.a[1] + r.b[1]) / 2], "medio", r.objeto, r.secundaria ? { secundario: true } : {});
 
   return { planta, puntos, rectas, caras, circulos, crucesEjes, direccion: direccionOrto(m, planta), siluetas: [...siluetas, ...siluetasEjes, ...siluetasLosas] };
 }
@@ -347,6 +354,14 @@ export interface Enganche {
   plantilla?: string;
   /** BN3: en un alzado, el punto del modelo. */
   modelo?: PuntoModelo;
+  /** M-22: lo que dice la barra de estado, si no es «tipo (objeto)». */
+  rotulo?: string;
+}
+
+/** Lo que dice la barra de estado de un enganche: «Punto medio (V2-N2)», «Cruce A-1», «Vértice (DXF planta)». */
+export function rotuloEnganche(e: Enganche): string {
+  if (e.rotulo) return e.rotulo;
+  return `${NOMBRE_ENGANCHE[e.tipo]} (${e.plantilla ? `DXF ${e.plantilla}` : e.objeto})`;
 }
 
 /** Redondea a 1e-9 m (sin −0). */
@@ -394,20 +409,22 @@ export function redondearPaso(x: number, paso: number): number {
 export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: OpcionesEnganche = {}): Enganche | null {
   const activo = (t: TipoEnganche) => !o.activos || o.activos.has(t);
   const conModelo = !o.fuentes || o.fuentes.has("modelo");
-  let mejor: (Enganche & { d: number; n: number; pl: number; enRecta?: { m: NonNullable<Recta["modelo"]>; t: number } }) | null = null;
+  let mejor: (Enganche & { d: number; n: number; pl: number; sec: boolean; enRecta?: { m: NonNullable<Recta["modelo"]>; t: number } }) | null = null;
   /** `pl`: la plantilla del rasgo, o −1 si es del modelo. BN3: `modelo`, el punto del modelo de un rasgo de alzado; `enRecta`, el de un punto de una recta. */
-  const proponer = (p: Vec2, tipo: TipoEnganche, objeto: string, pl = -1, modelo?: PuntoModelo, enRecta?: { m: NonNullable<Recta["modelo"]>; t: number }) => {
+  const proponer = (p: Vec2, tipo: TipoEnganche, objeto: string, pl = -1, modelo?: PuntoModelo, enRecta?: { m: NonNullable<Recta["modelo"]>; t: number }, extra: Pick<PuntoRasgo, "rotulo" | "secundario"> = {}) => {
     if (!activo(tipo)) return;
     const d = dist(p, q);
     if (d > radio) return;
     const n = NIVEL[tipo];
-    // A igual nivel, el modelo gana a la plantilla; entre los de la misma fuente, el más cercano
-    const gana = !mejor || n < mejor.n || (n === mejor.n && (pl < 0 !== mejor.pl < 0 ? pl < 0 : d < mejor.d));
-    if (gana) mejor = { p, tipo, objeto, d, n, pl, ...(modelo ? { modelo } : {}), ...(enRecta ? { enRecta } : {}) };
+    const sec = !!extra.secundario;
+    // A igual nivel, el modelo gana a la plantilla; en el modelo, una pieza a un lado de losa (M-22:
+    // el punto medio de una viga a radio gana al del borde de la losa); si no, el más cercano
+    const gana = !mejor || n < mejor.n || (n === mejor.n && (pl < 0 !== mejor.pl < 0 ? pl < 0 : sec !== mejor.sec ? !sec : d < mejor.d));
+    if (gana) mejor = { p, tipo, objeto, d, n, pl, sec, ...(modelo ? { modelo } : {}), ...(enRecta ? { enRecta } : {}), ...(extra.rotulo ? { rotulo: extra.rotulo } : {}) };
   };
   /** Un punto de la recta r (su proyección): con el punto del modelo, si es de un alzado. */
   const enR = (r: Recta, k: { p: Vec2; t: number }, tipo: TipoEnganche) => proponer(k.p, tipo, r.objeto, -1, undefined, r.modelo ? { m: r.modelo, t: k.t } : undefined);
-  if (conModelo) for (const x of ix.puntos) proponer(x.p, x.tipo, x.objeto, -1, x.modelo);
+  if (conModelo) for (const x of ix.puntos) proponer(x.p, x.tipo, x.objeto, -1, x.modelo, undefined, x);
   // La plantilla: sus puntos, y lo que hay cerca del cursor para lo demás
   const t = !o.fuentes || o.fuentes.has("plantilla") ? ix.plantilla : null;
   const junto = t ? cerca(t, q, radio) : null;
@@ -475,7 +492,7 @@ export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opcion
   const m = mejor as Enganche & { pl: number; enRecta?: { m: NonNullable<Recta["modelo"]>; t: number } };
   if (m.pl < 0) {
     const modelo = m.modelo ?? (m.enRecta ? modeloEnRecta(m.enRecta.m, m.enRecta.t) : undefined);
-    return { p: m.p, tipo: m.tipo, objeto: m.objeto, ...(modelo ? { modelo } : {}) };
+    return { p: m.p, tipo: m.tipo, objeto: m.objeto, ...(modelo ? { modelo } : {}), ...(m.rotulo ? { rotulo: m.rotulo } : {}) };
   }
   const pl = t!.plantillas[m.pl]!;
   return { p: redondear(m.p, pl.redondeo), tipo: m.tipo, objeto: "", plantilla: pl.nombre };

@@ -5,7 +5,7 @@
  * campo con el foco o bajo el ratón se resalta en el dibujo y un clic en una cota lleva a su campo.
  * Lo que falta se dice en el sitio de su cota.
  */
-import { useId } from "react";
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Seccion, Vec2 } from "../../../src/compilador/fisico.ts";
 import type { CroquisForjado } from "../../../src/editor/ficha.ts";
 import { describirSeccion } from "../../../src/editor/gestores.ts";
@@ -30,6 +30,28 @@ const parte = (clave: string, { activo, onCampo }: Pick<Props, "activo" | "onCam
   onMouseDown: (e: { preventDefault(): void }) => e.preventDefault(),
 });
 
+/**
+ * La letra del croquis a 11 px de pantalla aunque el panel lo encoja (D-24: con `width: 100%`, un
+ * panel de 272 px dejaba los rótulos en 9–10 px). Da la referencia del svg y su `--cq-letra`.
+ */
+function useLetra(ancho: number): [React.RefObject<SVGSVGElement | null>, CSSProperties] {
+  const ref = useRef<SVGSVGElement>(null);
+  const [k, setK] = useState(1);
+  useLayoutEffect(() => {
+    const svg = ref.current;
+    if (!svg || typeof ResizeObserver === "undefined") return;
+    const medir = () => {
+      const w = svg.getBoundingClientRect().width;
+      if (w > 0) setK(ancho / w);
+    };
+    const ro = new ResizeObserver(medir);
+    ro.observe(svg);
+    medir();
+    return () => ro.disconnect();
+  }, [ancho]);
+  return [ref, { "--cq-letra": `${(11 * k).toFixed(2)}px` } as CSSProperties];
+}
+
 // ─── Planta ─────────────────────────────────────────────────────────────────────────────────────
 
 const W = 262;
@@ -40,6 +62,7 @@ const NOMBRE_DIRECCION = { maciza: "eje 1", reticular: "nervios", unidireccional
 
 export function PlantaForjado({ c, activo, onCampo }: Props) {
   const id = useId().replace(/:/g, "");
+  const [svg, letra] = useLetra(W);
   if (!c.contorno || !c.caja) {
     return (
       <div className="croquis croquis-vacio">
@@ -69,7 +92,7 @@ export function PlantaForjado({ c, activo, onCampo }: Props) {
   const abacos = c.abacos.length ? ` · ${c.abacos.length} ábaco${c.abacos.length > 1 ? "s" : ""}` : "";
   return (
     <figure className="croquis">
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Planta del forjado: ${c.contorno.length} vértices`}>
+      <svg ref={svg} style={letra} viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Planta del forjado: ${c.contorno.length} vértices`}>
         <defs>
           {trama && (
             <pattern id={`t${id}`} patternUnits="userSpaceOnUse" width={paso} height={paso} patternTransform={`rotate(${-c.direccion})`}>
@@ -184,6 +207,7 @@ const WS = 262;
 
 export function SeccionForjado({ c, activo, onCampo }: Props) {
   const prop = { activo, onCampo };
+  const [svg, letra] = useLetra(WS);
   if (c.tipo === "maciza") {
     const h = c.canto ?? TIPICO.canto;
     const ancho = 1.2;
@@ -191,7 +215,7 @@ export function SeccionForjado({ c, activo, onCampo }: Props) {
     const [x0, y0] = [30, 16];
     return (
       <figure className="croquis">
-        <svg viewBox={`0 0 ${WS} ${h * k + 32}`} width={WS} height={h * k + 32} role="img" aria-label="Sección de la losa maciza">
+        <svg ref={svg} style={letra} viewBox={`0 0 ${WS} ${h * k + 32}`} width={WS} height={h * k + 32} role="img" aria-label="Sección de la losa maciza">
           <rect x={x0} y={y0} width={ancho * k} height={h * k} className="cq-hormigon" data-activo={activo === "espesor" || activo === "material" || undefined} />
           <path d={`M${x0 - 4} ${y0 - 4}l8 ${h * k + 8}M${x0 + ancho * k - 4} ${y0 - 4}l8 ${h * k + 8}`} className="cq-corte" />
           <Cota campo="espesor" titulo="canto" valor={c.canto} a={y0} b={y0 + h * k} linea={x0 - 12} vertical lado={-1} prop={prop} />
@@ -219,7 +243,7 @@ export function SeccionForjado({ c, activo, onCampo }: Props) {
     const altoSvg = Y(h) + 26;
     return (
       <figure className="croquis">
-        <svg viewBox={`0 0 ${WS} ${altoSvg}`} width={WS} height={altoSvg} role="img" aria-label="Sección del reticular">
+        <svg ref={svg} style={letra} viewBox={`0 0 ${WS} ${altoSvg}`} width={WS} height={altoSvg} role="img" aria-label="Sección del reticular">
           {huecos.map(([a, b], i) => (
             <rect key={i} x={X(a)} y={Y(hf)} width={(b - a) * k} height={(h - hf) * k} className="cq-caseton" data-perdido={c.caseton === "perdido" || undefined} {...parte("caseton", prop)} />
           ))}
@@ -267,6 +291,7 @@ function formaVigueta(v: Seccion): { b: number; h: number; d: (X: (x: number) =>
 }
 
 function SeccionUnidireccional({ c, prop }: { c: CroquisForjado; prop: Pick<Props, "activo" | "onCampo"> }) {
+  const [svg, letra] = useLetra(WS);
   const v = c.vigueta;
   const forma = v ? formaVigueta(v) : null;
   const s = c.intereje ?? Math.max(forma?.b ?? 0, 0.7);
@@ -279,7 +304,7 @@ function SeccionUnidireccional({ c, prop }: { c: CroquisForjado; prop: Pick<Prop
   const altoSvg = Y(h) + 26;
   return (
     <figure className="croquis">
-      <svg viewBox={`0 0 ${WS} ${altoSvg}`} width={WS} height={altoSvg} role="img" aria-label="Sección del unidireccional">
+      <svg ref={svg} style={letra} viewBox={`0 0 ${WS} ${altoSvg}`} width={WS} height={altoSvg} role="img" aria-label="Sección del unidireccional">
         {ejes.map((e) =>
           forma ? (
             <path key={e} d={forma.d(X, Y, e)} className="cq-hormigon" {...parte("seccion", prop)} data-activo={prop.activo === "seccion" || undefined} />

@@ -19,7 +19,7 @@ import { espesorLosaEn, huellasInglete, huellasVigas, tramosDe } from "../../vis
 
 export { espesorLosaEn };
 import { capaEjes } from "./ejes.ts";
-import { bandaPolilinea, cajaDe, longitud, momento2D, puntoEnPolilinea, puntoInterior, puntosDe, rayado, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
+import { bandaPolilinea, cajaDe, dentro, longitud, momento2D, puntoEnPolilinea, puntoInterior, puntosDe, rayado, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
 
 export const VISTAS_MODELO = ["modelo", "cargas", "diagnosticos"] as const;
 
@@ -219,7 +219,8 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   };
   const notas: string[] = [];
 
-  // Losas y paños
+  // Losas y paños; su rótulo, lejos de las vigas de la planta (D-26)
+  const ejesVigas = pl.enPlanta(f.vigas).map((v) => v.puntos as Vec2[]);
   for (const l of pl.enPlanta(f.losas)) {
     const anillos = [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])];
     P.push({ tipo: "poligono", anillos, estilo: est(l.reticular ? "losa-reticular" : "losa"), objeto: l.id });
@@ -246,7 +247,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     }
     // Los huecos, con aspa (los de cuatro vértices: sus diagonales)
     for (const h of l.huecos ?? []) if (h.length === 4) for (const [a, b] of [[0, 2], [1, 3]] as const) P.push({ tipo: "linea", puntos: [h[a]!, h[b]!], estilo: est("hueco-aspa") });
-    texto(puntoInterior(anillos), etiquetaLosa(l), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
+    texto(rotuloForjado(anillos, ejesVigas), etiquetaLosa(l), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
   }
   for (const p of pl.enPlanta(f.panos)) {
     const anillos = [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])];
@@ -256,7 +257,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     const [x0, y0, x1, y1] = cajaDe(p.contorno);
     const paso = Math.max(p.intereje, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 12 / p.intereje) * p.intereje);
     for (const [a, b] of rayado(anillos, d, paso)) P.push({ tipo: "linea", puntos: [a, b], estilo: est("pano-viguetas"), objeto: p.id });
-    texto(puntoInterior(anillos), etiquetaPano(p), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
+    texto(rotuloForjado(anillos, ejesVigas), etiquetaPano(p), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
   }
 
   // Vigas, con su ancho
@@ -438,6 +439,50 @@ export function capaApoyos(pl: PlantaFisica, o: { rotulos: boolean }): { primiti
 
 const circulo = (c: Vec2, r: number, n = 32): Vec2[] => Array.from({ length: n }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / n), c[1] + r * Math.sin((2 * Math.PI * i) / n)] as Vec2);
 
+/**
+ * Dónde va el rótulo de un forjado (D-26: en el muestrario caía sobre el eje de una viga y su fondo la
+ * tapaba). Su punto interior, si ninguna viga de la planta pasa cerca; si no, de los puntos de una
+ * rejilla de 15 × 15 en su caja que caen en él (no en un hueco) lejos de su borde y de las vigas, el
+ * más cercano al punto interior (si no hay ninguno, el más alejado de las vigas). La distancia en x
+ * cuenta un cuarto, porque el rótulo es ancho y bajo: lo que tapa es una viga que va a lo largo de él.
+ * No depende del orden de las listas.
+ */
+function rotuloForjado(anillos: readonly (readonly Vec2[])[], vigas: readonly (readonly Vec2[])[]): Vec2 {
+  const g = puntoInterior(anillos);
+  const [x0, y0, x1, y1] = cajaDe(anillos[0]!);
+  const [w, h] = [x1 - x0, y1 - y0];
+  // La distancia de q al segmento ab, con x a un cuarto
+  const dist = (q: Vec2, a: Vec2, b: Vec2): number => {
+    const [ax, ay, bx, by, qx, qy] = [a[0] / 4, a[1], b[0] / 4, b[1], q[0] / 4, q[1]];
+    const [dx, dy] = [bx - ax, by - ay];
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((qx - ax) * dx + (qy - ay) * dy) / l2)) : 0;
+    return Math.hypot(qx - ax - t * dx, qy - ay - t * dy);
+  };
+  const lejos = (q: Vec2, lineas: readonly (readonly Vec2[])[], cerrada: boolean): number => {
+    let d = Infinity;
+    for (const v of lineas) for (let i = cerrada ? 0 : 1; i < v.length; i++) d = Math.min(d, dist(q, v[i === 0 ? v.length - 1 : i - 1]!, v[i]!));
+    return d;
+  };
+  const umbral = 0.1 * Math.min(w / 4, h);
+  const dg = lejos(g, vigas, false);
+  if (!(umbral > 0) || dg >= umbral) return g;
+  let cerca: { q: Vec2; a: number } | null = null;
+  let mejor: { q: Vec2; d: number; a: number } | null = null;
+  const N = 15;
+  for (let i = 1; i < N; i++)
+    for (let j = 1; j < N; j++) {
+      const q: Vec2 = [x0 + (w * i) / N, y0 + (h * j) / N];
+      if (!dentro(q, anillos[0]!) || anillos.slice(1).some((x) => dentro(q, x)) || lejos(q, anillos, true) < umbral) continue;
+      const d = lejos(q, vigas, false);
+      const a = Math.hypot(q[0] - g[0], q[1] - g[1]);
+      // Los empates, por la posición en la rejilla (el primero), que no depende del orden de las listas
+      if (d >= umbral && (!cerca || a < cerca.a - 1e-9)) cerca = { q, a };
+      if (!mejor || d > mejor.d + 1e-9 || (Math.abs(d - mejor.d) <= 1e-9 && a < mejor.a - 1e-9)) mejor = { q, d, a };
+    }
+  return cerca ? cerca.q : mejor && mejor.d > dg ? mejor.q : g;
+}
+
 function etiquetaLosa(l: Losa): string {
   const e = `${rotulo(l.espesor * 100)} cm`;
   if (l.reticular) return `${l.id} · reticular ${e}, nervios a ${rotulo(l.reticular.intereje * 100)} cm`;
@@ -548,7 +593,16 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
     if (p.tipo !== "texto") usados.add(p.estilo);
     P.push(p);
   };
-  const rot = (p: Vec2, t: string, extra: Partial<Extract<Primitiva, { tipo: "texto" }>> = {}) => poner({ tipo: "texto", p, texto: t, tamano: 12, prioridad: 70, fondo: true, clase: "dato", ...extra });
+  /**
+   * R-27: el valor («↓ 2 kN/m²»), y el id de la carga aparte, como los de las piezas (clase `id`: en la
+   * app, con zoom o con la carga elegida; antes cada rótulo repetía el id largo delante del valor y se
+   * pisaban). Del lado del valor que se aleja de la pieza: encima si va encima, debajo si no.
+   */
+  const rot = (p: Vec2, id: string, t: string, extra: Partial<Extract<Primitiva, { tipo: "texto" }>> = {}) => {
+    poner({ tipo: "texto", p, texto: t, tamano: 12, prioridad: 70, fondo: true, clase: "dato", objeto: id, ...extra });
+    const dy = extra.dy ?? 0;
+    poner({ tipo: "texto", p, texto: id, tamano: 11, prioridad: 40, clase: "id", objeto: id, ...extra, dy: dy < 0 ? dy - 14 : dy + 14 });
+  };
   const vigas = new Map((f.vigas ?? []).map((v) => [v.id, v]));
   const losas = new Map((f.losas ?? []).map((l) => [l.id, l]));
   const panos = new Map((f.panos ?? []).map((p) => [p.id, p]));
@@ -572,14 +626,14 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         }
         poner({ tipo: "poligono", anillos, estilo: "carga-superficie", objeto: g.id });
         const sufijo = g.zona && (g.losa || g.pano) ? ` (sólo en ${g.losa ?? g.pano})` : "";
-        rot(puntoInterior(anillos), `${g.id}: ${valorCarga(g.q, "kN/m²")}${sufijo}`, { ancla: "medio" });
+        rot(puntoInterior(anillos), g.id, `${valorCarga(g.q, "kN/m²")}${sufijo}`, { ancla: "medio" });
         return;
       }
       case "lineal": {
         if (g.planta !== planta) return;
         poner({ tipo: "linea", puntos: g.puntos as Vec2[], estilo: "carga-lineal", objeto: g.id });
         const { p, d: dir } = puntoEnPolilinea(g.puntos, longitud(g.puntos) / 2);
-        rot(p, `${g.id}: ${valorCarga(g.q, "kN/m")}`, { giro: giroTexto(dir), ancla: "medio", dy: -8 });
+        rot(p, g.id, valorCarga(g.q, "kN/m"), { giro: giroTexto(dir), ancla: "medio", dy: -8 });
         return;
       }
       case "puntual": {
@@ -589,7 +643,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         poner({ tipo: "flecha", p: [g.x, g.y], d: h > 0 ? [F[0], F[1]] : null, abajo: F[2] <= 0, estilo: "carga-puntual", objeto: g.id });
         // Su momento: Mz en un arco (antihorario visto desde arriba) y (Mx, My), de doble punta
         if (g.M) for (const x of momento2D([g.x, g.y], g.M[2], [g.M[0], g.M[1]], "carga-puntual", g.id)) poner(x);
-        rot([g.x, g.y], `${g.id}: ${valorPuntual(g.F, g.M)}`, { dx: 10, dy: 18 });
+        rot([g.x, g.y], g.id, valorPuntual(g.F, g.M), { dx: 10, dy: 18 });
         return;
       }
       case "viga": {
@@ -600,7 +654,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         const tramo = Array.from({ length: 17 }, (_, i) => puntoEnPolilinea(v.puntos, s0 + ((s1 - s0) * i) / 16).p);
         poner({ tipo: "linea", puntos: tramo, estilo: "carga-pieza", objeto: g.id });
         const { p, d: dir } = puntoEnPolilinea(v.puntos, (s0 + s1) / 2);
-        rot(p, `${g.id}: ${valorCargaVariable(g.q, g.qb, "kN/m", { local: g.ejes === "local" })}`, { giro: giroTexto(dir), ancla: "medio", dy: -9 });
+        rot(p, g.id, valorCargaVariable(g.q, g.qb, "kN/m", { local: g.ejes === "local" }), { giro: giroTexto(dir), ancla: "medio", dy: -9 });
         return;
       }
       case "pilar": {
@@ -610,7 +664,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         const [px, py] = ejeSeccion(p, x.seccion);
         const horizontal = g.ejes === "global" ? Math.hypot(g.q[0], g.q[1]) > 0 : true;
         poner({ tipo: "flecha", p: [px, py], d: g.ejes === "global" && horizontal ? [g.q[0], g.q[1]] : null, abajo: true, estilo: "carga-pieza", objeto: g.id });
-        rot([px, py], `${g.id}: ${valorCargaVariable(g.q, g.qb, "kN/m", { local: g.ejes === "local" })}`, { dx: 10, dy: 20 });
+        rot([px, py], g.id, valorCargaVariable(g.q, g.qb, "kN/m", { local: g.ejes === "local" }), { dx: 10, dy: 20 });
         return;
       }
       case "empuje": {
@@ -618,7 +672,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         if (!x || !x.llega) return;
         poner({ tipo: "linea", puntos: x.m.puntos as Vec2[], estilo: "carga-pieza", objeto: g.id });
         const { p, d: dir } = puntoEnPolilinea(x.m.puntos, longitud(x.m.puntos) / 2);
-        rot(p, `${g.id}: empuje por el lado ${g.lado}, ${rotulo(g.p0)} a ${rotulo(g.p1)} kN/m²`, { giro: giroTexto(dir), ancla: "medio", dy: 18 });
+        rot(p, g.id, `empuje por el lado ${g.lado}, ${rotulo(g.p0)} a ${rotulo(g.p1)} kN/m²`, { giro: giroTexto(dir), ancla: "medio", dy: 18 });
         return;
       }
     }

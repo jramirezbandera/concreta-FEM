@@ -313,16 +313,16 @@ function orden(nombre: string) {
 }
 
 describe("GE2: casos de carga", () => {
-  it("las hipótesis típicas de una vez: reutiliza G y Q, crea el viento, y es un paso de deshacer", async () => {
+  it("los casos típicos de una vez: reutiliza G y Q, crea el viento, y es un paso de deshacer", async () => {
     await proyectoNuevo("ge2-juego");
-    orden("Hipótesis típicas");
+    orden("Casos típicos");
     const dlg = screen.getByRole("dialog", { name: "Casos de carga" });
     expect(within(dlg).getByLabelText("Lo que se va a hacer").textContent).toBe("Se crean W+X, W-X, W+Y, W-Y. Ya están: G, Q.");
     // Los típicos que ya están lo dicen
     expect(within(within(dlg).getByRole("group", { name: "Casos típicos: uso" })).getByRole("button", { name: /^Q.*ya está: Q/ })).toBeTruthy();
-    fireEvent.click(within(dlg).getByRole("button", { name: "Crear las hipótesis" }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Crear los casos" }));
     expect(within(dlg).getByRole("status").textContent).toBe("Creados W+X, W-X, W+Y, W-Y; ya estaban G, Q.");
-    expect(deshacer().getAttribute("title")).toMatch(/Hipótesis típicas: W\+X, W-X, W\+Y, W-Y/);
+    expect(deshacer().getAttribute("title")).toMatch(/Casos típicos: W\+X, W-X, W\+Y, W-Y/);
     // La ficha de un caso es su formulario
     fireEvent.click(within(within(dlg).getByRole("navigation", { name: "Lista de casos" })).getByRole("button", { name: /^W-Y/ }));
     expect((within(dlg).getByRole("combobox", { name: "dirección" }) as HTMLSelectElement).value).toBe("Y");
@@ -347,19 +347,19 @@ describe("GE2: casos de carga", () => {
 
   it("la ficha de un caso se aplica con «Aplicar», como Secciones, y no se tira sin preguntar (D-19)", async () => {
     await proyectoNuevo("ge2-aplicar");
-    orden("Hipótesis típicas");
+    orden("Casos típicos");
     const dlg = screen.getByRole("dialog", { name: "Casos de carga" });
-    fireEvent.click(within(dlg).getByRole("button", { name: "Crear las hipótesis" }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Crear los casos" }));
     const lista = () => within(dlg).getByRole("navigation", { name: "Lista de casos" });
     fireEvent.click(within(lista()).getByRole("button", { name: /^W-Y/ }));
     const aplicar = () => within(dlg).getByRole("button", { name: /^Aplicar/ }) as HTMLButtonElement;
     expect(aplicar().disabled).toBe(true);
     fireEvent.change(within(dlg).getByRole("combobox", { name: "signo" }), { target: { value: "1" } });
     // Elegir en un desplegable no lo lleva al modelo
-    expect(deshacer().getAttribute("title")).toMatch(/Hipótesis típicas/);
+    expect(deshacer().getAttribute("title")).toMatch(/Casos típicos/);
     fireEvent.change(within(dlg).getByRole("textbox", { name: "nombre" }), { target: { value: "Viento +Y bis" } });
     fireEvent.blur(within(dlg).getByRole("textbox", { name: "nombre" }));
-    expect(deshacer().getAttribute("title")).toMatch(/Hipótesis típicas/);
+    expect(deshacer().getAttribute("title")).toMatch(/Casos típicos/);
     // Ir a otro caso pregunta; «Seguir editando» lo deja como estaba
     fireEvent.click(within(lista()).getByRole("button", { name: /^W\+X/ }));
     fireEvent.click(within(dlg).getByRole("button", { name: "Seguir editando" }));
@@ -385,7 +385,7 @@ describe("GE2: casos de carga", () => {
     const dlg = screen.getByRole("dialog", { name: "Casos de carga" });
     expect(within(dlg).getByText("Para caso de la fila nueva")).toBeTruthy();
     // Desde un campo no se ofrece el juego: sólo un caso
-    expect(within(dlg).queryByRole("button", { name: "Crear las hipótesis" })).toBeNull();
+    expect(within(dlg).queryByRole("button", { name: "Crear los casos" })).toBeNull();
     fireEvent.click(within(within(dlg).getByRole("group", { name: "Casos típicos: sismo" })).getByRole("button", { name: /^EX/ }));
     expect(screen.queryByRole("dialog", { name: "Casos de carga" })).toBeNull();
     expect(screen.getByText(/EX se crea con ella/)).toBeTruthy();

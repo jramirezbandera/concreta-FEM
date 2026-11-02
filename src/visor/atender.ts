@@ -43,7 +43,8 @@ export class Atendedor {
     }
   }
 
-  async atender(p: Pedido): Promise<Contestacion> {
+  /** `alProgreso`: las fases del cálculo según terminan (sólo en `calcular`; R-25). */
+  async atender(p: Pedido, alProgreso?: (fase: string, ms: number) => void): Promise<Contestacion> {
     if (p.tipo === "abrir") {
       const a = Sesion.abrir(p.texto, this.motor, { diferir: !!p.diferir });
       this.empaquetado = null;
@@ -65,7 +66,7 @@ export class Atendedor {
         return bien("guardados", r.ok ? { usados: true, estado: s.estado() } : { usados: false, motivo: r.motivo });
       }
       case "calcular": {
-        const r = await s.calcular();
+        const r = await s.calcular(alProgreso ? { alProgreso } : {});
         if (!r.ok) return { ok: false, diagnosticos: r.diagnosticos };
         const e = s.estado();
         // La cabecera, como la escribe la CLI (cli/ordenes.ts): con el núcleo y el sha256 de los bytes
