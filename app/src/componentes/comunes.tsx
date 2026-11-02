@@ -193,7 +193,7 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200 }: { ds: readonly Di
         return (
           <li key={k} className="border-b border-border-sub px-3.5 py-1.5 text-[12px]" data-severidad={sev}>
             <div className="flex items-center gap-2">
-              <span className={`pill ${sev === "error" ? "fail" : sev === "aviso" ? "warn" : "neu"}`} style={{ height: 18, fontSize: 10 }}>
+              <span className={`pill ${sev === "error" ? "fail" : sev === "aviso" ? "warn" : "neu"}`} style={{ height: 18, fontSize: 11 }}>
                 {sev === "error" ? "ERROR" : sev === "aviso" ? "AVISO" : "INFO"}
               </span>
               {g.causa && <span className="text-[11px] font-medium text-state-warn">Posible causa de un error</span>}
@@ -205,7 +205,7 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200 }: { ds: readonly Di
             <p className="mt-1 text-text-secondary">{textoApp(g.d.mensaje)}</p>
             {n > 1 && (
               <>
-                <button type="button" className="enlace text-[11.5px]" aria-expanded={abierto} onClick={() => setAbiertos((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set([...s, k])))}>
+                <button type="button" className="enlace text-[12px]" aria-expanded={abierto} onClick={() => setAbiertos((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set([...s, k])))}>
                   {abierto ? "Ocultar los demás" : `Ver los otros ${n - 1}`}
                 </button>
                 {abierto &&

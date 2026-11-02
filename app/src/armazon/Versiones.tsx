@@ -115,7 +115,7 @@ export function DialogoVersiones({ id, nombre, onCerrar, onRestaurada }: { id: s
               <span className="min-w-0 flex-1">
                 <span className="block truncate">{v.nombre}</span>
                 {t && (
-                  <span className="block truncate text-[11.5px] text-text-muted" title={t.resumen}>
+                  <span className="block truncate text-[12px] text-text-muted" title={t.resumen}>
                     {t.resumen}
                     {t.cambios && <span className="text-text-secondary"> · {t.cambios} frente a la anterior</span>}
                   </span>

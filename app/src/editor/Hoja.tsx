@@ -649,7 +649,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         <div className="seg max-w-full" style={{ overflowX: "auto" }} role="tablist" aria-label="Tabla">
           {TABLAS.map((t) => (
             <button key={t} type="button" role="tab" aria-selected={t === tabla} data-on={t === tabla} onClick={() => setTabla(t)}>
-              {DEF_TABLAS[t].titulo} <span className="mono text-[10.5px] text-text-muted">{contar(t)}</span>
+              {DEF_TABLAS[t].titulo} <span className="mono text-[11px] text-text-muted">{contar(t)}</span>
             </button>
           ))}
         </div>
@@ -773,7 +773,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         </table>
       </div>
 
-      <div className={`flex h-7 shrink-0 items-center gap-2 border-t border-border-sub px-3 text-[11.5px] ${mensaje?.tono === "fail" ? "text-state-fail" : mensaje?.tono === "ok" ? "text-state-ok" : "text-text-secondary"}`} role="status" aria-live="polite">
+      <div className={`flex h-7 shrink-0 items-center gap-2 border-t border-border-sub px-3 text-[12px] ${mensaje?.tono === "fail" ? "text-state-fail" : mensaje?.tono === "ok" ? "text-state-ok" : "text-text-secondary"}`} role="status" aria-live="polite">
         <span className="min-w-0 flex-1 truncate" title={mensaje?.texto} data-mensaje-hoja>
           {mensaje ? (
             mensaje.texto

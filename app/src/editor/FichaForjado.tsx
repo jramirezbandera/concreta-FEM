@@ -96,7 +96,7 @@ export function RigidezAligeradoPanel({ fila, ctx, escribir, errores, rigidez }:
       </p>
       <TablaMultiplicadores r={r} mia={mia} escribir={escribir} />
       {errores.multiplicadores && <p className="error">{errores.multiplicadores}</p>}
-      <p className="text-[11.5px] leading-snug text-text-secondary mt-1.5">
+      <p className="text-[12px] leading-snug text-text-secondary mt-1.5">
         {mia ? (
           <>
             Van sobre la maciza con el ν del hormigón ({n(r.nu, 2)}), los ábacos son macizos (1) y las vigas planas a sus lados no se rebajan.
@@ -128,7 +128,7 @@ function TablaMultiplicadores({ r, mia, escribir }: { r: RigidezAligerado; mia: 
         {MULTIPLICADORES.map((m) => (
           <tr key={m.clave} title={m.que} className="border-t border-border-sub">
             <td className="py-0.5">
-              {m.nombre} <span className="font-mono text-[10.5px] text-text-secondary">{m.clave}</span>
+              {m.nombre} <span className="font-mono text-[11px] text-text-secondary">{m.clave}</span>
             </td>
             <td className={`text-right ${mia ? "text-text-secondary" : ""}`}>{n(r.calculados[m.clave])}</td>
             {mia && (

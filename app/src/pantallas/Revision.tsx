@@ -42,7 +42,7 @@ function Documento({ doc }: { doc: Bloque[] }) {
           case "titulo": {
             const T = b.nivel === 1 ? "h1" : b.nivel === 2 ? "h2" : "h3";
             return (
-              <T key={i} id={ancla(i)} className={b.nivel === 1 ? "mb-2 text-[18px] font-semibold" : b.nivel === 2 ? "mb-1.5 mt-6 border-b border-border-main pb-1 text-[14px] font-semibold" : "mb-1 mt-4 text-[13px] font-semibold"}>
+              <T key={i} id={ancla(i)} className={b.nivel === 1 ? "mb-2 text-[18px] font-semibold" : b.nivel === 2 ? "mb-1.5 mt-6 border-b border-border-main pb-1 text-[13px] font-semibold" : "mb-1 mt-4 text-[13px] font-semibold"}>
                 {b.texto}
               </T>
             );
@@ -138,7 +138,7 @@ function FormularioFirma({ huella, informe, avisos, firmas, firmar }: { huella: 
           He revisado el informe{avisos ? ` y sus ${avisos} aviso${avisos === 1 ? "" : "s"}` : ""}, y firmo esta versión del proyecto.
         </span>
       </label>
-      <p className="m-0 text-[11.5px] leading-snug text-text-muted">{NOTA_VALIDACION} La firma queda en el fichero de firmas, con la huella del modelo y el sha256 del informe.</p>
+      <p className="m-0 text-[12px] leading-snug text-text-muted">{NOTA_VALIDACION} La firma queda en el fichero de firmas, con la huella del modelo y el sha256 del informe.</p>
       {error && <p className="m-0 text-[12px] text-state-fail" role="alert">{error}</p>}
       <button type="submit" className="btn btn-p self-start" disabled={!listo} title={!revisado ? "Marque antes «He revisado el informe»" : por.trim().length < 3 ? "Escriba quién firma" : "Firmar el informe de esta versión"}>
         {firmando ? "Firmando…" : "Firmar el informe"}
@@ -288,7 +288,7 @@ export function EspacioRevision() {
                 <a key={c.codigo} href={`#${ancla(x.documento.findIndex((b) => b.tipo === "titulo" && b.texto.includes(c.titulo)))}`} className="flex items-center justify-between gap-2 border-b border-border-sub px-3.5 py-1.5 text-[12px] text-text-secondary hover:bg-bg-elevated">
                   <span className="min-w-0">
                     <span className="block text-text-primary">{c.titulo}</span>
-                    {c.peor && <span className="mono block truncate text-[10.5px] text-text-muted">peor: {c.peor}</span>}
+                    {c.peor && <span className="mono block truncate text-[11px] text-text-muted">peor: {c.peor}</span>}
                   </span>
                   <span className={`pill ${TONO[c.estado]}`}>{TEXTO[c.estado]}</span>
                 </a>

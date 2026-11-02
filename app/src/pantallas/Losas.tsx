@@ -279,7 +279,7 @@ export function ModoLosas() {
                 <div className="mono text-[11px] text-text-muted">
                   {puntoValido.v.losa} · ({fmt(puntoValido.p[0], 2)}; {fmt(puntoValido.p[1], 2)}) m
                 </div>
-                <div className="mono text-[17px] font-medium" data-valor-punto={puntoValido.v.valor}>
+                <div className="mono text-[18px] font-medium" data-valor-punto={puntoValido.v.valor}>
                   {textoValor(campo, puntoValido.v.valor, dec, unidad)}
                 </div>
                 {puntoValido.v.otros && (

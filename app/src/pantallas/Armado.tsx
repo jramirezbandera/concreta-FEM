@@ -143,14 +143,14 @@ function DiagramaFranja({ d, base, ancho = 320, alto = 170 }: { d: DatosFranja; 
     return (
       <g>
         <rect x={xx - w / 2} y={yy - 9.5} width={w} height={12.5} rx={2} fill="var(--color-bg-primary)" opacity={0.9} />
-        <text x={xx} y={yy} fontSize={10.5} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
+        <text x={xx} y={yy} fontSize={11} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
           {t}
         </text>
       </g>
     );
   };
   const eje = (v: number) => (
-    <text x={ml - 4} y={Y(v) + 3.5} fontSize={10} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+    <text x={ml - 4} y={Y(v) + 3.5} fontSize={11} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
       {fmt(v, 0)}
     </text>
   );
@@ -173,10 +173,10 @@ function DiagramaFranja({ d, base, ancho = 320, alto = 170 }: { d: DatosFranja; 
         {eje(0)}
         {eje(vmax)}
         {eje(-vmax)}
-        <text x={ml} y={H - 4} fontSize={10} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+        <text x={ml} y={H - 4} fontSize={11} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
           s = {fmt(s0, 2)}
         </text>
-        <text x={W - mr} y={H - 4} fontSize={10} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+        <text x={W - mr} y={H - 4} fontSize={11} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
           {fmt(s1, 2)} m
         </text>
         {inf.inferior[0] > 0 && rotulo(X(inf.s), Y(inf.inferior[0]), fmt(inf.inferior[0], 1), true)}
@@ -334,7 +334,7 @@ function ValorPunto({ punto, armadura, varias }: { punto: Punto | null; armadura
       <div className="mono text-[11px] text-text-muted">
         {v.franja} · s = {fmt(v.s, 2)} m · ({fmt(punto.p[0], 2)}; {fmt(punto.p[1], 2)}) m
       </div>
-      <div className="mono text-[17px] font-medium">
+      <div className="mono text-[18px] font-medium">
         {fmt(v.valor, 1)} {U}
         <span className="ml-1.5 text-[11px] font-normal text-text-secondary">{NOMBRE_CORTO[armadura]}</span>
       </div>
@@ -448,7 +448,7 @@ function DetalleZona({ z, varias }: { z: FilaRefuerzo; varias: boolean }) {
   return (
     <Seccion titulo={z.id} valor="zona de refuerzo">
       <div className="px-3.5 py-2 text-[12px] text-text-secondary">
-        <div className="mono text-[17px] font-medium text-text-primary">
+        <div className="mono text-[18px] font-medium text-text-primary">
           {fmt(z.maximo.v, 1)} {U} <span className="text-[12px] text-state-warn">(+{fmt(z.maximo.exceso, 1)})</span>
         </div>
         <div>

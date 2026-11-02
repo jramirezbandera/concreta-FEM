@@ -101,11 +101,11 @@ function GraficoAxil({ filas }: { filas: FilaPilar[] }) {
         const pasa = (f.nu?.nu ?? 0) > LIMITE_NU;
         return (
           <g key={i} transform={`translate(0 ${4 + i * 18})`}>
-            <text x={44} y={11} fontSize={10.5} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-secondary)">
+            <text x={44} y={11} fontSize={11} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-secondary)">
               {f.planta}
             </text>
             <rect x={50} y={2} width={w} height={11} fill={pasa ? "var(--color-tint-warn)" : "var(--color-bg-elevated)"} stroke={pasa ? "var(--color-state-warn)" : "var(--color-border-main)"} />
-            <text x={54 + w} y={11} fontSize={10.5} fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
+            <text x={54 + w} y={11} fontSize={11} fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
               {fmt(ns[i]!, 0)}
             </text>
           </g>

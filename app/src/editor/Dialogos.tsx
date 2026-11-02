@@ -100,7 +100,7 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = nu
         <div className="dialogo-cuerpo">{children}</div>
         {preguntando && pendiente ? (
           <div className="pie pie-pregunta" role="alertdialog" aria-label="Cambios sin aplicar">
-            <span className="mr-auto text-[12.5px]">{pendiente} Si cierra, se pierden.</span>
+            <span className="mr-auto text-[13px]">{pendiente} Si cierra, se pierden.</span>
             <button type="button" className="btn" autoFocus onClick={() => setPreguntando(false)}>
               Seguir editando
             </button>

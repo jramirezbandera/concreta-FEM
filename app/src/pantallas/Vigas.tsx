@@ -186,7 +186,7 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
         {v.apoyos.map((a, i) => (
           <g key={i}>
             <rect x={X(a.caras[0])} y={mt - 6} width={Math.max(1, X(a.caras[1]) - X(a.caras[0]))} height={H - mt - mb + 12} fill="var(--color-bg-elevated)" />
-            <text x={X(a.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
+            <text x={X(a.s)} y={H - 6} fontSize={11} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
               {a.objeto}
             </text>
           </g>
@@ -194,7 +194,7 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
         {(v.plantas ?? []).map((p) => (
           <g key={p.planta}>
             <line x1={X(p.s)} x2={X(p.s)} y1={mt - 6} y2={H - mb + 4} stroke="var(--color-border-main)" strokeDasharray="3 3" />
-            <text x={X(p.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
+            <text x={X(p.s)} y={H - 6} fontSize={11} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
               {p.planta}
             </text>
           </g>
@@ -213,14 +213,14 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
           return (
             <g key={i}>
               <rect x={X(p.s) - ancho / 2} y={y - 10} width={ancho} height={13} rx={2} fill="var(--color-bg-primary)" opacity={0.92} />
-              <text x={X(p.s)} y={y} fontSize={10.5} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
+              <text x={X(p.s)} y={y} fontSize={11} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
                 {t}
               </text>
             </g>
           );
         })}
         <line x1={X(s)} x2={X(s)} y1={mt - 8} y2={H - mb + 4} stroke="var(--color-accent)" strokeDasharray="4 3" />
-        <text x={ml - 6} y={y0 + 4} fontSize={10} textAnchor="end" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
+        <text x={ml - 6} y={y0 + 4} fontSize={11} textAnchor="end" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
           0
         </text>
       </svg>
@@ -374,8 +374,8 @@ export function ModoDiagramas() {
           {ps.map((p) => (
             <button key={p.id} type="button" className="lista-fila" data-on={p.id === id} style={{ gridTemplateColumns: "1fr auto auto" }} onClick={() => setSeleccion(p.id)}>
               <span className="mono truncate">{p.id}</span>
-              <span className="text-[11.5px]">{p.seccion ?? ""}</span>
-              <span className="mono text-[11.5px]">{fmt(p.longitud, 2)} m</span>
+              <span className="text-[12px]">{p.seccion ?? ""}</span>
+              <span className="mono text-[12px]">{fmt(p.longitud, 2)} m</span>
             </button>
           ))}
         </Seccion>

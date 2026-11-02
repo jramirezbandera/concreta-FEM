@@ -40,7 +40,7 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
         <g key={i}>
           <circle cx={X(p.ux)} cy={Y(p.z)} r={2.5} fill="var(--color-accent)" />
           <circle cx={X(p.uy)} cy={Y(p.z)} r={2.5} fill="var(--color-uy)" />
-          <text x={4} y={Y(p.z) + 3} fontSize={9.5} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+          <text x={4} y={Y(p.z) + 3} fontSize={11} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
             {cota(p.z)}
           </text>
         </g>
@@ -49,7 +49,7 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
       {(() => {
         const a = pts.reduce((x, p) => (p.z > x.z ? p : x), pts[0]!);
         const r = (u: number, color: string, dy: number) => (
-          <text x={Math.min(W - 12, Math.max(ml + 2, X(u) + (u >= 0 ? 5 : -5)))} y={Y(a.z) + dy} fontSize={10} textAnchor={u >= 0 ? "start" : "end"} fontFamily="var(--font-mono)" fill={color} className="halo">
+          <text x={Math.min(W - 12, Math.max(ml + 2, X(u) + (u >= 0 ? 5 : -5)))} y={Y(a.z) + dy} fontSize={11} textAnchor={u >= 0 ? "start" : "end"} fontFamily="var(--font-mono)" fill={color} className="halo">
             {fmt(u, 2)}
           </text>
         );
@@ -60,13 +60,13 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
           </>
         );
       })()}
-      <text x={X(0)} y={H - 6} fontSize={9.5} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+      <text x={X(0)} y={H - 6} fontSize={11} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         0
       </text>
-      <text x={X(umax)} y={H - 6} fontSize={9.5} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+      <text x={X(umax)} y={H - 6} fontSize={11} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         {fmt(umax, 2)} mm
       </text>
-      <text x={X(-umax)} y={H - 6} fontSize={9.5} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+      <text x={X(-umax)} y={H - 6} fontSize={11} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         {fmt(-umax, 2)}
       </text>
     </svg>

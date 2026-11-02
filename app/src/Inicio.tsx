@@ -172,7 +172,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
         {almacen && (
           <section className="border-t border-border-sub px-5 py-3" aria-label="Mis proyectos">
             <div className="flex items-baseline gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">Mis proyectos</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Mis proyectos</span>
               <span className="flex-1" />
               {persiste === false && !!mios?.length && (
                 <span className="text-[11px] text-state-warn" title="El navegador podría borrarlos si se queda sin espacio. Exporte los que no quiera perder.">
@@ -235,7 +235,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
         )}
 
         <div className="border-t border-border-sub px-5 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">Ejemplos del repositorio · se abren sin guardar</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">Ejemplos del repositorio · se abren sin guardar</div>
           <ul className="mt-1 list-none p-0">
             {Object.entries(EJEMPLOS).map(([k, e]) => (
               <li key={k}>
@@ -248,7 +248,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
         </div>
 
         <div className="border-t border-border-sub px-5 py-3 text-[12px] text-text-secondary">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">En el disco, para trabajar con el agente</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">En el disco, para trabajar con el agente</div>
           <p className="mt-1">
             El agente y la CLI leen el proyecto.json del disco. Para trabajar los dos sobre el mismo fichero, ábralo desde su carpeta (se recarga solo cuando el agente lo cambia) o con <span className="mono">bun run visor proyecto.json</span>.
           </p>
