@@ -228,7 +228,9 @@ const ESQ_LAMINA = [0, 1, 2, 0, 2, 3];
 const MAT = {
   lineas: new LineMaterial({ vertexColors: true, linewidth: 1.5, worldUnits: false }),
   elegidas: new LineMaterial({ linewidth: 3.5, worldUnits: false, depthTest: false, transparent: true }),
-  laminas: new MeshLambertMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity: 0.82, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
+  // Más atrás que las bandas de los isovalores, que van en su mismo plano: si no, en el analítico
+  // se pelean con el mapa de la planta elegida y lo emborronan
+  laminas: new MeshLambertMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity: 0.82, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 4 }),
   barras: new LineBasicMaterial({ vertexColors: true }),
   originales: new LineBasicMaterial({ transparent: true, opacity: 0.45 }),
   // I4: diagramas e isovalores
