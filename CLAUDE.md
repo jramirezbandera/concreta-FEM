@@ -676,7 +676,12 @@
     - el foco de los diálogos.
   - **Textos (UI-43, UI-44):** sin códigos internos ni órdenes de la CLI; lo que llega del motor y del compilador pasa por `textoApp()` (el agente y el informe los conservan), con la prueba en `src/pruebas/textos.test.ts`.
   - **Medios de §3.2:** UI-13, UI-18, UI-22 (lo elegido en ámbar), UI-23, UI-24, UI-36 (clic libre a 1 cm), UI-37 (Ctrl+A), UI-39, UI-40, UI-48, UI-55 y UI-56, y en parte UI-15, UI-41 y UI-53.
-  - **Quedan:** UI-15 en la tabla Plantas, UI-19, UI-20, UI-21, UI-32 (firmar en la web), UI-49 y parte de UI-41 y UI-53. Los bancos de Chrome no se han pasado.
+- **2026-11-02: lo que quedaba de la auditoría de la interfaz** (`auditoria-ui.md` §7):
+  - **Armado y gráficas (UI-19, UI-20, UI-21):** rampas de varios tonos, picos de franjas vecinas sin apilar, zonas de refuerzo con su máximo y el exceso, encuadre de la planta; el diagrama de la franja con ejes y a todo el ancho; rótulos del alzado de vigas con fondo.
+  - **UI-15:** la tabla Plantas da la altura del tramo de debajo (`DefTabla.ademas`), el JSON igual.
+  - **UI-32:** firmar en la web, con el nombre y «He revisado el informe»; cada firma lleva `NOTA_VALIDACION` (periodo en sombra). `Origen.escribirFichero` también deja `proyecto.json.bak` antes de sobrescribir.
+  - **UI-41, M-15, UI-49, D-19 y D-22:** retícula de ejes por luces, plantilla de Hueco por grupos, chip de la herramienta en una línea, versiones con lo que cambió, plantas en Renumerar, escala de letra de cinco tamaños, gestores con la misma cabecera.
+  - **Quedan:** el modelo de confirmar de los gestores y los bajos de §3.3. Los bancos de Chrome no se han pasado.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
