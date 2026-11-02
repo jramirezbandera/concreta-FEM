@@ -200,7 +200,7 @@ const plantas: DefTabla = {
     { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sótano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
     { clave: "altura", titulo: "altura", unidad: "m", ayuda: "la del tramo de debajo: de su forjado al de la planta de debajo, como en un alzado; vacía en la más baja. En una fila nueva, que va abajo del todo, la del tramo que la une a la de encima" },
     { clave: "cota", titulo: "cota", unidad: "m", calculada: true },
-    { clave: "diafragma", titulo: "diafragma", ayuda: "rígido o ninguno; por defecto, rígido salvo en la más baja (C1-d)", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
+    { clave: "diafragma", titulo: "diafragma", ayuda: "rígido: el forjado no se deforma en su plano y los nudos se mueven juntos en horizontal (lo normal en un forjado de hormigón continuo). Ninguno: lo ata en su plano la propia losa (semirrígido) o, sin losa, sólo las vigas; para plantas sin forjado continuo, con huecos grandes o muy alargadas, o si se quieren los axiles de las vigas, la membrana de la losa o diagonales en el plano. Vacío: rígido salvo en la más baja, donde arrancan los pilares", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
   ],
   fila(o, ctx) {
     const p = o as unknown as Planta;
