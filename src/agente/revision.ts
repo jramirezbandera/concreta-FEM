@@ -33,7 +33,17 @@ export interface Firma {
   fecha: string;
   /** sha256 del informe en Markdown que firmó. */
   informe: string;
+  /** UI-32: dónde se firmó (sin ella, en la línea de órdenes, como antes). */
+  via?: "app" | "cli";
+  /** UI-32: lo que la firma dice además (mientras dure el periodo en sombra, `NOTA_VALIDACION`). */
+  nota?: string;
 }
+
+/**
+ * UI-32: mientras la herramienta no pase la batería de validación y el periodo en sombra (regla de
+ * oro 7), cada firma lo dice: es la de haber revisado el informe, no la de un cálculo validado.
+ */
+export const NOTA_VALIDACION = "Concreta FEM 3D está en validación (periodo en sombra): esta firma dice que el informe se revisó, no que la herramienta esté validada; el cálculo se contrasta con otro programa.";
 
 export interface FicheroFirmas {
   esquema: typeof VERSION_FIRMAS;

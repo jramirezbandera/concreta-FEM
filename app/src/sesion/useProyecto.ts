@@ -94,6 +94,11 @@ export interface ProyectoAbierto {
   motivoGuardados: string | null;
   /** Texto del fichero de firmas (vacío si no hay). */
   firmas: string;
+  /**
+   * UI-32: añade una firma al fichero de firmas, junto al proyecto (en la carpeta o en el
+   * navegador); null si se hizo, o por qué no. Sin `escribirFichero` en el origen, no se puede.
+   */
+  firmar?: (texto: string) => Promise<string | null>;
   tiempos: Tiempos;
   /** Cuenta las cargas: cambia con cada versión del proyecto. */
   version: number;
@@ -449,6 +454,17 @@ export function useProyecto(): ProyectoAbierto {
         setGuardado({ tipo: "error", mensaje: `El proyecto no pasa el esquema: no se guarda (${l.diagnosticos[0]?.mensaje ?? ""}).` });
         return;
       }
+      // UI-31: antes de pisar lo de fuera en una carpeta, una copia (`proyecto.json.bak`)
+      if (o.forzar && fuente.tipo === "origen" && !fuente.origen.navegador && fuente.origen.escribirFichero) {
+        const fuera = await fuente.origen.leer(fuente.origen.fichero).catch(() => null);
+        if (fuera) {
+          const b = await fuente.origen.escribirFichero(`${fuente.origen.fichero}.bak`, fuera.texto);
+          if (!b.ok) {
+            setGuardado({ tipo: "error", mensaje: `No se sobrescribió: no se pudo dejar la copia de lo de fuera (${b.mensaje})` });
+            return;
+          }
+        }
+      }
       if (fuente.tipo === "texto") {
         descargar(texto, fuente.nombre);
         setEnDisco(p);
@@ -646,5 +662,20 @@ export function useProyecto(): ProyectoAbierto {
       }
     : null;
 
-  return { fase, estado, cliente, fuente, desactualizado, errores, motivoGuardados, firmas, tiempos, version, abrirOrigen, abrirTexto, recalcular, calcular, edicion };
+  const firmar = useCallback(
+    async (texto: string): Promise<string | null> => {
+      const f = fuenteRef.current;
+      if (f?.tipo !== "origen" || !f.origen.escribirFichero) return "Este proyecto no se puede firmar aquí: ábralo desde su carpeta o guárdelo en el navegador.";
+      const r = await f.origen.escribirFichero(nombreFirmas(f.origen.fichero), texto);
+      if (!r.ok) return r.mensaje;
+      const s = await f.origen.sello(nombreFirmas(f.origen.fichero));
+      if (ultimo.current) ultimo.current = { ...ultimo.current, selloFirmas: s };
+      setFirmas(texto);
+      return null;
+    },
+    [],
+  );
+  const puedeFirmar = fuente?.tipo === "origen" && !!fuente.origen.escribirFichero;
+
+  return { fase, estado, cliente, fuente, desactualizado, errores, motivoGuardados, firmas, tiempos, version, abrirOrigen, abrirTexto, recalcular, calcular, edicion, ...(puedeFirmar ? { firmar } : {}) };
 }

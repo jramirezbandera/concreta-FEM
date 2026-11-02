@@ -64,6 +64,22 @@ describe("proyectos", () => {
   });
 });
 
+describe("UI-32: el fichero de firmas de un proyecto del navegador", () => {
+  it("se escribe y se lee junto al proyecto, y se va con él", async () => {
+    const a = await crear(texto("Nave"));
+    const o = origenNavegador(a.id, "Nave");
+    expect(await o.leer("proyecto.revision.json")).toBeNull();
+    expect(await o.sello("proyecto.revision.json")).toBeNull();
+    expect(await o.escribirFichero!("proyecto.revision.json", '{"firmas":[]}')).toEqual({ ok: true });
+    expect((await o.leer("proyecto.revision.json"))?.texto).toBe('{"firmas":[]}');
+    expect(await o.sello("proyecto.revision.json")).not.toBeNull();
+    // El proyecto no cambia por ello
+    expect((await leer(a.id))?.texto).toBe(texto("Nave"));
+    await borrar(a.id);
+    expect(await origenNavegador(a.id, "Nave").leer("proyecto.revision.json")).toBeNull();
+  });
+});
+
 describe("versiones (§3.3, criterio 5)", () => {
   it("una versión al abrir y como mucho una cada 10 minutos de edición; restaurar da su texto byte a byte", async () => {
     const a = await crear(texto("A", 0));

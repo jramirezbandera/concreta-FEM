@@ -15,7 +15,7 @@ import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones,
 import { consultar, CONSULTAS, resumen, TOP_POR_DEFECTO, type OpcionesConsulta } from "../src/agente/consultas.ts";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../src/agente/resultados.ts";
-import { anadirFirma, estadoFirma, leerFirmas, revisar, type FicheroFirmas, type Revision } from "../src/agente/revision.ts";
+import { anadirFirma, estadoFirma, leerFirmas, NOTA_VALIDACION, revisar, type FicheroFirmas, type Revision } from "../src/agente/revision.ts";
 import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaArmado, vistaAxiles, vistaBandas, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Armadura, type Campo, type Envolvente, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
@@ -487,7 +487,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if (readFileSync(guardado, "utf8") !== rev.markdown) return no("cli/informe-cambiado", "El informe guardado no es el que sale ahora del proyecto (otro núcleo de cálculo u otras comprobaciones): vuelva a revisarlo con «fem revisar».");
       const firmas = firmasDe(orden, l.ruta);
       if ("codigo" in firmas) return firmas;
-      const firma = { huella, por, fecha: new Date().toISOString(), informe: sha256(rev.markdown) };
+      const firma = { huella, por, fecha: new Date().toISOString(), informe: sha256(rev.markdown), via: "cli" as const, nota: NOTA_VALIDACION };
       const fichero = rutaFirmas(l.ruta);
       writeFileSync(fichero, `${JSON.stringify(anadirFirma(firmas, firma), null, 2)}\n`);
       return { codigo: CODIGO.bien, json: { orden, ok: true, huella, firma, fichero: rel(fichero), diagnosticos: [] } };

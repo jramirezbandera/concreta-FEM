@@ -1,9 +1,15 @@
 /**
  * Espacio Revisión (la pantalla 7 de V1): el informe de A3 (`revisar`, el mismo de `fem revisar`)
- * con su índice en el navegador, y el estado de su firma en `<proyecto>.revision.json`. El visor no firma: firmar es `fem firmar`, sólo
- * del ingeniero, y el fichero de firmas se vuelve a leer cuando cambia.
+ * con su índice en el navegador, y el estado de su firma en `<proyecto>.revision.json`.
+ *
+ * UI-32: se firma también aquí, con el nombre tecleado y «He revisado el informe», con la misma
+ * huella y el mismo sha256 del informe que `fem firmar`, y la nota de que la herramienta está en
+ * validación. Es una interacción humana: el agente firma sólo si se lo pide el ingeniero, y la skill
+ * se lo prohíbe. Donde el origen no puede escribir junto al proyecto (el servidor local), la orden
+ * de la CLI.
  */
 import { useEffect, useMemo, useState } from "react";
+import { anadirFirma, leerFirmas, NOTA_VALIDACION, VERSION_FIRMAS, type Firma } from "../../../src/agente/revision.ts";
 import { ClipboardCopy } from "lucide-react";
 import type { Bloque } from "../../../src/agente/informe.ts";
 import { Disposicion, Herramienta, Separador } from "../armazon/Disposicion.tsx";
@@ -97,6 +103,50 @@ const TEXTO = { bien: "BIEN", avisos: "AVISOS", "no-aplica": "NO APLICA" } as co
 
 const IcCopiar: Icono = ({ size }) => <ClipboardCopy size={size} strokeWidth={1.5} aria-hidden="true" />;
 
+/** Firmar el informe aquí (UI-32): quién firma, tecleado, y la confirmación de haberlo revisado. */
+function FormularioFirma({ huella, informe, avisos, firmas, firmar }: { huella: string; informe: string; avisos: number; firmas: string; firmar: (texto: string) => Promise<string | null> }) {
+  const [por, setPor] = useState("");
+  const [revisado, setRevisado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [firmando, setFirmando] = useState(false);
+  const listo = por.trim().length >= 3 && revisado && !firmando;
+  const hacer = async () => {
+    if (!listo) return;
+    const f = leerFirmas(firmas);
+    if ("error" in f) return setError(`El fichero de firmas ${f.error}: no se toca.`);
+    const firma: Firma = { huella, por: por.trim(), fecha: new Date().toISOString(), informe, via: "app", nota: NOTA_VALIDACION };
+    setFirmando(true);
+    const e = await firmar(`${JSON.stringify(anadirFirma(f, firma), null, 2)}\n`);
+    setFirmando(false);
+    setError(e);
+  };
+  return (
+    <form
+      className="flex flex-col gap-2 px-3.5 py-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void hacer();
+      }}
+    >
+      <label className="campo">
+        <span>Quién firma</span>
+        <input value={por} onChange={(e) => setPor(e.target.value)} placeholder="Nombre y apellidos" aria-label="Quién firma" autoComplete="name" />
+      </label>
+      <label className="flex items-start gap-2 text-[12px] text-text-secondary">
+        <input type="checkbox" className="mt-[3px]" checked={revisado} onChange={(e) => setRevisado(e.target.checked)} aria-label="He revisado el informe" />
+        <span>
+          He revisado el informe{avisos ? ` y sus ${avisos} aviso${avisos === 1 ? "" : "s"}` : ""}, y firmo esta versión del proyecto.
+        </span>
+      </label>
+      <p className="m-0 text-[11.5px] leading-snug text-text-muted">{NOTA_VALIDACION} La firma queda en el fichero de firmas, con la huella del modelo y el sha256 del informe.</p>
+      {error && <p className="m-0 text-[12px] text-state-fail" role="alert">{error}</p>}
+      <button type="submit" className="btn btn-p self-start" disabled={!listo} title={!revisado ? "Marque antes «He revisado el informe»" : por.trim().length < 3 ? "Escriba quién firma" : "Firmar el informe de esta versión"}>
+        {firmando ? "Firmando…" : "Firmar el informe"}
+      </button>
+    </form>
+  );
+}
+
 export function EspacioRevision() {
   const { proyecto } = useVisor();
   const pan = usePaneles("revision", { nav: true, props: true });
@@ -115,16 +165,22 @@ export function EspacioRevision() {
         {estadoFirma ? <span className={`pill ${estadoFirma.tono}`}>{estadoFirma.texto}</span> : "Revisando…"}
       </span>
       <Separador />
-      <Herramienta
-        icono={IcCopiar}
-        nombre={copiada ? "Copiada" : "Orden de firmar"}
-        title={`Copiar la orden: ${orden}`}
-        onClick={() => {
-          void navigator.clipboard?.writeText(orden).then(() => setCopiada(true));
-          window.setTimeout(() => setCopiada(false), 1500);
-        }}
-      />
-      <span className="self-center px-2 text-[12px] text-text-muted">Firmar es sólo del ingeniero, en la línea de órdenes, después de leer el informe.</span>
+      {proyecto.firmar ? (
+        <span className="self-center px-2 text-[12px] text-text-muted">Firmar es del ingeniero, después de leer el informe: en Propiedades, a la derecha.</span>
+      ) : (
+        <>
+          <Herramienta
+            icono={IcCopiar}
+            nombre={copiada ? "Copiada" : "Orden de firmar"}
+            title={`Copiar la orden: ${orden}`}
+            onClick={() => {
+              void navigator.clipboard?.writeText(orden).then(() => setCopiada(true));
+              window.setTimeout(() => setCopiada(false), 1500);
+            }}
+          />
+          <span className="self-center px-2 text-[12px] text-text-muted">Firmar es del ingeniero, en la línea de órdenes, después de leer el informe.</span>
+        </>
+      )}
     </>
   );
 
@@ -196,15 +252,17 @@ export function EspacioRevision() {
             ) : (
               x.otrasHuellas > 0 && <p className="nota text-state-warn">Hay {x.otrasHuellas} firma{x.otrasHuellas === 1 ? "" : "s"} de versiones anteriores del proyecto: el modelo cambió desde entonces.</p>
             ))}
-          <p className="nota">
-            Firmar es sólo del ingeniero, en la línea de órdenes, después de leer el informe:
-            <code className="mt-1 block rounded bg-bg-elevated px-2 py-1 font-mono text-[11px] text-text-primary">bun run fem firmar {fichero} --por "Nombre"</code>
-            {proyecto.fuente?.tipo !== "origen"
-              ? "Abierto sin su carpeta: el visor no ve el fichero de firmas."
-              : proyecto.fuente.origen.navegador
-                ? "Este proyecto está en el navegador, y la orden firma un fichero del disco: expórtelo (el botón de descarga de la barra de arriba), fírmelo en su carpeta y ábralo desde esa carpeta para ver aquí la firma."
-                : "El visor vuelve a leer las firmas cuando cambian."}
-          </p>
+          {x && !("error" in x.firma) && !(x.firma.firmado && x.firma.mismoInforme) && proyecto.firmar && !proyecto.desactualizado ? (
+            <FormularioFirma huella={e.huella} informe={x.sha256} avisos={x.avisos} firmas={proyecto.firmas} firmar={proyecto.firmar} />
+          ) : !proyecto.firmar ? (
+            <p className="nota">
+              {proyecto.fuente?.tipo !== "origen"
+                ? "Abierto sin su carpeta, el proyecto no se puede firmar aquí: guárdelo en sus proyectos (botón de la barra de arriba) o ábralo desde su carpeta."
+                : "Aquí no se puede escribir junto al proyecto: fírmelo en la línea de órdenes, después de leer el informe."}
+              <code className="mt-1 block rounded bg-bg-elevated px-2 py-1 font-mono text-[11px] text-text-primary">bun run fem firmar {fichero} --por "Nombre"</code>
+            </p>
+          ) : null}
+          {x && !("error" in x.firma) && x.firma.firmado && <p className="nota">Firmas en {proyecto.fuente?.tipo === "origen" && proyecto.fuente.origen.navegador ? "este navegador, con el proyecto" : `${fichero.replace(/\.json$/i, "")}.revision.json, junto al proyecto`} ({VERSION_FIRMAS}).</p>}
         </Seccion>
         {x && (
           <>

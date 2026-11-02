@@ -75,6 +75,11 @@ export interface Origen {
   leerBytes?(nombre: string): Promise<Uint8Array | null>;
   /** V2c-4: deja un fichero junto al proyecto si aún no está (la carpeta); true si quedó. */
   dejarFichero?(nombre: string, bytes: Uint8Array): Promise<boolean>;
+  /**
+   * UI-32 y UI-31: escribe (o sobrescribe) un fichero de texto junto al proyecto: el de las firmas o
+   * la copia del proyecto antes de pisarlo. Sin él (el servidor local), no se puede.
+   */
+  escribirFichero?(nombre: string, texto: string): Promise<{ ok: true } | { ok: false; mensaje: string }>;
 }
 
 /** Fichero de firmas de un proyecto: `<nombre>.revision.json`, junto a él (como `rutaFirmas` de la CLI). */
@@ -154,6 +159,23 @@ export function origenCarpeta(dir: Directorio, fichero: string): Origen {
     async leerBytes(nombre) {
       const f = await archivo(nombre);
       return f ? new Uint8Array(await f.arrayBuffer()) : null;
+    },
+    async escribirFichero(nombre, texto) {
+      try {
+        const permiso = (await dir.queryPermission?.({ mode: "readwrite" })) ?? "granted";
+        if (permiso !== "granted" && (await dir.requestPermission?.({ mode: "readwrite" })) !== "granted") return { ok: false, mensaje: `No hay permiso para escribir en la carpeta ${dir.name}.` };
+        const w = await (await dir.getFileHandle(nombre, { create: true })).createWritable();
+        try {
+          await w.write(texto);
+          await w.close();
+        } catch (e) {
+          await w.abort().catch(() => {});
+          throw e;
+        }
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, mensaje: `No se pudo escribir ${nombre}: ${e instanceof Error ? e.message : String(e)}` };
+      }
     },
     async dejarFichero(nombre, bytes) {
       try {
