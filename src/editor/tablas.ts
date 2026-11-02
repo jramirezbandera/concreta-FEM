@@ -107,6 +107,12 @@ export interface DefTabla {
    * no significa lo mismo.
    */
   conValor?(f: Fila, clave: string, valor: string): Fila;
+  /**
+   * Lo que una fila cambia además de su objeto (UI-15, Plantas: la altura de su tramo de debajo, que
+   * el modelo guarda en la planta de debajo como «altura hasta la de encima»). Cada cambio, el
+   * objeto entero de otra fila con un campo nuevo.
+   */
+  ademas?(f: Fila, ctx: Contexto, base?: Objeto): { ok: true; cambios: { id: string; campo: string; valor: unknown }[] } | { ok: false; errores: ErrorCelda[] };
 }
 
 /** La fila con `valor` escrito en `clave`, con lo que la tabla haga al cambiarla (`DefTabla.conValor`). */
@@ -182,7 +188,7 @@ const plantas: DefTabla = {
     id,
     nombre,
     { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sotano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
-    { clave: "altura", titulo: "altura hasta la de encima", unidad: "m", ayuda: "de forjado a forjado, de esta planta a la de encima (la de un alzado es la de la de debajo); vacía en la de arriba" },
+    { clave: "altura", titulo: "altura", unidad: "m", ayuda: "la del tramo de debajo: de su forjado al de la planta de debajo, como en un alzado; vacía en la más baja. En una fila nueva, que va abajo del todo, la del tramo que la une a la de encima" },
     { clave: "cota", titulo: "cota", unidad: "m", calculada: true },
     { clave: "diafragma", titulo: "diafragma", ayuda: "rigido o ninguno; por defecto, rígido salvo en la más baja (C1-d)", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
   ],
@@ -190,18 +196,38 @@ const plantas: DefTabla = {
     const p = o as unknown as Planta;
     const i = ctx.modelo.plantas.findIndex((x) => x.id === p.id);
     const cota = i >= 0 ? cotasPlantas(ctx.modelo.plantas)[i] : null;
-    return { id: p.id, nombre: s(p.nombre), tipo: s(p.tipo), altura: n(p.altura), cota: n(cota ?? null), diafragma: s(p.diafragma) };
+    // UI-15: la altura de su tramo de debajo, que el modelo guarda en la planta de debajo
+    const altura = i < 0 ? p.altura : (ctx.modelo.plantas[i + 1]?.altura ?? null);
+    return { id: p.id, nombre: s(p.nombre), tipo: s(p.tipo), altura: n(altura), cota: n(cota ?? null), diafragma: s(p.diafragma) };
   },
-  objeto(f, _ctx, base) {
+  objeto(f, ctx, base) {
     const L = new Lector(f);
+    // La suya («hasta la de encima») no está en su fila: la de una planta que ya hay se queda (la
+    // cambia la fila de la de encima, `ademas`); una nueva va abajo del todo y su celda es esa
+    const ya = ctx.modelo.plantas.find((x) => x.id === (base?.id ?? (f.id ?? "").trim())) ?? (base as unknown as Planta | undefined);
     return resultado(L, {
       ...base,
       id: L.texto("id") ?? "",
       nombre: L.texto("nombre"),
       tipo: L.opcion("tipo", ["planta", "sotano", "cubierta"] as const),
-      altura: L.numero("altura", { mayorQue: 0 }) ?? null,
+      altura: ya ? ya.altura : (L.numero("altura", { mayorQue: 0 }) ?? null),
       diafragma: L.opcion("diafragma", ["rigido", "ninguno"] as const),
     });
+  },
+  ademas(f, ctx, base) {
+    if (!base) return { ok: true, cambios: [] };
+    // Sólo si la celda se escribió: sin ella (pegar unas columnas), la altura no se toca
+    if (f.altura === undefined) return { ok: true, cambios: [] };
+    const ps = ctx.modelo.plantas;
+    const i = ps.findIndex((x) => x.id === base.id);
+    const abajo = i < 0 ? undefined : ps[i + 1];
+    const L = new Lector(f);
+    const v = L.numero("altura", { mayorQue: 0 }) ?? null;
+    if (L.errores.length) return { ok: false, errores: L.errores };
+    if (v === (abajo?.altura ?? null)) return { ok: true, cambios: [] };
+    if (!abajo) return { ok: false, errores: [{ columna: "altura", mensaje: "la planta más baja no tiene tramo debajo" }] };
+    if (v === null) return { ok: false, errores: [{ columna: "altura", mensaje: `falta: la altura del tramo de ${abajo.id} a ${base.id}` }] };
+    return { ok: true, cambios: [{ id: abajo.id, campo: "altura", valor: v }] };
   },
   plantas: () => null,
 };

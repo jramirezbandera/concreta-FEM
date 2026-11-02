@@ -23,7 +23,21 @@ export interface ErrorFila {
   mensaje: string;
 }
 
-export type Traduccion = { ok: true; operacion: Operacion } | { ok: false; errores: ErrorFila[] };
+/** `ademas` (UI-15): lo que la fila cambia en otros objetos de su tabla (ya incluido en `operacion`). */
+export type Traduccion = { ok: true; operacion: Operacion; ademas?: readonly CambioOtro[] } | { ok: false; errores: ErrorFila[] };
+
+/** Un campo de otro objeto de la tabla que cambia una fila (Plantas: la altura de la de debajo). */
+export interface CambioOtro {
+  coleccion: Coleccion;
+  id: string;
+  campo: string;
+  valor: unknown;
+}
+
+/** Las operaciones de unos cambios de campo sobre el modelo `m`. */
+function operacionesCambios(m: ModeloFisico, cambios: readonly CambioOtro[]): Operacion[] {
+  return cambios.map((c) => ({ op: "cambiar", coleccion: c.coleccion, id: c.id, objeto: { ...lista(m, c.coleccion).find((o) => o.id === c.id)!, [c.campo]: c.valor } }));
+}
 
 const deCeldas = (fila: number | null, id: string | undefined, es: readonly ErrorCelda[]): ErrorFila[] => es.map((e) => ({ fila, ...(id ? { id } : {}), columna: e.columna, mensaje: e.mensaje }));
 
@@ -41,9 +55,14 @@ export function operacionFila(m: ModeloFisico, tabla: NombreTabla, id: string | 
   if (!l.ok) return { ok: false, errores: deCeldas(numero, f.id || id || undefined, l.errores) };
   const coleccion = l.coleccion ?? def.colecciones[0]!;
   if (id === null) return { ok: true, operacion: { op: "crear", coleccion, objeto: l.objeto } };
+  const x = def.ademas ? def.ademas(f, ctx, base) : { ok: true as const, cambios: [] };
+  if (!x.ok) return { ok: false, errores: deCeldas(numero, f.id || id || undefined, x.errores) };
+  const ademas = x.cambios.map((c) => ({ ...c, coleccion }));
   // En Forjados, un cambio de tipo pasa el objeto de las losas a los paños o al revés
   const de = ctx.coleccionDe(id)!;
-  return { ok: true, operacion: de === coleccion ? { op: "cambiar", coleccion, id, objeto: l.objeto } : { op: "convertir", de, coleccion, id, objeto: l.objeto } };
+  const propia: Operacion = de === coleccion ? { op: "cambiar", coleccion, id, objeto: l.objeto } : { op: "convertir", de, coleccion, id, objeto: l.objeto };
+  if (!ademas.length) return { ok: true, operacion: propia };
+  return { ok: true, operacion: { op: "lote", operaciones: [propia, ...operacionesCambios(m, ademas)] }, ademas };
 }
 
 /** Escribe una fila y aplica la operación. */
@@ -100,6 +119,7 @@ export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde 
   if (!cabecera && desde + ancho > def.columnas.length) errores.push({ fila: null, mensaje: `El bloque tiene ${ancho} columnas y desde «${def.columnas[desde]?.titulo}» la tabla sólo tiene ${def.columnas.length - desde}.` });
   const idx = indiceIds(m);
   const ops: Operacion[] = [];
+  const otros: CambioOtro[] = [];
   const vistos = new Set<string>();
   const enPosicion = !cabecera && destino !== undefined;
   datos.forEach((celdasFila, i) => {
@@ -128,9 +148,25 @@ export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde 
     const t = operacionFila(m, tabla, base ? base.id : null, fila, vistos, num);
     if (!t.ok) return errores.push(...t.errores);
     if (t.operacion.op === "crear") vistos.add(t.operacion.objeto.id);
-    ops.push(t.operacion);
+    // Lo que la fila cambia en otras (UI-15) va al final, sobre la operación de esas filas si las hay
+    ops.push(t.ademas ? t.operacion.op === "lote" ? t.operacion.operaciones[0]! : t.operacion : t.operacion);
+    if (t.ademas) otros.push(...t.ademas);
   });
   if (errores.length) return { ok: false, errores };
+  // UI-15: pegada en un proyecto sin plantas, la tabla es el edificio entero, y la celda de cada fila
+  // es la altura de su tramo de debajo, que el modelo guarda en la fila siguiente
+  if (tabla === "plantas" && m.plantas.length === 0) {
+    const nuevas = ops.filter((o): o is Extract<Operacion, { op: "crear" }> => o.op === "crear");
+    const celdas = nuevas.map((o) => (o.objeto as { altura?: number | null }).altura ?? null);
+    nuevas.forEach((o, k) => ((o.objeto as { altura?: number | null }).altura = k === 0 ? null : celdas[k - 1]!));
+  }
+  for (const c of otros) {
+    const k = ops.findIndex((o) => (o.op === "cambiar" || o.op === "convertir") && o.id === c.id);
+    if (k >= 0) {
+      const o = ops[k] as Extract<Operacion, { op: "cambiar" }>;
+      ops[k] = { ...o, objeto: { ...o.objeto, [c.campo]: c.valor } };
+    } else ops.push(...operacionesCambios(m, [c]));
+  }
   return { ok: true, operacion: { op: "lote", operaciones: ops } };
 }
 

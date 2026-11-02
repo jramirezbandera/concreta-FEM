@@ -66,6 +66,31 @@ describe("tablas: ida y vuelta (criterio 3)", () => {
     });
 });
 
+describe("UI-15: la tabla Plantas da la altura del tramo de debajo", () => {
+  it("la fila de una planta enseña la altura de la de debajo, y escribirla la cambia en ella", () => {
+    const { proyecto } = leerEjemplo("edificio");
+    const ps = proyecto.modelo.plantas;
+    const fs = filas(proyecto.modelo, "plantas");
+    // Cada fila, la del tramo de debajo (la «altura hasta la de encima» de la siguiente); la más baja, vacía
+    fs.forEach((f, i) => expect(f.fila.altura).toBe(i + 1 < ps.length ? String(ps[i + 1]!.altura).replace(".", ",") : ""));
+    const [arriba, abajo] = [ps[0]!, ps[1]!];
+    const r = escribirFila(proyecto, "plantas", arriba.id, { ...fs[0]!.fila, altura: "3,75" });
+    if (!r.ok) throw new Error(JSON.stringify(r.errores));
+    expect(r.proyecto.modelo.plantas.find((x) => x.id === abajo.id)!.altura).toBe(3.75);
+    expect(r.proyecto.modelo.plantas.find((x) => x.id === arriba.id)!.altura).toBe(arriba.altura);
+    // La más baja no tiene tramo debajo
+    const ultima = fs[fs.length - 1]!;
+    expect(escribirFila(proyecto, "plantas", ultima.id, { ...ultima.fila, altura: "3" }).ok).toBe(false);
+    // Pegando a la vez la fila de la de arriba (con su altura nueva) y la de la de debajo (otro nombre), las dos cosas
+    const tsv = `id\tnombre\taltura\n${arriba.id}\t\t4,1\n${abajo.id}\tCambiada\t${fs[1]!.fila.altura}`;
+    const pg = pegar(proyecto.modelo, "plantas", tsv);
+    if (!pg.ok) throw new Error(JSON.stringify(pg.errores));
+    const q = aplicado(proyecto, pg.operacion);
+    const nueva = q.modelo.plantas.find((x) => x.id === abajo.id)!;
+    expect([nueva.altura, nueva.nombre]).toEqual([4.1, "Cambiada"]);
+  });
+});
+
 describe("tablas: desplegables", () => {
   for (const nombre of ["ejemplo", "1022", "edificio"] as const)
     it(`${nombre}: cada valor de una columna con desplegable está entre sus opciones, y cada opción se lee sin error en esa columna`, () => {
