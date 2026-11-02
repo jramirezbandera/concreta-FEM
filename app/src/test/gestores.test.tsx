@@ -345,6 +345,37 @@ describe("GE2: casos de carga", () => {
     expect(idsTabla("casos")).toEqual(["G", "Q"]);
   }, 60_000);
 
+  it("la ficha de un caso se aplica con «Aplicar», como Secciones, y no se tira sin preguntar (D-19)", async () => {
+    await proyectoNuevo("ge2-aplicar");
+    orden("Hipótesis típicas");
+    const dlg = screen.getByRole("dialog", { name: "Casos de carga" });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Crear las hipótesis" }));
+    const lista = () => within(dlg).getByRole("navigation", { name: "Lista de casos" });
+    fireEvent.click(within(lista()).getByRole("button", { name: /^W-Y/ }));
+    const aplicar = () => within(dlg).getByRole("button", { name: /^Aplicar/ }) as HTMLButtonElement;
+    expect(aplicar().disabled).toBe(true);
+    fireEvent.change(within(dlg).getByRole("combobox", { name: "signo" }), { target: { value: "1" } });
+    // Elegir en un desplegable no lo lleva al modelo
+    expect(deshacer().getAttribute("title")).toMatch(/Hipótesis típicas/);
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "nombre" }), { target: { value: "Viento +Y bis" } });
+    fireEvent.blur(within(dlg).getByRole("textbox", { name: "nombre" }));
+    expect(deshacer().getAttribute("title")).toMatch(/Hipótesis típicas/);
+    // Ir a otro caso pregunta; «Seguir editando» lo deja como estaba
+    fireEvent.click(within(lista()).getByRole("button", { name: /^W\+X/ }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Seguir editando" }));
+    expect((within(dlg).getByRole("combobox", { name: "signo" }) as HTMLSelectElement).value).toBe("1");
+    // «Aplicar»: los dos cambios en un paso de deshacer
+    fireEvent.click(aplicar());
+    expect(aplicar().disabled).toBe(true);
+    expect(deshacer().getAttribute("title")).toMatch(/W-Y · .*signo = 1.*nombre = Viento \+Y bis|W-Y · .*nombre = Viento \+Y bis.*signo = 1/);
+    // Lo escrito sin aplicar se tira al cerrar sólo tras preguntar
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "nombre" }), { target: { value: "otro" } });
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar sin aplicar" }));
+    expect(screen.queryByRole("dialog", { name: "Casos de carga" })).toBeNull();
+    expect(deshacer().getAttribute("title")).toMatch(/nombre = Viento \+Y bis/);
+  }, 60_000);
+
   it("en la fila nueva de Cargas: «Nuevo caso…» y un típico; se crea con la carga", async () => {
     await proyectoNuevo("ge2-hoja");
     elegirTabla("cargas");

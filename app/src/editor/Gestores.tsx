@@ -636,7 +636,7 @@ export function Propiedades({ filas, nota }: { filas: [string, string][]; nota: 
 
 /** La lista de la izquierda de un gestor; `nuevaTexto`, la línea de arriba («Nueva sección»). */
 /** UI-30: ir a otra fila o a «Nueva» con la ficha cambiada pregunta antes de tirar lo escrito. */
-function PreguntaCambios({ texto, onDescartar, onSeguir }: { texto: string | null; onDescartar: () => void; onSeguir: () => void }) {
+export function PreguntaCambios({ texto, onDescartar, onSeguir }: { texto: string | null; onDescartar: () => void; onSeguir: () => void }) {
   return (
     <div className="ges-pregunta" role="alert">
       <span className="mr-auto">{texto} Si sigue, se pierden.</span>
@@ -662,11 +662,21 @@ export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir,
         <button key={x.id} type="button" aria-current={x.id === elegida || undefined} onClick={() => onElegir(x.id)}>
           {/* `marca`: el id como la letra de su acción, con su color (casos) */}
           {x.marca === undefined ? <span className="ges-id">{x.id}</span> : <span className="ges-id acc-letra" data-acc={x.marca || undefined}>{x.id}</span>}
-          <span className="ges-texto">{x.texto}</span>
-          <span className="ges-n" title={x.n ? `${x.n} objetos la usan` : "Sin usar"}>
-            {x.detalle}
-            {x.n ? ` · ${x.n}` : " · sin usar"}
-          </span>
+          {x.texto ? (
+            <>
+              <span className="ges-texto">{x.texto}</span>
+              <span className="ges-n" title={x.n ? `${x.n} objetos la usan` : "Sin usar"}>
+                {x.detalle}
+                {x.n ? ` · ${x.n}` : " · sin usar"}
+              </span>
+            </>
+          ) : (
+            // D-19: sin texto (un caso sin nombre), el detalle va en la línea del id, no debajo de ella
+            <span className="ges-texto" title={x.n ? `${x.n} objetos lo usan` : "Sin usar"}>
+              {x.detalle}
+              {x.n ? ` · ${x.n}` : " · sin usar"}
+            </span>
+          )}
         </button>
       ))}
     </nav>

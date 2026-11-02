@@ -5,8 +5,11 @@
  *
  * Lo que decide (los típicos, reutilizar uno con la misma acción, los ids libres) sale de
  * `src/editor/casos.ts`; aquí sólo se pinta.
+ *
+ * Como Secciones y Materiales (`auditoria-ui.md`, D-19), lo escrito en la ficha va al modelo con
+ * «Aplicar», en un paso de deshacer, y no se tira sin preguntar.
  */
-import { Fragment, useState } from "react";
+import { Fragment, useCallback, useRef, useState } from "react";
 import { Table2 } from "lucide-react";
 import type { CategoriaUso } from "../../../src/combinaciones/psi.ts";
 import { CASOS_TIPICOS, casoIgual, casosDelJuego, crearCasos, describirCaso, JUEGO_DEFECTO, psiCaso, type JuegoCasos } from "../../../src/editor/casos.ts";
@@ -15,8 +18,8 @@ import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { useVisor } from "../contexto.ts";
 import { AyudaCaso, LetraAccion, useCampoActivo } from "./AyudaCaso.tsx";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
-import { FormularioObjeto } from "./Formulario.tsx";
-import { Lista } from "./Gestores.tsx";
+import { FormularioObjeto, type ControlFicha } from "./Formulario.tsx";
+import { Lista, PreguntaCambios } from "./Gestores.tsx";
 import { ACCIONES } from "./explicaciones.ts";
 import { cerrarGestor, type PedidoGestor } from "./referencia.tsx";
 
@@ -46,6 +49,20 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
   const ir = (i: number) => {
     setElegido(i);
     setError(null);
+  };
+  // La ficha con «Aplicar»: lo escrito, y lo que se perdería al ir a otro caso o cerrar (UI-30)
+  const ficha = useRef<ControlFicha | null>(null);
+  const [cambiado, setCambiado] = useState(false);
+  const alCambiar = useCallback((c: boolean) => setCambiado(c), []);
+  const pendiente = actual && cambiado ? `${actual.id} tiene cambios sin aplicar.` : null;
+  const [irA, setIrA] = useState<(() => void) | null>(null);
+  const antes = (f: () => void) => (pendiente ? setIrA(() => f) : f());
+  const aplicar = () => {
+    if (!actual) return;
+    const id = actual.id;
+    setError(null);
+    if (ficha.current?.aplicar()) setAviso(`${id}: cambiado${usos.length ? ` (lo usan ${textoUsos(usos)})` : ""}.`);
+    else setError("No se ha aplicado: falta o no vale lo marcado.");
   };
 
   /** Aplica unas operaciones (si hay) y, desde un campo, elige `id`; devuelve si se hizo. */
@@ -99,6 +116,8 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
         titulo="Casos de carga"
         clase="gestor"
         onCerrar={cerrarGestor}
+        pendiente={pendiente}
+        fondoCierra={false}
         pie={
           <>
             <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("casos"))} title="Para cambiar muchos a la vez o pegar de Excel">
@@ -110,15 +129,16 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
                 Borrar
               </button>
             )}
-            {actual && pedido.alElegir ? (
-              <button type="button" className="btn btn-p" onClick={() => terminar(actual.id, [], "")}>
-                Usar {actual.id}
-              </button>
-            ) : (
-              <button type="button" className={actual ? "btn btn-p" : "btn"} onClick={cerrarGestor}>
-                Cerrar
-              </button>
-            )}
+            {actual &&
+              (pedido.alElegir && !cambiado ? (
+                <button type="button" className="btn btn-p" onClick={() => terminar(actual.id, [], "")}>
+                  Usar {actual.id}
+                </button>
+              ) : (
+                <button type="button" className="btn btn-p" disabled={!cambiado} onClick={aplicar}>
+                  {usos.length ? `Aplicar a ${textoUsos(usos)}` : "Aplicar"}
+                </button>
+              ))}
           </>
         }
       >
@@ -126,13 +146,14 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
           titulo="casos"
           nuevaTexto="Nuevo caso"
           nueva={!actual}
-          onNueva={() => (setAviso(null), ir(-1))}
+          onNueva={() => antes(() => (setAviso(null), ir(-1)))}
           elementos={casos.map((c) => ({ id: c.id, texto: c.nombre ?? "", detalle: describirCaso(c), n: usosDe(m, c.id).reduce((t, u) => t + u.n, 0), marca: c.accion?.tipo ?? "" }))}
           elegida={actual?.id ?? null}
-          onElegir={(id) => (setAviso(null), ir(casos.findIndex((c) => c.id === id)))}
+          onElegir={(id) => antes(() => (setAviso(null), ir(casos.findIndex((c) => c.id === id))))}
         />
         <div className="ges-ficha">
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
+          {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), ficha.current?.descartar(), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
             <p className="ges-aviso" role="status">
               {aviso}
@@ -229,9 +250,9 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
               <div className="ges-datos" {...manejadores}>
                 <p className="ges-cab">
                   <span>{actual.id}</span>
-                  <small>{actual.nombre ?? "caso de carga"} · se aplica al momento</small>
+                  <small>{actual.nombre ?? "caso de carga"}</small>
                 </p>
-                <FormularioObjeto id={actual.id} tabla="casos" />
+                <FormularioObjeto id={actual.id} tabla="casos" diferido={{ control: ficha, alCambiar }} />
               </div>
               <div className="ges-ver">
                 <AyudaCaso caso={actual} m={m} campo={activo} />

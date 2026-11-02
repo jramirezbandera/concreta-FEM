@@ -164,7 +164,23 @@ export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreT
   return c ? tablaDeColeccion(c) : null;
 }
 
-export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla }) {
+/**
+ * Lo que un gestor necesita de una ficha con «Aplicar» (`auditoria-ui.md`, D-19: todos los gestores
+ * confirman igual). El formulario lo rellena en cada render.
+ */
+export interface ControlFicha {
+  /** Lleva lo escrito al modelo en un paso de deshacer; devuelve si se hizo (si no, los errores van en sus campos). */
+  aplicar: () => boolean;
+  /** Tira lo escrito. */
+  descartar: () => void;
+}
+
+/**
+ * `diferido`: lo escrito se queda en la ficha (Intro o salir del campo no lo llevan al modelo) hasta
+ * que el gestor llama a `control.aplicar`; `alCambiar` dice si hay algo sin aplicar. Sin él, cada
+ * campo se escribe al salir de él, como en Propiedades.
+ */
+export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: NombreTabla; diferido?: { control: { current: ControlFicha | null }; alCambiar: (cambiado: boolean) => void } }) {
   const { proyecto, setSeleccion } = useVisor();
   const [foco, setFoco] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null);
@@ -180,11 +196,18 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
   /** Lo que dijo el último movimiento de un pilar (sus vigas), hasta que se elige otro objeto. */
   const [movido, setMovido] = useState<string | null>(null);
 
+  // Con «Aplicar», lo escrito sigue aunque el modelo cambie por otro lado; se tira al cambiar de objeto
   useEffect(() => {
     setBorrador({});
     setErrores({});
-  }, [id, fila]);
+  }, [id, diferido ? null : fila]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => setMovido(null), [id]);
+  /** Lo escrito que no es lo del modelo. */
+  const cambios = fila ? Object.fromEntries(Object.entries(borrador).filter(([k, v]) => v !== (fila[k] ?? ""))) : {};
+  const cambiado = Object.keys(cambios).length > 0;
+  const alCambiar = diferido?.alCambiar;
+  useEffect(() => alCambiar?.(cambiado), [alCambiar, cambiado]);
+  useEffect(() => () => alCambiar?.(false), [alCambiar]);
 
   if (!objeto || !fila) return <p className="nota">Este objeto ya no está en el proyecto.</p>;
 
@@ -192,18 +215,22 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
   const pendiente = borrador.tipo !== undefined && borrador.tipo !== fila.tipo;
   const actual = { ...fila, ...borrador };
 
-  /** Escribe varios campos en un paso de deshacer (el valor de una carga: q y qb a la vez). */
-  const escribirVarios = (cambios: Readonly<Record<string, string>>) => {
+  /** Escribe varios campos en un paso de deshacer (el valor de una carga: q y qb a la vez); devuelve si se hizo. */
+  const escribirVarios = (cambios: Readonly<Record<string, string>>): boolean => {
     const claves = Object.keys(cambios).filter((k) => pendiente || cambios[k] !== (fila[k] ?? ""));
-    if (!claves.length) return;
+    if (!claves.length) return true;
     const nueva = claves.reduce((f, k) => filaConValor(def, f, k, cambios[k]!), pendiente ? actual : fila);
     const t = operacionFila(m, tabla, id, nueva);
     if (!t.ok) {
       if (t.errores.every((e) => e.mensaje === "falta el dato") && ((claves.includes("tipo") && def.conValor) || pendiente)) {
         setBorrador(nueva);
-        return setErrores(Object.fromEntries(t.errores.map((e) => [e.columna ?? "", "falta el dato: se guarda en cuanto esté completo"])));
+        setErrores(Object.fromEntries(t.errores.map((e) => [e.columna ?? "", "falta el dato: se guarda en cuanto esté completo"])));
+        return false;
       }
-      return setErrores({ ...errores, [claves[0]!]: t.errores.map((e) => e.mensaje).join(" · ") });
+      // Con varios campos, el error va al que lo causa si se sabe
+      const col = t.errores.find((e) => e.columna && claves.includes(e.columna))?.columna ?? claves[0]!;
+      setErrores({ ...errores, [col]: t.errores.map((e) => e.mensaje).join(" · ") });
+      return false;
     }
     const titulo = (k: string) => def.columnas.find((c) => c.clave === k)!.titulo;
     // La x o la y de un pilar lo mueven con sus vigas, como sus cotas (CT3; UI-3: antes las dejaba atrás)
@@ -218,16 +245,44 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
       }
     }
     const r = ed.editar(operacion, `${id} · ${claves.map((k) => `${titulo(k)} = ${cambios[k] || "(vacío)"}`).join(", ")}`);
-    if (!r.ok) return setErrores({ ...errores, [claves[0]!]: r.errores.map((e) => e.mensaje).join(" ") });
+    if (!r.ok) {
+      setErrores({ ...errores, [claves[0]!]: r.errores.map((e) => e.mensaje).join(" ") });
+      return false;
+    }
     setMovido(avisos.length ? avisos.join(" ") : null);
-    if (t.operacion.op === "cambiar" && t.operacion.objeto.id !== id) setSeleccion(t.operacion.objeto.id);
+    // En un gestor, lo elegido en la vista no se toca (el gestor sigue la ficha por su posición)
+    if (!diferido && t.operacion.op === "cambiar" && t.operacion.objeto.id !== id) setSeleccion(t.operacion.objeto.id);
+    return true;
   };
 
-  /** `elegido`: lo elegido en un desplegable (si no, lo escrito en el campo). */
+  /** `elegido`: lo elegido en un desplegable (si no, lo escrito en el campo). Con «Aplicar», se queda en la ficha. */
   const escribir = (clave: string, elegido?: string) => {
+    if (diferido) {
+      if (elegido !== undefined) setBorrador({ ...borrador, [clave]: elegido });
+      return;
+    }
     const v = elegido ?? borrador[clave];
     if (v !== undefined) escribirVarios({ [clave]: v });
   };
+  /** Lo que escribe un croquis: con «Aplicar», a la ficha. */
+  const escribirCroquis = (c: Readonly<Record<string, string>>) => (diferido ? setBorrador({ ...borrador, ...c }) : escribirVarios(c));
+  if (diferido) {
+    diferido.control.current = {
+      aplicar: () => {
+        if (!cambiado) return true;
+        const hecho = escribirVarios(cambios);
+        if (hecho) {
+          setBorrador({});
+          setErrores({});
+        }
+        return hecho;
+      },
+      descartar: () => {
+        setBorrador({});
+        setErrores({});
+      },
+    };
+  }
 
   /**
    * GE: «Nueva…» o «Editar…» de un desplegable de referencia abre su gestor; lo que crea y la
@@ -290,7 +345,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                   activo={sobre ?? foco}
                   onCampo={irACampo}
                   escribir={escribir}
-                  escribirVarios={escribirVarios}
+                  escribirVarios={escribirCroquis}
                   errores={errores}
                   rigidezReticular={ed.proyecto.opciones?.rigidezReticular ?? "uniforme"}
                 />
@@ -336,7 +391,8 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                           {o.texto ?? o.valor}
                         </option>
                       ))}
-                      {c.referencia && <OpcionesGestor coleccion={c.referencia} valor={valor} />}
+                      {/* Dentro de un gestor no se abre otro */}
+                      {c.referencia && !diferido && <OpcionesGestor coleccion={c.referencia} valor={valor} />}
                     </select>
                   ) : (
                     <span className="unidad" data-unidad={c.unidad} style={c.unidad ? ({ "--u": c.unidad.length } as CSSProperties) : undefined}>
@@ -355,8 +411,8 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                       }}
                       onBlur={() => escribir(c.clave)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") escribir(c.clave);
-                        if (e.key === "Escape") {
+                        if (e.key === "Enter") (diferido ? diferido.control.current?.aplicar() : escribir(c.clave));
+                        if (e.key === "Escape" && !diferido) {
                           setBorrador({ ...borrador, [c.clave]: fila[c.clave] ?? "" });
                           setErrores({ ...errores, [c.clave]: "" });
                         }

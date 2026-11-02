@@ -914,7 +914,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .dialogo.gestor { width: 900px; height: min(680px, calc(100vh - 64px)); }
 .gestor .dialogo-cuerpo { flex: 1; display: grid; grid-template-columns: 220px minmax(0, 1fr); padding: 0; overflow: hidden; border-top: 1px solid var(--color-border-sub); margin-top: 10px; }
 .ges-lista { display: flex; flex-direction: column; gap: 1px; min-height: 0; overflow-y: auto; padding: 8px; border-right: 1px solid var(--color-border-sub); background: var(--color-bg-surface); }
-.ges-lista > button { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; color: var(--color-text-primary); }
+.ges-lista > button { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; color: var(--color-text-primary); }
 .ges-lista > button:hover { background: var(--color-bg-elevated); }
 .ges-lista > button[aria-current="true"] { background: var(--color-tint-accent); }
 .ges-lista > button[aria-current="true"] .ges-id { color: var(--color-accent); }

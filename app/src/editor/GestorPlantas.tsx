@@ -8,9 +8,12 @@
  * Con un proyecto que empieza (`pedido.inicio`, al crearlo, con su planta sobre la cimentación), lo
  * primero es cuántas plantas tiene y de qué altura (`plantasEdificio`): sin plantas no se dibuja nada.
  *
+ * Los datos de una planta van al modelo con «Aplicar», como en los demás gestores (`auditoria-ui.md`,
+ * D-19), y no se tiran sin preguntar.
+ *
  * Las alturas y el orden salen de `src/editor/plantas.ts`; aquí sólo se pinta.
  */
-import { useId, useState, type KeyboardEvent } from "react";
+import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Table2 } from "lucide-react";
 import type { Planta, TipoPlanta } from "../../../src/compilador/fisico.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
@@ -21,7 +24,8 @@ import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt } from "../fmt.ts";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
-import { FormularioObjeto } from "./Formulario.tsx";
+import { FormularioObjeto, type ControlFicha } from "./Formulario.tsx";
+import { PreguntaCambios } from "./Gestores.tsx";
 import { cerrarGestor, type PedidoGestor } from "./referencia.tsx";
 import "./gestores.css";
 
@@ -119,17 +123,34 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
     }
   };
 
+  // Los datos con «Aplicar»: lo escrito, y lo que se perdería al ir a otra planta, a «Añadir» o al cerrar (UI-30)
+  const ficha = useRef<ControlFicha | null>(null);
+  const [cambiado, setCambiado] = useState(false);
+  const alCambiar = useCallback((c: boolean) => setCambiado(c), []);
+  const pendiente = modo === "datos" && actual && cambiado ? `${actual.id} tiene cambios sin aplicar.` : null;
+  const [irA, setIrA] = useState<(() => void) | null>(null);
+  const antes = (f: () => void) => (pendiente ? setIrA(() => f) : f());
+
   const elegir = (id: string) => {
     const i = plantas.findIndex((p) => p.id === id);
     if (i < 0) return;
-    setAviso(null);
-    setError(null);
-    setElegida(i);
-    if (modo === "inicio") setModo("anadir");
+    antes(() => {
+      setAviso(null);
+      setError(null);
+      setElegida(i);
+      if (modo === "inicio") setModo("anadir");
+    });
   };
 
   const usos = actual ? usosDe(m, actual.id) : [];
   const enCurso = modo !== "datos";
+  const aplicar = () => {
+    if (!actual) return;
+    const id = actual.id;
+    setError(null);
+    if (ficha.current?.aplicar()) setAviso(`${id}: cambiada.`);
+    else setError("No se ha aplicado: falta o no vale lo marcado.");
+  };
 
   return (
     <>
@@ -137,8 +158,9 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
         titulo="Plantas"
         clase="gestor gestor-plantas"
         onCerrar={cerrarGestor}
-        // UI-39: el primer paso de una obra nueva no se cierra con un clic en el fondo
-        fondoCierra={modo !== "inicio"}
+        pendiente={pendiente}
+        // UI-39: el primer paso de una obra nueva no se cierra con un clic en el fondo; UI-30: ni lo escrito
+        fondoCierra={modo !== "inicio" && !pendiente}
         pie={
           <>
             <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("plantas"))} title="Para cambiar muchas a la vez o pegar de Excel">
@@ -150,7 +172,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                 Borrar {actual.id}
               </button>
             )}
-            {actual && pedido.alElegir && (
+            {actual && pedido.alElegir && !pendiente && (
               <button type="button" className="btn" onClick={() => terminar(actual.id, [], "")}>
                 Usar {actual.id}
               </button>
@@ -165,11 +187,16 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                 {pedido.alElegir ? "Añadir y usar" : r.ok ? `Añadir ${r.ids.length === 1 ? "1 planta" : `${r.ids.length} plantas`} ${donde === "encima" ? "encima de" : "debajo de"} ${de}` : "Añadir"}
               </button>
             )}
-            {modo === "datos" && (
-              <button type="button" className="btn btn-p" onClick={cerrarGestor}>
-                Hecho
-              </button>
-            )}
+            {modo === "datos" &&
+              (cambiado ? (
+                <button type="button" className="btn btn-p" onClick={aplicar}>
+                  {usos.length ? `Aplicar a ${textoUsos(usos)}` : "Aplicar"}
+                </button>
+              ) : (
+                <button type="button" className="btn btn-p" onClick={cerrarGestor}>
+                  Hecho
+                </button>
+              ))}
           </>
         }
       >
@@ -183,7 +210,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
           {modo !== "inicio" && (
             <div className="seg mb-3" role="tablist" aria-label="Añadir o ver los datos">
-              <button type="button" role="tab" aria-selected={modo === "anadir"} data-on={modo === "anadir"} onClick={() => (setModo("anadir"), setAviso(null))}>
+              <button type="button" role="tab" aria-selected={modo === "anadir"} data-on={modo === "anadir"} onClick={() => antes(() => (ficha.current?.descartar(), setModo("anadir"), setAviso(null)))}>
                 Añadir plantas
               </button>
               {actual && (
@@ -193,6 +220,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
               )}
             </div>
           )}
+          {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), ficha.current?.descartar(), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
             <p className="ges-aviso" role="status">
               {aviso}
@@ -300,7 +328,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
 
           {modo === "datos" && actual && (
             <>
-              <FormularioObjeto id={actual.id} tabla="plantas" />
+              <FormularioObjeto id={actual.id} tabla="plantas" diferido={{ control: ficha, alCambiar }} />
               <p className="ges-usos">{usos.length ? `La usan ${textoUsos(usos)}.` : "No la usa ningún objeto."}</p>
             </>
           )}
