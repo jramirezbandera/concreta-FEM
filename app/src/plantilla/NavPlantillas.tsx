@@ -181,7 +181,12 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
             </button>
           </div>
           <div>
-            <div className="text-text-secondary">Plantas</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-text-secondary">Plantas (dónde se ve)</span>
+              <button type="button" className="ib-chip ib-texto ml-auto" disabled={plantas.every((p) => t.plantas.includes(p.id))} title="Verla en todas las plantas" onClick={() => cambiar({ ...t, plantas: plantas.map((p) => p.id) }, `Plantas de la plantilla «${t.nombre}»`)}>
+                En todas
+              </button>
+            </div>
             <div className="flex flex-wrap gap-x-3">
               {plantas.map((p) => (
                 <label key={p.id} className="flex items-center gap-1">

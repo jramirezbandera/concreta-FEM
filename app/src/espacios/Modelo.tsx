@@ -491,7 +491,18 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           return <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta, { cotas: !cargas && plantaVista(v, e.calculado).vista === "modelo", plantilla: !!geo }) : null} dibujando={dibujando} plantilla={geo} />;
         },
         plantilla: (pl) => !!listaDxf?.some((t) => t.plantas.includes(pl)),
-        ...(ed ? { enganches: () => <BarraEnganches ctrl={ctrl} /> } : {}),
+        ...(ed
+          ? {
+              enganches: () => <BarraEnganches ctrl={ctrl} />,
+              // La última importada que esté en alguna planta (la de la planta de al lado suele ser la que se calca)
+              plantillaEnOtras: (pl: string) => [...(listaDxf ?? [])].reverse().find((t) => t.plantas.length && !t.plantas.includes(pl)) ?? null,
+              verPlantillaAqui: (pl: string, nombre: string) => {
+                const lista = ed.proyecto.plantillas ?? [];
+                const orden = ed.proyecto.modelo.plantas.map((p) => p.id);
+                ed.editar({ op: "plantillas", plantillas: lista.map((t) => (t.nombre === nombre ? { ...t, plantas: orden.filter((id) => id === pl || t.plantas.includes(id)) } : t)) }, `Plantas de la plantilla «${nombre}»`);
+              },
+            }
+          : {}),
         // BN3: en Modelo, el alzado también dibuja (con Barra)
         ...(ed && !cargas ? { alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v) } : null} dibujo={v.eje ? ctrl.adaptadorAlzado(v.eje, planoAlzado(v.eje, v).profundidad) : null} dibujando={dibujando} /> } : {}),
         ...(cargas && casoValido

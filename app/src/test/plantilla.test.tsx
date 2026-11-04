@@ -104,6 +104,22 @@ describe("la plantilla DXF (V2c-4)", () => {
     // Deshacer las unidades; y quitar la plantilla
     fireEvent.click(screen.getByRole("button", { name: "Deshacer" }));
     await waitFor(() => expect((within(nav).getByRole("combobox", { name: "Unidades del DXF" }) as HTMLSelectElement).value).toBe("mm"));
+
+    // Prueba de uso: en otra planta «dejó de verse». La cabecera de la vista dice dónde está y la pone allí
+    const selPlanta = document.querySelector<HTMLSelectElement>(".vista-cab select[aria-label='Planta']")!;
+    const aqui = selPlanta.value;
+    const otra = [...selPlanta.options].map((o) => o.value).find((v) => v && v !== aqui)!;
+    expect(screen.queryByRole("button", { name: /· Ver aquí/ })).toBeNull();
+    fireEvent.change(selPlanta, { target: { value: otra } });
+    const verAqui = await waitFor(() => screen.getByRole("button", { name: `DXF en ${aqui} · Ver aquí` }));
+    expect((within(nav).getByRole("checkbox", { name: new RegExp(`^${otra}$`) }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(verAqui);
+    await waitFor(() => expect((within(nav).getByRole("checkbox", { name: new RegExp(`^${otra}$`) }) as HTMLInputElement).checked).toBe(true));
+    expect(screen.queryByRole("button", { name: /· Ver aquí/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Deshacer" }).getAttribute("title")).toMatch(/Plantas de la plantilla «Planta baja»/);
+    // «En todas», ya en todas
+    expect((within(nav).getByRole("button", { name: "En todas" }) as HTMLButtonElement).disabled).toBe(true);
+
     fireEvent.click(within(nav).getByRole("button", { name: "Quitar la plantilla Planta baja" }));
     await waitFor(() => expect(within(nav).getByText(/Un plano DXF en gris detrás de la planta/)).toBeTruthy());
   }, 60_000);

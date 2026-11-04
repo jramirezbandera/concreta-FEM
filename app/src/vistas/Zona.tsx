@@ -113,6 +113,13 @@ export interface FuentesVistas {
   malla?: boolean;
   /** V2c-4: si la planta tiene una plantilla DXF (la barra de la vista ofrece ocultarla, `EstadoVista.plantilla`). */
   plantilla?: (planta: string) => boolean;
+  /**
+   * Una planta sin plantilla DXF, con alguna en otras plantas (la prueba de uso: se importó en una,
+   * se cambió de planta para dibujar las vigas y «dejó de verse»): la cabecera lo dice y ofrece verla
+   * también en ésta. Sólo con el editor.
+   */
+  plantillaEnOtras?: (planta: string) => { nombre: string; plantas: readonly string[] } | null;
+  verPlantillaAqui?: (planta: string, nombre: string) => void;
   /** V2c: el ortogonal y los enganches al dibujar, en la barra de las plantas (Modelo y Cargas, con el editor). */
   enganches?: () => ReactNode;
 }
@@ -256,6 +263,16 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           <>
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => p && poner(i, { planta: p })} />
             {fuentes.cabeceraPlanta?.(vv, i)}
+            {planta && !fuentes.plantilla?.(planta) && fuentes.verPlantillaAqui && (() => {
+              const otra = fuentes.plantillaEnOtras?.(planta);
+              return otra ? (
+                <span className="chip seg-chip" data-plantilla-otras="">
+                  <button type="button" title={`La plantilla DXF «${otra.nombre}» está en ${otra.plantas.join(", ")}: verla también en ${planta} (se cambia en Plantillas DXF, en el navegador)`} onClick={() => fuentes.verPlantillaAqui!(planta, otra.nombre)}>
+                    DXF en {otra.plantas.length > 2 ? `${otra.plantas.length} plantas` : otra.plantas.join(", ")} · Ver aquí
+                  </button>
+                </span>
+              ) : null;
+            })()}
             {fuentes.malla && e.calculado && (
               <span className="chip seg-chip">
                 <button type="button" data-on={!!v.malla} aria-pressed={!!v.malla} title="Dibujar la malla de la planta (las láminas y los nudos de las vigas) encima del resultado" onClick={() => poner(i, { malla: !v.malla })}>
