@@ -686,6 +686,10 @@
   - **D-19 (decisión del usuario):** todos los gestores confirman con «Aplicar», en un paso de deshacer y preguntando antes de tirar lo escrito; Casos y los datos de una planta, con `FormularioObjeto` `diferido`. La fila de un caso sin nombre, en una línea.
   - **Bajos de §3.3:** casi todos hechos; a medias R-27, R-33, M-32, C-35, D-24, D-26, D-28 y D-29. Lo que más cambia: progreso y «Cancelar» del cálculo (R-25), el informe empieza por el Veredicto (P-31: cambia su sha256), el aviso `sensatez/lejos` (M-26), pestañas y radios con teclado (`Grupo.tsx`) y «Casos típicos» y «Supuestos del cálculo» en los textos (C-30).
   - Los bancos de Chrome no se han pasado.
+- **2026-11-04: de la primera prueba de uso de un usuario externo** (reproducir un proyecto suyo):
+  - **la plantilla DXF «dejó de verse» al dibujar las vigas:** se ve sólo en las plantas donde está (al importar, la activa) y él había cambiado de planta. Ahora una planta sin plantilla, con alguna en otras, lo dice en la cabecera de la vista («DXF en N1 · Ver aquí», que la pone también en ésa), y la ficha de la plantilla tiene «En todas»;
+  - **la hoja con varias filas elegidas, como Excel:** Ctrl+Intro escribe lo tecleado en todas, Ctrl+D copia la primera hacia abajo, pegar un solo valor lo pone en todas, Supr las vacía y el desplegable va a todas (`operacionVarios`, un paso de deshacer); ←/→/Tab no sueltan las filas y la barra de abajo dice qué se puede hacer. Prueba: `app/src/test/hojaVarias.test.tsx`;
+  - **propuestos, sin hacer:** la cota de cada planta editable en el gestor (no se veía qué ponía la cimentación a −4,30), la herramienta Viga partiendo en los pilares por defecto con las asas de los vértices visibles, los tramos de pilar (`tramos`, hormigón y acero) en Propiedades y el panel de capas del DXF más grande.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

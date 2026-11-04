@@ -11,6 +11,12 @@
  * Las columnas con opciones (las plantas, las secciones, la base…) se eligen en un desplegable: doble
  * clic, Intro, Alt+↓ o la flecha de la celda activa. F2 o escribir directamente, y pegar, siguen igual.
  *
+ * Varias filas elegidas (Mayús+flechas o Mayús+clic en la marca), como en Excel (de la prueba de uso:
+ * «cambio la planta final de los pilares uno a uno»): Ctrl+Intro escribe lo tecleado en la columna de
+ * todas, Ctrl+D copia la primera hacia abajo, pegar un solo valor lo pone en todas y Supr las vacía; lo
+ * elegido en el desplegable va también a todas. Es `operacionVarios` (lo de Propiedades con varios):
+ * o entran todas o ninguna, en un paso de deshacer.
+ *
  * Cada celda se lee y se escribe con las funciones puras de `src/editor/` (`tablas.ts`,
  * `edicion.ts`): lo que se ve es lo que se guarda, y un dato que no vale no entra (se dice por qué).
  */
@@ -24,6 +30,7 @@ import { comoUna } from "../../../src/editor/gestores.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import { indiceIds, lista, type Objeto } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, conActual, contexto, filaConValor, objetosTabla, type NombreTabla, type Opcion } from "../../../src/editor/tablas.ts";
+import { operacionVarios } from "../../../src/editor/varios.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import { useVisor } from "../contexto.ts";
 import { DialogoBorrar, DialogoCopiar } from "./Dialogos.tsx";
@@ -344,12 +351,41 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
 
   const rango: [number, number] = ancla === null ? [f0, f0] : [Math.min(ancla, f0), Math.max(ancla, f0)];
   const elegidas = filas.slice(rango[0], Math.min(rango[1], nBorrador - 1) + 1).map((x) => x.id);
+  /** Varias filas del modelo elegidas: lo que se escribe puede ir a todas. */
+  const varias = ancla !== null && elegidas.length > 1;
 
-  const mover = (f: number, c: number, extender = false) => {
+  /** Escribe `valor` en la columna `c` de las filas `ids` (por defecto, las elegidas), en un paso; false si no entra. */
+  const escribirEnVarias = (c: number, valor: string, ids: readonly string[] = elegidas): boolean => {
+    const col = cols[c]!;
+    if (col.calculada) return true;
+    const t = operacionVarios(m, tabla, ids, col.clave, valor);
+    if (!t.ok) {
+      setMensaje({ tono: "fail", texto: `No se cambió ninguna: ${t.errores.slice(0, 3).map((e) => `${e.id ? `${e.id} · ` : ""}${e.mensaje}`).join(" · ")}${t.errores.length > 3 ? ` · y ${t.errores.length - 3} más` : ""}` });
+      return false;
+    }
+    const n = t.operacion.op === "lote" ? t.operacion.operaciones.length : 1;
+    if (n === 0) {
+      setMensaje({ tono: "neu", texto: `Las ${ids.length} filas ya tienen ${col.titulo} = ${valor || "(vacío)"}.` });
+      return true;
+    }
+    const r = ed.editar(t.operacion, `${col.titulo} = ${valor || "(vacío)"} en ${plural(n, "fila")}`);
+    if (!r.ok) {
+      setMensaje({ tono: "fail", texto: r.errores.map((e) => e.mensaje).join(" ") });
+      return false;
+    }
+    setMensaje({ tono: "ok", texto: `${col.titulo} = ${valor || "(vacío)"} en ${plural(n, "fila")}${n < ids.length ? ` (las otras ${ids.length - n} ya lo tenían)` : ""}.` });
+    return true;
+  };
+
+  /** `mantener`: un cambio de columna en la misma fila deja las filas elegidas (para escribir en todas). */
+  const mover = (f: number, c: number, extender = false, mantener = false) => {
     const nf = Math.max(0, Math.min(nBorrador, f));
     const nc = Math.max(0, Math.min(cols.length - 1, c));
-    if (extender) setAncla((a) => a ?? f0);
-    else setAncla(null);
+    if (extender) {
+      setAncla((a) => a ?? f0);
+      // Lo que se puede hacer con varias, en la barra de abajo (lo de antes ya no aplica)
+      setMensaje(null);
+    } else if (!(mantener && nf === f0)) setAncla(null);
     setCursor({ f: nf, c: nc });
     setError(false);
     const id = filas[nf]?.id;
@@ -463,7 +499,8 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
   /** Lo elegido en el desplegable se escribe en la celda, y el cursor se queda en ella. */
   const elegir = (v: string) => {
     if (cols[c0]?.referencia && esDelGestor(v)) return gestor(f0, c0, v);
-    const r = escribir(f0, c0, v);
+    // Con varias filas elegidas, a todas (y siguen elegidas, para seguir cambiándolas)
+    const r = varias && f0 < nBorrador ? escribirEnVarias(c0, v) : escribir(f0, c0, v);
     setEditando(null);
     setDesplegado(false);
     if (!r) setError(true);
@@ -524,6 +561,15 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
 
   const teclas = (e: KeyboardEvent<HTMLDivElement>) => {
     if (editando !== null) {
+      // Ctrl+Intro, como en Excel: lo tecleado, en todas las filas elegidas (que siguen elegidas)
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && varias && f0 < nBorrador) {
+        e.preventDefault();
+        if (!escribirEnVarias(c0, editando)) return setError(true);
+        setEditando(null);
+        setError(false);
+        hoja.current?.focus();
+        return;
+      }
       if (e.key === "Enter") confirmar(e.shiftKey ? -1 : 1, 0);
       else if (e.key === "Tab") {
         e.preventDefault();
@@ -541,6 +587,18 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
       e.preventDefault();
       return empezar(f0, c0, undefined, true);
     }
+    // Ctrl+D, como en Excel: la primera fila elegida, hacia abajo en la columna activa
+    if (mod && !e.altKey && (e.key === "d" || e.key === "D")) {
+      e.preventDefault();
+      if (!varias) {
+        setMensaje({ tono: "neu", texto: "Ctrl+D copia la primera fila elegida hacia abajo: elija varias con Mayús+↓ o Mayús+clic en la marca de la fila." });
+        return;
+      }
+      const [primera, ...resto] = elegidas;
+      const v = filas.find((x) => x.id === primera)!;
+      if (!escribirEnVarias(c0, v.fila[claves[c0]!] ?? "", resto)) setError(true);
+      return;
+    }
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
@@ -550,13 +608,13 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         return mover(f0 - 1, c0, e.shiftKey);
       case "ArrowRight":
         e.preventDefault();
-        return mover(f0, c0 + 1);
+        return mover(f0, c0 + 1, false, true);
       case "ArrowLeft":
         e.preventDefault();
-        return mover(f0, c0 - 1);
+        return mover(f0, c0 - 1, false, true);
       case "Tab":
         e.preventDefault();
-        return mover(f0, c0 + (e.shiftKey ? -1 : 1));
+        return mover(f0, c0 + (e.shiftKey ? -1 : 1), false, true);
       case "Home":
         return mover(mod ? 0 : f0, 0);
       case "End":
@@ -570,7 +628,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
       case "Delete":
       case "Backspace":
         e.preventDefault();
-        if (!escribir(f0, c0, "")) setError(true);
+        if (!(varias && f0 < nBorrador ? escribirEnVarias(c0, "") : escribir(f0, c0, ""))) setError(true);
         return;
       case "Escape":
         setAncla(null);
@@ -590,6 +648,12 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     if (editando !== null) return;
     e.preventDefault();
     const texto = e.clipboardData.getData("text/plain");
+    // Un solo valor (Excel copia una celda con su salto de línea) sobre varias filas elegidas: en todas
+    const unico = texto.replace(/\r?\n$/, "");
+    if (varias && f0 < nBorrador && !/[\t\r\n]/.test(unico)) {
+      if (!escribirEnVarias(c0, unico.trim())) setError(true);
+      return;
+    }
     const t = pegar(m, tabla, texto, c0, { ids: filas.map((x) => x.id), fila: f0 });
     if (!t.ok) {
       setMensaje({ tono: "fail", texto: `No se pegó nada: ${t.errores.slice(0, 4).map((x) => `${x.fila ? `fila ${x.fila}` : ""}${x.columna ? ` · ${x.columna}` : ""}: ${x.mensaje}`).join(" · ")}${t.errores.length > 4 ? ` · y ${t.errores.length - 4} más` : ""}` });
@@ -803,6 +867,10 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         <span className="min-w-0 flex-1 truncate" title={mensaje?.texto} data-mensaje-hoja>
           {mensaje ? (
             mensaje.texto
+          ) : varias ? (
+            <>
+              <span className="font-medium text-text-primary">{elegidas.length} filas elegidas</span> · {col.titulo}: lo elegido en el desplegable va a todas · Ctrl+Intro escribe lo tecleado en todas · Ctrl+D copia la primera hacia abajo · Ctrl+V de un valor, en todas · Supr las vacía
+            </>
           ) : (
             <>
               <span className="font-medium text-text-primary">{col.titulo}</span>
