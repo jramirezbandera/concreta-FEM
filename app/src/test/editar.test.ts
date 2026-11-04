@@ -75,7 +75,7 @@ describe("Mover, Copiar, Girar y Simetría", () => {
     expect(hechos).toEqual(["Mover V1-N1 (0,3; 0 m)"]);
     expect(viga(proyecto(), "V1-N1")).toEqual([[6.3, 0], [6.3, 5]]);
     // Sigue con lo mismo elegido, esperando otro punto base; Esc sale a Elegir
-    expect(ctrl.instantanea().ayuda).toBe("Mover V1-N1: el punto base. Esc vuelve a Elegir.");
+    expect(ctrl.instantanea().ayuda).toBe("Mover V1-N1: el punto base. Para mover un solo vértice, con Elegir: un clic en su cuadrado y otro donde va. Esc vuelve a Elegir.");
     ctrl.anular();
     expect(ctrl.activa).toBe("elegir");
   });
@@ -191,8 +191,10 @@ describe("Clic derecho", () => {
     clic([6, 0]);
     clic([11.4, 0]);
     expect(vista.derecho!()).toBe(true);
-    expect(hechos).toEqual(["Viga V1"]);
-    expect(viga(proyecto(), "V1")).toEqual([[0, 0], [6, 0], [11.4, 0]]);
+    // Una viga por vano (por defecto): se corta en el pilar de (6, 0)
+    expect(hechos).toEqual(["2 vigas, una por vano (V1…V2)"]);
+    expect(viga(proyecto(), "V1")).toEqual([[0, 0], [6, 0]]);
+    expect(viga(proyecto(), "V2")).toEqual([[6, 0], [11.4, 0]]);
     // Sigue en Viga, sin puntos: el siguiente clic derecho no hace nada
     expect(ctrl.activa).toBe("viga");
     expect(vista.derecho!()).toBe(false);

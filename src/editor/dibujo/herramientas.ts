@@ -62,6 +62,14 @@ export interface PlantillaViga {
   seccion?: string;
   /** Eje a eje (por defecto) o con una cara en la de los pilares (V2c-b). */
   alinear?: Alinear;
+  /**
+   * Una viga por vano (por defecto, sí; de la prueba de uso): lo dibujado se corta en cada pilar, el
+   * enganchado y el que la línea atraviesa por su punto fijo. Con false, una sola viga con todos los
+   * tramos, como antes. Para el cálculo da lo mismo (el compilador parte la viga en los pilares
+   * igual): en la retícula con núcleo de A2 partida así, las mismas reacciones totales y el mismo
+   * peso, y cada apoyo a ≤ 1,1e-5 de su Fz (la malla junto a los cortes cambia un poco).
+   */
+  porVanos?: boolean;
 }
 
 export interface Plantillas {
@@ -283,6 +291,71 @@ export function alinearACara(m: ModeloFisico, planta: string, puntos: readonly P
   return r;
 }
 
+/** A cuánto de un tramo tiene que estar el punto fijo de un pilar para que la viga pase por él, m. */
+const SOBRE_TRAMO = 1e-6;
+
+/**
+ * Los puntos dibujados con los pilares que atraviesa cada tramo por su punto fijo (a ≤ `SOBRE_TRAMO`,
+ * dentro del tramo), en orden, con el punto exacto del pilar: dibujar de P1 a P5 por P2, P3 y P4 corta
+ * en los cinco.
+ */
+export function conPilaresDelTramo(m: ModeloFisico, planta: string, puntos: readonly PuntoDibujo[]): PuntoDibujo[] {
+  const pilares = new PlantaFisica(m, planta).pilares().map(({ p }) => p);
+  if (!pilares.length || puntos.length < 2) return [...puntos];
+  const r: PuntoDibujo[] = [puntos[0]!];
+  for (let k = 1; k < puntos.length; k++) {
+    const [a, b] = [puntos[k - 1]!, puntos[k]!];
+    const [dx, dy] = [b.p[0] - a.p[0], b.p[1] - a.p[1]];
+    const l2 = dx * dx + dy * dy;
+    const dentro: { t: number; pilar: Pilar }[] = [];
+    for (const p of pilares) {
+      if (p.id === a.pilar || p.id === b.pilar) continue;
+      const t = ((p.x - a.p[0]) * dx + (p.y - a.p[1]) * dy) / l2;
+      const l = Math.sqrt(l2);
+      if (t * l <= SOBRE_TRAMO || (1 - t) * l <= SOBRE_TRAMO) continue;
+      if (Math.abs((p.x - a.p[0]) * dy - (p.y - a.p[1]) * dx) / l > SOBRE_TRAMO) continue;
+      dentro.push({ t, pilar: p });
+    }
+    dentro.sort((x, y) => x.t - y.t);
+    for (const { pilar } of dentro) r.push({ p: [pilar.x, pilar.y], pilar: pilar.id });
+    r.push(b);
+  }
+  return r;
+}
+
+/** ¿Está q en la huella del pilar `id` de la planta (o en su borde)? */
+function enHuella(pl: PlantaFisica, id: string, q: Vec2): boolean {
+  const x = pl.pilares().find((y) => y.p.id === id);
+  const h = x && huellaSeccion(x.p, x.seccion);
+  if (!h) return false;
+  if (!("anillo" in h)) return Math.hypot(q[0] - h.centro[0], q[1] - h.centro[1]) <= h.radio + SOBRE_TRAMO;
+  // Convexa (rectángulo, girado o no): del lado de dentro de todos sus lados
+  const a = h.anillo;
+  let signo = 0;
+  for (let i = 0; i < a.length; i++) {
+    const [p0, p1] = [a[i]!, a[(i + 1) % a.length]!];
+    const c = (p1[0] - p0[0]) * (q[1] - p0[1]) - (p1[1] - p0[1]) * (q[0] - p0[0]);
+    if (Math.abs(c) <= SOBRE_TRAMO * Math.hypot(p1[0] - p0[0], p1[1] - p0[1])) continue;
+    if (signo === 0) signo = Math.sign(c);
+    else if (Math.sign(c) !== signo) return false;
+  }
+  return true;
+}
+
+/**
+ * Dónde se corta lo dibujado en una viga por vano: los índices de los puntos interiores en un pilar
+ * (con `conPilaresDelTramo` ya aplicado). Un extremo que queda entero dentro de la huella de su pilar
+ * (dibujado hasta la cara de fuera del pilar de borde) no es un vano: va con el de al lado.
+ */
+export function cortesPorVanos(m: ModeloFisico, planta: string, ps: readonly PuntoDibujo[]): number[] {
+  const pl = new PlantaFisica(m, planta);
+  const cortes = ps.flatMap((x, k) => (k > 0 && k < ps.length - 1 && x.pilar ? [k] : []));
+  const dentro = (desde: number, hasta: number, pilar: string) => ps.slice(desde, hasta + 1).every((x) => enHuella(pl, pilar, x.p));
+  if (cortes.length && dentro(0, cortes[0]!, ps[cortes[0]!]!.pilar!)) cortes.shift();
+  if (cortes.length && dentro(cortes.at(-1)!, ps.length - 1, ps[cortes.at(-1)!]!.pilar!)) cortes.pop();
+  return cortes;
+}
+
 /** Los puntos de la viga que se crea con la plantilla. */
 function puntosViga(ctx: ContextoHerramienta, puntos: readonly PuntoDibujo[]): Vec2[] {
   const t = ctx.plantillas.viga;
@@ -391,9 +464,27 @@ function pasoViga(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): P
       if (e.puntos.length < 2) return { estado: e, ...(e.puntos.length ? { error: "Una viga necesita al menos dos puntos." } : {}) };
       const s = ctx.plantillas.viga.seccion;
       if (!seccionValida(ctx.modelo, s)) return { estado: e, error: "Elija en Propiedades la sección de la viga (o cree una)." };
-      const id = idNuevo(ctx.modelo, "V");
-      const viga: Viga = { id, planta: ctx.planta, puntos: puntosViga(ctx, e.puntos), seccion: s! };
-      return { estado: ESTADO_INICIAL, hecho: { operacion: { op: "crear", coleccion: "vigas", objeto: viga as unknown as Objeto }, etiqueta: `Viga ${id}` } };
+      if (ctx.plantillas.viga.porVanos === false) {
+        const id = idNuevo(ctx.modelo, "V");
+        const viga: Viga = { id, planta: ctx.planta, puntos: puntosViga(ctx, e.puntos), seccion: s! };
+        return { estado: ESTADO_INICIAL, hecho: { operacion: { op: "crear", coleccion: "vigas", objeto: viga as unknown as Objeto }, etiqueta: `Viga ${id}` } };
+      }
+      // Una viga por vano: se corta en cada pilar interior (alineada a una cara, con los mismos vértices)
+      const ps = conPilaresDelTramo(ctx.modelo, ctx.planta, e.puntos);
+      const qs = puntosViga(ctx, ps);
+      const ocupados = new Set<string>();
+      const ops: Operacion[] = [];
+      let i0 = 0;
+      for (const k of [...cortesPorVanos(ctx.modelo, ctx.planta, ps), ps.length - 1]) {
+        const id = idNuevo(ctx.modelo, "V", ocupados);
+        ocupados.add(id);
+        const viga: Viga = { id, planta: ctx.planta, puntos: qs.slice(i0, k + 1), seccion: s! };
+        ops.push({ op: "crear", coleccion: "vigas", objeto: viga as unknown as Objeto });
+        i0 = k;
+      }
+      const ids = [...ocupados];
+      const etiqueta = ids.length === 1 ? `Viga ${ids[0]}` : `${ids.length} vigas, una por vano (${ids[0]}…${ids.at(-1)})`;
+      return { estado: ESTADO_INICIAL, hecho: { operacion: ops.length === 1 ? ops[0]! : { op: "lote", operaciones: ops }, etiqueta } };
     }
     default:
       return { estado: e };
@@ -432,6 +523,8 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
     const ps = cursor && !igual(cursor, e.puntos[e.puntos.length - 1]!.p) ? [...e.puntos, { p: cursor }] : [...e.puntos];
     r.lineas.push(ps.map((x) => x.p));
     const t = ctx.plantillas.viga;
+    // Por vanos: los puntos son también los pilares que atraviesa (donde se cortará)
+    if (t.porVanos !== false && ps.length > 1) r.puntos = conPilaresDelTramo(ctx.modelo, ctx.planta, ps).map((x) => x.p);
     if (t.alinear && t.alinear !== "eje" && ps.length > 1) r.lineas.push(puntosViga(ctx, ps));
   }
   if (esPieza(h)) borradorPieza(h, e, cursor, ctx, r, crudo);
@@ -461,8 +554,8 @@ export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas 
   }
   if (h === "viga")
     return e.puntos.length
-      ? `Viga: el punto siguiente (${e.puntos.length} puesto${e.puntos.length > 1 ? "s" : ""}). Doble clic o Intro termina; Retroceso quita el último; Esc anula.`
-      : "Viga: el primer punto. Esc vuelve a Elegir.";
+      ? `Viga: el punto siguiente (${e.puntos.length} puesto${e.puntos.length > 1 ? "s" : ""}). Doble clic o Intro termina${t.viga.porVanos === false ? " (una sola viga)" : " (una viga por vano entre pilares)"}; Retroceso quita el último; Esc anula.`
+      : `Viga: el primer punto${t.viga.porVanos === false ? "" : "; se corta en cada pilar, una viga por vano"}. Esc vuelve a Elegir.`;
   return "";
 }
 

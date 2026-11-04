@@ -241,10 +241,25 @@ describe("herramientas (criterio 1: lo mismo que la tabla)", () => {
   it("Viga: polilínea enganchada; el doble clic no repite el punto; Retroceso y Esc", () => {
     const p = dibujar(base(EJES), "pilar", [{ tipo: "ventana", caja: [-1, -1, 11, 7] }]).proyecto;
     const a: Vec2 = [0.01, 6.31];
-    const r = dibujar(p, "viga", [clic(p, a), clic(p, [7, 6.6]), { tipo: "retroceso" }, clic(p, [5.02, 6.3]), clic(p, [10, 6.29]), clic(p, [10, 6.29]), { tipo: "terminar" }]);
+    const una: Plantillas = { ...PLANTILLAS, viga: { ...PLANTILLAS.viga, porVanos: false } };
+    const r = dibujar(p, "viga", [clic(p, a), clic(p, [7, 6.6]), { tipo: "retroceso" }, clic(p, [5.02, 6.3]), clic(p, [10, 6.29]), clic(p, [10, 6.29]), { tipo: "terminar" }], una);
     expect(r.etiquetas).toEqual(["Viga V1"]);
     const t = conTabla(p, "vigas", { planta: "N1", puntos: "0 6,3; 5 6,3; 10 6,3", seccion: "V30x50" });
     expect(serializar(r.proyecto)).toBe(serializar(t));
+    // Por defecto, una viga por vano: lo mismo que dos filas de la tabla, en un paso
+    const v = dibujar(p, "viga", [clic(p, a), clic(p, [5.02, 6.3]), clic(p, [10, 6.29]), { tipo: "terminar" }]);
+    expect(v.etiquetas).toEqual(["2 vigas, una por vano (V1…V2)"]);
+    const dos = conTabla(conTabla(p, "vigas", { planta: "N1", puntos: "0 6,3; 5 6,3", seccion: "V30x50" }), "vigas", { planta: "N1", puntos: "5 6,3; 10 6,3", seccion: "V30x50" });
+    expect(serializar(v.proyecto)).toBe(serializar(dos));
+    // Sin pinchar el pilar de en medio: se corta igual en el que atraviesa, con su punto exacto
+    expect(serializar(dibujar(p, "viga", [clic(p, a), clic(p, [10, 6.29]), { tipo: "terminar" }]).proyecto)).toBe(serializar(dos));
+    // Desde la cara de fuera del pilar de borde: ese trozo, dentro de su huella, no es un vano (sin
+    // tramo flexible el modelo no compilaría) y va con el primero
+    const cara = dibujar(p, "viga", [{ tipo: "punto", p: [-0.15, 6.3] }, clic(p, [10, 6.29]), { tipo: "terminar" }]);
+    expect(cara.proyecto.modelo.vigas!.map((x) => x.puntos)).toEqual([
+      [[-0.15, 6.3], [0, 6.3], [5, 6.3]],
+      [[5, 6.3], [10, 6.3]],
+    ]);
     // Esc con puntos anula; sin puntos, sale
     const e = dibujar(p, "viga", [clic(p, a), { tipo: "anular" }]);
     expect(e.estado.puntos.length).toBe(0);

@@ -33,7 +33,7 @@
  */
 import { huellaSeccion, PlantaFisica } from "../agente/render/modelo.ts";
 import { direccionEjes, ejesDe, letraEje } from "../compilador/ejes.ts";
-import type { ApoyoFisico, Barra, CargaFisica, ModeloFisico, Pilar, PuntoFijo, Vec2 } from "../compilador/fisico.ts";
+import type { ApoyoFisico, Barra, CargaFisica, ModeloFisico, Pilar, PuntoFijo, Vec2, Viga } from "../compilador/fisico.ts";
 import { distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
 import { limpio } from "./dibujo/cotas.ts";
@@ -695,10 +695,30 @@ export function moverAsa(m: ModeloFisico, a: Asa, q: Vec2, conVigas = true): Res
     const huecos = (o.huecos as { desde: number; hasta: number }[]).map((h) => ({ ...h, desde: reestacionar(ps, qs, h.desde), hasta: reestacionar(ps, qs, h.hasta) }));
     ops.push({ op: "cambiar", coleccion: "muros", id: a.id, objeto: { ...objeto, huecos } });
   } else ops.push({ op: "cambiar", coleccion: a.coleccion, id: a.id, objeto });
-  if (a.coleccion === "vigas")
+  const cargasDe = (id: string, antes: readonly Vec2[], despues: readonly Vec2[]) => {
     for (const c of m.cargas ?? []) {
-      if (c.tipo !== "viga" || c.viga !== a.id || (c.desde === undefined && c.hasta === undefined)) continue;
-      ops.push({ op: "cambiar", coleccion: "cargas", id: c.id, objeto: { ...c, ...(c.desde !== undefined ? { desde: reestacionar(ps, qs, c.desde) } : {}), ...(c.hasta !== undefined ? { hasta: reestacionar(ps, qs, c.hasta) } : {}) } as unknown as Objeto });
+      if (c.tipo !== "viga" || c.viga !== id || (c.desde === undefined && c.hasta === undefined)) continue;
+      ops.push({ op: "cambiar", coleccion: "cargas", id: c.id, objeto: { ...c, ...(c.desde !== undefined ? { desde: reestacionar(antes, despues, c.desde) } : {}), ...(c.hasta !== undefined ? { hasta: reestacionar(antes, despues, c.hasta) } : {}) } as unknown as Objeto });
     }
+  };
+  if (a.coleccion === "vigas") {
+    cargasDe(a.id, ps, qs);
+    // De la prueba de uso (una viga por vano): las vigas de la planta con un vértice en ese mismo punto
+    // lo siguen, como las de un pilar; no si hay un pilar ahí (se quedan en él) ni con `conVigas: false`
+    const v = o as unknown as Viga;
+    const hayPilar = new PlantaFisica(m, v.planta).pilares().some(({ p }) => p.x === a.p[0] && p.y === a.p[1]);
+    if (conVigas && !hayPilar) {
+      const siguen: string[] = [];
+      for (const w of m.vigas ?? []) {
+        if (w.id === a.id || w.planta !== v.planta || !w.puntos.some((p) => igual(p, a.p))) continue;
+        const ws = w.puntos.map((p) => (igual(p, a.p) ? q : p));
+        if (ws.some((p, k) => k > 0 && igual(p, ws[k - 1]!))) return { ok: false, mensaje: `El punto cae encima de otro vértice de ${w.id}, que lo sigue (con Ctrl, ${a.id} solo).` };
+        ops.push({ op: "cambiar", coleccion: "vigas", id: w.id, objeto: { ...w, puntos: ws } as unknown as Objeto });
+        cargasDe(w.id, w.puntos, ws);
+        siguen.push(w.id);
+      }
+      if (siguen.length) avisos.push(`${listaIds(siguen)} ${siguen.length > 1 ? "lo siguen" : "lo sigue"}: ${siguen.length > 1 ? "tenían" : "tenía"} un vértice en ese punto (con Ctrl, ${a.id} solo).`);
+    }
+  }
   return { ok: true, operacion: ops.length === 1 ? ops[0]! : { op: "lote", operaciones: ops }, avisos, nuevos: [] };
 }

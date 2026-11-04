@@ -464,6 +464,27 @@ describe("pinzamientos", () => {
     const l = asas(m, ["L1"], "N1")[0]!;
     expect(moverAsa(m, l, [6, 4.3])).toEqual({ ok: false, mensaje: "El punto cae encima de otro vértice de L1." });
   });
+
+  it("el vértice de una viga lleva el de las vigas que acaban en él, salvo en un pilar o con Ctrl (prueba de uso, una viga por vano)", () => {
+    const m0 = portico();
+    const m: ModeloFisico = { ...m0, vigas: [...m0.vigas!, { id: "V3", planta: "N1", puntos: [[6, 4.3], [0, 4.3]], seccion: "v30" }] };
+    const fin = asas(m, ["V2"], "N1").find((x) => x.p[1] === 4.3)!;
+    const r = moverAsa(m, fin, [6, 4]);
+    if (!r.ok) throw new Error(r.mensaje);
+    const n = aplicado(proyecto(m), r.operacion).modelo;
+    expect(n.vigas!.find((x) => x.id === "V2")!.puntos).toEqual([[6, 0], [6, 4]]);
+    expect(n.vigas!.find((x) => x.id === "V3")!.puntos).toEqual([[6, 4], [0, 4.3]]);
+    expect(r.avisos[0]).toMatch(/V3 lo sigue/);
+    // Ctrl: sólo la suya
+    const solo = moverAsa(m, fin, [6, 4], false);
+    if (!solo.ok) throw new Error(solo.mensaje);
+    expect(aplicado(proyecto(m), solo.operacion).modelo.vigas!.find((x) => x.id === "V3")!.puntos).toEqual([[6, 4.3], [0, 4.3]]);
+    // En el punto de un pilar (P2), las demás se quedan en el pilar
+    const ini = asas(m, ["V2"], "N1").find((x) => x.p[1] === 0)!;
+    const p = moverAsa(m, ini, [6.5, 0]);
+    if (!p.ok) throw new Error(p.mensaje);
+    expect(aplicado(proyecto(m), p.operacion).modelo.vigas!.find((x) => x.id === "V1")!.puntos).toEqual([[0, 0], [6, 0]]);
+  });
 });
 
 describe("los errores", () => {

@@ -240,7 +240,8 @@ describe("calcar la retícula con núcleo de A2 desde su DXF (criterio 2)", () =
         }
       }
     };
-    const base: Plantillas = { pilar: { seccion: n0.pilares![0]!.seccion }, viga: { seccion: n0.vigas![0]!.seccion } };
+    // Las vigas de la referencia son de varios vanos: una sola viga, como antes
+    const base: Plantillas = { pilar: { seccion: n0.pilares![0]!.seccion }, viga: { seccion: n0.vigas![0]!.seccion, porVanos: false } };
     // Los pilares, en el centro de su rectángulo
     dibujar("pilar", base, n0.pilares!.map((x) => [x.x, x.y]));
     for (const v of n0.vigas!) dibujar("viga", base, [...v.puntos, "fin"]);

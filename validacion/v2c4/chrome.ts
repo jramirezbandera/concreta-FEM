@@ -168,6 +168,8 @@ const cdp = (method: string, params: Record<string, unknown> = {}) =>
     pendientes.set(id, (m) => (m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result)));
     ws.send(JSON.stringify({ id, method, params }));
   });
+/** Desmarca «Una viga por vano»: la referencia tiene vigas de varios vanos. */
+const UNA_VIGA = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim().startsWith("Una viga por vano"))?.querySelector("input"); if (z?.checked) z.click(); }`;
 /** Desmarca «Con zunchos» en la plantilla de la herramienta activa: la referencia no los lleva. */
 const SIN_ZUNCHOS = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim() === "Con zunchos")?.querySelector("input"); if (z?.checked) z.click(); }`;
 
@@ -263,9 +265,9 @@ try {
   // el mismo punto gana el extremo de la viga dibujada (el modelo, a igual nivel y distancia)
   const [qx, qy] = n0.vigas![0]!.puntos[0]!;
   const pieEn = () => pagina<string>(`__c.vista().encuadrar([${qx - 1.5}, ${qy - 1.5}, ${qx + 1.5}, ${qy + 1.5}]); __c.ev("pointermove", [${qx}, ${qy}]); await __c.fotograma(); return __c.pie();`);
-  await pagina(`__c.herramienta("Viga").click(); await __c.esperar(() => document.querySelector('select[aria-label="Sección"]')); __c.elegir("Sección", "${n0.vigas![0]!.seccion}");`);
+  await pagina(`__c.herramienta("Viga").click(); await __c.esperar(() => document.querySelector('select[aria-label="Sección"]')); __c.elegir("Sección", "${n0.vigas![0]!.seccion}"); ${UNA_VIGA}`);
   const pieAntes = await pieEn();
-  comprobar(/x −?0,25 · y 0,1 m · Extremo \(DXF arquitectura-nucleo\)/.test(pieAntes.replace("-", "−")), `el pie dice el enganche a la plantilla, redondeado: «${pieAntes}»`);
+  comprobar(/x −?0,25(0)? · y 0,1(00)? m · Extremo \(DXF arquitectura-nucleo\)/.test(pieAntes.replace("x -", "x −")), `el pie dice el enganche a la plantilla, redondeado: «${pieAntes}»`);
   for (const v of n0.vigas!) await pagina(`${v.puntos.map((q) => `__c.clicCerca([${q[0]}, ${q[1]}]);`).join(" ")} __c.tecla("Enter");`);
   const pieDespues = await pieEn();
   comprobar(/Extremo \(V/.test(pieDespues), `dibujada la viga, en ese punto gana su extremo: «${pieDespues}»`);

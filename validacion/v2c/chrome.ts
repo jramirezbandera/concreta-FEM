@@ -172,6 +172,8 @@ const cdp = (method: string, params: Record<string, unknown> = {}) =>
     pendientes.set(id, (m) => (m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result)));
     ws.send(JSON.stringify({ id, method, params }));
   });
+/** Desmarca «Una viga por vano»: la referencia tiene vigas de varios vanos. */
+const UNA_VIGA = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim().startsWith("Una viga por vano"))?.querySelector("input"); if (z?.checked) z.click(); }`;
 /** Desmarca «Con zunchos» en la plantilla de la herramienta activa: la referencia no los lleva. */
 const SIN_ZUNCHOS = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim() === "Con zunchos")?.querySelector("input"); if (z?.checked) z.click(); }`;
 
@@ -341,7 +343,7 @@ try {
   await pagina(`__c.herramienta("Viga").click();`);
   const principales = referencia.modelo.vigas!.filter((v) => v.seccion === "V30x60");
   const secundarias = referencia.modelo.vigas!.filter((v) => v.seccion !== "V30x60");
-  await pagina(`__c.elegir("Sección", "V30x60");`);
+  await pagina(`__c.elegir("Sección", "V30x60"); ${UNA_VIGA}`);
   for (const v of principales) {
     const [a, b] = [v.puntos[0]!, v.puntos.at(-1)!];
     await pagina(`__c.clic([${a[0]}, ${a[1]}]); __c.clic([${b[0]}, ${b[1]}]); __c.sup().dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 0, clientY: 0 }));`);
@@ -421,7 +423,7 @@ try {
   for (const x of NX) await pagina(`await __c.teclear("${num(x)}; -2"); await __c.teclear("${num(x)}; 17");`);
   await pagina(`__c.herramienta("Pilar").click(); await __c.esperar(() => document.querySelector('[aria-label="Planta de la base"]')); __c.elegir("Sección", "${n0.pilares![0]!.seccion}");`);
   for (const p of n0.pilares!) await pagina(`__c.clic([${p.x}, ${p.y}]);`);
-  await pagina(`__c.herramienta("Viga").click(); __c.elegir("Sección", "${n0.vigas![0]!.seccion}");`);
+  await pagina(`__c.herramienta("Viga").click(); __c.elegir("Sección", "${n0.vigas![0]!.seccion}"); ${UNA_VIGA}`);
   for (const v of n0.vigas!) await pagina(`await __c.teclear("${num(v.puntos[0]![0])}; ${num(v.puntos[0]![1])}"); await __c.teclear("${num(v.puntos[1]![0])}; ${num(v.puntos[1]![1])}"); __c.tecla("Enter");`);
   // La losa, como polígono tecleado, con su canto; su hueco
   const ln = n0.losas![0]!;

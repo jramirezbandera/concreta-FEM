@@ -207,7 +207,9 @@ export function ayudaEditar(h: NombreEditar, e: EstadoHerramienta, t: Plantillas
     if (h === "girar") return `Girar ${que}: el centro del giro. Esc vuelve a Elegir.`;
     if (h === "simetria") return `Simetría de ${que}: el primer punto del eje. Esc vuelve a Elegir.`;
     if (h === "copiar" && t.editar?.plantas?.length) return `Copiar ${que} a ${t.editar.plantas.join(", ")}: el punto base, o Intro para copiarlo en su sitio. Esc vuelve a Elegir.`;
-    return `${n} ${que}: el punto base. Esc vuelve a Elegir.`;
+    // De la prueba de uso: corregir un punto con Mover desplazaba la viga entera
+    const vertice = h === "mover" ? " Para mover un solo vértice, con Elegir: un clic en su cuadrado y otro donde va." : "";
+    return `${n} ${que}: el punto base.${vertice} Esc vuelve a Elegir.`;
   }
   if (h === "girar") return `Girar ${que}: el ángulo, desde +X (un clic, o los grados e Intro).${vigas} Esc anula.`;
   if (h === "simetria") return `Simetría de ${que}: el segundo punto del eje.${t.editar?.conservar ? "" : vigas} Esc anula.`;
