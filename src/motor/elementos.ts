@@ -8,7 +8,7 @@
 import { prepararBarra, type BarraPreparada } from "./barras.ts";
 import type { Diagnosticos } from "./diagnosticos.ts";
 import { TOL_GEOMETRICA, type Geometria } from "./geometria.ts";
-import { prepararLamina, rigidezLamina, type LaminaPreparada } from "./laminas.ts";
+import { jacobianoEscaladoLamina, JACOBIANO_MAL_CONDICIONADO, prepararLamina, rigidezLamina, type LaminaPreparada } from "./laminas.ts";
 import type { ModeloAnalitico, Muelle } from "./modelo.ts";
 
 export { geometria, TOL_GEOMETRICA, type Geometria } from "./geometria.ts";
@@ -144,14 +144,28 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
     if (barra) lista.push({ tipo: "barra", indice, id: b.id, nudos: b.nudos, barra });
   });
 
+  /** AU-10: las láminas convexas pero casi degeneradas, con su jacobiano escalado. */
+  const malas: { id: string; j: number }[] = [];
   (modelo.laminas ?? []).forEach((l, indice) => {
     if (!nudosValidos(l.nudos, nn) || l.nudos.length !== 4) {
       diag.error("modelo/nudo-no-valido", `La lámina ${l.id} hace referencia a nudos inexistentes o repetidos.`, [l.id]);
       return;
     }
     const lamina = prepararLamina(l, indice, geo, diag);
-    if (lamina) lista.push({ tipo: "lamina", indice, id: l.id, nudos: l.nudos, lamina });
+    if (!lamina) return;
+    lista.push({ tipo: "lamina", indice, id: l.id, nudos: l.nudos, lamina });
+    const j = jacobianoEscaladoLamina(lamina.xy);
+    if (j < JACOBIANO_MAL_CONDICIONADO) malas.push({ id: l.id, j });
   });
+  if (malas.length) {
+    const peor = malas.reduce((x, y) => (y.j < x.j ? y : x));
+    diag.aviso(
+      "modelo/lamina-mal-condicionada",
+      `${malas.length === 1 ? "La lámina" : `${malas.length} láminas, la peor`} ${peor.id} ${malas.length === 1 ? "tiene" : "con"} una esquina a ${((Math.asin(Math.min(1, Math.max(0, peor.j))) * 180) / Math.PI).toFixed(3)}° de ser recta (0° o 180°): casi degenerada, el elemento queda mal condicionado y sus esfuerzos no son fiables.`,
+      malas.slice(0, 20).map((x) => x.id),
+      { cuantas: malas.length, jacobianoMinimo: peor.j },
+    );
+  }
 
   (modelo.muelles ?? []).forEach((m, indice) => {
     if (!nudosValidos(m.nudos, nn) || (m.nudos.length !== 1 && m.nudos.length !== 2)) {

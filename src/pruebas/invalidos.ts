@@ -279,6 +279,23 @@ export const ENTRADAS_NO_VALIDAS: EntradaNoValida[] = [
   },
   { id: "impuesto-gdl", descripcion: "desplazamiento impuesto en el GDL 7", codigos: [CARGA], aplicar: (m) => (m.casos[0].impuestos.push({ nudo: 0, gdl: 7, valor: 0.001 }), true) },
   { id: "impuesto-nan", descripcion: "desplazamiento impuesto NaN", codigos: [CARGA], aplicar: (m) => (m.casos[0].impuestos.push({ nudo: 0, gdl: 2, valor: Number.NaN }), true) },
+  // AU-11 a AU-14 (auditoría del 2026-10-25): antes, válidos en silencio
+  {
+    id: "impuesto-repetido",
+    descripcion: "dos desplazamientos impuestos en el mismo GDL (valía el último)",
+    codigos: ["carga/impuesto-repetido"],
+    aplicar: (m, r) => {
+      if (!m.apoyos.length) return false;
+      const a = elegir(m.apoyos, r);
+      const gdl = a.coartados.findIndex(Boolean);
+      if (gdl < 0) return false;
+      m.casos[0].impuestos.push({ nudo: a.nudo, gdl, valor: 0.001 }, { nudo: a.nudo, gdl, valor: 0.002 });
+      return true;
+    },
+  },
+  { id: "caso-repetido", descripcion: "dos casos con el mismo id", codigos: ["modelo/id-duplicado"], aplicar: (m) => (m.casos.push({ ...m.casos[0], id: m.casos[0].id }), true) },
+  { id: "apoyo-texto", descripcion: "un GDL de apoyo como texto «false» (coartaba)", codigos: ["modelo/apoyo-no-valido"], aplicar: (m, r) => { if (!m.apoyos.length) return false; elegir(m.apoyos, r).coartados[0] = "false"; return true; } },
+  { id: "barra-liberacion-texto", descripcion: "una liberación como 1 en vez de true (se ignoraba)", codigos: [PROP], aplicar: (m, r) => (((elegir(m.barras, r) as Mutable).liberaciones = { j: [false, false, false, false, 1, false] }), true) },
   {
     id: "carga-sin-rigidez",
     descripcion: "momento rx sobre el maestro auxiliar de un diafragma (GDL sin rigidez)",

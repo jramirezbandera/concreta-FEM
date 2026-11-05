@@ -403,3 +403,39 @@ describe("sin falsos positivos", () => {
     });
   }
 });
+
+describe("una lámina casi degenerada se avisa (AU-10)", () => {
+  const placa = (x2: number, y2: number) => {
+    const m = new Constructor();
+    const n = [m.nudo(0, 0, 0), m.nudo(1, 0, 0), m.nudo(x2, y2, 0), m.nudo(0, 2, 0)] as const;
+    m.lamina(n, MAT, "LAM");
+    for (const v of [n[0], n[1], n[3]]) m.apoyo(v);
+    m.caso("P", [carga(n[2], { fz: -1 })]);
+    return m.modelo();
+  };
+  it("una esquina a 179,99°: calcula, con el aviso y la lámina", () => {
+    // El escenario de la auditoría: antes, valido y sin diagnósticos
+    const r = calcular(placa(2, 1e-4));
+    expect(r.valido).toBe(true);
+    const d = r.diagnosticos.find((x) => x.codigo === "modelo/lamina-mal-condicionada");
+    expect(d?.severidad).toBe("aviso");
+    expect(d?.ids).toEqual(["LAM"]);
+    expect(d!.detalles!.jacobianoMinimo as number).toBeLessThan(1e-3);
+  });
+  it("una lámina corriente, sin aviso", () => {
+    const r = calcular(placa(1.5, 1.8));
+    expect(r.diagnosticos.some((x) => x.codigo === "modelo/lamina-mal-condicionada")).toBe(false);
+  });
+});
+
+describe("una carga puntual de lámina sin F ni M se avisa (AU-15)", () => {
+  it("calcula y dice que no carga nada", () => {
+    const m = new Constructor();
+    const n = [m.nudo(0, 0, 0), m.nudo(1, 0, 0), m.nudo(1, 1, 0), m.nudo(0, 1, 0)] as const;
+    const l = m.lamina(n, MAT, "LAM");
+    n.forEach((v) => m.apoyo(v));
+    m.caso("P", [], [], [], [{ tipo: "puntual", lamina: l, ejes: "global", punto: [0.5, 0.5, 0] }]);
+    const r = calcular(m.modelo());
+    expect(r.diagnosticos.find((d) => d.codigo === "carga/vacia")?.severidad).toBe("aviso");
+  });
+});

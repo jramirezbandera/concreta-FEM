@@ -103,6 +103,38 @@ describe.each(SOLVERS)("empotramiento parcial (solver %s)", (solver) => {
     }
   });
 
+  it("el diagrama de desplazamientos cierra en j' y los esfuerzos son los del cálculo (AU-9)", () => {
+    // El escenario de la auditoría: viga de 4 m, 30 × 50, α = 0,5 en i, j articulado, uniforme y puntual.
+    // Antes, uz(L) = 5,9e-4 m y ry(L) = −1,5e-4 rad donde el nudo tiene 0
+    const V = seccionRectangular(0.3, 0.5);
+    for (const alfa of [0.5, 0.3, 0.05]) {
+      const m = new Constructor();
+      const a = m.nudo(0, 0, 0);
+      const b = m.nudo(4, 0, 0);
+      m.barra(a, b, V, [0, 0, 1], { empotramiento: { i: alfa } });
+      m.apoyo(a);
+      m.apoyo(b, [true, true, true, true, false, true]);
+      m.caso("q", [], [], [
+        { tipo: "distribuida", barra: 0, ejes: "global", qa: [0, 0, -q] },
+        { tipo: "puntual", barra: 0, ejes: "global", x: 1.3, F: [0, 0, -20] },
+      ]);
+      const modelo = m.modelo();
+      const [c] = casosValidos(calcular(modelo, { solver }));
+      const d = new DiagramasBarras(modelo).diagrama(0, 0, c!);
+      const uL = d.desplazamientosEn(4);
+      // Local z de la viga = global z, y el giro local y es el global y
+      expect(Math.abs(uL[2]! - c!.u[6 * b + 2]!)).toBeLessThan(1e-15);
+      expect(Math.abs(uL[4]! - c!.u[6 * b + 4]!)).toBeLessThan(1e-15 + 1e-12 * Math.abs(c!.u[6 * b + 4]!));
+      expect(Math.abs(d.desplazamientosEn(0)[2]!)).toBeLessThan(1e-15);
+      // Los esfuerzos, los de los extremos del cálculo
+      for (let g = 0; g < 6; g++) {
+        const escala = Math.max(...Array.from(c!.esfuerzosBarras.subarray(0, 12), Math.abs), 1);
+        expect(Math.abs(d.esfuerzosEn(0)[g]! - c!.esfuerzosBarras[g]!)).toBeLessThan(1e-10 * escala);
+        expect(Math.abs(d.esfuerzosEn(4)[g]! - c!.esfuerzosBarras[6 + g]!)).toBeLessThan(1e-10 * escala);
+      }
+    }
+  });
+
   it("un coeficiente fuera de [0, 1] es un error del modelo", () => {
     expect(calcular(portico(T, { empotramiento: { i: -0.1 } }), { solver }).valido).toBe(false);
     const r = calcular(portico(T, { empotramiento: { j: 1.5 } }), { solver });

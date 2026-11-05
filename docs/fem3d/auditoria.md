@@ -159,4 +159,34 @@ Hechos los puntos 1 a 4 de §6, en ese orden. Compilador **AU1** (cambia el peso
   - **Por fuerzas nodales,** aviso `corte/borde-no-sigue-malla` con las láminas («le falta lo que pasa por ellas hasta el extremo»), no error. Probé primero el error que proponía §3.2: las franjas cortan la recta entera de una cara y usan sólo lo que pasa por los nudos de la ventana de cada pilar, que es exacto aunque los extremos de la recta no sigan la malla; con el error, `pilares-mezclados` perdía la estación de cara de un pilar en dos franjas. Con el aviso, sale bit a bit.
   - Las láminas con el centroide dentro siguen igual. Pruebas en `cortes-mixtos.test.ts` (el escenario de §3.2).
 - **AU-8, hecho.** `defectoCasos` (`fuerzasNodales.ts`): los resultados tienen que ser los de todos los casos del modelo, en su orden. `Cortes.cortar` devuelve si no un corte no válido con `motor/error-interno`, y los métodos de `FuerzasNodales` que toman resultados lanzan (como ya hacían con una lámina que no existe); las listas comprobadas se recuerdan. Prueba en `cortes.test.ts` con el escenario de §3.2 (un caso suelto y la lista al revés).
-- **Siguen abiertos:** los puntos 5 a 7 de §6 (AU-5, AU-6, AU-9 a AU-16 y los huecos de §5).
+- **Siguen abiertos (2026-10-25):** los puntos 5 a 7 de §6 (AU-5, AU-6, AU-9 a AU-16 y los huecos de §5).
+
+## 8. Correcciones (2026-11-05)
+
+Hechos los puntos 5 y 6 de §6. Ni el compilador ni la malla cambian. Las referencias congeladas siguen idénticas, salvo la de C5 en el my y el mxy de las caras de salida de las bandas (AU-6).
+
+- **AU-6, hecho.** Cada estación de cara de una banda sabe de qué lado está su vano (`EstacionBanda.lado`: −1 si el apoyo empieza en s, +1 si acaba), y las muestras de my y mxy se toman a δ de ese lado. Antes iban siempre a s − δ y, en la cara de salida, caían dentro del apoyo.
+  - Prueba en `esfuerzosBandas.test.ts`: las dos caras del vano central de la losa plana, simétricas, dan el mismo my a < 3 %. Con el código de antes se separan un 11,5 %, como medía §3.2.
+  - Referencia congelada de C5 regenerada a sabiendas (`validacion/c5/out_cambiosAU6.txt`). Cambian 67 caras, sólo en my y mxy (y en el Wood–Armer que sale de ellos); el mx exacto, ni un bit. Referido al mayor momento de su banda, la mediana del cambio es 0,0 % y el máximo, 8,7 % (las bandas de pilares de `reticular-h25`).
+- **AU-5, hecho avisando, sin sembrar.** Sembrar las caras de banda que no son de franja cambiaría la malla de F, que las dejó fuera a propósito, y las bandas ya sólo las usa el agente.
+  - Una cara que no sigue la malla (`corte/atraviesa-laminas` o `corte/restriccion-partida`) lleva `banda/cara-fuera-de-malla`, que dice que con «franjas: false» sí se mide.
+  - `reparto` avisa de las estaciones que deja fuera (`banda/reparto-incompleto`, con la lista en `detalles.estaciones`).
+  - Prueba con la losa plana con las franjas: las 28 caras de §3.2 llevan el aviso.
+  - `estaciones.ts` ya no promete que las caras se siembran siempre.
+- **AU-9, hecho como lo verificó §3.2.** `DiagramasBarras.diagrama` hace, con empotramiento parcial, un diagrama por término de la mezcla (con los giros que libera ese juego recuperados) y los combina con sus pesos.
+  - Los esfuerzos no cambian: Σ wₖ·(Kₖ·uₖ + r₀ₖ) = K·u + r₀.
+  - Prueba en `empotramiento.test.ts`: la viga de §3.2 con α = 0,5, 0,3 y 0,05. uz y ry en j' son los del nudo a 1e-15, y los esfuerzos de extremo, los del cálculo a 1e-10. Con el diagrama de antes, 7,0e-4 m.
+- **AU-10, hecho.** Una lámina convexa con una esquina a menos de 1,15° de 0° o de 180° (jacobiano escalado < `JACOBIANO_MAL_CONDICIONADO` = 0,02) da un único aviso por cálculo, `modelo/lamina-mal-condicionada`, con cuántas son, la peor y su jacobiano. Las mallas del compilador avisan antes, a 0,2. Prueba en `diagnosticos.test.ts`.
+- **AU-11 a AU-16, hechos (guardas de entrada del motor).**
+  - AU-11: un id de caso repetido es `modelo/id-duplicado`.
+  - AU-12: un GDL impuesto dos veces en un caso es `carga/impuesto-repetido`.
+  - AU-13: un apoyo con un GDL que no es booleano es `modelo/apoyo-no-valido`.
+  - AU-14: una liberación que no es booleana es `modelo/propiedad-no-valida`.
+  - AU-15: una carga puntual de lámina sin F ni M avisa (`carga/vacia`).
+  - AU-16: la carga sobre una barra o una lámina que existe pero no es válida lo dice así, y no «inexistente».
+  - Las cuatro primeras son entradas nuevas de `invalidos.ts` (el hueco 3 de §5); AU-15, una prueba en `diagnosticos.test.ts`.
+- **Siguen abiertos:**
+  - los leves de AU-17 a AU-26, que son documentales, de opciones que no son las de por defecto o decisiones ya tomadas;
+  - los huecos 1, 4 (`posicion()`), 5, 8 y 9 de §5;
+  - y el peso de los ábacos con casetón perdido (MA3).
+

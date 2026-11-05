@@ -220,7 +220,8 @@ describe("criterio 5 de E5: diagnósticos de los cortes", () => {
 describe("AU-8: los resultados tienen que ser los de todos los casos, en el orden del modelo", () => {
   it("un corte con un caso suelto o desordenado es un error, no un resultado", () => {
     const { modelo: base, b } = losaUnidireccional(6, 2);
-    const modelo = { ...base, casos: [...base.casos, { ...base.casos[0]!, id: "otras" }] };
+    // Un caso más, con su id (antes repetía «otras», que el motor ya no admite: AU-11)
+    const modelo = { ...base, casos: [...base.casos, { ...base.casos[0]!, id: "q-2" }] };
     const casos = casosValidos(calcular(modelo));
     const ct = new Cortes(modelo);
     const corte: Corte = { origen: [2, b / 2, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [-b / 2, b / 2] };

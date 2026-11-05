@@ -169,6 +169,11 @@ export function numerar(modelo: ModeloAnalitico, elementos: readonly ElementoMot
       diag.error("modelo/apoyo-no-valido", `Hay un apoyo sobre un nudo inexistente o sin sus 6 GDL (índice ${a.nudo}).`);
       continue;
     }
+    // AU-13: cualquier valor verdadero coartaba («"false"» también)
+    if (a.coartados.some((v) => typeof v !== "boolean")) {
+      diag.error("modelo/apoyo-no-valido", `El apoyo del nudo ${idNudo(a.nudo)} tiene que dar sus 6 GDL como true (coartado) o false.`, [idNudo(a.nudo)]);
+      continue;
+    }
     for (let c = 0; c < 6; c++) {
       if (!a.coartados[c]) continue;
       const p = 6 * a.nudo + c;

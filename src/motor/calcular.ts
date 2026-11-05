@@ -131,7 +131,15 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   const casos = modelo.casos;
   const nc = casos.length;
   const P = 6 * nn;
+  // AU-11: quien indexa los resultados por id pisaría uno con otro
+  const vistos = new Set<string>();
+  for (const caso of casos) {
+    if (vistos.has(caso.id)) diag.error("modelo/id-duplicado", `Hay dos casos con el id ${caso.id}: cada caso tiene que tener el suyo.`, [caso.id]);
+    vistos.add(caso.id);
+  }
   casos.forEach((caso) => {
+    /** AU-12: dos impuestos en el mismo GDL valían el último, sin aviso. */
+    const impuestos = new Set<number>();
     for (const c of caso.nodales ?? []) {
       if (!Number.isInteger(c.nudo) || c.nudo < 0 || c.nudo >= nn || !Array.isArray(c.f) || c.f.length !== 6 || !c.f.every(Number.isFinite)) {
         diag.error("carga/no-valida", `El caso ${caso.id} tiene una carga nodal sobre un nudo inexistente o con valores no finitos.`, [caso.id]);
@@ -143,6 +151,12 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         diag.error("carga/no-valida", `El caso ${caso.id} tiene un desplazamiento impuesto no válido.`, [caso.id]);
         continue;
       }
+      if (impuestos.has(p)) {
+        const id = modelo.nudos[d.nudo]!.id;
+        diag.error("carga/impuesto-repetido", `El caso ${caso.id} impone dos veces el GDL ${NOMBRES_GDL[d.gdl]} del nudo ${id}: déjelo en uno.`, [caso.id, id]);
+        continue;
+      }
+      impuestos.add(p);
       if (num.tipo[p] !== TipoGdl.Coartado) {
         const id = modelo.nudos[d.nudo]!.id;
         diag.error(

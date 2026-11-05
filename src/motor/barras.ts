@@ -145,8 +145,9 @@ export function prepararBarra(b: BarraAnalitica, indice: number, modelo: ModeloA
   const li = b.liberaciones?.i;
   const lj = b.liberaciones?.j;
   if (li || lj) {
-    if ((li && li.length !== 6) || (lj && lj.length !== 6)) {
-      diag.error("modelo/propiedad-no-valida", `Las liberaciones de la barra ${b.id} tienen que dar 6 valores por extremo.`, ids);
+    // AU-14: lo que no era el booleano true se ignoraba
+    if ((li && li.length !== 6) || (lj && lj.length !== 6) || [...(li ?? []), ...(lj ?? [])].some((v) => typeof v !== "boolean")) {
+      diag.error("modelo/propiedad-no-valida", `Las liberaciones de la barra ${b.id} tienen que dar 6 valores por extremo, true (liberado) o false.`, ids);
       return null;
     }
     lib = [...(li ?? new Array(6).fill(false)), ...(lj ?? new Array(6).fill(false))].map((v) => v === true);
@@ -303,7 +304,9 @@ export function cargasDeBarrasDelCaso(
     const pb = Number.isInteger(c.barra) ? barras[c.barra] : undefined;
     const idBarra = Number.isInteger(c.barra) && modelo.barras?.[c.barra] ? modelo.barras[c.barra]!.id : undefined;
     if (!pb || (c.ejes !== "local" && c.ejes !== "global")) {
-      diag.error("carga/no-valida", `El caso ${idCaso} tiene una carga de barra sobre una barra inexistente o con unos ejes no válidos.`, [idCaso, ...(idBarra ? [idBarra] : [])]);
+      // AU-16: una barra que existe pero no se pudo preparar (su error ya está dicho) no es «inexistente»
+      const porque = c.ejes !== "local" && c.ejes !== "global" ? `con unos ejes no válidos («${String(c.ejes)}»: local o global)` : idBarra ? `sobre la barra ${idBarra}, que no es válida (véase su error)` : "sobre una barra inexistente";
+      diag.error("carga/no-valida", `El caso ${idCaso} tiene una carga de barra ${porque}.`, [idCaso, ...(idBarra ? [idBarra] : [])]);
       continue;
     }
     const ids = [idCaso, idBarra!];
@@ -488,10 +491,42 @@ export class DiagramasBarras {
     const pb = this.barra(b);
     const [i, j] = this.modelo.barras![b]!.nudos;
     const cargas = this.cargas[k]!.get(b);
+    const dc = cargas ? cargas.dc : diagramaDeCargas(pb.L, []);
+    if (pb.mezcla) return this.diagramaMezcla(pb, i, j, resultado.u, cargas, dc);
     const ul = desplazamientosLocales(pb, resultado.u, i, j, cargas);
     const f = fuerzasLocales(pb, ul, cargas);
-    const dc = cargas ? cargas.dc : diagramaDeCargas(pb.L, []);
     return DiagramaBarra.desde(pb.seccion, dc, arranqueDeFuerzas(f), ul.subarray(0, 6));
+  }
+
+  /**
+   * Con empotramiento parcial (CY2, AU-9): la rigidez es la mezcla Σ wₖ·Kₖ, que no es la de ninguna
+   * barra física, así que integrar la curvatura de la sección desde el giro del nudo no cerraba en j'
+   * (hasta 8,8e-4 m con α = 0,3). Ahora, un diagrama por término, con los giros que ese juego libera
+   * recuperados, mezclado con los mismos pesos: cada uno cierra, y la mezcla también. Los esfuerzos
+   * son los de antes: Σ wₖ·(Kₖ·uₖ + r₀ₖ) = K_efectiva·u + r₀, porque uₖ sólo difiere de u en lo que Kₖ
+   * libera (sus filas y columnas son nulas) y los pesos suman 1.
+   */
+  private diagramaMezcla(pb: BarraPreparada, i: number, j: number, u: ArrayLike<number>, cargas: CargasDeBarra | undefined, dc: ReturnType<typeof diagramaDeCargas>): DiagramaBarra {
+    const un = new Float64Array(12);
+    for (let c = 0; c < 6; c++) {
+      un[c] = u[6 * i + c]!;
+      un[6 + c] = u[6 * j + c]!;
+    }
+    const base = aLocales(desplazamientosExtremos(un, pb.di, pb.dj), pb.R);
+    const partes = pb.mezcla!.map(({ cond }) => {
+      const ul = Float64Array.from(base);
+      if (cond) recuperarLiberados(ul, cargas ? cargas.fer : null, cond.condensaciones);
+      const kk = cond ? cond.k : pb.kLocal;
+      const r0 = cargas ? (cond ? condensarFer(cargas.fer, cond.condensaciones) : cargas.fer) : null;
+      const f = new Float64Array(12);
+      for (let a = 0; a < 12; a++) {
+        let s = r0 ? r0[a]! : 0;
+        for (let c = 0; c < 12; c++) s += kk[12 * a + c]! * ul[c]!;
+        f[a] = s;
+      }
+      return DiagramaBarra.desde(pb.seccion, dc, arranqueDeFuerzas(f), ul.subarray(0, 6));
+    });
+    return DiagramaBarra.combinar(partes, pb.mezcla!.map((m) => m.peso));
   }
 
   /** Punto del eje deformado en x (globales): i' + x·e₁ + Rᵀ·u_local(x)·escala. */

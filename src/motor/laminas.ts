@@ -110,6 +110,28 @@ export function prepararLamina(l: LaminaAnalitica, indice: number, geo: Geometri
   return { indice, R: marco.R, xy, origen: marco.origen, seccion: seccionLamina(m, mult, op), area: area / 2 };
 }
 
+/**
+ * Por debajo de este jacobiano escalado (el seno del ángulo de una esquina: 0,02 es una esquina a
+ * menos de 1,15° de 0° o de 180°), una lámina está casi degenerada: calcula, pero mal condicionada
+ * (AU-10). Las mallas del compilador ya avisan antes, con 0,2 (`malla/calidad`).
+ */
+export const JACOBIANO_MAL_CONDICIONADO = 0.02;
+
+/** El jacobiano escalado mínimo de una lámina en sus ejes 1-2: el menor seno de sus cuatro esquinas. */
+export function jacobianoEscaladoLamina(xy: ArrayLike<number>): number {
+  let j = Infinity;
+  for (let a = 0; a < 4; a++) {
+    const p = (a + 3) % 4;
+    const n = (a + 1) % 4;
+    const ux = xy[2 * n]! - xy[2 * a]!;
+    const uy = xy[2 * n + 1]! - xy[2 * a + 1]!;
+    const vx = xy[2 * p]! - xy[2 * a]!;
+    const vy = xy[2 * p + 1]! - xy[2 * a + 1]!;
+    j = Math.min(j, (ux * vy - uy * vx) / (Math.hypot(ux, uy) * Math.hypot(vx, vy)));
+  }
+  return j;
+}
+
 /** Rigidez de la lámina en ejes globales (24×24, nueva). */
 export function rigidezLamina(pl: LaminaPreparada): Float64Array {
   return rigidezLaminaGlobal(pl.xy, pl.R, pl.seccion);
@@ -224,7 +246,9 @@ export function cargasDeLaminasDelCaso(
     const pl = Number.isInteger(c.lamina) ? laminas[c.lamina] : undefined;
     const la = Number.isInteger(c.lamina) ? modelo.laminas?.[c.lamina] : undefined;
     if (!pl || !la || (c.ejes !== "local" && c.ejes !== "global")) {
-      diag.error("carga/no-valida", `El caso ${idCaso} tiene una carga de lámina sobre una lámina inexistente o con unos ejes no válidos.`, [idCaso, ...(la ? [la.id] : [])]);
+      // AU-16: una lámina que existe pero no se pudo preparar (su error ya está dicho) no es «inexistente»
+      const porque = c.ejes !== "local" && c.ejes !== "global" ? `con unos ejes no válidos («${String(c.ejes)}»: local o global)` : la ? `sobre la lámina ${la.id}, que no es válida (véase su error)` : "sobre una lámina inexistente";
+      diag.error("carga/no-valida", `El caso ${idCaso} tiene una carga de lámina ${porque}.`, [idCaso, ...(la ? [la.id] : [])]);
       continue;
     }
     const ids = [idCaso, la.id];
@@ -338,6 +362,8 @@ export function cargasDeLaminasDelCaso(
         diag.error("carga/no-valida", `El caso ${idCaso} tiene una carga puntual no válida en la lámina ${la.id}.`, ids);
         continue;
       }
+      // AU-15: sin F ni M no hacía nada y no se decía
+      if (c.F === undefined && c.M === undefined) diag.aviso("carga/vacia", `El caso ${idCaso} tiene una carga puntual sin F ni M en la lámina ${la.id}: no carga nada.`, ids);
       const p = situar(pl, c.punto, tol);
       if (!p.dentro) {
         diag.error(
