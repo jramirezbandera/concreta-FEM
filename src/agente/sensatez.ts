@@ -16,6 +16,7 @@
  * Unidades kN y m (D1); fck en MPa; pesos específicos en kN/m³. Puro: sin IO.
  */
 import { compilar } from "../compilador/compilar.ts";
+import { direccionEjes } from "../compilador/ejes.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import { puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
@@ -30,6 +31,7 @@ import { volumenReticular } from "../compilador/reticular.ts";
 import type { TipoAccion } from "../combinaciones/generador.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { cargasPorPlanta, type Resumen } from "./consultas.ts";
+import { casiAlineados as gruposCasiAlineados, distancia, textoGrupo, TOLERANCIA_ALINEAR } from "../editor/alinear.ts";
 
 /** Umbrales de aviso (§8 de `agente.md`, fijados con el usuario el 2026-10-09). */
 export const UMBRALES = {
@@ -80,6 +82,8 @@ export const UMBRALES = {
   /** M-26: un objeto a más de estas veces la extensión del resto (con la extensión mínima, m) está lejos. */
   lejos: 5,
   lejosExtension: 10,
+  /** MA5: pilares y vértices que no coinciden por menos de esto según los ejes, m (la tolerancia de «Alinear»). */
+  casiAlineados: TOLERANCIA_ALINEAR,
 } as const;
 
 /** Acciones que no son gravitatorias: no entran en la «gravedad» ni en las cargas por uso. */
@@ -973,6 +977,35 @@ function lejanos(f: ModeloFisico): Registro[] {
   return [reg];
 }
 
+// ─── Casi alineados ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * MA5 (`docs/fem3d/modelado.md` §7): pilares y vértices casi alineados según los ejes (a menos de
+ * `casiAlineados` sin coincidir) y tramos casi rectos, con lo que les falta. Un dibujo calcado de un
+ * DXF los trae, y la malla los resuelve con láminas de décimas de milímetro. La regla y la propuesta
+ * de dónde llevarlos son las de «Alinear» (`editor/alinear.ts`).
+ */
+function alineados(f: ModeloFisico): Registro[] {
+  const tol = UMBRALES.casiAlineados;
+  const reg = new Registro("sensatez/casi-alineados", "Pilares y vértices alineados", `a menos de ${distancia(tol)} sin coincidir según la dirección de los ejes (pilares, vértices y tramos casi rectos), sin contar lo que comparte una cara`);
+  if (!(f.pilares ?? []).length && !(f.vigas ?? []).length && !(f.losas ?? []).length && !(f.muros ?? []).length && !(f.panos ?? []).length) return [reg];
+  reg.aplica();
+  let grupos;
+  try {
+    grupos = gruposCasiAlineados(f, tol);
+  } catch {
+    // Un modelo con datos rotos (lo dice el compilador): sin esta comprobación
+    return [reg];
+  }
+  const theta = grupos.length ? direccionEjes(f) : 0;
+  for (const g of grupos) {
+    reg.peor(g.falta, `${g.nombre} = ${num(g.valor, 5)}: les falta ${distancia(g.falta)}`);
+    const ids = [...new Set(g.valores.flatMap((v) => v.objetos))].sort();
+    reg.aviso(textoGrupo(g, theta), ids, { eje: g.nombre, valor: g.valor, falta: g.falta, valores: g.valores, ...(g.tramos.length ? { tramos: g.tramos } : {}), plantas: g.plantas });
+  }
+  return [reg];
+}
+
 // ─── Entrada ────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -984,7 +1017,7 @@ function lejanos(f: ModeloFisico): Registro[] {
 export function sensatezPrevia(f: ModeloFisico, opciones?: OpcionesCompilacion): Comprobacion[] {
   const P = new Plantas(f);
   const eps = opciones?.epsSnap ?? 0.05;
-  return [...datos(f), ...lejanos(f), ...cargas(f), ...pilares(f, P, eps), ...bordes(f, P, eps)].map((r) => r.c);
+  return [...datos(f), ...lejanos(f), ...alineados(f), ...cargas(f), ...pilares(f, P, eps), ...bordes(f, P, eps)].map((r) => r.c);
 }
 
 export interface SensatezModelo {
@@ -1000,8 +1033,8 @@ export function sensatezModelo(f: ModeloFisico, opciones: OpcionesCompilacion | 
   const P = new Plantas(f);
   const pp = pesoPropio(f, P, opciones);
   const eps = opciones?.epsSnap ?? 0.05;
-  const regs = [...datos(f), ...lejanos(f), ...cargas(f), ...cargasPorM2(f, P, res), ...pilares(f, P, eps), ...bordes(f, P, eps), pp.registro];
-  // El mismo orden que en el informe: datos, objetos lejos, cargas, cargas por planta, pilares, bordes y peso propio
+  const regs = [...datos(f), ...lejanos(f), ...alineados(f), ...cargas(f), ...cargasPorM2(f, P, res), ...pilares(f, P, eps), ...bordes(f, P, eps), pp.registro];
+  // El mismo orden que en el informe: datos, objetos lejos, casi alineados, cargas, cargas por planta, pilares, bordes y peso propio
   return { comprobaciones: regs.map((r) => r.c), pesoPropio: pp.desglose };
 }
 

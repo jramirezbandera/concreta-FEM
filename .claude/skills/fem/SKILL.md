@@ -64,7 +64,20 @@ fem importar-dxf plano.dxf --salida proyecto.json --capa-pilares "PILARES" --cap
 - **Losas:** van hasta la línea de fuera del borde (con las líneas dobles de un peto o de una fachada, la de fuera); dos contornos que se tocan son dos losas. Todas en la planta de `--planta-losas`, macizas, con `--espesor`: pásalas a su planta y a su tipo de forjado (reticular, unidireccional) con lo que te digan. Con un DXF por planta, importa la primera y copia del resto sólo lo que haga falta.
 - **Cotas:** `cotas.noCuadran` lista las cotas del plano cuyos puntos no caen en nada reconocido. Si no cuadra ninguna, las unidades o las capas están mal.
 - Si el DXF está en la carpeta del proyecto, queda como plantilla de la planta de las losas: el ingeniero lo ve detrás del modelo en la app. Nunca escribe encima de un proyecto que ya existe.
-- Después, como siempre: `fem validar` y `fem render --vista modelo` para comparar con el plano. Las coordenadas salen al mm del dibujo: un descuadre de 1 o 2 cm entre pilares de una alineación es del dibujo; pregunta si se alinean.
+- Después, como siempre: `fem validar` y `fem render --vista modelo` para comparar con el plano. Las coordenadas salen al mm del dibujo: un descuadre de 1 o 2 cm entre pilares de una alineación es del dibujo, y `validar` lo avisa (`sensatez/casi-alineados`). Pregunta si se alinean y, si te dicen que sí, usa `fem alinear` (abajo), no lo corrijas a mano ni con código propio.
+
+### Alinear lo casi alineado
+
+```bash
+fem alinear proyecto.json                      # sólo propone: qué está casi alineado y adónde iría
+fem alinear proyecto.json --escribir           # lo mueve y reescribe el fichero (el de antes, en proyecto.json.bak)
+fem alinear proyecto.json --tolerancia 0.02    # otra tolerancia, en m (por defecto 0.03)
+```
+
+- **Qué mira:** según la dirección de los ejes, los pilares y los vértices (vigas, muros, losas, huecos, ábacos, paños, apoyos, cargas) que no coinciden por menos de la tolerancia, y los tramos casi rectos. Lo que comparte una cara no cuenta (un pilar de 35 enrasado con uno de 30, la losa en la cara de una viga), ni dos vértices de dos arcos que coinciden por casualidad.
+- **Adónde lo lleva:** a un eje guardado si lo hay (no se mueve) y, si no, donde hay más piezas. Nada se mueve más que la tolerancia en cada coordenada; lo que estaba en el mismo punto sigue junto, y los huecos de muro y los tramos de las cargas de viga se vuelven a medir.
+- **`grupos`** trae cada recta con sus valores, sus piezas, lo que les falta (`falta`, m) y el texto del aviso; **`movimientos`**, cada punto que se mueve (`id`, `punto` dentro del objeto, `de`, `a`); **`quedan`**, los casi alineados que quedarían.
+- Enséñale al ingeniero la propuesta antes de escribir: dos cosas a 2 cm pueden ser distintas de verdad (una junta). Con `--escribir`, vuelve a `fem validar`.
 
 ## Flujo
 

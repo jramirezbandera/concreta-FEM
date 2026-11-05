@@ -732,6 +732,11 @@
   - **Hallado al comparar los motores** (FR-1, FR-2): en la planta circular de G, Bun pone offsets de 1 ulp que Node no, y reparte las cargas de barra en otros tramos (19 150 frente a 19 098) con la misma resultante. **Pendiente técnico:** FR-2, sin investigar.
   - **Coste:** 0,2–0,46 s en los edificios objetivo, al guardar y al reutilizar.
   - **Validación:** `src/agente/firma.test.ts` (también Bun frente a Node con `validacion/firma/firmas.ts`) y `cli.test.ts` (resultados de otra malla en `.fem/` con huella, núcleo y sha256 válidos: recalcula).
+- **2026-11-05: MA5, el aviso de casi alineados y «Alinear»** (decisión del usuario, «opción 2», de los racimos de la malla del proyecto «51»; `modelado.md` §7). El arreglo de los descuadres de un dibujo calcado es en el dibujo, no en el mallador.
+  - **`src/editor/alinear.ts`** (puro): según las dos direcciones de los ejes, pilares y vértices que no coinciden por menos de 3 cm y tramos casi rectos. No cuenta lo que comparte una cara (pilares enrasados de dos secciones, la losa en la cara de una viga) ni dos vértices de dos arcos que coinciden por casualidad. Lo lleva al eje guardado o a donde hay más piezas, sin mover nada más que la tolerancia en cada coordenada; lo que estaba junto sigue junto.
+  - **Aviso `sensatez/casi-alineados`** en `fem validar`, el informe y Diagnósticos, con lo que les falta. **`fem alinear proyecto.json [--tolerancia 0.03] [--escribir]`** (MA-e: sólo propone; con `--escribir`, deja `.bak`). **«Alinear»** en Modelo · Editar y en la paleta.
+  - **Medido:** ningún aviso en los modelos de A3, los ejemplos, las geometrías de G y las 24 retículas al azar; el DXF crudo de la vivienda da 7 rectas y queda alineado sin restos; con ruido al azar (1 372 casos), el modelo vuelve bit a bit.
+  - **Pruebas:** `src/editor/alinear.test.ts`, `cli.test.ts` y `app/src/test/editor.test.tsx`. **Queda de MA5:** el escalón de cubierta.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

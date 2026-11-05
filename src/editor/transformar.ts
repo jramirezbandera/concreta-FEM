@@ -37,6 +37,7 @@ import type { ApoyoFisico, Barra, CargaFisica, ModeloFisico, Pilar, PuntoFijo, V
 import { distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
 import { limpio } from "./dibujo/cotas.ts";
+import { reestacionar } from "./estaciones.ts";
 import { moverPilar } from "./estirar.ts";
 import type { Operacion } from "./operaciones.ts";
 import { conValor, indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
@@ -629,24 +630,6 @@ export function asas(m: ModeloFisico, ids: readonly string[], planta: string): A
     }
   }
   return r;
-}
-
-const longitudes = (ps: readonly Vec2[]): number[] => {
-  const r = [0];
-  for (let i = 1; i < ps.length; i++) r.push(r[i - 1]! + Math.hypot(ps[i]![0] - ps[i - 1]![0], ps[i]![1] - ps[i - 1]![1]));
-  return r;
-};
-
-/** La estación s de la polilínea `ps`, medida otra vez sobre `qs` (los mismos vértices, alguno movido): en su tramo, a la misma fracción. */
-function reestacionar(ps: readonly Vec2[], qs: readonly Vec2[], s: number): number {
-  const [l0, l1] = [longitudes(ps), longitudes(qs)];
-  let i = 0;
-  while (i < ps.length - 2 && s > l0[i + 1]!) i++;
-  const largo = l0[i + 1]! - l0[i]!;
-  const lam = largo > 0 ? (s - l0[i]!) / largo : 0;
-  const r = l1[i]! + lam * (l1[i + 1]! - l1[i]!);
-  // Como las estaciones dibujadas (V2c2-1): a 1e-9 m
-  return Math.min(Math.max(Math.round(r * 1e9) / 1e9, 0), l1.at(-1)!);
 }
 
 /**

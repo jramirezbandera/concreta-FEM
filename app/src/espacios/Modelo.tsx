@@ -26,7 +26,7 @@
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Check, ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
+import { Check, ChevronRight, ListOrdered, Magnet, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { objetosVisibles } from "../../../src/editor/edicion.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
@@ -36,7 +36,7 @@ import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombin
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
-import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
+import { DialogoAbacos, DialogoAlinear, DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { FormularioVarios, tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt, textoApp, coma, plural, NOMBRE_ACCION, textoCaso as textoCasoFmt } from "../fmt.ts";
@@ -68,6 +68,7 @@ const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
 type Escala = (typeof ESCALAS)[number];
 const IcBorrar: Icono = ({ size }) => <Trash2 size={size} strokeWidth={1.5} aria-hidden="true" />;
 const IcRenumerar: Icono = ({ size }) => <ListOrdered size={size} strokeWidth={1.5} aria-hidden="true" />;
+const IcAlinear: Icono = ({ size }) => <Magnet size={size} strokeWidth={1.5} aria-hidden="true" />;
 
 let ultimoPedido = 0;
 
@@ -98,7 +99,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     if (tablaElegido && (!cargas || tablaElegido === "cargas")) setTabla(tablaElegido);
   }, [tablaElegido, cargas]);
   const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
-  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | null>(null);
+  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | "alinear" | null>(null);
 
   // V2c: la herramienta activa (Elegir por defecto), fuera de React; aquí, lo que cambia la barra y Propiedades
   const [ctrl] = useState(() => new ControladorDibujo());
@@ -462,6 +463,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcAPlantas} nombre="A plantas" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, forjados, apoyos o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
+          <Herramienta icono={IcAlinear} nombre="Alinear" onClick={() => setDialogo("alinear")} title="Pilares y vértices casi alineados (a menos de 3 cm sin coincidir): dice cuáles y los lleva al valor de la mayoría" />
           </GrupoPlegable>
         </>
       )}
@@ -648,6 +650,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {dialogo === "copiar" && copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={cerrarDialogo} />}
       {dialogo === "renumerar" && ed && <DialogoRenumerar onCerrar={() => setDialogo(null)} />}
       {dialogo === "abacos" && ed && <DialogoAbacos onCerrar={() => setDialogo(null)} />}
+      {dialogo === "alinear" && ed && <DialogoAlinear onCerrar={cerrarDialogo} />}
     </>
   );
 }

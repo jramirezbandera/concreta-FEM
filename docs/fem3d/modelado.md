@@ -125,4 +125,33 @@ A petición del usuario, MA1 y MA6 van antes que MA2–MA5 (y antes de la puerta
   - `supuestos` dice lo que se puso sin dato (capas, plantas, material, espesor, unidades), para preguntarlo.
 - **Criterio 6:** `src/agente/importarDxf.test.ts`. Ida y vuelta con el muestrario (las dos plantas, en LWPOLYLINE, con sus huecos y sus ejes con burbuja) y la vivienda (en `LINE` sueltas, con las dos cubiertas que se tocan y los pilares con su cruz), y un DXF sintético como el de la vivienda (`$INSUNITS` en mm con el dibujo en m, contorno doble por el peto, aspas, un pilar circular y otro girado, un trozo de muro sin cruz, un triángulo y tres cotas). En mm da lo mismo que en m.
 - **Con el DXF real de la vivienda** (fuera del repo): los 23 pilares de 30 × 30 (a ≤ 2,4 cm de los del ejemplo, que el agente alineó a 2 cm), los dos contornos de cubierta (hasta su borde real, con los vuelos) y 16 de las 18 cotas cuadran, en 1,3 s. Las capas las propone solas («00 0 PLANTA BAJA» para los pilares, por sus cruces, y «00 1 PLANTA CUBIERTA» para las losas).
-- **Falta:** la puerta de la fase (criterio 1) y MA2–MA5.
+- **Falta:** la puerta de la fase (criterio 1) y MA2–MA5 (la parte de alinear de MA5, hecha: §7).
+
+## 7. MA5, la parte de alinear: el aviso de casi alineados y «Alinear», hechos (2026-11-05)
+
+**Origen:** el proyecto «51» del usuario (un reticular calcado de un DXF) salía con racimos de miles de láminas de 0,1 mm: las caras de franja y los anchos de las vigas son trazos exactos y quedaban a 0,2–20 mm por pilares casi alineados (x = 4,26 / 4,28 / 4,282) y tramos de viga girados 0,1°. Recortar o deslizar las caras junto a esos casi contactos se probó y se descartó (el metro de los pilares de borde cambiaba un 10–30 %, del lado inseguro); alinear la geometría a 3 cm dejaba la malla limpia con el compilador de siempre. **El arreglo es en el dibujo** (decisión del usuario, «opción 2»): un aviso al validar y la orden «Alinear» de MA-e. El escalón de cubierta de MA5 sigue pendiente.
+
+**Ya en el repo:**
+
+- **`src/editor/alinear.ts`** (puro): `casiAlineados(modelo, tolerancia)` y `proponerAlinear(modelo, tolerancia)`, con la regla en su cabecera:
+  - según las dos direcciones de los ejes (`direccionEjes`), las coordenadas de pilares, vértices (vigas, muros, apoyos lineales, losas con huecos y ábacos, paños, bandas, cargas), apoyos, extremos de barras y ejes guardados, agrupadas si van seguidas a ≤ la tolerancia;
+  - **cuenta** un pilar, un punto suelto, el vértice con un tramo casi según esa dirección (≤ 10°, y que no sea un trozo de curva) y el extremo de una polilínea abierta que acaba junto a algo (un pilar, un vértice de otra pieza o un tramo según la dirección que pasa por su lado). Así no avisan dos vértices de dos arcos que coinciden por casualidad en una coordenada (las plantas circular y en abanico de G);
+  - **coincide** lo que tiene la misma coordenada (a 1e-9 m) o comparte una cara: la de un pilar (con cada sección de sus tramos) o la de un tramo de viga o muro (eje ± b/2). Un pilar de 35 enrasado con uno de 30 no avisa, ni la losa en la cara de una viga;
+  - es un casi alineado si dos clases que no coinciden están en una misma planta;
+  - **destino:** el eje guardado del grupo (no se mueve) o la clase que recoge más piezas a ≤ la tolerancia (luego más puntos, el número más redondo y el menor); con lo que sobra, otra vez. Cada otra clase se traslada entera hasta su valor más cercano al del destino, así que nada se mueve más que la tolerancia en cada coordenada y lo enrasado sigue enrasado. Lo que está en el mismo punto que algo que se mueve, va con ello (una viga oblicua que acaba en un pilar). Con los ejes según X e Y queda el mismo double;
+  - los huecos de los muros y los tramos de las cargas de viga se vuelven a medir en su tramo (`reestacionar`, ahora en `src/editor/estaciones.ts`, compartido con los pinzamientos), y dos vértices seguidos que acaban en el mismo punto quedan en uno.
+- **El aviso `sensatez/casi-alineados`** (`src/agente/sensatez.ts`, «Pilares y vértices alineados», umbral `UMBRALES.casiAlineados` = 3 cm): uno por recta, con sus valores, sus piezas, lo que les falta y los tramos casi rectos con su desvío y su ángulo. Lo dan `fem validar` (aunque no compile), `fem revisar`, el informe y Diagnósticos de la app.
+- **`fem alinear proyecto.json [--tolerancia 0.03] [--escribir]`** (MA-e): sólo propone (`grupos`, `movimientos`, `quedan`); con `--escribir`, aplica la propuesta como el editor, deja el fichero de antes en `proyecto.json.bak`, escribe el formato canónico y compila.
+- **En la app:** «Alinear» en Modelo · Editar (junto a Renumerar) y en la paleta (Ctrl+K). El diálogo dice qué rectas y cuántos puntos, con la tolerancia en cm; un clic en una recta elige sus piezas; aplica en un paso de deshacer.
+- La skill dice cuándo usarlo (tras `importar-dxf`, si el ingeniero quiere alinear) y que se enseña la propuesta antes de escribir.
+
+**Medido:**
+
+- **Sin avisos en falso:** los cinco modelos de A3, los seis ejemplos (muestrario, vivienda, los de A2 y el de la skill), las 5 familias de G con cuatro variantes cada una (giro de 30°, pilares circulares, hueco) y las 24 retículas al azar dan 0 casi alineados. Antes de la regla de «cuenta», la circular y el abanico daban 4 avisos falsos cada una, y la triangular con hueco, 1.
+- **Con el DXF crudo de la vivienda** (`fem importar-dxf` sin alinear, fuera del repo): 7 rectas, todas de pilares (x = 4,26 / 4,28 / 4,282; 7,568 / 7,591 / 7,611…). «Alinear» mueve 10 puntos, no queda ninguna y el proyecto valida. Frente al ejemplo que el agente alineó a mano, los pilares quedan a ≤ 0,4 cm salvo la fila de x = 0, que va a −0,02 (tres pilares) en vez de a 0 (dos): manda la mayoría, no el número redondo.
+- **Ruido al azar** (criterio 5, `alinear.test.ts`; fuera de la batería, 1 372 casos en siete modelos): con 2–12 mm en pilares y extremos de vigas, «Alinear» deja el modelo como estaba bit a bit, sin mover nada más que la tolerancia y sin que quede ningún casi alineado.
+- **Coste:** ≤ 3 ms en los modelos de A3 y en los ejemplos.
+
+**Pruebas:** `src/editor/alinear.test.ts` (lo anterior, más enrasados, tramo casi recto, eje guardado, estaciones de muro, vértices que se juntan y la tolerancia), `src/agente/cli.test.ts` («MA5: alinear», la CLI en un proceso aparte) y `app/src/test/editor.test.tsx` («Alinear (MA5)»). El sondeo de los modelos de referencia, en `validacion/ma/sondeo.ts`.
+
+**Queda de MA5:** el escalón de cubierta (`"tipo": "escalon"`). **Para la puerta de uso:** con el proyecto «51», ver que tras «Alinear» la malla queda sin racimos.

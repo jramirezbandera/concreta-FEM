@@ -538,3 +538,23 @@ describe("Ábacos en los pilares", () => {
     expect(within(d).getByText(/Ningún ábaco nuevo/)).toBeTruthy();
   }, 120_000);
 });
+
+describe("Alinear (MA5)", () => {
+  it("el diálogo dice qué está casi alineado antes de mover nada: en el muestrario, nada; a 20 cm de tolerancia, no admite más", async () => {
+    const p = JSON.parse(readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8")) as Proyecto;
+    const { container } = render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Muestrario/ }));
+    await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(huella(p)), { timeout: 30_000 });
+    fireEvent.click(screen.getAllByRole("button", { name: "Alinear" })[0]!);
+    const d = screen.getByRole("dialog", { name: "Alinear" });
+    expect(within(d).getByRole("textbox", { name: /Tolerancia/ })).toHaveProperty("value", "3");
+    expect(within(d).getByText(/No hay nada casi alineado/)).toBeTruthy();
+    expect(within(d).getByRole("button", { name: "Alinear" })).toHaveProperty("disabled", true);
+    fireEvent.change(within(d).getByRole("textbox", { name: /Tolerancia/ }), { target: { value: "25" } });
+    expect(within(d).getByText(/La tolerancia va de más de 0 a 20 cm/)).toBeTruthy();
+  }, 120_000);
+});

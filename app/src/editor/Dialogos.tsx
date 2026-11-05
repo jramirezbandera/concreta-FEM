@@ -1,7 +1,7 @@
 /**
  * Diálogos del editor (V2a): borrar (si otros objetos usan lo que se borra, se dice cuáles y se
- * elige entre borrarlos también o pasarlos a otro), copiar a otras plantas, renumerar (I-g) y
- * los ábacos en los pilares de un reticular.
+ * elige entre borrarlos también o pasarlos a otro), copiar a otras plantas, renumerar (I-g),
+ * los ábacos en los pilares de un reticular y alinear lo casi alineado (MA5).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
@@ -14,7 +14,8 @@ import { leerNumero } from "../../../src/editor/celdas.ts";
 import { PREFIJOS, propuestaPlantas, renumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
 import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { useVisor } from "../contexto.ts";
-import { plural } from "../fmt.ts";
+import { plural, textoApp } from "../fmt.ts";
+import { distancia, metros, proponerAlinear, TOLERANCIA_ALINEAR } from "../../../src/editor/alinear.ts";
 
 const total = (m: ModeloFisico) => COLECCIONES.reduce((n, c) => n + lista(m, c).length, 0);
 
@@ -494,6 +495,93 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
               {p.fuera.length > 0 && <li className="text-text-secondary">Se salen del forjado (cuenta lo de dentro): {p.fuera.join(", ")}.</li>}
             </ul>
           )}
+          <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
+        </>
+      )}
+      {error && <p className="mt-2 text-state-fail">{error}</p>}
+    </Dialogo>
+  );
+}
+
+/**
+ * «Alinear» (MA5, `docs/fem3d/modelado.md` §7): los pilares y vértices casi alineados según los ejes
+ * y adónde los lleva (`editor/alinear.ts`, lo mismo que `fem alinear`). Sólo propone: mueve al pulsar,
+ * en un paso de deshacer. Un clic en un grupo elige sus piezas, para verlas en la planta.
+ */
+export function DialogoAlinear({ onCerrar }: { onCerrar: (hecho?: string) => void }) {
+  const { proyecto, setElegidos } = useVisor();
+  const ed = proyecto.edicion!;
+  const m = ed.proyecto.modelo;
+  const [cm, setCm] = useState(String(TOLERANCIA_ALINEAR * 100).replace(".", ","));
+  const [error, setError] = useState<string | null>(null);
+  const ncm = numero(cm);
+  const malTol = typeof ncm === "string" ? `Tolerancia: ${ncm}.` : ncm <= 0 || ncm > 20 ? "La tolerancia va de más de 0 a 20 cm." : null;
+  const p = useMemo(() => (malTol ? null : proponerAlinear(m, (ncm as number) / 100)), [m, ncm, malTol]);
+  const piezas = p ? new Set(p.movimientos.map((x) => x.id)).size : 0;
+
+  const hacer = () => {
+    if (!p?.operacion) return;
+    const r = ed.editar(p.operacion, "Alinear");
+    if (!r.ok) return setError(r.errores.map((e) => textoApp(e.mensaje)).join(" "));
+    onCerrar(`${plural(p.movimientos.length, "punto alineado", "puntos alineados")} en ${plural(piezas, "pieza")}.`);
+  };
+
+  return (
+    <Dialogo
+      titulo="Alinear"
+      onCerrar={() => onCerrar()}
+      alConfirmar={hacer}
+      pie={
+        <>
+          <button type="button" className="btn" onClick={() => onCerrar()}>
+            {p?.operacion ? "Cancelar" : "Cerrar"}
+          </button>
+          <button type="button" className="btn btn-p" onClick={hacer} disabled={!p?.operacion}>
+            Alinear
+          </button>
+        </>
+      }
+    >
+      <p>
+        Los pilares y vértices que no coinciden por menos de la tolerancia según la dirección de los ejes (un dibujo calcado de un DXF los trae, y la malla los resuelve con láminas diminutas) van al valor de la mayoría: un eje guardado si lo hay y, si no, donde hay más piezas. Lo que comparte una cara (pilares enrasados, la losa en la cara de una viga) no cuenta. Nada se mueve más que la tolerancia.
+      </p>
+      <div className="mt-3 grid grid-cols-[auto_8rem] items-center gap-x-4">
+        <label htmlFor="alinear-tol">Tolerancia (cm)</label>
+        <input id="alinear-tol" className="sel mono" value={cm} inputMode="decimal" aria-invalid={!!malTol} data-error={!!malTol} onChange={(e) => setCm(e.target.value)} />
+      </div>
+      {malTol ? (
+        <p className="mt-3 text-state-fail">{malTol}</p>
+      ) : !p || !p.grupos.length ? (
+        <p className="mt-3">No hay nada casi alineado: no cambia nada.</p>
+      ) : (
+        <>
+          <p className="mt-3">
+            {plural(p.grupos.length, "recta", "rectas")} con piezas casi alineadas; se {p.movimientos.length === 1 ? "mueve" : "mueven"} {plural(p.movimientos.length, "punto")} de {plural(piezas, "pieza")}:
+          </p>
+          <ul className="dlg-lista" aria-label="Casi alineados">
+            {p.grupos.slice(0, 12).map((g, i) => {
+              const otros = g.valores.filter((v) => Math.abs(v.valor - g.valor) > 1e-9);
+              const ids = [...new Set(g.valores.flatMap((v) => v.objetos))];
+              return (
+                <li key={i}>
+                  <button type="button" className="text-left hover:underline" title="Elegir sus piezas" onClick={() => setElegidos(ids)}>
+                    <span className="mono">
+                      {g.nombre} = {metros(g.valor)}
+                    </span>
+                    : {otros.map((v) => `${metros(v.valor)} (${v.objetos.slice(0, 3).join(", ")}${v.objetos.length > 3 ? "…" : ""})`).join(", ")} · hasta {distancia(g.falta)}
+                    {g.tramos.length > 0 && ` · ${plural(g.tramos.length, "tramo casi recto", "tramos casi rectos")}`}
+                  </button>
+                </li>
+              );
+            })}
+            {p.grupos.length > 12 && <li className="text-text-muted">… y {p.grupos.length - 12} más</li>}
+          </ul>
+          {p.avisos.map((a, i) => (
+            <p key={i} className="mt-2 text-state-warn">
+              {textoApp(a)}
+            </p>
+          ))}
+          {p.quedan > 0 && <p className="mt-2 text-state-warn">Después {p.quedan === 1 ? "queda 1 recta" : `quedan ${p.quedan} rectas`} con piezas casi alineadas (lo que estaba a más de la tolerancia del valor elegido): vuelva a alinear o corríjalo a mano.</p>}
           <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
       )}

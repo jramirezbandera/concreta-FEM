@@ -229,7 +229,8 @@ describe("A3: revisar", () => {
     // Sólo el borde sin viga: la retícula no lleva zunchos
     expect(j.avisos).toBe(1);
     expect(j.comprobaciones.find((c) => c.codigo === "sensatez/borde-sin-viga")?.estado).toBe("avisos");
-    expect(j.comprobaciones.length).toBe(22); // M-26: «Objetos lejos del resto»
+    expect(j.comprobaciones.length).toBe(23); // M-26: «Objetos lejos del resto»; MA5: «Pilares y vértices alineados»
+    expect(j.comprobaciones.find((c) => c.codigo === "sensatez/casi-alineados")?.estado).toBe("bien");
     const md = readFileSync(join(ruta, "..", ".fem", j.huella, "informe.md"), "utf8");
     expect(md).toContain(j.huella);
     expect(md).toContain("# Informe de revisión: Retícula");
@@ -303,5 +304,32 @@ describe("A4: render", () => {
     expect(fem(["render", ruta, "--planta", "N9"]).codigo).toBe(2);
     expect(fem(["render", ruta, "--vista", "uz", "--escala", "5:1:1"]).codigo).toBe(2);
     expect(fem(["render", ruta, "--vista", "uz", "--escala", "a lo bestia"]).codigo).toBe(2);
+  });
+});
+
+describe("MA5: alinear", () => {
+  it("sólo propone; con --escribir alinea, deja el fichero de antes en .bak y el proyecto valida sin el aviso", () => {
+    const m = reticulaConNucleo();
+    const ruta = escribir({ ...m, pilares: m.pilares!.map((p) => (p.id === "P6-5" ? { ...p, x: 6.018 } : p)) });
+    const antes = readFileSync(ruta, "utf8");
+    const v = fem(["validar", ruta]);
+    expect((v.json.diagnosticos as { codigo: string; ids?: string[] }[]).find((d) => d.codigo === "sensatez/casi-alineados")?.ids).toContain("P6-5");
+    const a = fem(["alinear", ruta]);
+    expect(a.codigo).toBe(0);
+    expect(a.json.escrito).toBe(false);
+    expect((a.json.grupos as unknown[]).length).toBe(1);
+    expect(a.json.movimientos).toEqual([{ id: "P6-5", coleccion: "pilares", de: [6.018, 5], a: [6, 5] }]);
+    expect(readFileSync(ruta, "utf8")).toBe(antes);
+    const b = fem(["alinear", ruta, "--escribir"]);
+    expect(b.codigo).toBe(0);
+    expect(b.json.escrito).toBe(true);
+    expect(b.json.huella).toBe(compilar(m).huella);
+    expect(readFileSync(`${ruta}.bak`, "utf8")).toBe(antes);
+    expect(fem(["alinear", ruta]).json.grupos).toEqual([]);
+    expect((fem(["validar", ruta]).json.diagnosticos as { codigo: string }[]).some((d) => d.codigo === "sensatez/casi-alineados")).toBe(false);
+    // A 1 cm, 1,8 cm no es casi alineado; una tolerancia que no es un número es una orden mal dada
+    writeFileSync(ruta, antes);
+    expect(fem(["alinear", ruta, "--tolerancia", "0,01"]).json.grupos).toEqual([]);
+    expect(fem(["alinear", ruta, "--tolerancia", "tres"]).codigo).toBe(2);
   });
 });

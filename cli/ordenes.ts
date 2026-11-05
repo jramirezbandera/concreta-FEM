@@ -24,6 +24,8 @@ import { huellaSinCompilar } from "../src/compilador/compilar.ts";
 import { aplanarDxf } from "../src/dxf/aplanar.ts";
 import { ErrorDxf, leerDxf } from "../src/dxf/lector.ts";
 import { serializar } from "../src/editor/serializar.ts";
+import { proponerAlinear, textoGrupo, TOLERANCIA_ALINEAR } from "../src/editor/alinear.ts";
+import { aplicar } from "../src/editor/operaciones.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
 import { Consultas } from "../src/compilador/consultas.ts";
@@ -57,8 +59,8 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "vista", "escala", "armadura", "envolvente", "salida", "capa-pilares", "capa-losas", "capa-ejes", "unidades", "planta-losas", "material", "espesor", "lado-maximo", "nombre"]);
-const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "vista", "escala", "armadura", "envolvente", "salida", "capa-pilares", "capa-losas", "capa-ejes", "unidades", "planta-losas", "material", "espesor", "lado-maximo", "nombre", "tolerancia"]);
+const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda", "escribir"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
   const [orden = "ayuda", ...resto] = argv;
@@ -98,6 +100,9 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
       [--planta id:cota]… [--planta-losas id] [--material HA-30] [--espesor 0.30] [--unidades m|cm|mm] [--nombre N]
       sin --salida, sólo dice lo que reconoce (y las capas); con ella, escribe el proyecto (nunca encima de otro)
   fem seleccion <proyecto.json>            lo que el ingeniero tiene elegido en la app (planta, espacio y objetos, tal como están en el fichero)
+  fem alinear <proyecto.json> [--tolerancia 0.03] [--escribir]
+      pilares y vértices casi alineados según los ejes (a menos de la tolerancia, en m, sin coincidir) y adónde los llevaría;
+      sólo propone: con --escribir, los mueve y reescribe el proyecto (deja el de antes en <proyecto>.json.bak)
   fem esquema
   fem visor <proyecto.json> [--nuevo]      abre la app sobre el proyecto (no escribe JSON; Ctrl+C la cierra)
 
@@ -470,6 +475,8 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
     }
     case "importar-dxf":
       return importarDxfOrden(a, mal);
+    case "alinear":
+      return alinearOrden(a, mal);
     case "seleccion": {
       const l = leer(orden, a.posicionales[0]);
       if ("codigo" in l) return l;
@@ -554,6 +561,47 @@ function importarDxfOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
     json.proyecto = rel(salida);
   } else json.escrito = false;
   Object.assign(json, { valido: c.valido, ...listaDiagnosticos(c.diagnosticos.filter((x) => x.severidad === "error")) });
+  return { codigo: CODIGO.bien, json };
+}
+
+/**
+ * `fem alinear` (MA5, `docs/fem3d/modelado.md` §2.5 y §7): sólo propone (MA-e); con `--escribir`,
+ * aplica la propuesta como el editor (`aplicar`), deja el fichero de antes en `.bak` y escribe el
+ * proyecto en el formato canónico.
+ */
+function alinearOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
+  const orden = "alinear";
+  const l = leer(orden, a.posicionales[0]);
+  if ("codigo" in l) return l;
+  const t = a.banderas.get("tolerancia")?.at(-1);
+  let tol = TOLERANCIA_ALINEAR;
+  if (t !== undefined) {
+    const x = Number(t.replace(",", "."));
+    if (!Number.isFinite(x) || x <= 0 || x > 0.2) return mal("--tolerancia tiene que ser un número positivo, en m (por defecto 0.03; como mucho 0.2).");
+    tol = x;
+  }
+  const p = proponerAlinear(l.proyecto.modelo, tol);
+  const ruta = (r: readonly (string | number)[]) => (r[0] === "x" && r.length === 1 ? "" : r.join("."));
+  const json: Record<string, unknown> = {
+    orden,
+    ok: true,
+    tolerancia: tol,
+    ...(p.direccion ? { direccion: p.direccion } : {}),
+    grupos: p.grupos.map((g) => ({ ...g, aviso: textoGrupo(g, p.direccion) })),
+    movimientos: p.movimientos.map((x) => ({ id: x.id, coleccion: x.coleccion, ...(ruta(x.ruta) ? { punto: ruta(x.ruta) } : {}), de: x.de, a: x.a })),
+    ...(p.avisos.length ? { avisos: p.avisos } : {}),
+    quedan: p.quedan,
+  };
+  if (!a.banderas.has("escribir") || !p.operacion) {
+    json.escrito = false;
+    return { codigo: CODIGO.bien, json };
+  }
+  const r = aplicar(l.proyecto, p.operacion);
+  if (!r.ok) return { codigo: CODIGO.errores, json: { ...json, ok: false, escrito: false, ...listaDiagnosticos(r.errores) } };
+  writeFileSync(`${l.ruta}.bak`, readFileSync(l.ruta));
+  writeFileSync(l.ruta, serializar(r.proyecto), "utf8");
+  const c = compilar(r.proyecto.modelo, r.proyecto.opciones);
+  Object.assign(json, { escrito: true, proyecto: rel(l.ruta), copia: rel(`${l.ruta}.bak`), huella: c.huella, valido: c.valido, ...listaDiagnosticos(c.diagnosticos.filter((x) => x.severidad === "error")) });
   return { codigo: CODIGO.bien, json };
 }
 
