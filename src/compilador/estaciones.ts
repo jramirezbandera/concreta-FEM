@@ -1,7 +1,9 @@
 /**
  * Estaciones de una banda de dimensionado (C5.2): dónde se cortan sus esfuerzos a lo largo del eje.
- * - Caras: los extremos de sus `apoyos` dentro de la banda (no en sus extremos). El compilador las
- *   siembra a lo ancho de la banda, así que su corte por fuerzas nodales es exacto (E5-5).
+ * - Caras: los extremos de sus `apoyos` dentro de la banda (no en sus extremos). Con `franjas: false`,
+ *   el compilador las siembra a lo ancho de la banda, así que su corte por fuerzas nodales es exacto
+ *   (E5-5). Con las franjas (por defecto), sólo las que son caras de franja; las de los pilares de
+ *   borde paralelas al borde no están en la malla y su estación no vale (AU-5, `banda/cara-fuera-de-malla`).
  * - Vanos: el centro de cada tramo libre entre dos apoyos consecutivos.
  * Sin apoyos, una banda no tiene estaciones (sólo se siembra su contorno, C2).
  */
@@ -11,6 +13,11 @@ export interface EstacionBanda {
   /** Distancia a lo largo del eje desde `desde`, m. */
   s: number;
   tipo: "cara" | "vano";
+  /**
+   * En una cara, el lado del vano que mira (AU-6): −1 si el apoyo empieza en s (el vano queda en s
+   * menores), +1 si acaba en s (el vano, en s mayores). Las muestras de my y mxy van de ese lado.
+   */
+  lado?: -1 | 1;
 }
 
 /** Ejes de la banda: d a lo largo (de `desde` a `hasta`), n = d girado 90° (a su izquierda), y su longitud. */
@@ -53,8 +60,8 @@ export function estacionesBanda(b: Banda, eps: number): EstacionBanda[] {
   const r: EstacionBanda[] = [];
   const dentro = (s: number) => s > eps && s < L - eps;
   unidos.forEach(([a, c], i) => {
-    if (dentro(a)) r.push({ s: a, tipo: "cara" });
-    if (dentro(c) && c - a > eps) r.push({ s: c, tipo: "cara" });
+    if (dentro(a)) r.push({ s: a, tipo: "cara", lado: -1 });
+    if (dentro(c) && c - a > eps) r.push({ s: c, tipo: "cara", lado: 1 });
     const sig = unidos[i + 1];
     if (sig && sig[0] - c > eps) r.push({ s: (c + sig[0]) / 2, tipo: "vano" });
   });

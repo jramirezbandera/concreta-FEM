@@ -86,6 +86,42 @@ describe("estaciones de las bandas (C5.2)", () => {
   });
 });
 
+describe("las muestras de my y mxy de una cara, del lado de su vano (AU-6)", () => {
+  it("las dos caras del vano central, simétricas respecto a x = 9, dan el mismo my", () => {
+    // 6,15 es la cara de salida del apoyo de P6 (su vano, en s mayores) y 11,85 la de entrada del de
+    // P12. Antes las muestras de 6,15 se tomaban en 6,149, dentro del apoyo: my un 11 % bajo
+    const e = eb.estaciones("L:1:P2")!;
+    const cara = (s: number) => e.find((x) => x.tipo === "cara" && Math.abs(x.s - s) < 1e-9)!;
+    const [a, b] = [cara(6.15), cara(11.85)];
+    expect(a.lado).toBe(1);
+    expect(b.lado).toBe(-1);
+    for (const k of [0, 1]) {
+      const [ma, mb] = [a.medios[3 * k + 1]!, b.medios[3 * k + 1]!];
+      expect(rel(ma, mb)).toBeLessThan(0.03);
+      // Y el mx exacto, igual por simetría
+      expect(rel(a.medios[3 * k]!, b.medios[3 * k]!)).toBeLessThan(0.03);
+    }
+  });
+});
+
+describe("con las franjas (por defecto), lo que no sale se dice (AU-5)", () => {
+  it("las caras fuera de la malla lo avisan, y el reparto dice lo que deja fuera", () => {
+    const r = compilar(fisico, { tamanoMalla: 0.5, empotramientoCabeza: 1 });
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join(" · "));
+    const e2 = new EsfuerzosBandas(fisico, r.modelo, casosValidos(calcular(r.modelo)));
+    const malas = e2.bandas.flatMap((id) => e2.estaciones(id)!).filter((x) => !x.valido);
+    // Las de la auditoría: 28 de 126 (con «franjas: false», ninguna)
+    expect(malas.length).toBe(28);
+    expect(malas.every((x) => x.tipo === "cara" && x.diagnosticos.some((d) => d.codigo === "banda/cara-fuera-de-malla"))).toBe(true);
+    const rep = e2.reparto("L", [1, 0], [1, 1]);
+    const aviso = rep.diagnosticos.find((d) => d.codigo === "banda/reparto-incompleto");
+    expect(aviso).toBeTruthy();
+    expect((aviso!.detalles!.estaciones as string[]).length).toBe(malas.filter((x) => x.banda.startsWith("L:1:")).length);
+    // Sin franjas, ninguno
+    expect(eb.reparto("L", [1, 0], [1, 1]).diagnosticos.some((d) => d.codigo === "banda/reparto-incompleto")).toBe(false);
+  });
+});
+
 describe("integración exacta (C5, criterio 2)", () => {
   it("en una línea de caras, la suma de las bandas que la cruzan es el corte de toda la losa (≤ 1e-9)", () => {
     const ids = eb.bandas.filter((id) => id.startsWith("L:1:"));

@@ -44,6 +44,8 @@ export interface EstacionResultado {
   /** Distancia desde `desde` a lo largo del eje, m. */
   s: number;
   tipo: "cara" | "vano";
+  /** En una cara, el lado de su vano (−1, s menores; +1, s mayores), donde van las muestras de my y mxy (AU-6). */
+  lado?: -1 | 1;
   /** Punto del eje en planta. */
   punto: Vec2;
   /** Ancho de la banda, m. */
@@ -148,12 +150,17 @@ export class EsfuerzosBandas {
     const nd = Math.sqrt(direccion[0] * direccion[0] + direccion[1] * direccion[1]);
     const d: Vec2 = [direccion[0] / nd, direccion[1] / nd];
     const lineas = new Map<string, LineaReparto>();
+    /** Las estaciones que no valen y no entran en el reparto (AU-5: antes, sin decirlo). */
+    const fuera: string[] = [];
     for (const b of this.fisico.bandas ?? []) {
       if (b.planta !== l.planta || !b.tipo) continue;
       const e = ejesBanda(b).d;
       if (Math.abs(Math.abs(e[0] * d[0] + e[1] * d[1]) - 1) > 1e-9) continue;
       for (const x of this.estaciones(b.id)!) {
-        if (!x.valido) continue;
+        if (!x.valido) {
+          fuera.push(`${b.id} @ ${x.s.toFixed(3)}`);
+          continue;
+        }
         const s = x.punto[0] * d[0] + x.punto[1] * d[1];
         const clave = `${x.tipo}@${Math.round(s / this.eps)}`;
         let li = lineas.get(clave);
@@ -165,6 +172,13 @@ export class EsfuerzosBandas {
       }
     }
     const r = [...lineas.values()].sort((a, b) => a.s - b.s || (a.tipo < b.tipo ? -1 : 1));
+    if (fuera.length)
+      diag.aviso(
+        "banda/reparto-incompleto",
+        `En la losa ${losa}, ${fuera.length} estaciones de las bandas no valen y no entran en el reparto (${fuera.slice(0, 6).join(", ")}${fuera.length > 6 ? "…" : ""}): las líneas que las tienen comparan sólo las demás bandas.`,
+        [losa],
+        { estaciones: fuera },
+      );
     for (const li of r) {
       const total = li.pilares + li.centrales;
       // La tabla reparte negativos en las caras y positivos en los vanos: con el otro signo en alguna
@@ -190,9 +204,10 @@ export class EsfuerzosBandas {
     const nc = this.casos.length;
     return estacionesBanda(b, this.eps).map((e) => {
       const r = this.cortes.cortar(this.corte(b, e.s, e.tipo === "cara" ? "fuerzas-nodales" : "campos"), this.casos, this.campos);
-      // Muestras: en un vano, las del propio corte (por campos); en una cara, las de un corte a δ, del
-      // lado del vano más largo (las dos caras de un apoyo miran a vanos distintos)
-      const sm = e.s - DELTA_MUESTRAS > 0 ? e.s - DELTA_MUESTRAS : Math.min(L, e.s + DELTA_MUESTRAS);
+      // Muestras: en un vano, las del propio corte (por campos); en una cara, las de un corte a δ del
+      // lado de su vano (AU-6: antes siempre en s − δ, y en la cara de salida de un apoyo caían dentro de él)
+      const hacia = e.lado ?? -1;
+      const sm = e.s + hacia * DELTA_MUESTRAS > 0 && e.s + hacia * DELTA_MUESTRAS < L ? e.s + hacia * DELTA_MUESTRAS : e.s - hacia * DELTA_MUESTRAS;
       const rm = e.tipo === "vano" ? r : this.cortes.cortar(this.corte(b, sm, "campos"), this.casos, this.campos);
       const ms = rm.valido && rm.muestras && rm.muestras.pesos.length ? rm.muestras : null;
       const medios = new Float64Array(3 * nc);
@@ -222,6 +237,15 @@ export class EsfuerzosBandas {
       const anchoEnLosa = b.ancho * fraccionEnRegiones(A!, B!, this.regiones.get(b.planta) ?? []);
       const diag = new Diagnosticos();
       const enLosa = anchoEnLosa > this.eps;
+      // AU-5: con `franjas` (por defecto), las caras de las bandas no se siembran (son las de las franjas)
+      // y las de los pilares de borde paralelas al borde no son de ninguna franja: su corte exacto no sale
+      if (e.tipo === "cara" && !r.valido && r.diagnosticos.some((d) => d.codigo === "corte/atraviesa-laminas" || d.codigo === "corte/restriccion-partida"))
+        diag.aviso(
+          "banda/cara-fuera-de-malla",
+          `La cara ${e.s.toFixed(3)} m de la banda ${b.id} no sigue la malla: con las franjas (por defecto) sólo se siembran sus caras, y las de los pilares de borde paralelas al borde no lo son. Para medirla, compile con «franjas: false».`,
+          [b.id],
+          { s: e.s },
+        );
       if (!enLosa) diag.aviso("banda/estacion-sin-losa", `La estación ${e.s.toFixed(3)} m de la banda ${b.id} cae entera en un hueco o fuera de las losas: no tiene esfuerzos.`, [b.id]);
       for (let k = 0; k < nc; k++) medios[3 * k] = enLosa ? r.esfuerzos[6 * k + 4]! / anchoEnLosa : Number.NaN;
       if (!enLosa) medios.fill(Number.NaN);
@@ -241,6 +265,7 @@ export class EsfuerzosBandas {
         banda: b.id,
         s: e.s,
         tipo: e.tipo,
+        ...(e.lado ? { lado: e.lado } : {}),
         punto: P,
         ancho: b.ancho,
         anchoEnLosa,
