@@ -7,6 +7,7 @@
  * Además, los códigos de salida y la forma de la salida.
  */
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,12 +16,13 @@ import { reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import { calcular } from "../motor/calcular.ts";
+import type { ModeloAnalitico } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
 import { azar, fisicoAleatorio } from "../pruebas/fisicoAleatorio.ts";
 import { conForjadosAleatorios } from "../pruebas/forjadosAleatorios.ts";
 import { barajar } from "../pruebas/metamorficasFisicas.ts";
-import { desempaquetarResultados, type CabeceraResultados } from "./resultados.ts";
+import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "./resultados.ts";
 import { VERSION_ESQUEMA } from "./proyecto.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
@@ -58,12 +60,12 @@ function escribir(modelo: ModeloFisico, opciones?: OpcionesCompilacion, extra: R
   return ruta;
 }
 
-function guardados(ruta: string, huella: string) {
+function guardados(ruta: string, huella: string, modelo: ModeloAnalitico) {
   const carpeta = join(ruta, "..", ".fem", huella);
   const cabecera = JSON.parse(readFileSync(join(carpeta, "resultados.json"), "utf8")) as CabeceraResultados;
-  const casos = desempaquetarResultados(cabecera, new Uint8Array(readFileSync(join(carpeta, "resultados.bin"))));
-  expect(casos).not.toBeNull();
-  return casos!;
+  const d = desempaquetarResultados(cabecera, new Uint8Array(readFileSync(join(carpeta, "resultados.bin"))), modelo);
+  if ("motivo" in d) throw new Error(d.motivo);
+  return d.casos;
 }
 
 const mismosBits = (a: Float64Array, b: Float64Array) => a.length === b.length && Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength));
@@ -86,7 +88,7 @@ describe("criterio 3 de A0: fem calcular da los mismos bits que compilar y calcu
       if (!c.valido) throw new Error("no compila");
       expect(s.json.huella).toBe(c.huella);
       const directos = casosValidos(calcular(c.modelo));
-      const cli = guardados(ruta, c.huella);
+      const cli = guardados(ruta, c.huella, c.modelo);
       expect(cli.length).toBe(directos.length);
       directos.forEach((d, k) => {
         for (const campo of ["u", "reacciones", "esfuerzosBarras", "esfuerzosLaminas"] as const) expect(mismosBits(cli[k]![campo], d[campo]), `${d.id}.${campo}`).toBe(true);
@@ -97,6 +99,31 @@ describe("criterio 3 de A0: fem calcular da los mismos bits que compilar y calcu
       expect(t.json.reutilizados).toBe(true);
       expect(t.json.casos).toEqual(s.json.casos);
     });
+
+  // `docs/fem3d/firma-resultados.md`: si el compilador cambia su salida sin cambiar de versión, la
+  // misma huella da otra malla, y los guardados de la malla de antes se leían sobre la nueva
+  it("con la misma huella y otro modelo analítico, recalcula en vez de reutilizar los guardados", () => {
+    const ruta = escribir(reticulaConNucleo(), { tamanoMalla: 1 });
+    const s = fem(["calcular", ruta]);
+    expect(s.codigo, JSON.stringify(s.json)).toBe(0);
+    const carpeta = join(ruta, "..", ".fem", s.json.huella as string);
+    const fCab = join(carpeta, "resultados.json");
+    const motor = (JSON.parse(readFileSync(fCab, "utf8")) as { motor: string }).motor;
+    // Los resultados de otra malla, con la huella, el núcleo y el sha256 que pide la CLI
+    const otra = compilar(reticulaConNucleo(), { tamanoMalla: 0.9 });
+    if (!otra.valido) throw new Error("no compila");
+    const r = calcular(otra.modelo);
+    if (!r.valido) throw new Error("no calcula");
+    const { cabecera, bytes } = empaquetarResultados(s.json.huella as string, otra.modelo, r.casos, r.estadisticas, []);
+    writeFileSync(join(carpeta, "resultados.bin"), bytes);
+    writeFileSync(fCab, JSON.stringify({ ...cabecera, motor, sha256: createHash("sha256").update(bytes).digest("hex") }));
+    const t = fem(["calcular", ruta]);
+    expect(t.codigo).toBe(0);
+    expect(t.json.reutilizados).toBe(false);
+    expect(t.json.casos).toEqual(s.json.casos);
+    // Y lo que deja guardado es ya lo de su modelo
+    expect(fem(["calcular", ruta]).json.reutilizados).toBe(true);
+  });
 });
 
 /** El mismo JSON con las claves de cada objeto en orden inverso. */
@@ -116,7 +143,9 @@ describe("criterio 4 de A0: la salida no depende del orden del JSON ni del motor
     expect(sa.codigo).toBe(0);
     expect(sb.json.huella).toBe(sa.json.huella);
     expect(sb.json.huella).toBe(compilar(f).huella);
-    const [ca, cb] = [guardados(a, sa.json.huella as string), guardados(b, sb.json.huella as string)];
+    const cf = compilar(f);
+    if (!cf.valido) throw new Error("no compila");
+    const [ca, cb] = [guardados(a, sa.json.huella as string, cf.modelo), guardados(b, sb.json.huella as string, cf.modelo)];
     ca.forEach((c, k) => {
       for (const campo of ["u", "reacciones", "esfuerzosBarras", "esfuerzosLaminas"] as const) expect(mismosBits(c[campo], cb[k]![campo]), campo).toBe(true);
     });

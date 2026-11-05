@@ -469,8 +469,9 @@ export class Sesion {
     if (cab.motor !== this.motor) return { ok: false, motivo: "se calcularon con otro núcleo de cálculo" };
     if (typeof cab.sha256 !== "string") return { ok: false, motivo: "no llevan el sha256 de sus datos (los guardó una versión anterior de la CLI)" };
     if ((await sha256Bytes(bytes)) !== cab.sha256) return { ok: false, motivo: "resultados.bin no es el que se guardó (su sha256 no coincide)" };
-    const casos = desempaquetarResultados(cab, bytes);
-    if (!casos) return { ok: false, motivo: "resultados.bin no casa con su cabecera" };
+    const d = desempaquetarResultados(cab, bytes, this.compilacion.modelo);
+    if ("motivo" in d) return { ok: false, motivo: d.motivo };
+    const casos = d.casos;
     if (casos.map((x) => x.id).join("\n") !== this.proyecto.modelo.casos.map((x) => x.id).join("\n")) return { ok: false, motivo: "sus casos no son los del proyecto" };
     this.fijar(casos, cab, "guardados", cab.sha256);
     return { ok: true };
@@ -486,7 +487,7 @@ export class Sesion {
     const r = calcular(c.modelo, opciones.alProgreso ? { alProgreso: opciones.alProgreso } : {});
     const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
     if (!r.valido) return { ok: false, diagnosticos: ordenSeveridad(diags) };
-    const { cabecera, bytes } = empaquetarResultados(c.huella, r.casos, r.estadisticas, diags);
+    const { cabecera, bytes } = empaquetarResultados(c.huella, c.modelo, r.casos, r.estadisticas, diags);
     this.fijar(r.casos, cabecera, "calculo", await sha256Bytes(bytes));
     return { ok: true, cabecera, bytes };
   }
