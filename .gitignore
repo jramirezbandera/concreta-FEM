@@ -57,3 +57,6 @@ ejemplos/Proyectos/
 
 # Prueba en sombra: los datos derivados del modelo CYPECAD del cliente (CY4)
 validacion/sombra/*/.datos/
+
+# Validación DW: las muestras de ACadSharp (se traen con validacion/dwg/muestras.ts)
+validacion/dwg/.muestras/

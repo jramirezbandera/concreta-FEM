@@ -30,6 +30,44 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 --------------------------------------------------------------------------------
+ACadSharp (commit d9f3de8c9910b602d392aa1acc72b62c095ec40e, 2026-11-03) — https://github.com/DomCR/ACadSharp
+Licencia MIT. Copyright (c) 2021 Albert Domenech
+
+Portado a TypeScript (fase DW, el lector de DWG; sólo la lectura de lo que usa la plantilla):
+  src/dwg/bits.ts      ←  src/ACadSharp/IO/DWG/DwgStreamReaders/DwgStreamReaderBase.cs,
+                          DwgStreamReaderAC15.cs; la tabla de CRC.cs (CrcTable)
+  src/dwg/cabecera.ts  ←  src/ACadSharp/IO/DWG/DwgStreamReaders/DwgHeaderReader.cs (hasta INSUNITS)
+  src/dwg/objetos.ts   ←  src/ACadSharp/IO/DWG/DwgStreamReaders/DwgHandleReader.cs,
+                          DwgObjectReader.cs (cabecera común, capas, LINE, ARC, CIRCLE)
+  src/dwg/lector.ts    ←  src/ACadSharp/IO/DwgReader.cs (cabecera del fichero de R13–R2000);
+                          la tabla de páginas de códigos de src/ACadSharp/CadUtils.cs
+Código propio: la comprobación de los CRC al leer, la traducción a pares de DXF y el orden del
+espacio modelo. Las muestras de AutoCAD de su carpeta samples/ se usan como oráculo
+(validacion/dwg/muestras.ts) y no se versionan.
+
+MIT License
+
+Copyright (c) 2021 Albert Domenech
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
 faer 0.24.4 — https://codeberg.org/sarah-quinones/faer
 Licencia MIT. Se enlaza como dependencia del núcleo WASM (kernel/), sin modificar.
 

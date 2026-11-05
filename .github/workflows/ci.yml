@@ -25,6 +25,8 @@ jobs:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
+      # Las muestras de AutoCAD del lector de DWG (fase DW, DW-d): del commit fijado de ACadSharp, con su sha256
+      - run: bun validacion/dwg/muestras.ts
       - run: bun run test:run
 
   # Visor de sólo lectura (V1, app/): tipos, tests de DOM (con la sesión de verdad) y compilación.

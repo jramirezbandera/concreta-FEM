@@ -1,6 +1,6 @@
 # DW: la plantilla desde un DWG (plan)
 
-> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, propuestas.
+> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, propuestas (DW-d, puesta en DW1 como se proponía). **DW1 hecho el 2026-11-05** (§9).
 >
 > **Origen:** el usuario: «lo de tener que trabajar en DXF en lugar de DWG es un latazo». El 2026-10-28 se dejó el DWG sin decidir porque LibreDWG es GPL y el SDK de la ODA es de pago. Al mirarlo otra vez, apareció ACadSharp (MIT), que lee DWG, y se puede portar con la regla 6.
 
@@ -69,3 +69,43 @@ Un lector de DWG que dé **el mismo `Dxf`**: las entidades, traducidas a sus có
 - **ACadSharp está en alfa.** Si una entidad de las nuestras sale mal, se corrige contra la especificación y el oráculo, y el arreglo se apunta en `NOTICE` y en los hallazgos. No se da por bueno lo que lee ACadSharp: manda el DXF de AutoCAD.
 - **Los DWG de otros programas** (BricsCAD, ZWCAD, progeCAD, exportados desde Revit) pueden escribir cosas que AutoCAD no escribe. Por eso está el criterio 3 y, cuando lleguen, un DWG de cada uno con su DXF.
 - **Lo que no está en el espacio modelo** (presentaciones y referencias externas) no se lee, como en el DXF. Una referencia externa sin enlazar se cuenta y se avisa.
+
+## 9. DW1 hecho (2026-11-05)
+
+R13–R2000 (AC1012, AC1014, AC1015), con las capas, `LINE`, `ARC` y `CIRCLE`. Pasa el criterio 1 en AC1015 con lo que lee, y el 2 entre AC1014 y AC1015.
+
+### 9.1 Qué hay
+
+- **`src/dwg/`** (puro, sin dependencias):
+  - `bits.ts`: el flujo de bits (B, BB, RC, RS, RL, RD, BS, BL, BLL, BD, DD, BT, BE, MC, MS, H, TV) con un tope por sección: leer más allá es un `ErrorDxf`, nunca un valor inventado. Y el CRC-16 del DWG (semilla 0xC0C1);
+  - `version.ts`: las versiones y sus banderas. Las de 2004 en adelante dicen todavía «Todavía no se leen los DWG 2004 (AC1018): guárdalo como DWG 2000 o como DXF»; las de antes de R13, que se guarde como 2010 o 2018;
+  - `cabecera.ts`: la sección de variables hasta `$INSUNITS`, variable a variable con las condiciones de cada versión (también las de 2004+, para DW3). Guarda `$EXTMIN` y `$EXTMAX` para comprobar que la lectura no se descoloca;
+  - `objetos.ts`: el mapa de objetos, la cabecera común de objetos y entidades (modo, capa, anterior y siguiente), el control de capas, las capas y `LINE`, `ARC` y `CIRCLE` traducidas a sus pares de DXF (los ángulos de radianes a grados; el espesor y la extrusión, sólo si no son los de por defecto, como AutoCAD);
+  - `lector.ts`: `leerDwg(bytes)` da un `Dxf` con, además, `cabeceraDwg`, `handles`, `fallos` (los objetos que no se pudieron leer), `sinTraducir` (por tipo) y `posiciones`. Las entidades del espacio modelo van en el orden de su lista; las capas, en el de su tabla;
+  - `comparar.ts`: el DWG frente al DXF del mismo dibujo, entidad a entidad por su handle (código 5): tipo, capa y los códigos geométricos de `CODIGOS_TIPO`, lo que falta en cada lado y el orden.
+- **`validacion/dwg/muestras.ts`** (DW-d): descarga las muestras del commit fijado de ACadSharp, comprueba su sha256 y las deja en `validacion/dwg/.muestras/` (ignorada). El CI lo ejecuta antes de las pruebas.
+- **`src/dwg/dwg.test.ts`**: los criterios 1, 2 y 4 de lo que hay.
+- **`NOTICE`**: ACadSharp, con su commit, los ficheros portados y su licencia.
+- La app no cambia todavía (DW4).
+
+### 9.2 Criterios
+
+| Criterio | Resultado |
+|---|---|
+| 1. AC1015 frente al DXF de AutoCAD | **Pasa:** las 35 entidades de los tipos traducidos (26 `LINE`, 8 `CIRCLE`, 1 `ARC`), por handle, en el mismo orden, con las mismas capas. Error máximo 4,2e-16 (la última cifra de las 16 que escribe el DXF). Las 21 capas, con la apagada y la congelada. `$INSUNITS` = 1; `$EXTMIN` y `$EXTMAX` a ≤ 1e-15. Ningún objeto en `fallos`. |
+| 2. Entre versiones | **Pasa en AC1014 y AC1015:** la misma geometría bit a bit. |
+| 4. Robustez | **Pasa en lo que hay:** cortado en diez sitios, siempre un `ErrorDxf`; 300 ficheros con 1 a 4 bytes cambiados al azar, o lo dice (`ErrorDxf` o un objeto en `fallos`) o sale exactamente lo mismo; un byte cambiado dentro de una `LINE` deja esa `LINE` en `fallos` y las demás iguales. |
+| 3, 5, 6, 7 | En DW4 (5, 6 y 3) y al final (7, ya en `NOTICE`). |
+
+Tiempo, como información: la muestra de 1,3 MB, en ~6 ms en Bun.
+
+### 9.3 Hallazgos
+
+- **DW1-1: ACadSharp no comprueba los CRC al leer, y aquí se comprueban todos los de R2000:** el de la cabecera del fichero (desde el byte 0 hasta el final de los localizadores, con la marca del final), el de la sección de variables, el de cada trozo del mapa y el de cada objeto. Sin ellos, un byte dañado en una coordenada daría una línea en otro sitio sin aviso, que es lo que la regla 1 no admite. Con ellos, el objeto dañado se salta y se dice. Que pasen todos los objetos de las dos muestras confirma también la lectura de los tamaños.
+- **DW1-2: R14 no guarda `$INSUNITS` y escribe las capas en mayúsculas**, con «0 @ 1» como «0___1». Es lo que hace AutoCAD al guardar en R14, no un fallo del lector: la prueba compara el R14 con el DXF de 2000 adaptado así, y la geometría es la de 2000 bit a bit. En la app, un DWG R14 tendrá `$INSUNITS` vacío y las unidades se propondrán por el tamaño del edificio, como con un DXF sin él.
+- **DW1-3: los DXF de las muestras están en GitHub con LF.** Un clon con `core.autocrlf` (el de Windows por defecto) los pasa a CRLF y cambia su sha256: el script descarga los bytes de GitHub, no los de un clon.
+- **DW1-4: los `BLOCK` y `ENDBLK` de `*Model_Space` tienen el modo 2** (espacio modelo, sin propietario). No se dibujan ni cuentan como «sin traducir».
+
+### 9.4 Lo siguiente
+
+DW2: el resto de entidades de §1 (`LWPOLYLINE`, `POLYLINE` y sus vértices, `ELLIPSE`, `SPLINE`, `POINT`, `SOLID`, `TRACE`, `3DFACE`, `LEADER`, `TEXT`, `MTEXT`, `INSERT` y `MINSERT` con atributos, y las cotas), los bloques con su base y sus entidades, las clases (para las entidades de tipo ≥ 500) y la comparación de `aplanar` entero frente al DXF.

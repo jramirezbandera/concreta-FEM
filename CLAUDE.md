@@ -703,6 +703,11 @@
     - DW-c: los oráculos de §4.
   - **Propuestas:** DW-d (las muestras no se versionan; se descargan con su sha256, también en el CI) y DW-e («Plantilla DXF o DWG»).
   - **Tramos:** DW1 (bits, secciones R13–R2000, objetos básicos) → DW2 (el resto de entidades y los bloques) → DW3 (2004+, LZ77) → DW4 (la app) → DW5 (2007).
+- **2026-11-05: DW1 hecho** (`dwg.md` §9): `src/dwg/` lee R13–R2000 (AC1012, AC1014, AC1015) con las capas, `LINE`, `ARC` y `CIRCLE`, y da el `Dxf` de `src/dxf/lector.ts`.
+  - **Frente al DXF de AutoCAD de la muestra de 2000:** las 35 entidades por handle, en el mismo orden, a 4,2e-16 (la última cifra del DXF); las 21 capas, `$INSUNITS`, `$EXTMIN` y `$EXTMAX`. R14 da la misma geometría bit a bit (DW1-2: no guarda `$INSUNITS` y escribe las capas en mayúsculas, como AutoCAD).
+  - **DW1-1:** ACadSharp no comprueba los CRC al leer; aquí se comprueban todos (cabecera del fichero, de variables, mapa y cada objeto). Un objeto dañado va a `fallos` y el resto sale igual: con bytes cambiados al azar, o se avisa o sale lo mismo.
+  - **DW-d, como se proponía:** `validacion/dwg/muestras.ts` trae las muestras con su sha256 (también en el CI). Las pruebas, en `src/dwg/dwg.test.ts`. `NOTICE` cita ACadSharp.
+  - **Sigue DW2:** el resto de entidades, los bloques y las clases.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
