@@ -186,7 +186,12 @@ export function usePlantillasDxf(lista: readonly PlantillaDxf[] | undefined, ori
         const indice = () => (ix === undefined ? (ix = indicePlantilla(colocadas)) : ix);
         r = { colocadas, indice, geometria: geometriaDe(colocadas) };
         cache.set(planta, r);
-        if (ix === undefined) setTimeout(indice, 0);
+        // El índice, cuando el hilo esté libre: con setTimeout(0) iba antes de pintar el cambio
+        // (apagar una capa se veía tarde) y con un plano grande era un segundo parón
+        if (ix === undefined) {
+          if (typeof requestIdleCallback === "function") requestIdleCallback(indice, { timeout: 1000 });
+          else setTimeout(indice, 50);
+        }
       }
       return r;
     };

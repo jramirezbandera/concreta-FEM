@@ -393,7 +393,8 @@ export function App() {
                 </button>
                 {ed.modo === "auto" ? (
                   // AL-b: se guarda solo; aquí sólo se dice cómo va
-                  <span className="flex items-center gap-1 px-1 text-[12px] text-text-secondary" role="status" aria-label="Estado del guardado" data-sin-guardar={ed.sinGuardar} title="Se guarda solo en este navegador">
+                  // Con su ancho fijo: «Guardando…» y «Guardado» se alternan en cada cambio y movían la barra
+                  <span className="flex min-w-[5.75rem] shrink-0 items-center gap-1 px-1 text-[12px] whitespace-nowrap text-text-secondary" role="status" aria-label="Estado del guardado" data-sin-guardar={ed.sinGuardar} title="Se guarda solo en este navegador">
                     {/* UI-25: con un error o un conflicto el autoguardado se para; decía «Guardando…» */}
                     {ed.conflicto ? (
                       <span className="text-state-warn">Conflicto: sin guardar</span>

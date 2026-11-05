@@ -15,8 +15,9 @@
  *   dice `compilando` y los diagnósticos son sólo los de la sensatez previa.
  * - El proyecto que se edita está en el hilo principal (`historial`); el worker recibe su texto
  *   canónico. Deshacer devuelve el proyecto anterior tal cual.
- * - AB: un cambio que sólo toca la armadura base (`armado`) no reabre el proyecto ni pierde los
- *   resultados: no entra en la huella, y las pantallas la mandan en sus pedidos.
+ * - AB: un cambio que sólo toca la armadura base (`armado`), las plantillas DXF o las vistas
+ *   guardadas no reabre el proyecto ni pierde los resultados: no entran en la huella, y la app los
+ *   lee del proyecto que se edita (`FUERA_DEL_WORKER`).
  * - Nunca se pisa nada en silencio: si el fichero cambia en el disco con cambios sin guardar, no se
  *   recarga ni se sobrescribe; se avisa (`conflicto`) y el ingeniero elige.
  * - AL (`docs/fem3d/almacen-local.md`): un proyecto del navegador se guarda solo (AL-b), guarda su
@@ -125,14 +126,26 @@ export const PAUSA_COMPILAR_MS = 150;
 /** AL-b: pausa tras el último cambio antes de guardar en el navegador (al ocultar la página, ya). */
 export const AUTOGUARDADO_MS = 400;
 
-/** ¿Difieren dos proyectos sólo en la armadura base? (el editor copia sólo lo que cambia: basta comparar referencias) */
-export function soloArmado(a: Proyecto | null, b: Proyecto): boolean {
+/**
+ * Lo del proyecto que el worker no usa: no entra en la huella ni en el cálculo, y la app lo lee del
+ * proyecto que se edita. La armadura base (AB, va en cada pedido), las plantillas DXF (V2c-4: se
+ * leen y dibujan en el hilo principal) y las vistas guardadas (I3: las listas leen las editadas).
+ * Antes, apagar una capa del DXF reabría el proyecto en un worker nuevo: el dibujo se quedaba sin su
+ * versión, la barra pasaba por «Compilando…» y, en Resultados, se perdían los resultados.
+ */
+const FUERA_DEL_WORKER: ReadonlySet<string> = new Set(["armado", "plantillas", "vistas"]);
+
+/** ¿Difieren dos proyectos sólo en lo que el worker no usa? (el editor copia sólo lo que cambia: basta comparar referencias) */
+export function soloFueraDelWorker(a: Proyecto | null, b: Proyecto): boolean {
   if (!a) return false;
   const claves = new Set([...Object.keys(a), ...Object.keys(b)]);
-  claves.delete("armado");
+  for (const k of FUERA_DEL_WORKER) claves.delete(k);
   for (const k of claves) if ((a as unknown as Record<string, unknown>)[k] !== (b as unknown as Record<string, unknown>)[k]) return false;
   return true;
 }
+
+/** AB: el nombre de antes (sólo la armadura base). */
+export const soloArmado = soloFueraDelWorker;
 
 /** Nombre de fichero para exportar un proyecto («Nave Málaga» → «Nave Málaga.json»). */
 export function nombreFichero(nombre: string | undefined): string {
@@ -418,8 +431,9 @@ export function useProyecto(): ProyectoAbierto {
   /** Compila la versión editada tras una pausa; los resultados se marcan como desactualizados ya. */
   const programar = useCallback(
     (p: Proyecto) => {
-      // Sólo cambió la armadura base: el worker sigue con su proyecto y sus resultados
-      if (soloArmado(cargado.current, p)) return;
+      // Sólo cambió lo que el worker no usa (armadura base, plantillas DXF, vistas guardadas): sigue
+      // con su proyecto y sus resultados; el siguiente cambio de verdad le manda todo
+      if (soloFueraDelWorker(cargado.current, p)) return;
       cargado.current = p;
       // Antes de nada: lo que se ve ya no es de esta versión, y lo que llegue de antes se descarta
       gen.current++;

@@ -22,7 +22,7 @@ import { ContextoVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { ModoArmado } from "../pantallas/Armado.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
-import { soloArmado, type Edicion, type ProyectoAbierto } from "../sesion/useProyecto.ts";
+import { soloArmado, soloFueraDelWorker, type Edicion, type ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import type { Proyecto } from "../../../src/agente/proyecto.ts";
 import { fireEvent } from "@testing-library/react";
@@ -248,5 +248,25 @@ describe("Fase AB · la armadura base y las zonas de refuerzo en el DOM", () => 
     const r3 = aplicar(r.proyecto, { op: "cambiar", coleccion: "losas", id: l.id, objeto: { ...l, espesor: l.espesor + 0.01 } });
     if (!r3.ok) throw new Error();
     expect(soloArmado(r.proyecto, r3.proyecto)).toBe(false);
+  });
+
+  it("las plantillas DXF y las vistas guardadas tampoco reabren el proyecto (apagar una capa congelaba la app)", () => {
+    const p = proyectoBase(undefined);
+    const t = { nombre: "Planta", fichero: "planta.dxf", sha256: "0".repeat(64), unidades: "m" as const, plantas: [MODELO.plantas[0]!.id] };
+    const r = aplicar(p, { op: "plantillas", plantillas: [t] });
+    if (!r.ok) throw new Error(r.errores[0]?.mensaje);
+    expect(soloFueraDelWorker(p, r.proyecto)).toBe(true);
+    const r2 = aplicar(r.proyecto, { op: "plantillas", plantillas: [{ ...t, ocultas: ["COTAS"] }] });
+    if (!r2.ok) throw new Error(r2.errores[0]?.mensaje);
+    expect(soloFueraDelWorker(r.proyecto, r2.proyecto)).toBe(true);
+    // Desde el que tiene el worker, aunque haya habido varios cambios de capas por medio
+    expect(soloFueraDelWorker(p, r2.proyecto)).toBe(true);
+    const r3 = aplicar(r2.proyecto, { op: "vistas", vistas: [{ nombre: "Una", tipo: "3d" }] });
+    if (!r3.ok) throw new Error(r3.errores[0]?.mensaje);
+    expect(soloFueraDelWorker(r2.proyecto, r3.proyecto)).toBe(true);
+    const l = MODELO.losas![0]!;
+    const r4 = aplicar(r2.proyecto, { op: "cambiar", coleccion: "losas", id: l.id, objeto: { ...l, espesor: l.espesor + 0.01 } });
+    if (!r4.ok) throw new Error();
+    expect(soloFueraDelWorker(p, r4.proyecto)).toBe(false);
   });
 });
