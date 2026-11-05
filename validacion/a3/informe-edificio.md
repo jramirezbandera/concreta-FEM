@@ -599,7 +599,3 @@ Axil de compresión en la cabeza de cada tramo de pilar con la suma de los casos
 ## Avisos del compilador y del cálculo
 
 Ninguno.
-
-## Firma
-
-El ingeniero firma este informe con «fem firmar <proyecto> --por "<nombre>"», que guarda en proyecto.revision.json, junto al proyecto, la huella 3d095f21cbe2faec…, quién firma, la fecha y el sha256 de este informe. El agente nunca firma.

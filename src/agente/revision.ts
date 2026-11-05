@@ -1,15 +1,11 @@
 /**
  * Revisión de un proyecto calculado (A3, regla A3 de `docs/fem3d/agente.md`): las comprobaciones de
- * sensatez (`sensatez.ts`, `sensatezResultados.ts`) y el informe (`informe.ts`), y el fichero de
- * firmas en el que el ingeniero deja constancia de que lo ha revisado.
+ * sensatez (`sensatez.ts`, `sensatezResultados.ts`) y el informe (`informe.ts`).
  *
- * El fichero de firmas (`<proyecto>.revision.json`, junto al proyecto y en git) guarda, por cada
- * firma, la huella del modelo, quién firma, la fecha y el sha256 del informe en Markdown. Una firma
- * vale para su huella: si el proyecto cambia, la huella cambia y no hay firma. Si la huella es la
- * misma y el informe no (otro núcleo de cálculo, otra versión de las comprobaciones), la firma se
- * marca como de otro informe.
+ * No hay firma (decisión del usuario, 2026-11-05): el informe es la revisión de sensatez del modelo
+ * y de sus resultados, no algo que se firme. Va ligado a la huella: si el proyecto cambia, se rehace.
  *
- * Puro: la CLI lee y escribe los ficheros y calcula los sha256.
+ * Puro: la CLI escribe los ficheros.
  */
 import type { ResultadoCompilacion } from "../compilador/compilar.ts";
 import type { Consultas } from "../compilador/consultas.ts";
@@ -22,33 +18,6 @@ import { conjuntosSensatez, sensatezResultados, type TramoComparado } from "./se
 import { escenaASvg } from "./render/svg.ts";
 import { vistaModelo } from "./render/modelo.ts";
 import { ResultadosRender, vistaCampo } from "./render/resultados.ts";
-
-export const VERSION_FIRMAS = "concreta-fem/revision@1";
-
-export interface Firma {
-  huella: string;
-  /** Quién firma (lo da el ingeniero con --por). */
-  por: string;
-  /** Fecha y hora ISO 8601 de la firma. */
-  fecha: string;
-  /** sha256 del informe en Markdown que firmó. */
-  informe: string;
-  /** UI-32: dónde se firmó (sin ella, en la línea de órdenes, como antes). */
-  via?: "app" | "cli";
-  /** UI-32: lo que la firma dice además (mientras dure el periodo en sombra, `NOTA_VALIDACION`). */
-  nota?: string;
-}
-
-/**
- * UI-32: mientras la herramienta no pase la batería de validación y el periodo en sombra (regla de
- * oro 7), cada firma lo dice: es la de haber revisado el informe, no la de un cálculo validado.
- */
-export const NOTA_VALIDACION = "Concreta FEM 3D está en validación (periodo en sombra): esta firma dice que el informe se revisó, no que la herramienta esté validada; el cálculo se contrasta con otro programa.";
-
-export interface FicheroFirmas {
-  esquema: typeof VERSION_FIRMAS;
-  firmas: Firma[];
-}
 
 export interface Revision {
   comprobaciones: Comprobacion[];
@@ -69,7 +38,7 @@ export function revisar(
   p: Proyecto,
   c: Extract<ResultadoCompilacion, { valido: true }>,
   q: Consultas,
-  datos: { motor: string; diagnosticos: readonly Diagnostico[]; equilibrio: readonly { id: string; fuerzas: number; momentos: number }[]; ficheroFirmas: string },
+  datos: { motor: string; diagnosticos: readonly Diagnostico[]; equilibrio: readonly { id: string; fuerzas: number; momentos: number }[] },
 ): Revision {
   const res = resumen(p, c);
   if (!res.valido) throw new Error("revisar: el resumen de un modelo compilado no puede fallar");
@@ -127,38 +96,4 @@ export function cimentacion(q: Consultas): ReaccionBase[] {
     if (x.valido && x.valor.nudos) r.push({ id, tipo, punto: x.valor.punto, R: x.valor.resultante });
   }
   return r;
-}
-
-/** Lee el fichero de firmas; un texto vacío es un fichero sin firmas. */
-export function leerFirmas(texto: string): FicheroFirmas | { error: string } {
-  if (!texto.trim()) return { esquema: VERSION_FIRMAS, firmas: [] };
-  let d: unknown;
-  try {
-    d = JSON.parse(texto);
-  } catch (e) {
-    return { error: `no es JSON válido: ${e instanceof Error ? e.message : String(e)}` };
-  }
-  const x = d as Partial<FicheroFirmas>;
-  if (x?.esquema !== VERSION_FIRMAS) return { error: `no es un fichero de firmas ${VERSION_FIRMAS}` };
-  if (!Array.isArray(x.firmas) || !x.firmas.every((f) => f && typeof f.huella === "string" && typeof f.por === "string" && typeof f.fecha === "string" && typeof f.informe === "string")) return { error: "sus firmas no tienen huella, por, fecha e informe" };
-  return { esquema: VERSION_FIRMAS, firmas: x.firmas };
-}
-
-export type EstadoFirma =
-  | { firmado: false }
-  /** `mismoInforme`: el informe firmado es el de ahora (mismo sha256). */
-  | { firmado: true; por: string; fecha: string; mismoInforme: boolean };
-
-/** Estado de firma de una huella con el informe de sha256 `informe`: la última firma de esa huella. */
-export function estadoFirma(f: FicheroFirmas, huella: string, informe: string): EstadoFirma {
-  const firmas = f.firmas.filter((x) => x.huella === huella);
-  const mismo = firmas.filter((x) => x.informe === informe);
-  const ultima = (mismo.length ? mismo : firmas).at(-1);
-  return ultima ? { firmado: true, por: ultima.por, fecha: ultima.fecha, mismoInforme: ultima.informe === informe } : { firmado: false };
-}
-
-/** El fichero con una firma más (si la misma persona ya firmó ese informe, no se repite). */
-export function anadirFirma(f: FicheroFirmas, firma: Firma): FicheroFirmas {
-  if (f.firmas.some((x) => x.huella === firma.huella && x.informe === firma.informe && x.por === firma.por)) return f;
-  return { esquema: VERSION_FIRMAS, firmas: [...f.firmas, firma] };
 }

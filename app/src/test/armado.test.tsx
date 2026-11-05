@@ -71,7 +71,7 @@ function Paneles({ children }: { children: React.ReactNode }) {
 }
 
 function montar(planta: string, seleccion: string | null, edicion?: Edicion) {
-  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "h25.json" }, desactualizado: false, errores: [], motivoGuardados: null, firmas: "", tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {}, ...(edicion ? { edicion } : {}) };
+  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "h25.json" }, desactualizado: false, errores: [], motivoGuardados: null, tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {}, ...(edicion ? { edicion } : {}) };
   return render(
     <ThemeProvider>
       <Paneles>

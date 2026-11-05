@@ -43,7 +43,7 @@ describe("proyectos", () => {
     expect(await esta.sello("proyecto.json")).toBe("2");
     expect(await esta.escribir(texto("A", 2), { sello: leido!.sello, forzar: true })).toMatchObject({ ok: true, sello: "3" });
     expect((await leer(a.id))?.texto).toBe(texto("A", 2));
-    // Lo que no es el proyecto (las firmas) no existe en el navegador
+    // Lo que no es el proyecto no existe en el navegador
     expect(await esta.leer("proyecto.revision.json")).toBeNull();
   });
 
@@ -61,22 +61,6 @@ describe("proyectos", () => {
     expect(await leer(c!.id)).not.toBeNull();
     const r = await escribir(a.id, texto("A"), { sello: 1 });
     expect(r).toMatchObject({ ok: false, conflicto: false });
-  });
-});
-
-describe("UI-32: el fichero de firmas de un proyecto del navegador", () => {
-  it("se escribe y se lee junto al proyecto, y se va con él", async () => {
-    const a = await crear(texto("Nave"));
-    const o = origenNavegador(a.id, "Nave");
-    expect(await o.leer("proyecto.revision.json")).toBeNull();
-    expect(await o.sello("proyecto.revision.json")).toBeNull();
-    expect(await o.escribirFichero!("proyecto.revision.json", '{"firmas":[]}')).toEqual({ ok: true });
-    expect((await o.leer("proyecto.revision.json"))?.texto).toBe('{"firmas":[]}');
-    expect(await o.sello("proyecto.revision.json")).not.toBeNull();
-    // El proyecto no cambia por ello
-    expect((await leer(a.id))?.texto).toBe(texto("Nave"));
-    await borrar(a.id);
-    expect(await origenNavegador(a.id, "Nave").leer("proyecto.revision.json")).toBeNull();
   });
 });
 

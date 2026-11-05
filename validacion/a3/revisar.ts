@@ -36,7 +36,6 @@ export function revisarProyecto(p: Proyecto): { valido: true; revision: Revision
     motor: "validacion",
     diagnosticos: [...c.diagnosticos, ...traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo)],
     equilibrio: r.casos.map((k) => ({ id: k.id, fuerzas: k.equilibrio.fuerzas, momentos: k.equilibrio.momentos })),
-    ficheroFirmas: "proyecto.revision.json",
   });
   return { valido: true, revision, huella: c.huella, segundos: (performance.now() - t0) / 1000 };
 }

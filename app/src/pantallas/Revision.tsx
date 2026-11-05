@@ -1,24 +1,18 @@
 /**
  * Espacio Revisión (la pantalla 7 de V1): el informe de A3 (`revisar`, el mismo de `fem revisar`)
- * con su índice en el navegador, y el estado de su firma en `<proyecto>.revision.json`.
+ * con su índice en el navegador y sus comprobaciones de sensatez en Propiedades.
  *
- * UI-32: se firma también aquí, con el nombre tecleado y «He revisado el informe», con la misma
- * huella y el mismo sha256 del informe que `fem firmar`, y la nota de que la herramienta está en
- * validación. Es una interacción humana: el agente firma sólo si se lo pide el ingeniero, y la skill
- * se lo prohíbe. Donde el origen no puede escribir junto al proyecto (el servidor local), la orden
- * de la CLI.
+ * Sin firma (decisión del usuario, 2026-11-05): no tiene sentido firmar los resultados de un
+ * programa. El informe es la revisión de sensatez del modelo y de sus resultados.
  */
 import { useEffect, useMemo, useState } from "react";
-import { anadirFirma, leerFirmas, NOTA_VALIDACION, VERSION_FIRMAS, type Firma } from "../../../src/agente/revision.ts";
-import { ClipboardCopy } from "lucide-react";
 import type { Bloque } from "../../../src/agente/informe.ts";
-import { Disposicion, Herramienta, Separador } from "../armazon/Disposicion.tsx";
-import { IcFirma, type Icono } from "../armazon/iconos.tsx";
+import { Disposicion } from "../armazon/Disposicion.tsx";
+import { IcInforme } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { Dialogo } from "../editor/Dialogos.tsx";
 import { useVisor } from "../contexto.ts";
-import { nombreFirmas } from "../sesion/origen.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 
 const ancla = (i: number) => `informe-${i}`;
@@ -26,7 +20,7 @@ const ancla = (i: number) => `informe-${i}`;
 /**
  * R-33: la letra de la figura. El SVG de `fem render` pide Roboto, que la página no puede darle a
  * una imagen (salía con serifa, la de por defecto): aquí, una sin serifa del sistema detrás. El
- * fichero del informe no cambia (su sha256 es el de la firma).
+ * fichero del informe no cambia.
  */
 const conLetra = (svg: string) => svg.replace(/font-family="Roboto"/, `font-family="Roboto, 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif"`);
 
@@ -137,100 +131,19 @@ function Documento({ doc }: { doc: Bloque[] }) {
 const TONO = { bien: "ok", avisos: "warn", "no-aplica": "neu" } as const;
 const TEXTO = { bien: "BIEN", avisos: "AVISOS", "no-aplica": "NO APLICA" } as const;
 
-const IcCopiar: Icono = ({ size }) => <ClipboardCopy size={size} strokeWidth={1.5} aria-hidden="true" />;
-
-/** Firmar el informe aquí (UI-32): quién firma, tecleado, y la confirmación de haberlo revisado. */
-function FormularioFirma({ huella, informe, avisos, firmas, firmar }: { huella: string; informe: string; avisos: number; firmas: string; firmar: (texto: string) => Promise<string | null> }) {
-  const [por, setPor] = useState("");
-  const [revisado, setRevisado] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [firmando, setFirmando] = useState(false);
-  const listo = por.trim().length >= 3 && revisado && !firmando;
-  const hacer = async () => {
-    if (!listo) return;
-    const f = leerFirmas(firmas);
-    if ("error" in f) return setError(`El fichero de firmas ${f.error}: no se toca.`);
-    const firma: Firma = { huella, por: por.trim(), fecha: new Date().toISOString(), informe, via: "app", nota: NOTA_VALIDACION };
-    setFirmando(true);
-    const e = await firmar(`${JSON.stringify(anadirFirma(f, firma), null, 2)}\n`);
-    setFirmando(false);
-    setError(e);
-  };
-  return (
-    <form
-      className="flex flex-col gap-2 px-3.5 py-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void hacer();
-      }}
-    >
-      <label className="campo">
-        <span>Quién firma</span>
-        <input value={por} onChange={(e) => setPor(e.target.value)} placeholder="Nombre y apellidos" aria-label="Quién firma" autoComplete="name" />
-      </label>
-      <label className="flex items-start gap-2 text-[12px] text-text-secondary">
-        <input type="checkbox" className="mt-[3px]" checked={revisado} onChange={(e) => setRevisado(e.target.checked)} aria-label="He revisado el informe" />
-        <span>
-          He revisado el informe{avisos ? ` y sus ${avisos} aviso${avisos === 1 ? "" : "s"}` : ""}, y firmo esta versión del proyecto.
-        </span>
-      </label>
-      <p className="m-0 text-[12px] leading-snug text-text-muted">{NOTA_VALIDACION} La firma queda en el fichero de firmas, con la huella del modelo y el sha256 del informe.</p>
-      {error && <p className="m-0 text-[12px] text-state-fail" role="alert">{error}</p>}
-      <button type="submit" className="btn btn-p self-start" disabled={!listo} title={!revisado ? "Marque antes «He revisado el informe»" : por.trim().length < 3 ? "Escriba quién firma" : "Firmar el informe de esta versión"}>
-        {firmando ? "Firmando…" : "Firmar el informe"}
-      </button>
-    </form>
-  );
-}
-
 export function EspacioRevision() {
   const { proyecto } = useVisor();
   const pan = usePaneles("revision", { nav: true, props: true });
-  const [copiada, setCopiada] = useState<"ok" | "fail" | null>(null);
   const e = proyecto.estado!;
-  const fichero = proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? "proyecto.json");
-  const r = usePedido(proyecto.cliente, { tipo: "revision", firmas: proyecto.firmas, ficheroFirmas: nombreFirmas(fichero) });
+  const r = usePedido(proyecto.cliente, { tipo: "revision" });
   const x = r.datos;
 
-  const orden = `bun run fem firmar ${fichero} --por "Nombre"`;
-  const estadoFirma = !x ? null : "error" in x.firma ? { tono: "fail", texto: "FICHERO DE FIRMAS CON ERRORES" } : x.firma.firmado ? (x.firma.mismoInforme ? { tono: "ok", texto: "FIRMADO" } : { tono: "warn", texto: "FIRMADO OTRO INFORME" }) : { tono: "neu", texto: "SIN FIRMAR" };
+  const resumen = !x ? null : x.avisos ? { tono: "warn", texto: `${x.avisos} AVISO${x.avisos === 1 ? "" : "S"} DE SENSATEZ` } : { tono: "ok", texto: "SIN AVISOS DE SENSATEZ" };
   const herramientas = (
-    <>
-      <span className="flex items-center gap-2 px-2 text-[13px] text-text-secondary">
-        <IcFirma size={20} />
-        {estadoFirma ? <span className={`pill ${estadoFirma.tono}`}>{estadoFirma.texto}</span> : "Revisando…"}
-      </span>
-      <Separador />
-      {proyecto.firmar ? (
-        <span className="self-center px-2 text-[12px] text-text-muted">Firmar es del ingeniero, después de leer el informe: en Propiedades, a la derecha.</span>
-      ) : (
-        <>
-          <Herramienta
-            icono={IcCopiar}
-            nombre={copiada === "ok" ? "Copiada" : "Orden de firmar"}
-            title={`Copiar la orden: ${orden}`}
-            onClick={() => {
-              // C-11: si el portapapeles se niega (o no lo hay), se dice y se enseña la orden
-              const p = navigator.clipboard?.writeText(orden) ?? Promise.reject(new Error("sin portapapeles"));
-              p.then(
-                () => {
-                  setCopiada("ok");
-                  window.setTimeout(() => setCopiada(null), 1500);
-                },
-                () => setCopiada("fail"),
-              );
-            }}
-          />
-          {copiada === "fail" ? (
-            <span className="self-center px-2 text-[12px] text-state-fail" role="status">
-              El navegador no dejó copiar al portapapeles. La orden es <span className="mono">{orden}</span>
-            </span>
-          ) : (
-            <span className="self-center px-2 text-[12px] text-text-muted">Firmar es del ingeniero, en la línea de órdenes, después de leer el informe.</span>
-          )}
-        </>
-      )}
-    </>
+    <span className="flex items-center gap-2 px-2 text-[13px] text-text-secondary">
+      <IcInforme size={20} />
+      {resumen ? <span className={`pill ${resumen.tono}`}>{resumen.texto}</span> : "Revisando…"}
+    </span>
   );
 
   return (
@@ -280,39 +193,11 @@ export function EspacioRevision() {
       </section>
       }
       props={{
-        titulo: "Firma",
+        titulo: "Informe",
         ancho: 320,
         contenido: (
           <>
-        <Cabecera
-          icono={IcFirma}
-          tipo="Informe de revisión"
-          titulo={!x ? "—" : "error" in x.firma ? "Firmas ilegibles" : x.firma.firmado ? (x.firma.mismoInforme ? "Firmado" : "Firmado otro informe") : "Sin firmar"}
-          detalle={x && !("error" in x.firma) && x.firma.firmado ? `Por ${x.firma.por} el ${x.firma.fecha.slice(0, 10)}.` : undefined}
-        >
-          {x && !("error" in x.firma) && <span className={`pill ${x.firma.firmado ? (x.firma.mismoInforme ? "ok" : "warn") : "neu"}`}>{x.firma.firmado ? (x.firma.mismoInforme ? "FIRMADO" : "OTRO INFORME") : "SIN FIRMAR"}</span>}
-        </Cabecera>
-        <Seccion titulo="Firma">
-          {x &&
-            ("error" in x.firma ? (
-              <p className="nota text-state-fail">El fichero de firmas {x.firma.error}.</p>
-            ) : x.firma.firmado ? (
-              !x.firma.mismoInforme && <p className="nota text-state-warn">La firma es de esta huella pero de otro informe (otro núcleo de cálculo u otras comprobaciones): hay que volver a revisarlo.</p>
-            ) : (
-              x.otrasHuellas > 0 && <p className="nota text-state-warn">Hay {x.otrasHuellas} firma{x.otrasHuellas === 1 ? "" : "s"} de versiones anteriores del proyecto: el modelo cambió desde entonces.</p>
-            ))}
-          {x && !("error" in x.firma) && !(x.firma.firmado && x.firma.mismoInforme) && proyecto.firmar && !proyecto.desactualizado ? (
-            <FormularioFirma huella={e.huella} informe={x.sha256} avisos={x.avisos} firmas={proyecto.firmas} firmar={proyecto.firmar} />
-          ) : !proyecto.firmar ? (
-            <p className="nota">
-              {proyecto.fuente?.tipo !== "origen"
-                ? "Abierto sin su carpeta, el proyecto no se puede firmar aquí: guárdelo en sus proyectos (botón de la barra de arriba) o ábralo desde su carpeta."
-                : "Aquí no se puede escribir junto al proyecto: fírmelo en la línea de órdenes, después de leer el informe."}
-              <code className="mt-1 block rounded bg-bg-elevated px-2 py-1 font-mono text-[11px] text-text-primary">bun run fem firmar {fichero} --por "Nombre"</code>
-            </p>
-          ) : null}
-          {x && !("error" in x.firma) && x.firma.firmado && <p className="nota">Firmas en {proyecto.fuente?.tipo === "origen" && proyecto.fuente.origen.navegador ? "este navegador, con el proyecto" : `${fichero.replace(/\.json$/i, "")}.revision.json, junto al proyecto`} ({VERSION_FIRMAS}).</p>}
-        </Seccion>
+        <Cabecera icono={IcInforme} tipo="Informe de revisión" titulo={!x ? "—" : x.avisos ? "Con avisos" : "Sin avisos"} detalle="Comprobaciones de orden de magnitud del modelo y de sus resultados; no son comprobaciones de norma." />
         {x && (
           <>
             <Seccion titulo="Identidad">
@@ -321,16 +206,10 @@ export function EspacioRevision() {
                 <span className="v">{e.huella.slice(0, 16)}</span>
               </div>
               <div className="fila">
-                <span>sha256 del informe</span>
-                <span className="v" title={x.sha256}>
-                  {x.sha256.slice(0, 16)}
-                </span>
-              </div>
-              <div className="fila">
                 <span>Núcleo</span>
                 <span className="v">{proyecto.cliente?.motor?.slice(0, 16)}</span>
               </div>
-              <p className="nota">El sha256 es el del informe en Markdown que escribe <span className="mono">fem revisar</span>: el que cubre la firma.</p>
+              <p className="nota">El informe vale para esta versión del proyecto: si el modelo cambia, se rehace.</p>
             </Seccion>
             {/* R-29: de sensatez (los del compilador y el cálculo, al final del informe y en Diagnósticos) */}
             <Seccion titulo="Comprobaciones de sensatez" valor={`${x.avisos} aviso${x.avisos === 1 ? "" : "s"}`}>

@@ -51,15 +51,14 @@ describe("los textos de la app no nombran software comercial ni lo interno", () 
   });
 
   it("UI-43: los literales de la app no llevan códigos internos ni órdenes de la CLI", () => {
-    // Las órdenes de firmar de Revisión son el camino real hasta que se firme en la web (UI-32), y
     // `origen.ts` lee los guardados de la CLI por su ruta
-    const permitidos = /pantallas[\\/]Revision\.tsx|sesion[\\/]origen\.ts/;
+    const permitidos = /sesion[\\/]origen\.ts/;
     const malos: string[] = [];
     for (const f of ficheros(join(RAIZ, "app", "src"))) {
       if (permitidos.test(f) || /[\\/]fmt\.ts$/.test(f)) continue;
       for (const l of sinComentarios(readFileSync(f, "utf8")).split("\n")) {
         const parentesis = [...l.matchAll(/\(([^()]*)\)/g)].some((m) => soloCodigos(m[1]!));
-        if (parentesis || /\bfem (validar|calcular|compilar|consultar|resumen|render|revisar|firmar)\b|\.fem\/|\bSPR\b|ε_snap/.test(l)) malos.push(`${relative(RAIZ, f)}: ${l.trim().slice(0, 140)}`);
+        if (parentesis || /\bfem (validar|calcular|compilar|consultar|resumen|render|revisar)\b|\.fem\/|\bSPR\b|ε_snap/.test(l)) malos.push(`${relative(RAIZ, f)}: ${l.trim().slice(0, 140)}`);
       }
     }
     expect(malos).toEqual([]);

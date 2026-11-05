@@ -1,12 +1,13 @@
 /**
- * Informe de revisión (A3, regla A3 de `docs/fem3d/agente.md`): lo que el ingeniero revisa y firma
- * antes de dar por bueno un resultado. Va ligado a la huella: si el modelo cambia, deja de valer.
+ * Informe de revisión (A3, regla A3 de `docs/fem3d/agente.md`): lo que el ingeniero revisa antes de
+ * dar por bueno un resultado (sin firma: decisión del usuario, 2026-11-05). Va ligado a la huella:
+ * si el modelo cambia, deja de valer.
  *
  * Contiene las comprobaciones de sensatez con sus avisos, el resumen del modelo, las cargas por
  * planta, el desglose del peso propio, la bajada tributaria, las hipótesis y los avisos del
  * compilador y del cálculo. Se arma como un documento (`Bloque[]`) y se escribe en Markdown y en
  * HTML. No lleva fecha ni nada que no salga del proyecto y de su cálculo, así que es determinista y
- * su sha256 se puede reproducir (`fem firmar` lo guarda).
+ * su sha256 se puede reproducir.
  *
  * Puro: entran los datos y salen textos.
  */
@@ -23,7 +24,7 @@ export type Bloque =
   | { tipo: "parrafo"; texto: string }
   | { tipo: "lista"; items: string[] }
   | { tipo: "tabla"; cabecera: string[]; filas: string[][]; numericas?: number[] }
-  /** Figura (A4): su SVG va en el HTML; en el Markdown, su título y el sha256 del SVG, que la firma cubre. */
+  /** Figura (A4): su SVG va en el HTML; en el Markdown, su título y el sha256 del SVG. */
   | { tipo: "figura"; titulo: string; svg: string };
 
 /** Avisos que se listan de cada comprobación en el informe; del resto se dice cuántos hay. */
@@ -54,8 +55,6 @@ export interface DatosInforme {
   equilibrio: readonly { id: string; fuerzas: number; momentos: number }[];
   modelo: SensatezModelo;
   resultados: SensatezResultados;
-  /** Nombre del fichero de firmas, para decirlo en el informe. */
-  ficheroFirmas: string;
   /** Figuras del render (A4): la planta del modelo y la uz de las losas de cada planta. */
   figuras?: readonly { titulo: string; svg: string }[];
 }
@@ -234,7 +233,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
 
   if (d.figuras?.length) {
     titulo(2, "Figuras");
-    parrafo("La planta del modelo y el desplazamiento vertical de las losas de cada planta, en la combinación de las flechas. Las figuras van en el informe HTML; aquí, el sha256 de cada SVG, así que la firma también las cubre. Todas las vistas, con «fem render».");
+    parrafo("La planta del modelo y el desplazamiento vertical de las losas de cada planta, en la combinación de las flechas. Las figuras van en el informe HTML; aquí, el sha256 de cada SVG. Todas las vistas, con «fem render».");
     for (const x of d.figuras) b.push({ tipo: "figura", titulo: x.titulo, svg: x.svg });
   }
 
@@ -264,8 +263,6 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
     ],
   });
 
-  titulo(2, "Firma");
-  parrafo(`El ingeniero firma este informe con «fem firmar <proyecto> --por "<nombre>"», que guarda en ${d.ficheroFirmas}, junto al proyecto, la huella ${d.huella.slice(0, 16)}…, quién firma, la fecha y el sha256 de este informe. El agente nunca firma.`);
   return b;
 }
 

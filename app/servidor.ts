@@ -79,7 +79,7 @@ export function manejadorCarpeta(carpeta: string, fichero: string) {
     }
     const valido = (req.method === "GET" || req.method === "HEAD") && dentro && existsSync(f) && statSync(f).isFile();
     if (!valido) {
-      // Un HEAD de lo que no existe es la vigilancia (las firmas aún sin firmar): 204, sin error en la consola
+      // Un HEAD de lo que no existe es la vigilancia: 204, sin error en la consola
       if (req.method === "HEAD") res.setHeader("x-existe", "no");
       res.statusCode = req.method === "HEAD" ? 204 : req.method === "GET" ? 404 : 405;
       res.end();

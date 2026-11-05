@@ -17,9 +17,8 @@ Trabajas sobre **un único fichero `proyecto.json`**: es la única fuente de ver
    - No te inventes cargas que no te han dado.
 3. **No decides por el ingeniero.** Si la descripción es ambigua (una luz, una sección, un apoyo), pregunta o dilo; no elijas en silencio. Las opciones de compilación por defecto (`opciones`) ya están decididas: no las cambies si no te lo piden. Si te lo piden («sin modificadores de rigidez», «malla de 1 m»), búscalas en el esquema: `"modificadores": {}` quita los de por defecto.
 4. **Ningún resultado vale si `ok` no es `true`.** Los errores se corrigen en el fichero, por el `id` que nombra cada diagnóstico. Los avisos se leen todos y se explican al usuario si afectan al modelo.
-5. **Ningún resultado se da por bueno sin `fem revisar`.** Sus avisos de sensatez (`sensatez/…`) se corrigen si son un error del modelo o se explican al usuario si son legítimos. Nunca los silencies cambiando el modelo para que desaparezcan.
-6. **Nunca ejecutas `fem firmar`.** Firmar es del ingeniero, después de leer el informe. Tú le dices dónde está el informe y qué avisos tiene.
-7. **Un número nunca se lee de una imagen.** Las figuras de `fem render` sirven para ver el modelo y encontrar lo raro. El valor que cites sale del JSON de `render` (`extremos`) o de una consulta.
+5. **Ningún resultado se da por bueno sin `fem revisar`.** Sus avisos de sensatez (`sensatez/…`) se corrigen si son un error del modelo o se explican al usuario si son legítimos. Nunca los silencies cambiando el modelo para que desaparezcan. Al acabar, dile al ingeniero dónde está el informe y qué avisos tiene: él lo revisa (no hay firma).
+6. **Un número nunca se lee de una imagen.** Las figuras de `fem render` sirven para ver el modelo y encontrar lo raro. El valor que cites sale del JSON de `render` (`extremos`) o de una consulta.
 
 ## Flujo
 
@@ -52,7 +51,7 @@ fem revisar proyecto.json                    # sensatez e informe de revisión (
 - axil de cada pilar frente a su bajada por áreas tributarias;
 - luz/canto de vigas y losas, flechas, desplomes y axil reducido.
 
-Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe en `.fem/<huella>/informe.md` e `informe.html`, y dice si esa huella está firmada (`firma`). Un aviso legítimo (una transición, un voladizo) se explica; uno que delata un error del modelo, se corrige en el fichero.
+Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe en `.fem/<huella>/informe.md` e `informe.html`. Un aviso legítimo (una transición, un voladizo) se explica; uno que delata un error del modelo, se corrige en el fichero.
 
 ### Render
 
@@ -104,7 +103,7 @@ La app vigila el fichero: cada vez que lo editas, se recarga sola (o usa lo que 
 - Las losas macizas y reticulares se arman con **franjas** de ancho fijo (1 m, o el intereje en un reticular) que cubren toda la losa en sus dos direcciones (X, el `eje1` de la losa, e Y). No se escriben: salen solas de la losa, y sus esfuerzos, de `consultar franjas` y `consultar franja`. La app ya no propone ni edita bandas; las `bandas` del proyecto, si las hay, son cortes de comprobación tuyos: no las quites ni las cambies sin que el ingeniero lo pida.
 - La **armadura base** (`armado` del proyecto, fuera del `modelo`: no cambia la huella ni obliga a recalcular) es el momento en kN·m/m que cubre la armadura base de cada losa: `{ "base": { "x-sup": 20 }, "losas": { "<losa>": { "x-inf": 15 } } }` (la de la losa manda sobre la común; las armaduras son `x-inf`, `x-sup`, `y-inf` e `y-sup`). Es una decisión del ingeniero: léela y úsala, pero no la pongas ni la cambies si no te la da.
 
-La app no firma. Tú no la necesitas: tus números salen de la CLI.
+Tú no necesitas la app: tus números salen de la CLI.
 
 ## El fichero
 

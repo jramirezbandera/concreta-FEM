@@ -210,10 +210,11 @@ export const IcReacciones = icono(
     <path d="M7 18V8M4.5 10.5 7 8l2.5 2.5M17 18V5M14.5 7.5 17 5l2.5 2.5" />
   </>,
 );
-export const IcFirma = icono(
+/** El informe de revisión: una hoja con una marca. */
+export const IcInforme = icono(
   <>
-    <path d="M3 17c3 0 4-6 6-6s1 5 3 5 2-3 4-3 2 2 5 2" />
-    <path d="M3 21h18" />
+    <path d="M6 3h9l4 4v14H6z" />
+    <path d="M15 3v4h4M9 14l2 2 4-4" />
   </>,
 );
 export const IcEjes = icono(

@@ -505,9 +505,8 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
   it("revisión: el informe es el de fem revisar (mismo sha256)", async () => {
     const r = await ejecutar(["revisar", proyecto]);
     expect(r.codigo, JSON.stringify(r.json)).toBe(0);
-    const x = valido(datosRevision(s, "", "proyecto.revision.json"));
+    const x = valido(datosRevision(s));
     expect(x.sha256).toBe((r.json.informe as { sha256: string }).sha256);
-    expect(x.firma).toEqual(r.json.firma);
   }, 120_000);
 
   it("3D: la geometría y los desplazamientos son los del modelo y del cálculo", () => {

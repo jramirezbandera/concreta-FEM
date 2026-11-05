@@ -4,7 +4,7 @@
  * - el peso propio esperado (sin la malla) es el del cálculo;
  * - la bajada tributaria: un caso a mano y la conservación de la carga en edificios;
  * - criterio 1: las mutaciones graves se detectan todas (el banco de `validacion/a3/mutaciones.ts`);
- * - el informe es determinista y las firmas valen para su huella y su informe.
+ * - el informe es determinista y lleva la huella.
  * El criterio 2 (avisos en las referencias a tamaño completo) lo mide `validacion/a3/referencias.ts`.
  */
 import { readFileSync } from "node:fs";
@@ -19,7 +19,6 @@ import { prepararNucleo, proyectoDe, revisarProyecto } from "../../validacion/a3
 import { compilar } from "../compilador/compilar.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
-import { anadirFirma, estadoFirma, leerFirmas, VERSION_FIRMAS } from "./revision.ts";
 import { leerProyecto } from "./proyecto.ts";
 import { pesoPropioCalculado, pesoPropioEsperado, Plantas, sensatezPrevia } from "./sensatez.ts";
 import { bajadaTributaria } from "./tributaria.ts";
@@ -199,7 +198,7 @@ describe("criterio 1: mutaciones graves", () => {
   });
 });
 
-describe("informe y firmas", () => {
+describe("informe", () => {
   it("el informe es determinista y lleva la huella", () => {
     const p = proyectoDe(losaCuatroPilares(), undefined, "Losa <de> prueba");
     const [a, b] = [revisarProyecto(p), revisarProyecto(p)];
@@ -219,20 +218,5 @@ describe("informe y firmas", () => {
     // G: la losa (25 · 0,2 · 36 = 180) y los pilares (4 · 25 · 0,09 · 3 = 27); Q: 10 · 36 = 360
     expect(md).toContain("| Total |  |  | 207 | 360 |");
     for (const p of ["P1", "P2", "P3", "P4"]) expect(md).toMatch(new RegExp(`\\| ${p} \\| [0-9,]+ \\| [0-9,]+ \\| 51,75 \\| 90 \\|`));
-  });
-
-  it("una firma vale para su huella y dice si el informe es el mismo", () => {
-    let f = leerFirmas("");
-    if ("error" in f) throw new Error(f.error);
-    expect(estadoFirma(f, "h1", "s1")).toEqual({ firmado: false });
-    f = anadirFirma(f, { huella: "h1", por: "A", fecha: "2026-10-09T10:00:00Z", informe: "s1" });
-    expect(anadirFirma(f, { huella: "h1", por: "A", fecha: "2026-10-10T10:00:00Z", informe: "s1" }).firmas).toHaveLength(1);
-    expect(estadoFirma(f, "h1", "s1")).toEqual({ firmado: true, por: "A", fecha: "2026-10-09T10:00:00Z", mismoInforme: true });
-    expect(estadoFirma(f, "h1", "s2")).toMatchObject({ firmado: true, mismoInforme: false });
-    expect(estadoFirma(f, "h2", "s1")).toEqual({ firmado: false });
-    const otra = leerFirmas(JSON.stringify(f));
-    expect(otra).toEqual({ esquema: VERSION_FIRMAS, firmas: f.firmas });
-    expect(leerFirmas('{"esquema":"otro","firmas":[]}')).toHaveProperty("error");
-    expect(leerFirmas("{roto")).toHaveProperty("error");
   });
 });

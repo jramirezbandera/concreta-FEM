@@ -184,23 +184,11 @@ export async function escribir(id: string, texto: string, o: { sello: number | n
   }
 }
 
-/** La clave de un fichero de un proyecto (las firmas) en «textos». */
-const claveFichero = (id: string, nombre: string) => `${id}/${nombre}`;
-
-/** UI-32: un fichero de texto de un proyecto del navegador (las firmas), o null si no lo tiene. */
-export async function leerFichero(id: string, nombre: string): Promise<string | null> {
-  const r = await tx(["textos"], "readonly", (t) => pedido(t.objectStore("textos").get(claveFichero(id, nombre)) as IDBRequest<string | undefined>));
-  return r ?? null;
-}
-
-export async function escribirFichero(id: string, nombre: string, texto: string): Promise<void> {
-  await tx(["textos"], "readwrite", (t) => pedido(t.objectStore("textos").put(texto, claveFichero(id, nombre))));
-}
-
 export async function borrar(id: string): Promise<void> {
   await tx(["proyectos", "textos", "versiones", "resultados"], "readwrite", async (t) => {
     t.objectStore("proyectos").delete(id);
     t.objectStore("textos").delete(id);
+    // Los ficheros junto al proyecto de versiones anteriores (las firmas, ya sin uso)
     t.objectStore("textos").delete(IDBKeyRange.bound(`${id}/`, `${id}/\uffff`));
     for (const almacen of ["versiones", "resultados"]) {
       const s = t.objectStore(almacen);
@@ -347,28 +335,14 @@ export function origenNavegador(id: string, nombre: string): Origen {
     fichero,
     navegador: id,
     async leer(n) {
-      if (n !== fichero) {
-        const t = await leerFichero(id, n);
-        return t === null ? null : { texto: t, sello: `${t.length}` };
-      }
+      if (n !== fichero) return null;
       const l = await leer(id);
       return l ? { texto: l.texto, sello: String(l.ficha.sello) } : null;
     },
     async sello(n) {
-      if (n !== fichero) {
-        const t = await leerFichero(id, n);
-        return t === null ? null : `${t.length}`;
-      }
+      if (n !== fichero) return null;
       const f = await ficha(id);
       return f ? String(f.sello) : null;
-    },
-    async escribirFichero(n, texto) {
-      try {
-        await escribirFichero(id, n, texto);
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, mensaje: `No se pudo guardar ${n} en el navegador: ${e instanceof Error ? e.message : String(e)}` };
-      }
     },
     guardados: (huella) => leerResultados(huella).catch(() => null),
     escribir: (texto, o) => escribir(id, texto, { sello: o.sello === null ? null : Number(o.sello), ...(o.forzar ? { forzar: true } : {}) }),

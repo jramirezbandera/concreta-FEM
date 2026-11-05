@@ -708,6 +708,7 @@
   - **DW1-1:** ACadSharp no comprueba los CRC al leer; aquí se comprueban todos (cabecera del fichero, de variables, mapa y cada objeto). Un objeto dañado va a `fallos` y el resto sale igual: con bytes cambiados al azar, o se avisa o sale lo mismo.
   - **DW-d, como se proponía:** `validacion/dwg/muestras.ts` trae las muestras con su sha256 (también en el CI). Las pruebas, en `src/dwg/dwg.test.ts`. `NOTICE` cita ACadSharp.
   - **Sigue DW2:** el resto de entidades, los bloques y las clases.
+- **2026-11-05: sin firma** (decisión del usuario: «no tiene sentido que se firmen los resultados del programa»; `agente.md` §11). Fuera `fem firmar`, el fichero `<proyecto>.revision.json`, el campo `firma` de `fem revisar`, la sección «Firma» del informe (cambia su sha256) y el formulario de firmar de Revisión. Se quedan `fem revisar`, el informe de sensatez ligado a la huella y la pantalla Revisión con sus comprobaciones.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

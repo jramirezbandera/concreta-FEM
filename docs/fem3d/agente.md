@@ -36,7 +36,8 @@ Lo que falta es una capa fina: un fichero de proyecto, una CLI, consultas compac
     - cargas por planta;
     - comprobaciones de sensatez (§3, A3);
     - avisos.
-  - El ingeniero lo revisa y lo firma. Si después cambia el modelo, la huella cambia y el informe deja de valer.
+  - El ingeniero lo revisa. Si después cambia el modelo, la huella cambia y el informe deja de valer.
+  - **Sin firma (decisión del usuario, 2026-11-05, §11):** no tiene sentido firmar los resultados de un programa. Se quitaron `fem firmar`, el fichero `<proyecto>.revision.json` y la firma de la app; el informe de sensatez se queda.
   - Es la regla de oro 1 aplicada a la entrada: un error de modelado es un fallo silencioso como cualquier otro.
 - **A4. Es un adaptador; el motor sigue puro.**
   - Las consultas, los resúmenes y las comprobaciones de sensatez son puros (`src/agente/`), para poder llevarlos a Concreta.
@@ -112,14 +113,14 @@ Los rangos se fijan con el usuario. Igual que las metamórficas, se validan con 
 
 | Riesgo | Mitigación |
 |---|---|
-| **Error de modelado silencioso:** el motor calcula bien un modelo equivocado | A3 (sensatez, informe y firma) y A7 (periodo en sombra con modelos del agente) |
+| **Error de modelado silencioso:** el motor calcula bien un modelo equivocado | A3 (sensatez e informe) y A7 (periodo en sombra con modelos del agente) |
 | Coordenadas sacadas de una imagen | A5: DXF o IFC antes que PDF; ráster sólo como referencia y con superposición. Las tolerancias de H28 absorben el ruido de dibujo, no el de una lectura mala |
 | El modelo de lenguaje «recuerda» mal la norma | A1: la norma va en código con tests. El agente cita lo que devuelve la herramienta |
 | Modelos grandes que no caben en el contexto | A1: resúmenes y consultas acotadas; ediciones por planta o por objeto, no el fichero entero |
 | Las comprobaciones viven en Concreta | La capa sólo depende de las consultas de C5. La versión completa (dimensionado, armado) se integra allí con el PR que decida el usuario |
 | Depender de un proveedor de IA | La CLI y el esquema no dependen de ningún agente: cualquiera, o una persona, puede usarlos. La skill y el MCP son el único acoplamiento |
 | **Confidencialidad:** los planos y modelos de clientes llegan al proveedor de la IA | Decidirlo por proyecto, con las condiciones del servicio que se use. El motor y la CLI corren en local; sólo sale lo que el agente lee |
-| Trazabilidad de la firma | git registra cada edición del agente; el informe va ligado a la huella y anota qué partes del modelo vienen de un plano (`proyecto.origen.json`) |
+| Trazabilidad | git registra cada edición del agente; el informe va ligado a la huella y anota qué partes del modelo vienen de un plano (`proyecto.origen.json`) |
 
 ## 5. Fuera del alcance
 
@@ -350,3 +351,13 @@ Combinaciones por defecto: las de las consultas de A1 (`combinaciones.ts`); si l
    - `informe.md` lista cada figura con el sha256 de su SVG, así que la firma también cubre las figuras.
 
 **Fuera de A4:** la axonometría; el plano de fondo, que va con A5; las vistas en alzado de muros y pórticos.
+
+## 11. Sin firma (decisión del usuario, 2026-11-05)
+
+El usuario: «no tiene sentido que se firmen los resultados del programa […]; está bien que haya informe de sensatez, pero lo de firmar no». Lo que firma el ingeniero es su proyecto, no la salida de una herramienta.
+
+- **Quitado:** la orden `fem firmar` (y `--por`), el fichero de firmas `<proyecto>.revision.json` (`leerFirmas`, `estadoFirma`, `anadirFirma`, `NOTA_VALIDACION` de `src/agente/revision.ts`), el campo `firma` de `fem revisar`, la sección «Firma» del informe, el formulario de firmar de Revisión y la orden de firmar copiable (UI-32), y el fichero de firmas de los proyectos del navegador.
+- **Se queda:** `fem revisar`, el informe en Markdown y HTML ligado a la huella (su sha256 sigue en la salida de `fem revisar`, para reconocerlo) y la pantalla Revisión, con sus comprobaciones de sensatez.
+- **Cambia el informe:** sin la sección «Firma», su sha256 cambia.
+- **Los `.revision.json` que ya existan** no se leen ni se borran. Abrir una carpeta los sigue saltando al buscar proyectos.
+- Lo de §7, §8 y §10 sobre la firma queda como historia.

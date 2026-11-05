@@ -4,7 +4,7 @@
  * espesor en cm, un pilar que falta), y eso es un fallo silencioso como cualquier otro.
  *
  * - Dan avisos (`sensatez/…`), nunca errores: un valor raro puede ser legítimo (una viga de
- *   transición, un voladizo). El ingeniero los revisa en el informe (`informe.ts`) y lo firma.
+ *   transición, un voladizo). El ingeniero los revisa en el informe (`informe.ts`).
  * - Se calculan desde el modelo físico, por un camino independiente del compilador: sin la malla,
  *   con sus polígonos (`poligonos.ts`) y las fórmulas de las secciones. De lo compilado sólo usan
  *   el reparto de las cargas por planta (el del resumen, A1) y el peso propio calculado, que es lo

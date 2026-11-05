@@ -15,7 +15,7 @@ import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
 import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
-import { estadoFirma, leerFirmas, revisar, type EstadoFirma } from "../agente/revision.ts";
+import { revisar } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion } from "../agente/sensatez.ts";
 import { puntosBarra } from "../compilador/barras.ts";
@@ -698,15 +698,12 @@ export interface DatosRevision {
   documento: Bloque[];
   comprobaciones: Pick<Comprobacion, "codigo" | "titulo" | "estado" | "peor">[];
   avisos: number;
-  /** sha256 del informe en Markdown: el que firma `fem firmar`. */
+  /** sha256 del informe en Markdown: el mismo de `fem revisar`. */
   sha256: string;
-  firma: EstadoFirma | { error: string };
-  /** Firmas de otras huellas en el fichero (el proyecto cambió desde que se firmaron). */
-  otrasHuellas: number;
 }
 
-/** La revisión de A3, como `fem revisar`, y el estado de su firma en el fichero de firmas (su texto, o vacío). */
-export function datosRevision(s: Sesion, textoFirmas: string, ficheroFirmas: string): Resultado<DatosRevision> {
+/** La revisión de A3, como `fem revisar`. */
+export function datosRevision(s: Sesion): Resultado<DatosRevision> {
   const q = s.q;
   const c = s.compilado;
   const cab = s.cabeceraResultados;
@@ -715,19 +712,14 @@ export function datosRevision(s: Sesion, textoFirmas: string, ficheroFirmas: str
     motor: s.motor,
     diagnosticos: [...c.diagnosticos, ...cab.diagnosticos],
     equilibrio: cab.casos.map((x) => ({ id: x.id, ...x.equilibrio })),
-    ficheroFirmas,
   });
-  const sha = sha256(rev.markdown);
-  const fichero = leerFirmas(textoFirmas);
   return {
     valido: true,
     valor: {
       documento: rev.documento,
       comprobaciones: rev.comprobaciones.map((x) => ({ codigo: x.codigo, titulo: x.titulo, estado: x.estado, ...(x.peor ? { peor: x.peor } : {}) })),
       avisos: rev.avisos.length,
-      sha256: sha,
-      firma: "error" in fichero ? fichero : estadoFirma(fichero, s.huella, sha),
-      otrasHuellas: "error" in fichero ? 0 : fichero.firmas.filter((x) => x.huella !== s.huella).length,
+      sha256: sha256(rev.markdown),
     },
   };
 }

@@ -30,7 +30,7 @@ import { aplicar, type Aplicacion, type Operacion } from "../../../src/editor/op
 import { serializar } from "../../../src/editor/serializar.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
-import { descargar, nombreFirmas, type Origen } from "./origen.ts";
+import { descargar, type Origen } from "./origen.ts";
 import { crear, origenNavegador, versionar } from "./almacen.ts";
 import { ClienteSesion, ErrorObsoleto } from "./cliente.ts";
 
@@ -92,13 +92,6 @@ export interface ProyectoAbierto {
   errores: Diagnostico[];
   /** Por qué no se usaron los resultados de `.fem/` (si los había). */
   motivoGuardados: string | null;
-  /** Texto del fichero de firmas (vacío si no hay). */
-  firmas: string;
-  /**
-   * UI-32: añade una firma al fichero de firmas, junto al proyecto (en la carpeta o en el
-   * navegador); null si se hizo, o por qué no. Sin `escribirFichero` en el origen, no se puede.
-   */
-  firmar?: (texto: string) => Promise<string | null>;
   tiempos: Tiempos;
   /** Cuenta las cargas: cambia con cada versión del proyecto. */
   version: number;
@@ -177,7 +170,6 @@ export function useProyecto(): ProyectoAbierto {
   const [desactualizado, setDesactualizado] = useState(false);
   const [errores, setErrores] = useState<Diagnostico[]>([]);
   const [motivoGuardados, setMotivoGuardados] = useState<string | null>(null);
-  const [firmas, setFirmas] = useState("");
   const [tiempos, setTiempos] = useState<Tiempos>({});
   const [version, setVersion] = useState(0);
   const [hist, setHist] = useState<Historial | null>(null);
@@ -189,7 +181,7 @@ export function useProyecto(): ProyectoAbierto {
   const [progreso, setProgreso] = useState<string | null>(null);
   const gen = useRef(0);
   const clienteRef = useRef<ClienteSesion | null>(null);
-  const ultimo = useRef<{ texto: string; sello: string | null; selloFirmas: string | null } | null>(null);
+  const ultimo = useRef<{ texto: string; sello: string | null } | null>(null);
   const histRef = useRef<Historial | null>(null);
   const sinGuardarRef = useRef(false);
   const temporizador = useRef<number | null>(null);
@@ -334,25 +326,16 @@ export function useProyecto(): ProyectoAbierto {
     setGuardado({ tipo: "nada" });
   }, []);
 
-  const leerFirmas = useCallback(async (f: Fuente) => {
-    if (f.tipo !== "origen") return null;
-    const l = await f.origen.leer(nombreFirmas(f.origen.fichero));
-    setFirmas(l?.texto ?? "");
-    return l?.sello ?? null;
-  }, []);
-
   const abrirOrigen = useCallback(
     (o: Origen) => {
       void (async () => {
         // C-12: si leer lanza (IndexedDB, permisos), se dice; antes el clic no hacía nada
         let l: Awaited<ReturnType<Origen["leer"]>>;
-        let selloFirmas: string | null;
         const f: Fuente = { tipo: "origen", origen: o };
         try {
           // AL §3.3: lo que había al abrir queda como versión, antes de cualquier cambio
           if (o.navegador) await versionar(o.navegador).catch(() => {});
           l = await o.leer(o.fichero);
-          selloFirmas = l ? await leerFirmas(f) : null;
         } catch (e) {
           setErrores([{ codigo: "visor/fichero", severidad: "error", mensaje: `No se pudo leer ${o.descripcion}: ${e instanceof Error ? e.message : String(e)}` }]);
           setFase("error");
@@ -363,18 +346,17 @@ export function useProyecto(): ProyectoAbierto {
           setFase("error");
           return;
         }
-        ultimo.current = { texto: l.texto, sello: l.sello, selloFirmas };
+        ultimo.current = { texto: l.texto, sello: l.sello };
         empezarEdicion(l.texto);
         await cargar(l.texto, f);
       })();
     },
-    [cargar, leerFirmas, empezarEdicion],
+    [cargar, empezarEdicion],
   );
 
   const abrirTexto = useCallback(
     (texto: string, nombre: string) => {
-      ultimo.current = { texto, sello: null, selloFirmas: null };
-      setFirmas("");
+      ultimo.current = { texto, sello: null };
       empezarEdicion(texto);
       void cargar(texto, { tipo: "texto", nombre });
     },
@@ -518,7 +500,7 @@ export function useProyecto(): ProyectoAbierto {
       try {
         r = await fuente.origen.escribir(texto, { sello: ultimo.current?.sello ?? null, forzar: o.forzar });
         // El sello nuevo, antes de soltar la marca: la vigilancia no lo puede ver como un cambio de fuera
-        if (r.ok) ultimo.current = { texto, sello: r.sello, selloFirmas: ultimo.current?.selloFirmas ?? null };
+        if (r.ok) ultimo.current = { texto, sello: r.sello };
       } finally {
         escribiendo.current = false;
       }
@@ -546,13 +528,13 @@ export function useProyecto(): ProyectoAbierto {
         return;
       }
       setDesactualizado(true);
-      ultimo.current = { texto: l.texto, sello: l.sello, selloFirmas: ultimo.current?.selloFirmas ?? null };
+      ultimo.current = { texto: l.texto, sello: l.sello };
       empezarEdicion(l.texto);
       await cargar(l.texto, fuente);
     })();
   }, [cargar, fuente, empezarEdicion]);
 
-  // Vigilancia del fichero y de sus firmas
+  // Vigilancia del fichero
   useEffect(() => {
     if (!fuente || fuente.tipo !== "origen") return;
     const o = fuente.origen;
@@ -585,8 +567,6 @@ export function useProyecto(): ProyectoAbierto {
             }
           }
         }
-        const sf = await o.sello(nombreFirmas(o.fichero));
-        if (sf !== ultimo.current.selloFirmas) ultimo.current = { ...ultimo.current, selloFirmas: await leerFirmas(fuente) };
         fallos = 0;
       } catch (e) {
         if (++fallos === FALLOS_VIGILANCIA && !parado) {
@@ -601,7 +581,7 @@ export function useProyecto(): ProyectoAbierto {
       parado = true;
       window.clearInterval(t);
     };
-  }, [fuente, cargar, leerFirmas, empezarEdicion]);
+  }, [fuente, cargar, empezarEdicion]);
 
   // AL-b: en el navegador se guarda solo tras una pausa (no con un conflicto ni tras un error: hasta el siguiente cambio)
   const auto = fuente?.tipo === "origen" && !!fuente.origen.navegador;
@@ -655,7 +635,7 @@ export function useProyecto(): ProyectoAbierto {
     creando.current = true;
     try {
       const fi = await crear(texto, f.nombre.replace(/\.json$/i, ""));
-      ultimo.current = { texto, sello: String(fi.sello), selloFirmas: null };
+      ultimo.current = { texto, sello: String(fi.sello) };
       setEnDisco(h.actual);
       setGuardado({ tipo: "guardado", ms: 0 });
       const nf: Fuente = { tipo: "origen", origen: origenNavegador(fi.id, fi.nombre) };
@@ -714,20 +694,6 @@ export function useProyecto(): ProyectoAbierto {
       }
     : null;
 
-  const firmar = useCallback(
-    async (texto: string): Promise<string | null> => {
-      const f = fuenteRef.current;
-      if (f?.tipo !== "origen" || !f.origen.escribirFichero) return "Este proyecto no se puede firmar aquí: ábralo desde su carpeta o guárdelo en el navegador.";
-      const r = await f.origen.escribirFichero(nombreFirmas(f.origen.fichero), texto);
-      if (!r.ok) return r.mensaje;
-      const s = await f.origen.sello(nombreFirmas(f.origen.fichero));
-      if (ultimo.current) ultimo.current = { ...ultimo.current, selloFirmas: s };
-      setFirmas(texto);
-      return null;
-    },
-    [],
-  );
-  const puedeFirmar = fuente?.tipo === "origen" && !!fuente.origen.escribirFichero;
 
-  return { fase, estado, cliente, fuente, desactualizado, errores, motivoGuardados, firmas, tiempos, version, abrirOrigen, abrirTexto, recalcular, calcular, progreso: fase === "calculando" ? progreso : null, cancelar, edicion, ...(puedeFirmar ? { firmar } : {}) };
+  return { fase, estado, cliente, fuente, desactualizado, errores, motivoGuardados, tiempos, version, abrirOrigen, abrirTexto, recalcular, calcular, progreso: fase === "calculando" ? progreso : null, cancelar, edicion };
 }

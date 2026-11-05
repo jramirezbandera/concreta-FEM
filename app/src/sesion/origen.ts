@@ -1,7 +1,7 @@
 /**
- * De dónde lee el visor un proyecto (V1, §3.1): el `proyecto.json`, los resultados que guardó la CLI
- * en `.fem/<huella>/` y el fichero de firmas `<proyecto>.revision.json`. Desde V2a (V-d) se escribe
- * también el proyecto, y sólo él: nunca `.fem/` ni las firmas.
+ * De dónde lee el visor un proyecto (V1, §3.1): el `proyecto.json` y los resultados que guardó la
+ * CLI en `.fem/<huella>/`. Desde V2a (V-d) se escribe también el proyecto (y, al sobrescribir, su
+ * copia `.bak`): nunca `.fem/`.
  *
  * Al escribir se compara el sello del fichero con el que tenía al leerlo: si cambió (el agente, o el
  * ingeniero a mano), no se escribe y se dice (conflicto, criterio 4 de V2a); «sobrescribir» es
@@ -76,14 +76,11 @@ export interface Origen {
   /** V2c-4: deja un fichero junto al proyecto si aún no está (la carpeta); true si quedó. */
   dejarFichero?(nombre: string, bytes: Uint8Array): Promise<boolean>;
   /**
-   * UI-32 y UI-31: escribe (o sobrescribe) un fichero de texto junto al proyecto: el de las firmas o
-   * la copia del proyecto antes de pisarlo. Sin él (el servidor local), no se puede.
+   * UI-31: escribe (o sobrescribe) un fichero de texto junto al proyecto: la copia del proyecto
+   * antes de pisarlo. Sin él (el servidor local), no se puede.
    */
   escribirFichero?(nombre: string, texto: string): Promise<{ ok: true } | { ok: false; mensaje: string }>;
 }
-
-/** Fichero de firmas de un proyecto: `<nombre>.revision.json`, junto a él (como `rutaFirmas` de la CLI). */
-export const nombreFirmas = (proyecto: string): string => `${proyecto.replace(/\.json$/i, "")}.revision.json`;
 
 // ─── Carpeta ────────────────────────────────────────────────────────────────────────────────────
 
@@ -106,6 +103,7 @@ export async function proyectosEn(dir: Directorio): Promise<string[]> {
   const r: string[] = [];
   for await (const e of dir.values()) {
     const n = e.name.toLowerCase();
+    // `.revision.json`: las firmas de antes (ya no hay firma), que no son proyectos
     if (e.kind !== "file" || !n.endsWith(".json") || n.endsWith(".revision.json")) continue;
     const f = await (await dir.getFileHandle(e.name)).getFile();
     if (f.size < 64 * 1024 * 1024 && (await f.text()).includes(ESQUEMA)) r.push(e.name);
@@ -219,7 +217,7 @@ export function origenUrl(url: string): Origen {
     try {
       const r = await fetch(base + nombre.split("/").map(encodeURIComponent).join("/"), { method: metodo, cache: "no-store" });
       // El servidor del visor contesta a un HEAD de un fichero que no existe con 204 y «x-existe: no»
-      // (un 404 por segundo, al vigilar las firmas, llenaría la consola de errores)
+      // (un 404 por segundo, al vigilar, llenaría la consola de errores)
       return r.ok && r.headers.get("x-existe") !== "no" ? r : null;
     } catch {
       return null;

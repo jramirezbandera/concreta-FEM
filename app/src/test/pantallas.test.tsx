@@ -72,7 +72,7 @@ function Paneles({ children }: { children: React.ReactNode }) {
 }
 
 function montar(pantalla: React.ReactNode, planta: string, modo: ModoResultados) {
-  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "nucleo.json" }, desactualizado: false, errores: [], motivoGuardados: null, firmas: "", tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {} };
+  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "nucleo.json" }, desactualizado: false, errores: [], motivoGuardados: null, tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {} };
   return render(
     <ThemeProvider>
       <Paneles>
