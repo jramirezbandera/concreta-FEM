@@ -788,7 +788,10 @@
   - **`revisar` en dos partes** (`src/agente/revision.ts`): `prepararRevision` (la sensatez de los resultados, las figuras y la cimentación: lo que cuesta) y `componerRevision` (la sensatez del modelo y el informe, 52 ms). `revisar` es las dos seguidas, así que `fem revisar` no cambia.
   - **`sensatezModelo(…, pesoCalculado)`:** si se da, no compila; con `"pendiente"`, la comprobación sale en el estado nuevo `pendiente` y la columna «Calculado», con «…».
   - **El pedido `revision` con `provisional`:** sin el peso propio calculado y con `pendiente` en la respuesta. La final reutiliza lo preparado y es la de `fem revisar` byte a byte; si ya está hecha, la provisional es la final. La pantalla pide la provisional, la enseña con «Calculando el peso propio…» y luego pide la final.
-  - **Medido en Node:** la provisional en ~4,2 s y la final ~2,3 s después; antes, todo junto en ~6 s.
+  - **Medido:**
+    - en Node, la provisional en ~4,2 s y la final ~2,3 s después; antes, todo junto en ~6 s;
+    - en Chrome (banco i1), la Revisión en 3,1 s; antes, 5,0 s.
+  - **Lo que cuesta:** el worker no cancela, así que si se sale de la Revisión antes de que llegue la final, la pantalla siguiente espera por ella. En i1, que sale enseguida, Modelo tarda 1,7 s.
   - **Validación:** `visor.test.ts` (la provisional, pendiente; la final, con el sha256 de `fem revisar`) y `app/src/test/pantallas.test.tsx` (la pantalla pide las dos y acaba sin nada pendiente).
 - **2026-11-05: el peso propio de los forjados, revisado** (revisión del usuario, `pesoForjado.ts`; decisiones del usuario: relleno por peso aparente o por piezas, excluyentes; procedencia con su fuente; el peso medio con ábacos sólo informativo):
   - **Lo que ya cumplía:**
