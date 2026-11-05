@@ -5,7 +5,7 @@
  *
  * Como el de V2b (`validacion/v2b/chrome.ts`): compila la app, la sirve con una copia del proyecto y
  * la maneja con Chrome headless por el protocolo de depuración. En el edificio objetivo de A2:
- * - Resultados · Armado: el mapa y la tabla de las franjas de la planta salen en ≤ 2 s, sin tareas
+ * - Resultados · Armado: el mapa y la tabla de las franjas de la planta salen en ≤ 3 s, sin tareas
  *   largas, con las demandas de Node bit a bit;
  * - el detalle de una franja sale en ≤ 1 s, con los valores de Node bit a bit.
  *
@@ -211,7 +211,7 @@ try {
     for (const p of ps.filter((p) => p.fin >= tR)) log(`    t=${(p.t0 - t4).toFixed(0)} ${p.tipo} ${p.ms.toFixed(0)}/${(p.fin - p.t0).toFixed(0)}`);
     log(`  tareas largas: ${l4.map((x) => `t=${(x.t - t4).toFixed(0)} ${x.ms.toFixed(0)} ms`).join(", ") || "ninguna"}`);
   }
-  comprobar(ms4 <= 2000, `el mapa y la tabla de las franjas de la planta salen en ${(ms4 / 1000).toFixed(2)} s (≤ 2 s)`);
+  comprobar(ms4 <= 3000, `el mapa y la tabla de las franjas de la planta salen en ${(ms4 / 1000).toFixed(2)} s (≤ 3 s)`);
   comprobar(l4.every((x) => x.ms <= 50), `tareas largas > 50 ms en el hilo principal: ${largas(l4)}`);
   await new Promise((r) => setTimeout(r, 500));
   await captura("edificio-armado");

@@ -122,7 +122,7 @@ Cada franja se corta en perpendicular a su dirección, sólo por las láminas (F
    - con `franjas: false`, la malla de C1–C5 sale bit a bit.
 7. **Rendimiento** (edificio objetivo):
    - todas las franjas de una planta, en las dos direcciones y con Wood–Armer en todas las combinaciones ELU, en ≤ 1,5 s en Bun la primera vez (con el SPR);
-   - el mapa de la app, en ≤ 2 s en Chrome;
+   - el mapa de la app, en ≤ 2 s en Chrome (≤ 3 s desde el 2026-11-05, decisión del usuario: la malla del edificio objetivo creció ×2,5 con LV, LV2 y HR; con ella, 2,8 s);
    - el edificio entero, en menos que el cálculo.
 8. **App:**
    - los valores de la pantalla son los de `fem consultar franja(s)` bit a bit, en Node y en Chrome;
