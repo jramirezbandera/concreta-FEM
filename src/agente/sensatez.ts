@@ -90,7 +90,8 @@ export const UMBRALES = {
 /** Acciones que no son gravitatorias: no entran en la «gravedad» ni en las cargas por uso. */
 export const ACCIONES_NO_GRAVITATORIAS: readonly TipoAccion[] = ["W", "E", "T", "N", "A"];
 
-export type EstadoComprobacion = "bien" | "avisos" | "no-aplica";
+/** «pendiente»: todavía no se ha hecho (la Revisión de la app enseña el informe antes que el peso propio calculado). */
+export type EstadoComprobacion = "bien" | "avisos" | "no-aplica" | "pendiente";
 
 export interface Comprobacion {
   codigo: string;
@@ -543,6 +544,8 @@ export interface DesglosePesoPropio {
   caso: string;
   plantas: PesoPropioPlanta[];
   total: Omit<PesoPropioPlanta, "planta">;
+  /** Lo calculado, todavía sin hacer (`sensatezModelo` con `"pendiente"`): la columna va vacía. */
+  pendiente?: true;
 }
 
 /**
@@ -776,12 +779,20 @@ export function pesoPropioCalculado(f: ModeloFisico, opciones: OpcionesCompilaci
   return r;
 }
 
-function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion | undefined): { registro: Registro; desglose: DesglosePesoPropio | null } {
+/**
+ * Lo calculado del peso propio: sin darlo, se compila (`pesoPropioCalculado`); `"pendiente"`, se deja
+ * para después (la comprobación sale «pendiente» y la columna, vacía).
+ */
+export type PesoCalculado = Map<string, number> | null | "pendiente";
+
+function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion | undefined, dado?: PesoCalculado): { registro: Registro; desglose: DesglosePesoPropio | null } {
   const U = UMBRALES;
   const reg = new Registro("sensatez/peso-propio", "Peso propio calculado frente al esperado", `difieren más de un ${num(U.pesoPropio * 100)} % (por planta y en total)`);
   const caso = f.casos.find((c) => c.pesoPropio);
   if (!caso) return { registro: reg, desglose: null };
-  const calc = pesoPropioCalculado(f, opciones);
+  const pendiente = dado === "pendiente";
+  const calc = dado === undefined ? pesoPropioCalculado(f, opciones) : pendiente ? null : dado;
+  if (pendiente) reg.c.estado = "pendiente";
   const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P, opciones?.epsSnap, (opciones?.tamanoMalla ?? TAMANO_MALLA) / 2).map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
   const total = { pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, ...(f.barras?.length ? { barras: 0 } : {}), solapes: 0, esperado: 0, calculado: calc ? 0 : null } as DesglosePesoPropio["total"];
   for (const x of plantas) {
@@ -800,7 +811,7 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
         { calculado: x.calculado, esperado: x.esperado },
       );
   }
-  return { registro: reg, desglose: { caso: caso.id, plantas, total } };
+  return { registro: reg, desglose: { caso: caso.id, plantas, total, ...(pendiente ? { pendiente: true as const } : {}) } };
 }
 
 // ─── Bordes de forjado ──────────────────────────────────────────────────────────────────────────
@@ -1034,11 +1045,12 @@ export interface SensatezModelo {
 
 /**
  * Las comprobaciones que no necesitan el cálculo: datos, cargas, plantas, pilares y peso propio.
- * `res` es el resumen del modelo compilado (A1).
+ * `res` es el resumen del modelo compilado (A1). `pesoCalculado`, lo calculado del peso propio si ya
+ * se tiene o `"pendiente"` (si no se da, se compila: ~2 s en el edificio objetivo).
  */
-export function sensatezModelo(f: ModeloFisico, opciones: OpcionesCompilacion | undefined, res: Resumen): SensatezModelo {
+export function sensatezModelo(f: ModeloFisico, opciones: OpcionesCompilacion | undefined, res: Resumen, pesoCalculado?: PesoCalculado): SensatezModelo {
   const P = new Plantas(f);
-  const pp = pesoPropio(f, P, opciones);
+  const pp = pesoPropio(f, P, opciones, pesoCalculado);
   const eps = opciones?.epsSnap ?? 0.05;
   const regs = [...datos(f), ...lejanos(f), ...alineados(f), ...cargas(f), ...cargasPorM2(f, P, res), ...pilares(f, P, eps), ...bordes(f, P, eps), pp.registro];
   // El mismo orden que en el informe: datos, objetos lejos, casi alineados, cargas, cargas por planta, pilares, bordes y peso propio

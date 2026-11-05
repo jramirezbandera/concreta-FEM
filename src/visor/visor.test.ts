@@ -505,8 +505,21 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
   it("revisión: el informe es el de fem revisar (mismo sha256)", async () => {
     const r = await ejecutar(["revisar", proyecto]);
     expect(r.codigo, JSON.stringify(r.json)).toBe(0);
+    // Primero la provisional (sin el peso propio calculado), como la pide la app, y luego la final:
+    // la final sale de lo preparado para la provisional y es la de fem revisar
+    // (sin caso de peso propio, la provisional ya es la final)
+    const conPeso = s.proyecto.modelo.casos.some((c) => c.pesoPropio);
+    const p0 = valido(datosRevision(s, { provisional: true }));
+    if (conPeso) {
+      expect(p0.pendiente).toBe(true);
+      expect(p0.comprobaciones.find((c) => c.codigo === "sensatez/peso-propio")!.estado).toBe("pendiente");
+      expect(p0.sha256).not.toBe((r.json.informe as { sha256: string }).sha256);
+    } else expect(p0.pendiente).toBeUndefined();
     const x = valido(datosRevision(s));
+    expect(x.pendiente).toBeUndefined();
     expect(x.sha256).toBe((r.json.informe as { sha256: string }).sha256);
+    // Con la final hecha, la provisional es la final
+    expect(valido(datosRevision(s, { provisional: true }))).toBe(x);
   }, 120_000);
 
   it("3D: la geometría y los desplazamientos son los del modelo y del cálculo", () => {

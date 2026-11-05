@@ -59,7 +59,7 @@ export interface DatosInforme {
   figuras?: readonly { titulo: string; svg: string }[];
 }
 
-const ESTADO: Record<Comprobacion["estado"], string> = { bien: "bien", avisos: "AVISOS", "no-aplica": "no aplica" };
+const ESTADO: Record<Comprobacion["estado"], string> = { bien: "bien", avisos: "AVISOS", "no-aplica": "no aplica", pendiente: "pendiente" };
 const kN = (x: number) => num(x, 4);
 
 export function documentoInforme(d: DatosInforme): Bloque[] {
@@ -70,6 +70,9 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
   const conAvisos = comprobaciones.filter((c) => c.estado === "avisos");
   const nAvisos = conAvisos.reduce((s, c) => s + c.avisos.length, 0);
   const otros = d.diagnosticos.filter((x) => x.severidad !== "info");
+  // Sólo en la Revisión de la app, mientras llega el peso propio calculado (el informe final no lo lleva)
+  const pendientes = comprobaciones.filter((c) => c.estado === "pendiente");
+  const yPendientes = pendientes.length ? ` Pendiente: ${pendientes.map((c) => c.titulo.toLowerCase()).join("; ")}.` : "";
 
   // P-31: el veredicto, lo primero; la huella y el núcleo, al final (Identidad), que al ingeniero no le dicen nada al abrirlo
   titulo(1, `Informe de revisión${d.proyecto.nombre ? `: ${d.proyecto.nombre}` : ""}`);
@@ -79,7 +82,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
   b.push({
     tipo: "lista",
     items: [
-      conAvisos.length ? `${nAvisos} ${nAvisos === 1 ? "aviso" : "avisos"} de sensatez en ${conAvisos.length} de ${comprobaciones.length} comprobaciones: ${conAvisos.map((c) => c.titulo.toLowerCase()).join("; ")}.` : `Ningún aviso de sensatez en las ${comprobaciones.length} comprobaciones (${comprobaciones.filter((c) => c.estado === "no-aplica").length} no aplican a este modelo).`,
+      conAvisos.length ? `${nAvisos} ${nAvisos === 1 ? "aviso" : "avisos"} de sensatez en ${conAvisos.length} de ${comprobaciones.length} comprobaciones: ${conAvisos.map((c) => c.titulo.toLowerCase()).join("; ")}.${yPendientes}` : `Ningún aviso de sensatez en las ${comprobaciones.length} comprobaciones (${comprobaciones.filter((c) => c.estado === "no-aplica").length} no aplican a este modelo).${yPendientes}`,
       otros.length ? `${otros.length} ${otros.length === 1 ? "aviso" : "avisos"} del compilador y del cálculo (al final).` : "Ningún aviso del compilador ni del cálculo.",
       `Equilibrio de cargas y reacciones: ${num(eq, 2)} relativo como máximo (tiene que ser ≤ 1e-9).`,
     ],
@@ -193,7 +196,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
   if (pp) {
     titulo(2, "Peso propio");
     parrafo(
-      `Caso ${pp.caso}. Lo esperado es Σ V·γ por tipo de pieza (losas y paños con su pp), calculado sin la malla, menos los solapes que el compilador no cuenta dos veces (C2-g y C3-g, estimados por la huella de las vigas y los muros dentro de las losas). Lo calculado es el caso de peso propio compilado sin las demás cargas. kN.`,
+      `Caso ${pp.caso}. Lo esperado es Σ V·γ por tipo de pieza (losas y paños con su pp), calculado sin la malla, menos los solapes que el compilador no cuenta dos veces (C2-g y C3-g, estimados por la huella de las vigas y los muros dentro de las losas). Lo calculado es el caso de peso propio compilado sin las demás cargas. kN.${pp.pendiente ? " Lo calculado está en curso." : ""}`,
     );
     // Fase BN: la columna de las barras, sólo si el modelo tiene alguna
     const conBarras = pp.total.barras !== undefined;
@@ -207,8 +210,8 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
       ...(conBarras ? [kN(x.barras ?? 0)] : []),
       kN(-x.solapes),
       kN(x.esperado),
-      x.calculado === null ? "—" : kN(x.calculado),
-      x.calculado === null || !(x.esperado || x.calculado) ? "—" : `${num(((x.calculado - x.esperado) / Math.max(x.esperado, x.calculado)) * 100, 2)} %`,
+      x.calculado === null ? (pp.pendiente ? "…" : "—") : kN(x.calculado),
+      x.calculado === null || !(x.esperado || x.calculado) ? (pp.pendiente ? "…" : "—") : `${num(((x.calculado - x.esperado) / Math.max(x.esperado, x.calculado)) * 100, 2)} %`,
     ]);
     b.push({
       tipo: "tabla",

@@ -13,8 +13,8 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { resumen, type Resumen } from "./consultas.ts";
 import { documentoInforme, html, markdown, type Bloque, type ReaccionBase } from "./informe.ts";
 import type { Proyecto } from "./proyecto.ts";
-import { sensatezModelo, type Comprobacion, type DesglosePesoPropio } from "./sensatez.ts";
-import { conjuntosSensatez, sensatezResultados, type TramoComparado } from "./sensatezResultados.ts";
+import { sensatezModelo, type Comprobacion, type DesglosePesoPropio, type PesoCalculado } from "./sensatez.ts";
+import { conjuntosSensatez, sensatezResultados, type SensatezResultados, type TramoComparado } from "./sensatezResultados.ts";
 import { escenaASvg } from "./render/svg.ts";
 import { vistaModelo } from "./render/modelo.ts";
 import { ResultadosRender, vistaCampo } from "./render/resultados.ts";
@@ -30,24 +30,44 @@ export interface Revision {
   html: string;
 }
 
+type DatosRevisar = { motor: string; diagnosticos: readonly Diagnostico[]; equilibrio: readonly { id: string; fuerzas: number; momentos: number }[]; resumen?: Resumen };
+
+/** Lo que una revisión necesita de los resultados (lo que más cuesta), para componerla una o más veces. */
+export interface RevisionPreparada {
+  res: Resumen;
+  resultados: SensatezResultados;
+  figuras: { titulo: string; svg: string }[];
+  cimentacion: ReaccionBase[];
+  otros: Omit<DatosRevisar, "resumen">;
+}
+
 /**
  * Comprueba y arma el informe. `q`: las consultas del cálculo de `c`; `diagnosticos`, los avisos de
  * la compilación y del cálculo; `equilibrio`, el de cada caso; `resumen`, el de `c` si ya se tiene
  * (el visor lo hace al compilar; en el edificio objetivo, ~0,5 s).
  */
-export function revisar(
-  p: Proyecto,
-  c: Extract<ResultadoCompilacion, { valido: true }>,
-  q: Consultas,
-  datos: { motor: string; diagnosticos: readonly Diagnostico[]; equilibrio: readonly { id: string; fuerzas: number; momentos: number }[]; resumen?: Resumen },
-): Revision {
+export function revisar(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: true }>, q: Consultas, datos: DatosRevisar): Revision {
+  return componerRevision(p, c, prepararRevision(p, c, q, datos));
+}
+
+/** La parte de `revisar` que sale de los resultados: la sensatez de los resultados, las figuras y la cimentación. */
+export function prepararRevision(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: true }>, q: Consultas, datos: DatosRevisar): RevisionPreparada {
   const { resumen: dado, ...otros } = datos;
   const res = dado ? { valido: true as const, valor: dado } : resumen(p, c);
   if (!res.valido) throw new Error("revisar: el resumen de un modelo compilado no puede fallar");
-  const modelo = sensatezModelo(p.modelo, p.opciones, res.valor);
-  const resultados = sensatezResultados(q, res.valor, p.opciones);
-  const figuras = figurasInforme(p, c, q, res.valor);
-  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res.valor, hipotesis: c.hipotesis, modelo, resultados, cimentacion: cimentacion(q), figuras, ...otros });
+  return { res: res.valor, resultados: sensatezResultados(q, res.valor, p.opciones), figuras: figurasInforme(p, c, q, res.valor), cimentacion: cimentacion(q), otros };
+}
+
+/**
+ * El informe de una revisión preparada, con la sensatez del modelo. `pesoCalculado`: sin darlo, el
+ * peso propio calculado se compila (como `revisar`, el mismo informe byte a byte); `"pendiente"`, la
+ * revisión sale antes, con esa comprobación pendiente (la Revisión de la app la enseña así y luego
+ * pide la final).
+ */
+export function componerRevision(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: true }>, prep: RevisionPreparada, pesoCalculado?: PesoCalculado): Revision {
+  const { res, resultados, figuras } = prep;
+  const modelo = sensatezModelo(p.modelo, p.opciones, res, pesoCalculado);
+  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res, hipotesis: c.hipotesis, modelo, resultados, cimentacion: prep.cimentacion, figuras, ...prep.otros });
   const comprobaciones = [...modelo.comprobaciones, ...resultados.comprobaciones];
   return {
     comprobaciones,

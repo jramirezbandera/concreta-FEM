@@ -141,7 +141,7 @@ export class Atendedor {
       case "reacciones-casos":
         return de(reaccionesPorCaso(s));
       case "revision":
-        return de(datosRevision(s));
+        return de(datosRevision(s, { provisional: !!p.provisional }));
       case "precalentar":
         if (s.proyecto.modelo.plantas.some((x) => x.id === p.planta)) s.rr?.valores(p.planta, "losas", "flexion");
         return bien("precalentar", null);

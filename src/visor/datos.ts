@@ -15,7 +15,7 @@ import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
 import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
-import { revisar } from "../agente/revision.ts";
+import { componerRevision, prepararRevision, type RevisionPreparada } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion } from "../agente/sensatez.ts";
 import { puntosBarra } from "../compilador/barras.ts";
@@ -698,36 +698,51 @@ export interface DatosRevision {
   documento: Bloque[];
   comprobaciones: Pick<Comprobacion, "codigo" | "titulo" | "estado" | "peor">[];
   avisos: number;
-  /** sha256 del informe en Markdown: el mismo de `fem revisar`. */
+  /** sha256 del informe en Markdown: el mismo de `fem revisar` (salvo con `pendiente`). */
   sha256: string;
+  /** Sin el peso propio calculado todavía (`provisional`): falta pedir la revisión final. */
+  pendiente?: true;
 }
 
-/** La revisión de A3, como `fem revisar`. */
 /**
- * La revisión de unos resultados, hecha una vez: sólo depende de ellos (las consultas son de un
- * cálculo de una compilación de un proyecto), y en el edificio objetivo cuesta varios segundos.
+ * La revisión de A3, como `fem revisar`, hecha una vez por resultados: sólo depende de ellos (las
+ * consultas son de un cálculo de una compilación de un proyecto), y en el edificio objetivo cuesta
+ * varios segundos.
+ *
+ * `provisional`: sin el peso propio calculado, que es una compilación más (~2 s en el edificio
+ * objetivo): la pantalla enseña el informe antes y pide después la final, que reutiliza lo
+ * preparado de los resultados. Si la final ya está, se da ésa.
  */
 const REVISIONES = new WeakMap<object, DatosRevision>();
+const PREPARADAS = new WeakMap<object, RevisionPreparada>();
 
-export function datosRevision(s: Sesion): Resultado<DatosRevision> {
+export function datosRevision(s: Sesion, o: { provisional?: boolean } = {}): Resultado<DatosRevision> {
   const q = s.q;
   const c = s.compilado;
   const cab = s.cabeceraResultados;
   if (!q || !c || !cab) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const hecha = REVISIONES.get(q);
   if (hecha) return { valido: true, valor: hecha };
-  const rev = revisar(s.proyecto, c, q, {
-    motor: s.motor,
-    diagnosticos: [...c.diagnosticos, ...cab.diagnosticos],
-    equilibrio: cab.casos.map((x) => ({ id: x.id, ...x.equilibrio })),
-    ...(s.resumen ? { resumen: s.resumen } : {}),
-  });
+  let prep = PREPARADAS.get(q);
+  if (!prep) {
+    prep = prepararRevision(s.proyecto, c, q, {
+      motor: s.motor,
+      diagnosticos: [...c.diagnosticos, ...cab.diagnosticos],
+      equilibrio: cab.casos.map((x) => ({ id: x.id, ...x.equilibrio })),
+      ...(s.resumen ? { resumen: s.resumen } : {}),
+    });
+    PREPARADAS.set(q, prep);
+  }
+  const rev = componerRevision(s.proyecto, c, prep, o.provisional ? "pendiente" : undefined);
   const valor: DatosRevision = {
     documento: rev.documento,
     comprobaciones: rev.comprobaciones.map((x) => ({ codigo: x.codigo, titulo: x.titulo, estado: x.estado, ...(x.peor ? { peor: x.peor } : {}) })),
     avisos: rev.avisos.length,
     sha256: sha256(rev.markdown),
+    ...(o.provisional && rev.pesoPropio ? { pendiente: true as const } : {}),
   };
+  if (valor.pendiente) return { valido: true, valor };
   REVISIONES.set(q, valor);
+  PREPARADAS.delete(q);
   return { valido: true, valor };
 }

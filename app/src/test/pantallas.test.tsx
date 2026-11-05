@@ -10,7 +10,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
 import { sha256 } from "../../../src/compilador/huella.ts";
 import { Atendedor } from "../../../src/visor/atender.ts";
-import type { DatosEstacion, DatosLosas, DatosPilares, ReaccionesCasos } from "../../../src/visor/datos.ts";
+import type { DatosEstacion, DatosLosas, DatosPilares, DatosRevision, ReaccionesCasos } from "../../../src/visor/datos.ts";
 import type { Pilares3D } from "../../../src/visor/pilares3d.ts";
 import type { Reacciones3D } from "../../../src/visor/reacciones3d.ts";
 import type { Pedido } from "../../../src/visor/protocolo.ts";
@@ -22,6 +22,7 @@ import { ModoLosas, textoValor } from "../pantallas/Losas.tsx";
 import { lineasTramo, ModoPilares } from "../pantallas/Pilares.tsx";
 import { lineasReaccion, ModoReacciones } from "../pantallas/Reacciones.tsx";
 import { lineasEstacion } from "../pantallas/Vigas.tsx";
+import { EspacioRevision } from "../pantallas/Revision.tsx";
 import { LIMITE_NU } from "../pantallas/Ternas.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
@@ -52,12 +53,13 @@ beforeAll(async () => {
   estado = c.valor as EstadoSesion;
 }, 120_000);
 
-/** Un cliente que contesta con el atendedor de este proceso. */
-const cliente = () =>
+/** Un cliente que contesta con el atendedor de este proceso (y apunta lo que se le pide en `pedidos`). */
+const cliente = (pedidos?: Pedido[]) =>
   ({
     motor: at.motor,
     huella: estado.huella,
     pedir: async (p: Pedido) => {
+      pedidos?.push(p);
       const r = await at.atender(p);
       return r.ok ? { ok: true, valor: r.valor, ms: 0 } : { ok: false, diagnosticos: r.diagnosticos, ms: 0 };
     },
@@ -71,8 +73,8 @@ function Paneles({ children }: { children: React.ReactNode }) {
   );
 }
 
-function montar(pantalla: React.ReactNode, planta: string, modo: ModoResultados) {
-  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "nucleo.json" }, desactualizado: false, errores: [], motivoGuardados: null, tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {} };
+function montar(pantalla: React.ReactNode, planta: string, modo: ModoResultados, pedidos?: Pedido[]) {
+  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(pedidos), fuente: { tipo: "texto", nombre: "nucleo.json" }, desactualizado: false, errores: [], motivoGuardados: null, tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {} };
   return render(
     <ThemeProvider>
       <Paneles>
@@ -119,6 +121,20 @@ describe("V1 · DOM", () => {
           expect([1, 2, 3].map((c) => celdas[desde + c]!.textContent)).toEqual([fmt(x.esfuerzos[0], 1), fmt(x.esfuerzos[4], 1), fmt(x.esfuerzos[5], 1)]);
         }
     });
+  }, 60_000);
+
+  it("revisión: primero sin el peso propio calculado y luego la de fem revisar", async () => {
+    const pedidos: Pedido[] = [];
+    montar(<EspacioRevision />, estado.plantas[0]!.id, "losas", pedidos);
+    await waitFor(() => expect(pedidos.filter((p) => p.tipo === "revision")).toEqual([{ tipo: "revision", provisional: true }, { tipo: "revision" }]));
+    const r = await at.atender({ tipo: "revision" });
+    const d = (r as { valor: DatosRevision }).valor;
+    expect(d.pendiente).toBeUndefined();
+    await waitFor(() => expect(screen.queryByText("Calculando el peso propio…")).toBeNull());
+    const pp = d.comprobaciones.find((c) => c.codigo === "sensatez/peso-propio")!;
+    expect(pp.estado).not.toBe("pendiente");
+    await waitFor(() => expect(screen.queryByText("CALCULANDO…")).toBeNull());
+    expect(screen.getByText(pp.titulo, { selector: "a span span" })).toBeTruthy();
   }, 60_000);
 
   it("losas: los extremos y las flechas dicen los valores de la consulta", async () => {

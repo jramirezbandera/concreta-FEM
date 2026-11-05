@@ -128,14 +128,18 @@ function Documento({ doc }: { doc: Bloque[] }) {
   );
 }
 
-const TONO = { bien: "ok", avisos: "warn", "no-aplica": "neu" } as const;
-const TEXTO = { bien: "BIEN", avisos: "AVISOS", "no-aplica": "NO APLICA" } as const;
+const TONO = { bien: "ok", avisos: "warn", "no-aplica": "neu", pendiente: "neu" } as const;
+const TEXTO = { bien: "BIEN", avisos: "AVISOS", "no-aplica": "NO APLICA", pendiente: "CALCULANDO…" } as const;
 
 export function EspacioRevision() {
   const { proyecto } = useVisor();
   const pan = usePaneles("revision", { nav: true, props: true });
   const e = proyecto.estado!;
-  const r = usePedido(proyecto.cliente, { tipo: "revision" });
+  // Primero sin el peso propio calculado (una compilación más, ~2 s en un edificio grande) y luego
+  // la final, que reutiliza lo demás; si la final ya está hecha, la primera ya es ésa
+  const r0 = usePedido(proyecto.cliente, { tipo: "revision", provisional: true });
+  const r1 = usePedido(proyecto.cliente, r0.datos?.pendiente ? { tipo: "revision" } : null);
+  const r = r1.datos || r1.diagnosticos ? r1 : r0;
   const x = r.datos;
 
   const resumen = !x ? null : x.avisos ? { tono: "warn", texto: `${x.avisos} AVISO${x.avisos === 1 ? "" : "S"} DE SENSATEZ` } : { tono: "ok", texto: "SIN AVISOS DE SENSATEZ" };
@@ -143,6 +147,7 @@ export function EspacioRevision() {
     <span className="flex items-center gap-2 px-2 text-[13px] text-text-secondary">
       <IcInforme size={20} />
       {resumen ? <span className={`pill ${resumen.tono}`}>{resumen.texto}</span> : "Revisando…"}
+      {x?.pendiente && <span className="text-[12px] text-text-muted">Calculando el peso propio…</span>}
     </span>
   );
 

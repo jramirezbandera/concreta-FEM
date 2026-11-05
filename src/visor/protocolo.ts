@@ -73,7 +73,8 @@ export type Pedido =
   /** AB: el armado en el 3D y el valor de un punto de su mapa. */
   | ({ tipo: "armado3d" } & PedidoArmado3D)
   | ({ tipo: "valor-armado" } & PedidoValorArmado)
-  | { tipo: "revision" }
+  /** `provisional`: sin el peso propio calculado, para enseñarla antes (luego se pide sin él). */
+  | { tipo: "revision"; provisional?: boolean }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
   | { tipo: "precalentar"; planta: string };
 
