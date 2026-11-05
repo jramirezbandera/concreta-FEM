@@ -22,7 +22,11 @@ function ficheros(dir: string): string[] {
   return r;
 }
 
-/** El fuente sin comentarios (los de línea, los de bloque y los de JSX); los literales se quedan. */
+/**
+ * El fuente sin comentarios (los de línea, los de bloque y los de JSX); los literales se quedan.
+ * Las expresiones regulares (una `/` donde empieza una expresión) se saltan enteras: una comilla en
+ * una clase como `/[:*?"<>|]/` abría si no un literal que se comía cientos de líneas.
+ */
 function sinComentarios(s: string): string {
   let r = "";
   for (let i = 0; i < s.length; ) {
@@ -32,6 +36,17 @@ function sinComentarios(s: string): string {
     } else if (c === "/" && s[i + 1] === "*") {
       const f = s.indexOf("*/", i + 2);
       i = f < 0 ? s.length : f + 2;
+    } else if (c === "/" && empiezaExpresion(r)) {
+      let j = i + 1;
+      let clase = false;
+      while (j < s.length && s[j] !== "\n" && (clase || s[j] !== "/")) {
+        if (s[j] === "\\") j++;
+        else if (s[j] === "[") clase = true;
+        else if (s[j] === "]") clase = false;
+        j++;
+      }
+      r += s.slice(i, j + 1);
+      i = j + 1;
     } else if (c === '"' || c === "'" || c === "`") {
       let j = i + 1;
       while (j < s.length && s[j] !== c) j += s[j] === "\\" ? 2 : 1;
@@ -45,9 +60,21 @@ function sinComentarios(s: string): string {
   return r;
 }
 
+/** Una `/` es una expresión regular y no una división si lo de antes no acaba un valor. */
+function empiezaExpresion(antes: string): boolean {
+  const t = antes.trimEnd();
+  if (!t) return true;
+  if (/(^|[^\w$])(return|typeof|case|do|else|in|of|void|yield|await)$/.test(t)) return true;
+  return "(,=:[!&|?{};+-*%<>~^".includes(t[t.length - 1]!);
+}
+
 describe("los textos de la app no nombran software comercial ni lo interno", () => {
   it("quita los comentarios y deja los literales", () => {
     expect(sinComentarios(`a = "x // y"; // SAP2000\n/* ETABS */ b = 'CSI'`)).toBe(`a = "x // y"; \n b = 'CSI'`);
+  });
+
+  it("salta las expresiones regulares con comillas, y una división no es una", () => {
+    expect(sinComentarios(`n.replace(/[\\\\/:*?"<>|]+/g, " ");\n// CYPECAD\nx = a / b; // ETABS`)).toBe(`n.replace(/[\\\\/:*?"<>|]+/g, " ");\n\nx = a / b; `);
   });
 
   it("UI-43: los literales de la app no llevan códigos internos ni órdenes de la CLI", () => {
