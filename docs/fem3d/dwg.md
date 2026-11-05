@@ -1,6 +1,6 @@
 # DW: la plantilla desde un DWG (plan)
 
-> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, propuestas (DW-d, puesta en DW1 como se proponía). **DW1 hecho el 2026-11-05** (§9).
+> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, propuestas (DW-d, puesta en DW1 como se proponía). **DW1 hecho el 2026-11-05** (§9); **DW2, el mismo día** (§10).
 >
 > **Origen:** el usuario: «lo de tener que trabajar en DXF en lugar de DWG es un latazo». El 2026-10-28 se dejó el DWG sin decidir porque LibreDWG es GPL y el SDK de la ODA es de pago. Al mirarlo otra vez, apareció ACadSharp (MIT), que lee DWG, y se puede portar con la regla 6.
 
@@ -109,3 +109,38 @@ Tiempo, como información: la muestra de 1,3 MB, en ~6 ms en Bun.
 ### 9.4 Lo siguiente
 
 DW2: el resto de entidades de §1 (`LWPOLYLINE`, `POLYLINE` y sus vértices, `ELLIPSE`, `SPLINE`, `POINT`, `SOLID`, `TRACE`, `3DFACE`, `LEADER`, `TEXT`, `MTEXT`, `INSERT` y `MINSERT` con atributos, y las cotas), los bloques con su base y sus entidades, las clases (para las entidades de tipo ≥ 500) y la comparación de `aplanar` entero frente al DXF.
+
+## 10. DW2 hecho (2026-11-05)
+
+R13–R2000 entero para lo que dibuja `aplanar.ts`: todas las entidades de §1, los bloques, las clases y los propietarios (vértices de polilíneas y atributos de inserciones). Pasa el criterio 1 en AC1015 con todo el dibujo y el 2 entre AC1014 y AC1015, con las diferencias explicadas.
+
+### 10.1 Qué hay
+
+- **`src/dwg/entidades.ts`:** `POINT`, `ELLIPSE`, `LWPOLYLINE`, `POLYLINE` 2D y 3D con sus `VERTEX`, las mallas y las caras (sólo su bandera de malla, que `aplanar` no dibuja), `SPLINE`, `SOLID`, `TRACE`, `3DFACE`, `LEADER`, `TEXT`, `ATTRIB`, `MTEXT`, `INSERT` y `MINSERT` con su bloque, y las siete cotas (lo común y su bloque anónimo, que ya lleva el dibujo). Lo que `aplanar` no dibuja sale sólo con su tipo de DXF, y así cuenta igual entre las no leídas.
+- **`objetos.ts`:** la cabecera de bloque (`BLOCK_HEADER`: nombre, base y su `BLOCK`), el nombre de cada `BLOCK` y la sección de clases (AcDb:Classes, con su CRC) para los tipos ≥ 500.
+- **`lector.ts`:** las entidades se agrupan por propietario (bloque, polilínea o inserción) y cada lista va en su orden (anterior y siguiente). Los bloques salen con su nombre y su base; `INSERT` y `DIMENSION` llevan en el código 2 el nombre de su bloque; las entidades de clase, su nombre de DXF. Lo de los espacios papel, vacío, como el DXF (código 67).
+- **`bits.ts`:** `cuenta(n, bits)`: un recuento leído (vértices, nudos, reactores, entradas) que no cabe en lo que queda del objeto es un `ErrorDxf`, no una reserva de memoria imposible.
+- **`comparar.ts`, rehecho:** compara lo aplanado. El dibujo entero y cada entidad sola por su handle, en el espacio modelo y en cada bloque (tipo, capa, hijos, orden y lo que dibuja), con las capas, `$INSUNITS` y la base de cada bloque. `excluir` quita de los dos lados las diferencias conocidas, cada una con su motivo. Un bloque sin ningún handle en común, con los mismos tipos en el mismo orden, se empareja por posición y se dice en `regenerados`.
+
+### 10.2 Criterios
+
+| Criterio | Resultado |
+|---|---|
+| 1. AC1015 frente al DXF de AutoCAD | **Pasa:** 163 entidades en el espacio modelo y 27 bloques, como en el DXF; 334 entidades emparejadas por handle, cada una dibuja lo mismo; el dibujo entero igual (205 segmentos, 1 558 cuerdas, 432 puntos y 49 textos), con las mismas no leídas (`MESH`, `HATCH`, `MULTILEADER`, `ACAD_TABLE`…). Error máximo 2,3e-12 en coordenadas de hasta ~1 850 (el redondeo del DXF). Fuera, sólo el `LEADER` 512 (DW2-4). |
+| 2. Entre versiones | **Pasa con las diferencias explicadas:** de las 351 entidades del 2000, las 318 que también están en el R14 son idénticas código a código, bit a bit. Las otras 33 son de cuatro bloques anónimos (`*D4`, `*D5`, `*D8` y `*U25`) que AutoCAD regenera con handles nuevos al guardar en R14 (DW2-5). |
+| 4. Robustez | **Pasa:** a lo de DW1 se añade una tanda de 2 000 ficheros por versión con 1 a 4 bytes cambiados (`validacion/dwg/danados.ts`, `out_danados.txt`): en todos, o lo dice (`ErrorDxf` o un objeto en `fallos`) o sale el mismo dibujo; ninguna otra excepción. La prueba de vitest tiene la tanda de 300. |
+| 3 | **En DW3:** el DWG del cliente (`ejemplos/Proyectos/modelo.dwg`, fuera de git) es de 2018 (AC1032). |
+
+Tiempo, como información: la muestra de 1,3 MB, ~17 ms en Bun.
+
+### 10.3 Hallazgos
+
+- **DW2-1 (fallo del lector de DXF, de V2c-4): el código 3 de un `MTEXT` se recortaba.** Es el texto en trozos de 250 caracteres, que empiezan y acaban en espacio, así que un `MTEXT` largo de una plantilla DXF perdía los espacios de los cortes («bla bla» → «blabla»). Ahora no se recorta; prueba nueva en `dxf.test.ts`. La vivienda sigue igual frente a ezdxf (no tiene `MTEXT` tan largos).
+- **DW2-2: los bloques anónimos se llaman por su posición en la tabla de bloques.** En la tabla, un anónimo sólo guarda «*D», «*U», «*T»… y un espacio papel, «*Paper_Space». AutoCAD les añade al escribir el DXF su posición en `BLOCK_CONTROL`, contando las entradas vacías. Casi siempre coincide con el nombre de su `BLOCK`, pero no en el anónimo de un bloque dinámico: su `BLOCK` se llama como el bloque dinámico («my-dynamic-block») y el DXF lo llama `*U17`. ACadSharp toma el del `BLOCK`, así que aquí no sirve de oráculo.
+- **DW2-3: en R14, `LWPOLYLINE` y `HATCH` son clases** (551 y 552 en la muestra), no los tipos fijos 77 y 78 de 2000. Se leen igual, por el nombre de la clase (también «LWPLINE», como en ACadSharp).
+- **DW2-4 (diferencia conocida): el gancho de un `LEADER` no está en el DWG.** El DWG guarda los vértices hasta el final del gancho; AutoCAD, al escribir el DXF, añade el principio del gancho, a `DIMASZ` × `DIMSCALE` del final (2,5 con ISO-25). Para rehacerlo habría que leer los estilos de cota, sus sobrescrituras en los datos extendidos y la regla de AutoCAD para el gancho. Es un vértice de una directriz de anotación, no geometría de la estructura: se deja así, la prueba lo excluye con su motivo y la plantilla dibuja la directriz sin ese quiebro.
+- **DW2-5: AutoCAD regenera algunos bloques anónimos al guardar, con handles nuevos.** Al escribir el DXF, el de la tabla (`*U25`, el mismo contenido); al guardar en R14, además, los de tres cotas, con diferencias en la última cifra y la fracción apilada escrita como «1#4». El comparador los empareja por posición y los dice.
+
+### 10.4 Lo siguiente
+
+DW3: 2004 y posteriores (AC1018, AC1024, AC1027, AC1032). Hay que añadir el mapa de páginas con su cabecera cifrada, la descompresión LZ77, el flujo de cadenas aparte (desde 2007) y los colores CMC y ENC de 2004. Con eso se puede hacer el criterio 3 con el DWG del cliente.

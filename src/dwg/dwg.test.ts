@@ -3,11 +3,12 @@
  * son el mismo dibujo guardado por AutoCAD en cada versión, con su DXF ASCII al lado; se traen con
  * `bun validacion/dwg/muestras.ts` (DW-d). Sin ellas, la prueba falla diciendo cómo traerlas.
  *
- * Tramo DW1: R14 y 2000, con las capas, `LINE`, `ARC` y `CIRCLE`.
+ * Tramos DW1 y DW2: R14 y 2000, con las capas, los bloques y todo lo que dibuja `aplanar.ts`.
  */
 import { describe, expect, it } from "vitest";
 import { muestra } from "../../validacion/dwg/muestras.ts";
-import { type Dxf, ErrorDxf, leerDxf, texto } from "../dxf/lector.ts";
+import { aplanarDxf } from "../dxf/aplanar.ts";
+import { type Dxf, type Entidad, ErrorDxf, leerDxf, texto } from "../dxf/lector.ts";
 import { compararDwgConDxf } from "./comparar.ts";
 import { esDwg, leerDwg } from "./lector.ts";
 
@@ -21,18 +22,42 @@ function variableDxf(n: string, nombre: string): number[] {
   return [Number(l[3]), Number(l[5]), Number(l[7])];
 }
 
+/**
+ * Las diferencias conocidas con el DXF de AutoCAD (`dwg.md` §10.3), con su motivo: se quitan de los
+ * dos lados y lo demás tiene que salir igual.
+ */
+const CONOCIDAS = new Map([["512", "DW2-4: el gancho del LEADER no está en el DWG; AutoCAD lo añade al escribir el DXF con el DIMASZ del estilo"]]);
+
 describe("DWG 2000 (AC1015) frente al DXF de AutoCAD", () => {
   const dwg = leerDwg(muestra("sample_AC1015.dwg"));
+  const dxf = dxf2000();
 
-  it("las entidades, una a una por su handle, y en el mismo orden", () => {
-    const dxf = dxf2000();
-    const r = compararDwgConDxf(dwg, dxf);
+  it("lo dibujado: el dibujo entero y cada entidad por su handle (modelo y bloques)", () => {
+    const r = compararDwgConDxf(dwg, dxf, 1e-9, CONOCIDAS);
     expect(r.fallos).toEqual([]);
-    const traducibles = dxf.entidades.filter((e) => ["LINE", "ARC", "CIRCLE"].includes(e.tipo)).length;
-    expect(r.emparejadas).toBe(traducibles);
-    expect(r.emparejadas).toBe(35);
-    // El DXF escribe 16 cifras: lo que queda es su redondeo
-    expect(r.errorMaximo).toBeLessThan(1e-15);
+    expect(r.emparejadas).toBe(334);
+    // Lo que queda es el redondeo del DXF (16 cifras) en coordenadas de hasta ~1850
+    expect(r.errorMaximo).toBeLessThan(1e-11);
+    // DW2-5: el bloque de la tabla, AutoCAD lo regenera con otros handles al escribir el DXF
+    expect(r.regenerados).toEqual(["bloque «*U25»"]);
+  });
+
+  it("las mismas entidades en el espacio modelo y los mismos bloques", () => {
+    expect(dwg.entidades.length).toBe(dxf.entidades.length);
+    expect(dwg.entidades.length).toBe(163);
+    expect([...dwg.bloques.keys()].sort()).toEqual([...dxf.bloques.keys()].sort());
+    expect(dwg.bloques.size).toBe(27);
+    // DW2-2: el anónimo de un bloque dinámico, por su posición en la tabla, no por el nombre de su BLOCK
+    expect(dwg.bloques.has("*U17")).toBe(true);
+    expect(dwg.bloques.has("my-dynamic-block")).toBe(false);
+  });
+
+  it("sin las diferencias conocidas, lo no leído y los avisos de aplanar, iguales", () => {
+    const a = aplanarDxf(dwg);
+    const b = aplanarDxf(dxf);
+    expect(a.ignoradas).toEqual(b.ignoradas);
+    expect(a.textos.length).toBe(b.textos.length);
+    expect(a.curvas.length).toBe(b.curvas.length);
   });
 
   it("la cabecera: $INSUNITS, $EXTMIN y $EXTMAX", () => {
@@ -53,29 +78,53 @@ describe("DWG 2000 (AC1015) frente al DXF de AutoCAD", () => {
   });
 });
 
-describe("DWG R14 (AC1014)", () => {
+describe("DWG R14 (AC1014) frente al DWG 2000 (criterio 2)", () => {
   const r14 = leerDwg(muestra("sample_AC1014.dwg"));
+  const d15 = leerDwg(muestra("sample_AC1015.dwg"));
 
-  it("frente al DXF de 2000: igual, salvo lo que R14 no guarda", () => {
-    // R14 no tiene $INSUNITS y guarda los nombres en mayúsculas («Layer_Off» → «LAYER_OFF», «0 @ 1» → «0___1»)
-    const x = dxf2000();
-    const mayus = (s: string) => s.toUpperCase().replace(/[^A-Z0-9_$-]/g, "_");
-    const adaptado: Dxf = {
-      ...x,
-      insunits: null,
-      capas: x.capas.map((c) => ({ ...c, nombre: mayus(c.nombre) })),
-      entidades: x.entidades.map((e) => ({ ...e, capa: mayus(e.capa) })),
-    };
-    const r = compararDwgConDxf(r14, adaptado);
-    expect(r.fallos).toEqual([]);
-    expect(r.emparejadas).toBe(35);
+  /** Todas las entidades (modelo, bloques e hijos) por bloque y handle. */
+  const todas = (d: Dxf) => {
+    const m = new Map<string, Entidad>();
+    const poner = (l: Entidad[], b: string) =>
+      l.forEach((e) => {
+        m.set(`${b}:${texto(e, 5)}`, e);
+        for (const h of e.hijos ?? []) m.set(`${b}:${texto(h, 5)}`, h);
+      });
+    poner(d.entidades, "");
+    for (const [n, b] of d.bloques) poner(b.entidades, n.toUpperCase());
+    return m;
+  };
+  /** Los pares sin los nombres (capa y bloque), que R14 escribe en mayúsculas (DW1-2). */
+  const pares = (e: Entidad) => e.codigos.map((c, i) => (c === 8 || c === 2 ? `${c}` : `${c}=${e.valores[i]}`)).join(" ");
+
+  it("lo que está en los dos, bit a bit; lo que no, sólo en los anónimos que AutoCAD regenera (DW2-5)", () => {
     expect(r14.fallos).toEqual([]);
+    const a = todas(r14);
+    const b = todas(d15);
+    let comunes = 0;
+    const faltan = new Set<string>();
+    for (const [k, e] of b) {
+      const x = a.get(k);
+      if (!x) {
+        faltan.add(k.split(":")[0]!);
+        continue;
+      }
+      comunes++;
+      expect(x.tipo).toBe(e.tipo);
+      expect(pares(x)).toBe(pares(e));
+    }
+    expect(comunes).toBe(318); // de 351: las otras 33 están en los bloques regenerados
+    expect([...faltan].sort()).toEqual(["*D4", "*D5", "*D8", "*U25"]);
   });
 
-  it("la misma geometría que el DWG 2000, bit a bit (criterio 2)", () => {
-    const d15 = leerDwg(muestra("sample_AC1015.dwg"));
-    const geo = (d: Dxf) => d.entidades.map((e) => [e.tipo, texto(e, 5), ...e.valores.slice(2)].join(" "));
-    expect(geo(r14)).toEqual(geo(d15));
+  it("R14 no guarda $INSUNITS y escribe los nombres en mayúsculas (DW1-2)", () => {
+    expect(r14.insunits).toBeNull();
+    expect(r14.capas.map((c) => c.nombre)).toEqual(d15.capas.map((c) => c.nombre.toUpperCase().replace(/[^A-Z0-9_$-]/g, "_")));
+  });
+
+  it("LWPOLYLINE y HATCH, que en R14 son clases, se leen como en 2000 (DW2-3)", () => {
+    const tipos = (d: Dxf) => d.entidades.map((e) => e.tipo).join(" ");
+    expect(tipos(r14)).toBe(tipos(d15));
   });
 });
 

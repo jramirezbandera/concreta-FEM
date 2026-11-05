@@ -38,11 +38,15 @@ Portado a TypeScript (fase DW, el lector de DWG; sólo la lectura de lo que usa 
                           DwgStreamReaderAC15.cs; la tabla de CRC.cs (CrcTable)
   src/dwg/cabecera.ts  ←  src/ACadSharp/IO/DWG/DwgStreamReaders/DwgHeaderReader.cs (hasta INSUNITS)
   src/dwg/objetos.ts   ←  src/ACadSharp/IO/DWG/DwgStreamReaders/DwgHandleReader.cs,
-                          DwgObjectReader.cs (cabecera común, capas, LINE, ARC, CIRCLE)
+                          DwgClassesReader.cs, DwgObjectReader.cs (cabecera común, capas,
+                          cabeceras de bloque)
+  src/dwg/entidades.ts ←  src/ACadSharp/IO/DWG/DwgStreamReaders/DwgObjectReader.cs y
+                          DwgObjectReader.Entities.cs (las entidades que dibuja la plantilla)
   src/dwg/lector.ts    ←  src/ACadSharp/IO/DwgReader.cs (cabecera del fichero de R13–R2000);
                           la tabla de páginas de códigos de src/ACadSharp/CadUtils.cs
-Código propio: la comprobación de los CRC al leer, la traducción a pares de DXF y el orden del
-espacio modelo. Las muestras de AutoCAD de su carpeta samples/ se usan como oráculo
+Código propio: la comprobación de los CRC al leer, la traducción a pares de DXF, el orden de las
+listas y el nombre de los bloques anónimos por su posición en la tabla. Las muestras de AutoCAD
+de su carpeta samples/ se usan como oráculo
 (validacion/dwg/muestras.ts) y no se versionan.
 
 MIT License

@@ -109,6 +109,16 @@ export class Bits {
     this.pos += 8 * n;
   }
 
+  /**
+   * Un recuento leído del fichero (vértices, nudos, puntos…), comprobado: no negativo y que quepa en
+   * lo que queda, con al menos `bits` por elemento. Un recuento dañado es un `ErrorDxf`, no una
+   * reserva de memoria imposible.
+   */
+  cuenta(n: number, bits: number): number {
+    if (!Number.isInteger(n) || n < 0 || n * bits > this.fin - this.pos) throw new ErrorDxf("El DWG está dañado: un número de elementos que no cabe en su objeto.");
+    return n;
+  }
+
   /** Lleva la posición al siguiente byte entero. */
   alinear(): void {
     this.pos = (this.pos + 7) & ~7;

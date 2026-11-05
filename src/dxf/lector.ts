@@ -159,7 +159,8 @@ export function leerDxf(bytes: Uint8Array): Dxf {
     let j = k + 1;
     for (; j < n && codigos[j] !== 0; j++) {
       const c = codigos[j]!;
-      const v = NOMBRES.has(c) ? valores[j]!.trim() : valores[j]!;
+      // El 3 de un MTEXT es un trozo de su texto (de 250 caracteres): sus espacios cuentan (DW2-1)
+      const v = NOMBRES.has(c) && !(c === 3 && e.tipo === "MTEXT") ? valores[j]!.trim() : valores[j]!;
       e.codigos.push(c);
       e.valores.push(v);
       if (c === 8) e.capa = v;

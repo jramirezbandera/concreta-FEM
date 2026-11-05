@@ -1,0 +1,3 @@
+AC1014: 2000 ficheros → ErrorDxf 29, con objetos en fallos 1956, el mismo dibujo 15, distinto sin aviso 0, otra excepción 0 (el más lento, 126 ms)
+AC1015: 2000 ficheros → ErrorDxf 27, con objetos en fallos 1958, el mismo dibujo 15, distinto sin aviso 0, otra excepción 0 (el más lento, 17 ms)
+Pasa.

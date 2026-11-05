@@ -707,7 +707,12 @@
   - **Frente al DXF de AutoCAD de la muestra de 2000:** las 35 entidades por handle, en el mismo orden, a 4,2e-16 (la última cifra del DXF); las 21 capas, `$INSUNITS`, `$EXTMIN` y `$EXTMAX`. R14 da la misma geometría bit a bit (DW1-2: no guarda `$INSUNITS` y escribe las capas en mayúsculas, como AutoCAD).
   - **DW1-1:** ACadSharp no comprueba los CRC al leer; aquí se comprueban todos (cabecera del fichero, de variables, mapa y cada objeto). Un objeto dañado va a `fallos` y el resto sale igual: con bytes cambiados al azar, o se avisa o sale lo mismo.
   - **DW-d, como se proponía:** `validacion/dwg/muestras.ts` trae las muestras con su sha256 (también en el CI). Las pruebas, en `src/dwg/dwg.test.ts`. `NOTICE` cita ACadSharp.
-  - **Sigue DW2:** el resto de entidades, los bloques y las clases.
+- **2026-11-05: DW2 hecho** (`dwg.md` §10): R13–R2000 entero para lo que dibuja `aplanar.ts` (todas sus entidades, bloques, clases, vértices y atributos).
+  - **Frente al DXF de AutoCAD:** el dibujo entero igual y 334 entidades por handle, a 2,3e-12; fuera, sólo el gancho de un `LEADER` (DW2-4, no está en el DWG). R14 frente a 2000: lo común, bit a bit; lo demás, bloques anónimos que AutoCAD regenera (DW2-5).
+  - **DW2-1, fallo de V2c-4 corregido:** el lector de DXF recortaba el código 3 de los `MTEXT` y un texto largo perdía los espacios de sus cortes.
+  - **DW2-2:** los anónimos se llaman por su posición en la tabla de bloques, como hace AutoCAD (ACadSharp no). **DW2-3:** en R14, `LWPOLYLINE` y `HATCH` son clases.
+  - **Robustez:** con 2 000 ficheros dañados por versión, o se avisa o sale el mismo dibujo.
+  - **Sigue DW3** (2004+). El DWG del cliente (`ejemplos/Proyectos/modelo.dwg`) es de 2018: su criterio 3, con DW3.
 - **2026-11-05: sin firma** (decisión del usuario: «no tiene sentido que se firmen los resultados del programa»; `agente.md` §11). Fuera `fem firmar`, el fichero `<proyecto>.revision.json`, el campo `firma` de `fem revisar`, la sección «Firma» del informe (cambia su sha256) y el formulario de firmar de Revisión. Se quedan `fem revisar`, el informe de sensatez ligado a la huella y la pantalla Revisión con sus comprobaciones.
 - **2026-11-05: el agente fuera del repo** (`agente.md` §12). `bun run instalar` enlaza la skill `fem` en `~/.claude/skills/fem` (junction al repo, no copia) y deja la orden `fem` en `~/.local/bin` (`--quitar` lo deshace); `fem visor <proyecto> [--nuevo]` abre la app desde cualquier carpeta. La skill dice que se trabaja en la carpeta de la obra y que un proyecto del navegador hay que exportarlo. Prueba: `src/agente/instalar.test.ts`.
 - **Siguiente paso:**

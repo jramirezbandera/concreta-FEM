@@ -24,6 +24,14 @@ describe("lector de DXF frente a ezdxf", () => {
     });
   }
 
+  it("el texto de un MTEXT en trozos (código 3) conserva sus espacios (DW2-1)", () => {
+    const l = ["0", "SECTION", "2", "ENTITIES", "0", "MTEXT", "8", "0", "10", "0", "20", "0", "40", "1", "3", "uno dos ", "3", " tres", "1", " cuatro", "0", "ENDSEC", "0", "EOF"];
+    const bytes = new TextEncoder().encode(l.join("\n"));
+    const d = leerDxf(bytes);
+    expect(dibujoDxf(bytes).textos.map((t) => t.texto)).toEqual(["uno dos  tres cuatro"]);
+    expect(d.entidades[0]!.valores.filter((_, i) => d.entidades[0]!.codigos[i] === 3)).toEqual(["uno dos ", " tres"]);
+  });
+
   it("los doubles del fichero, sin transformar, salen tal cual", () => {
     const d = dibujoDxf(leer("basico.dxf"));
     const xs = Array.from(d.lineas);

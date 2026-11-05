@@ -75,6 +75,7 @@ export const TIPO = {
 
 /** Los tipos fijos que son entidades (los demás fijos son objetos no gráficos). */
 export function esEntidadFija(t: number): boolean {
+  if (t === 0x1f2) return true; // ACAD_PROXY_ENTITY
   return (t >= 0x01 && t <= 0x29 && t !== 0x09) || (t >= 0x2b && t <= 0x2f) || t === TIPO.OLE2FRAME || t === TIPO.LWPOLYLINE || t === TIPO.HATCH;
 }
 
@@ -162,8 +163,7 @@ function comun(v: Version, a: Abierto): { handle: number; f: Flujos | null } {
 
 /** Los reactores y el diccionario de extensión, en los handles. */
 function reactores(v: Version, f: Flujos): void {
-  const n = f.d.BL();
-  if (n < 0 || n > 1e6) throw new ErrorDxf("El DWG está dañado: un número de reactores fuera de rango.");
+  const n = f.h.cuenta(f.d.BL(), 8);
   for (let i = 0; i < n; i++) f.h.H();
   if (!(v.r2004 && f.d.B() === 1)) f.h.H();
   if (v.r2013) f.d.B();
@@ -233,8 +233,7 @@ export function entidad(v: Version, a: Abierto): Entidad {
 /** Un objeto de control de tabla: los handles de sus entradas, en su orden. */
 export function control(v: Version, a: Abierto): { objeto: Objeto; entradas: number[] } {
   const o = objeto(v, a);
-  const n = o.f.d.BL();
-  if (n < 0 || n > 1e6) throw new ErrorDxf("El DWG está dañado: una tabla con un número de entradas fuera de rango.");
+  const n = o.f.h.cuenta(o.f.d.BL(), 8);
   const entradas: number[] = [];
   for (let i = 0; i < n; i++) entradas.push(o.f.h.H());
   return { objeto: o, entradas };
@@ -279,95 +278,73 @@ export function capa(v: Version, a: Abierto, dec: TextDecoder): CapaDwg {
   return { handle: o.handle, nombre, apagada: apagada || color < 0, congelada };
 }
 
-// ─── Entidades ──────────────────────────────────────────────────────────────────────────────────
 
-/** Una entidad traducida a sus pares de DXF (los códigos de grupo que lee `aplanar.ts`). */
-export interface Pares {
-  tipo: string;
-  codigos: number[];
-  valores: string[];
+// ─── Bloques ────────────────────────────────────────────────────────────────────────────────────
+
+export interface CabeceraBloque {
+  handle: number;
+  /** El de la tabla: en los anónimos, sólo «*» y su letra; el completo va en su BLOCK. */
+  nombre: string;
+  xref: boolean;
+  base: [number, number, number];
+  /** El BLOCK que abre su definición. */
+  inicio: number;
 }
 
-const GRADOS = 180 / Math.PI;
-
-function pares(tipo: string): Pares & { p: (c: number, v: number | string) => void; extrusion: (e: readonly number[]) => void; espesor: (t: number) => void } {
-  const r = {
-    tipo,
-    codigos: [] as number[],
-    valores: [] as string[],
-    p(c: number, v: number | string) {
-      r.codigos.push(c);
-      r.valores.push(typeof v === "number" ? String(v) : v);
-    },
-    espesor(t: number) {
-      if (t !== 0) r.p(39, t);
-    },
-    extrusion(e: readonly number[]) {
-      if (e[0] !== 0 || e[1] !== 0 || e[2] !== 1) {
-        r.p(210, e[0]!);
-        r.p(220, e[1]!);
-        r.p(230, e[2]!);
-      }
-    },
-  };
-  return r;
+export function cabeceraBloque(v: Version, a: Abierto, dec: TextDecoder): CabeceraBloque {
+  const o = objeto(v, a);
+  const nombre = nombreEntrada(v, o, dec);
+  const { d, h } = o.f;
+  d.B(); // anónimo
+  d.B(); // con atributos
+  const xref = d.B() === 1;
+  const superpuesto = d.B() === 1;
+  if (v.r2000) d.B(); // cargado
+  if (v.r2004 && !xref && !superpuesto) d.BL(); // objetos propios
+  const base = d.BD3();
+  h.H(); // NULL
+  const inicio = h.H();
+  return { handle: o.handle, nombre, xref: xref || superpuesto, base, inicio };
 }
 
-const sinAyudas = (r: ReturnType<typeof pares>): Pares => ({ tipo: r.tipo, codigos: r.codigos, valores: r.valores });
+/** El nombre de un BLOCK (TV, detrás de la cabecera común de entidad). */
+export function nombreBloque(e: Entidad, dec: TextDecoder): string {
+  return e.f.t.TV(dec);
+}
 
-export function linea(v: Version, e: Entidad): Pares {
-  const { d } = e.f;
-  const r = pares("LINE");
-  let a: number[];
-  let b: number[];
-  if (v.r13_14) {
-    a = d.BD3();
-    b = d.BD3();
-  } else {
-    const zCero = d.B() === 1;
-    const x0 = d.RD();
-    const x1 = d.DD(x0);
-    const y0 = d.RD();
-    const y1 = d.DD(y0);
-    let z0 = 0;
-    let z1 = 0;
-    if (!zCero) {
-      z0 = d.RD();
-      z1 = d.DD(z0);
-    }
-    a = [x0, y0, z0];
-    b = [x1, y1, z1];
+// ─── Clases ─────────────────────────────────────────────────────────────────────────────────────
+
+const SENTINELA_CLASES = [0x8d, 0xa1, 0xc4, 0xb8, 0xc4, 0xa9, 0xf8, 0xc5, 0xc0, 0xdc, 0xf4, 0x5f, 0xe7, 0xcf, 0xb6, 0x8a];
+
+export interface Clase {
+  numero: number;
+  nombreDxf: string;
+  /** 0x1F2: produce entidades; 0x1F3: objetos. */
+  entidad: boolean;
+}
+
+/** AcDb:Classes de R13–R2000: las clases (tipo ≥ 500) con su nombre de DXF. */
+export function leerClases(v: Version, s: Bits, dec: TextDecoder): Map<number, Clase> {
+  if (v.r2004) throw new Error("clases de R2004+: DW3");
+  const inicio = s.pos >> 3;
+  const marca = s.bytes(16);
+  if (!SENTINELA_CLASES.every((x, i) => marca[i] === x)) throw new ErrorDxf("El DWG está dañado: la sección de las clases no empieza por su marca.");
+  const tam = s.RLu();
+  const datos = (s.pos >> 3);
+  const fin = datos + tam;
+  const clases = new Map<number, Clase>();
+  const d = s.en(s.pos, fin * 8);
+  while (Math.ceil(d.pos / 8) < fin) {
+    const numero = d.BS();
+    d.BS(); // banderas de proxy
+    d.TV(dec); // aplicación
+    d.TV(dec); // clase de C++
+    const nombreDxf = d.TV(dec);
+    d.B(); // zombi
+    const id = d.BS();
+    clases.set(numero, { numero, nombreDxf, entidad: id === 0x1f2 });
   }
-  const t = d.BT(v.r2000);
-  const ext = d.BE(v.r2000);
-  r.espesor(t);
-  r.p(10, a[0]!);
-  r.p(20, a[1]!);
-  r.p(30, a[2]!);
-  r.p(11, b[0]!);
-  r.p(21, b[1]!);
-  r.p(31, b[2]!);
-  r.extrusion(ext);
-  return sinAyudas(r);
-}
-
-export function circuloOArco(v: Version, e: Entidad): Pares {
-  const { d } = e.f;
-  const arco = e.tipo === TIPO.ARC;
-  const r = pares(arco ? "ARC" : "CIRCLE");
-  const c = d.BD3();
-  const radio = d.BD();
-  const t = d.BT(v.r2000);
-  const ext = d.BE(v.r2000);
-  r.espesor(t);
-  r.p(10, c[0]);
-  r.p(20, c[1]);
-  r.p(30, c[2]);
-  r.p(40, radio);
-  r.extrusion(ext);
-  if (arco) {
-    r.p(50, d.BD() * GRADOS);
-    r.p(51, d.BD() * GRADOS);
-  }
-  return sinAyudas(r);
+  const crc = crc16(s.buf, inicio + 16, fin);
+  if (s.en(fin * 8).RSu() !== crc) throw new ErrorDxf("El DWG está dañado: la sección de las clases no pasa su CRC.");
+  return clases;
 }
