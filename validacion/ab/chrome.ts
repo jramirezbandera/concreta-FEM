@@ -123,7 +123,7 @@ window.__ab = {
   esperar: async (f, ms = 180000) => { const t0 = performance.now(); for (;;) { let v = null; try { v = await f(); } catch { v = null; } if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 5)); } },
   estado: () => document.querySelector("[data-estado]")?.dataset.estado ?? null,
   huella: () => document.querySelector("[data-estado]")?.dataset.huella ?? null,
-  boton: (texto) => [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === texto || b.textContent.trim().startsWith(texto)),
+  boton: (texto) => [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === texto || b.textContent.trim().startsWith(texto) || b.getAttribute("aria-label") === texto),
   motor: () => window.__motorVistas,
   dep: (i) => window.__motorVistas.vista(i).depuracion(),
   sup: (i) => document.querySelector('.celda[data-vista="' + i + '"] .celda-superficie'),

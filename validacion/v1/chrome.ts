@@ -127,7 +127,7 @@ window.__v1 = {
   sha: () => document.querySelector("[data-sha]")?.dataset.sha ?? null,
   origen: () => document.querySelector("[data-sha]")?.dataset.origen ?? null,
   pie: () => document.querySelector("footer")?.innerText ?? "",
-  boton: (texto, raiz = document) => [...raiz.querySelectorAll("button")].find((b) => b.textContent.trim() === texto || b.textContent.trim().startsWith(texto + " ")),
+  boton: (texto, raiz = document) => [...raiz.querySelectorAll("button")].find((b) => b.textContent.trim() === texto || b.textContent.trim().startsWith(texto + " ") || b.getAttribute("aria-label") === texto),
   quietos: () => [...document.querySelectorAll(".lienzo[data-cargando]")].every((x) => x.dataset.cargando === "false"),
   // Todas las vistas con su escena (de la versión que tienen: las de otra se descartan, criterio 3)
   dibujado: () => { const ls = [...document.querySelectorAll(".lienzo[data-cargando]")]; return ls.length > 0 && ls.every((x) => x.dataset.cargando === "false"); },
@@ -158,7 +158,9 @@ try {
     const shaChrome = await pagina<string>(`return __v1.sha();`);
     const pie = await pagina<string>(`return __v1.pie();`);
     // «El cálculo» es lo que hace `fem calcular`: compilar y calcular (los dos en el worker)
-    const calculo = Number(/compilado en ([\d.]+) s/.exec(pie)?.[1] ?? NaN) + Number(/calculado en el visor en ([\d.]+) s/.exec(pie)?.[1] ?? NaN);
+    // El pie, como lo escribe la app (con coma decimal desde la auditoría de la interfaz): «compilado en 0,25 s y calculado en 0,24 s»
+    const seg = (re: RegExp) => Number((re.exec(pie)?.[1] ?? "NaN").replace(",", "."));
+    const calculo = seg(/compilado en ([\d.,]+) s/) + seg(/calculado en ([\d.,]+) s/);
     const c = await ejecutar(["calcular", p]);
     const cab = JSON.parse(readFileSync(join(datos, nombre, ".fem", String(c.json.huella), "resultados.json"), "utf8")) as { sha256: string };
     comprobar(shaChrome === cab.sha256, `${nombre}: sha256 en Chrome ${shaChrome?.slice(0, 16)} = fem calcular ${cab.sha256.slice(0, 16)}`);
@@ -193,7 +195,11 @@ try {
   const pasos: [string, number][] = [];
   const medir = async (que: string, js: string, cond = "true") => {
     pasos.push([que, await pagina<number>(`return performance.now();`)]);
-    cambios.push([que, await accion(js, cond)]);
+    try {
+      cambios.push([que, await accion(js, cond)]);
+    } catch (e) {
+      throw new Error(`en el paso «${que}»: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
   const planta = (id: string) => `{ const s = document.querySelector('select[aria-label=Planta]'); s.value = "${id}"; s.dispatchEvent(new Event("change", { bubbles: true })); }`;
   // Desde I1 (docs/fem3d/interfaz.md §13), las pantallas de resultados de V1 son modos de Resultados

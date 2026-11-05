@@ -87,7 +87,8 @@ const ESPERADO = {
   diagramas: (dMy.positivo.length + dMy.negativo.length) / 9,
   isoTodas: isoTodas.triangulos.length / 9,
   isoN3: isoN3.triangulos.length / 9,
-  alzado: shaBuferes(valor(ses.alzado({ eje: "3" }, { esfuerzo: "M", combinaciones: D, escala: 1 }))),
+  // En Resultados, el alzado va alámbrico por defecto (2026-10-29, `niveles.md` §0)
+  alzado: shaBuferes(valor(ses.alzado({ eje: "3", modo: "alambrico" }, { esfuerzo: "M", combinaciones: D, escala: 1 }))),
 };
 
 // ─── 1. La app compilada y el proyecto ──────────────────────────────────────────────────────────
@@ -360,6 +361,9 @@ try {
   log("\n## Pilares por colores: N");
   {
     await pagina(`__i2.boton("Pilares").click()`);
+    await quietos();
+    // Pilares se abre en la planta más baja (UI-16): el 3D, con todas
+    await pagina(elegir("Planta", ""));
     await quietos();
     await pagina(`__i2.boton("3D").click()`);
     await pagina(`window.__largas = [];`);

@@ -1,31 +1,31 @@
 ## Criterio 1: el dibujo manda (Modelo, paneles por defecto, nada elegido)
-BIEN  1920×1080: la vista ocupa el 72.8 % de la ventana (≥ 70 %)
-BIEN  1366×768: la vista ocupa el 63.0 % de la ventana (≥ 60 %)
+BIEN  1920×1080: la vista ocupa el 72.7 % de la ventana (≥ 70 %)
+BIEN  1366×768: la vista ocupa el 65.6 % de la ventana (≥ 60 %)
 
 ## Criterio 4: espacios, modos, paneles y paleta en el edificio objetivo (1440×900)
-  planta N3: 35 ms
-  3D: 139 ms
-  planta: 34 ms
-  elegir un pilar (navegador): 101 ms
-  Esc: 34 ms
-  tablas: 45 ms
-  plegar el panel inferior: 39 ms
-  espacio Cargas: 42 ms
-  espacio Resultados (losas): 156 ms
-  M11: 652 ms
-  modo Diagramas: 763 ms
-  modo Pilares: 93 ms
-  elegir un pilar (cuadro): 35 ms
-  modo Deformada: 57 ms
-  plegar las propiedades: 75 ms
-  abrir las propiedades: 38 ms
-  espacio Revisión: 2683 ms
-  paleta: 38 ms
-  buscar en la paleta: 33 ms
-  elegir desde la paleta: 34 ms
-  espacio Modelo: 46 ms
-  tema oscuro: 35 ms
-  tema claro: 36 ms
-BIEN  ninguna tarea larga de más de 50 ms en el recorrido (la peor, 0 ms; 0 en total)
+  planta N3: 315 ms
+  3D: 92 ms
+  planta: 36 ms
+  elegir un pilar (navegador): 108 ms
+  Esc: 103 ms · tareas largas: 80 ms
+  tablas: 108 ms · tareas largas: 80 ms
+  plegar el panel inferior: 46 ms
+  espacio Cargas: 66 ms
+  espacio Resultados (losas): 213 ms
+  M11: 484 ms
+  modo Diagramas: 11431 ms · tareas largas: 123 ms
+  modo Pilares: 509 ms · tareas largas: 52 ms
+  elegir un pilar (cuadro): 79 ms
+  modo Deformada: 323 ms · tareas largas: 50, 116 ms
+  plegar las propiedades: 76 ms · tareas largas: 73 ms
+  abrir las propiedades: 49 ms
+  espacio Revisión: 18681 ms · tareas largas: 95, 51 ms
+  paleta: 60 ms
+  buscar en la paleta: 51 ms
+  elegir desde la paleta: 50 ms · tareas largas: 56 ms
+  espacio Modelo: 97 ms · tareas largas: 56 ms
+  tema oscuro: 104 ms
+  tema claro: 51 ms
+FALLA ninguna tarea larga de más de 50 ms en el recorrido (la peor, 123 ms; 9 en total)
 
-TODO BIEN
+1 FALLOS

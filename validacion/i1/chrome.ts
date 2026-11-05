@@ -141,6 +141,8 @@ try {
     [1366, 768, 0.6],
   ] as const) {
     await abrir("edificio", w, h);
+    // El aviso «Calculado · Ver resultados» (P-27) es pasajero (se va a los 12 s): se mide sin él
+    await pagina(`document.querySelector('button[aria-label="Cerrar el aviso"]')?.click(); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));`);
     const a = await pagina<number>(`return __i1.area();`);
     comprobar(a >= min, `${w}×${h}: la vista ocupa el ${(a * 100).toFixed(1)} % de la ventana (≥ ${min * 100} %)`);
     await captura(`modelo-${w}x${h}`);
@@ -168,7 +170,7 @@ try {
   await medir("espacio Cargas", espacio("Cargas"), "true", "5-cargas");
   await medir("espacio Resultados (losas)", espacio("Resultados"), "document.querySelector('[data-extremo]')", "6-resultados-losas");
   await medir("M11", `__i1.boton("M11").click()`);
-  await medir("modo Diagramas", `__i1.boton("Diagramas").click()`, `document.querySelector("#estacion")`, "7-resultados-diagramas");
+  await medir("modo Diagramas", `__i1.boton("Diagramas").click()`, `document.body.innerText.includes("Vanos de cara a cara")` /* UI-46: el alzado de la pieza se abre al elegirla; al entrar, la primera viga en Propiedades */, "7-resultados-diagramas");
   await medir("modo Pilares", `__i1.boton("Pilares").click()`, `document.querySelector("tr.clic")`, "8-resultados-pilares");
   await medir("elegir un pilar (cuadro)", `document.querySelectorAll("tr.clic")[5].click()`, `document.querySelector(".panel.der svg")`, "9-resultados-pilar");
   await medir("modo Deformada", `__i1.boton("Deformada").click()`, `document.querySelector('.celda[data-tipo="3d"]')`, "10-resultados-deformada");

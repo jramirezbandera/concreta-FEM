@@ -55,10 +55,23 @@ function precalentar(r: WebGLRenderer): void {
     tri.setAttribute("position", new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3));
     tri.setAttribute("normal", new BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), 3));
     tri.setAttribute("color", new BufferAttribute(new Float32Array(9), 3));
-    escena.add(new Mesh(tri, new MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, side: DoubleSide })));
-    escena.add(new Mesh(tri, new MeshLambertMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity: 0.82 })));
-    escena.add(new LineSegments(tri, new LineBasicMaterial({ vertexColors: true })));
-    escena.add(new LineSegments(tri, new LineBasicMaterial({ transparent: true, opacity: 0.45 })));
+    // Three.js decide el programa también por los atributos de la geometría: el relleno de la planta y
+    // del alzado va sólo con la posición, el sólido del 3D sin normales (sombreado plano) y sus aristas,
+    // sólo con la posición. Con un único triángulo con posición, normal y color, la primera vista en
+    // sólido o el primer alzado compilaban sus programas en mitad de un fotograma (84–100 ms al pasar a
+    // cuatro vistas, en el banco de I2 del 2026-11-05). Cada material, con las tres geometrías.
+    const conColor = new BufferGeometry();
+    conColor.setAttribute("position", tri.getAttribute("position"));
+    conColor.setAttribute("color", new BufferAttribute(new Uint8Array(9), 3, true));
+    const soloPosicion = new BufferGeometry();
+    soloPosicion.setAttribute("position", tri.getAttribute("position"));
+    const GEOMETRIAS = [tri, conColor, soloPosicion];
+    const malla = (m: Material) => GEOMETRIAS.forEach((g) => escena.add(new Mesh(g, m)));
+    const lineas = (m: Material) => GEOMETRIAS.forEach((g) => escena.add(new LineSegments(g, m)));
+    malla(new MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, side: DoubleSide }));
+    malla(new MeshLambertMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity: 0.82 }));
+    lineas(new LineBasicMaterial({ vertexColors: true }));
+    lineas(new LineBasicMaterial({ transparent: true, opacity: 0.45 }));
     const lg = new LineSegmentsGeometry();
     lg.setPositions([0, 0, 0, 1, 0, 0]);
     lg.setColors([0, 0, 0, 0, 0, 0]);
@@ -73,13 +86,11 @@ function precalentar(r: WebGLRenderer): void {
     rgba.setAttribute("color", new BufferAttribute(new Float32Array(8), 4));
     escena.add(new LineSegments(rgba, MATERIAL_LINEAS));
     escena.add(new Mesh(tri, MATERIAL_DEGRADADO));
-    // Los del 3D, los mismos objetos (con sus planos de recorte)
+    // Los del 3D, los mismos objetos (con sus planos de recorte), con las tres geometrías
     for (const m of MATERIALES_3D) {
-      if (m instanceof LineMaterial) {
-        const l = new LineSegments2(lg, m);
-        escena.add(l);
-      } else if (m instanceof LineBasicMaterial) escena.add(new LineSegments(tri, m));
-      else escena.add(new Mesh(tri, m));
+      if (m instanceof LineMaterial) escena.add(new LineSegments2(lg, m));
+      else if (m instanceof LineBasicMaterial) lineas(m);
+      else malla(m);
     }
     void r.compileAsync(escena, new PerspectiveCamera()).catch(() => {});
   };

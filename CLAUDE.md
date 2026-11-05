@@ -737,6 +737,20 @@
   - **Aviso `sensatez/casi-alineados`** en `fem validar`, el informe y Diagnósticos, con lo que les falta. **`fem alinear proyecto.json [--tolerancia 0.03] [--escribir]`** (MA-e: sólo propone; con `--escribir`, deja `.bak`). **«Alinear»** en Modelo · Editar y en la paleta.
   - **Medido:** ningún aviso en los modelos de A3, los ejemplos, las geometrías de G y las 24 retículas al azar; el DXF crudo de la vivienda da 7 rectas y queda alineado sin restos; con ruido al azar (1 372 casos), el modelo vuelve bit a bit.
   - **Pruebas:** `src/editor/alinear.test.ts`, `cli.test.ts` y `app/src/test/editor.test.tsx`. **Queda de MA5:** el escalón de cubierta.
+- **2026-11-05: la auditoría del motor, puntos 5 y 6 (`auditoria.md` §8), y los bancos de Chrome otra vez:**
+  - **Auditoría:**
+    - AU-5: las caras de banda fuera de la malla y el reparto lo avisan;
+    - AU-6: las muestras de my y mxy van del lado del vano, con la referencia de C5 regenerada a sabiendas;
+    - AU-9: la deformada con empotramiento parcial cierra en su nudo;
+    - AU-10: aviso de lámina mal condicionada;
+    - AU-11 a AU-16: guardas de entrada del motor.
+  - **Bancos:** los 17 y la PWA se pasaron por primera vez desde la auditoría de la interfaz. Se arreglaron los bancos que se habían quedado atrás (botones sólo con icono, la disposición en «Vistas», el pie con coma decimal, Diagramas sin panel al entrar, el alzado alámbrico en Resultados, Pilares en la planta más baja) y dos fallos de la app:
+    - al recalcular tras un cambio del fichero, Pilares volvía a la planta más baja (UI-16 se aplicaba cada vez que se montaba el modo);
+    - el precalentado de los programas de Three.js usaba una sola geometría, y el primer 3D en sólido o el primer alzado los compilaban en mitad de un fotograma (84–100 ms al pasar a cuatro vistas).
+  - **Pasan 16 de 18.** Fallan i1 y f por tiempo; son regresiones reales desde que se subieron (2026-10-12 y 2026-10-13), con la malla del edificio objetivo ×2,5 (LV, LV2, HR):
+    - i1: entrar en Diagramas, de 0,76 a 11,4 s; en Revisión, de 2,7 a 18,7 s; y 9 tareas largas de 50 a 123 ms;
+    - f: el mapa de franjas, de 1,89 a 3,42 s, y una tarea larga de 62 ms.
+  - **Pendiente del usuario:** decidir qué se hace con esos tiempos; y la banda «Calculado · Ver resultados», que mueve el dibujo 39 px al aparecer y al irse (i1 la cierra antes de medir).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

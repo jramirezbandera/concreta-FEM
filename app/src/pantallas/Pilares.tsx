@@ -120,6 +120,9 @@ function GraficoAxil({ filas }: { filas: FilaPilar[] }) {
   );
 }
 
+/** Los proyectos abiertos (por su fuente) en los que ya se entró en Pilares. */
+const YA_ABIERTOS = new WeakSet<object>();
+
 export function ModoPilares() {
   const { proyecto, planta, setPlanta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:pilares", { props: true, dock: true, pestana: "cuadro" });
@@ -130,11 +133,18 @@ export function ModoPilares() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
   }, []);
   const e = proyecto.estado!;
-  // Se abre en la planta más baja a la que llegan pilares: la del mayor axil (UI-16)
+  // Se abre en la planta más baja a la que llegan pilares: la del mayor axil (UI-16). Sólo la primera
+  // vez con cada proyecto abierto: al recalcular tras un cambio del fichero el modo se vuelve a montar,
+  // y pisaba la planta elegida (el banco de V1, criterio 5)
   const abierta = useRef(false);
   useEffect(() => {
     if (abierta.current) return;
     abierta.current = true;
+    const fuente = proyecto.fuente;
+    if (fuente) {
+      if (YA_ABIERTOS.has(fuente)) return;
+      YA_ABIERTOS.add(fuente);
+    }
     const f = proyecto.edicion?.proyecto.modelo;
     if (!f) return;
     const ids = f.plantas.map((p) => p.id);

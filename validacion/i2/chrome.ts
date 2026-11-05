@@ -263,7 +263,9 @@ try {
     comprobar(mediana(t) <= 17, `${que}: mediana ${mediana(t).toFixed(1)} ms entre fotogramas (p95 ${p95(t).toFixed(1)} ms, ${t.length} fotogramas)`);
   const t1 = performance.now();
   await marca("cuatro vistas");
-  const ms14 = await pagina<number>(`const t0 = performance.now(); __i2.boton("2 × 2").click(); await __i2.esperar(() => document.querySelectorAll(".celda").length === 4); await new Promise((r) => setTimeout(r, 20)); await __i2.esperar(() => __i2.quietos(), 10000); await __i2.fotograma(); return performance.now() - t0;`);
+  // La disposición, en el menú «Vistas» desde la auditoría de la interfaz (UI-7): se abre fuera de la medida
+  await pagina(`document.querySelector('button[aria-label^="Disposición"]').click(); await __i2.esperar(() => document.querySelector("[role=menuitemradio]"));`);
+  const ms14 = await pagina<number>(`const t0 = performance.now(); [...document.querySelectorAll("[role=menuitemradio]")].find((b) => b.textContent.trim().startsWith("Cuatro")).click(); await __i2.esperar(() => document.querySelectorAll(".celda").length === 4); await new Promise((r) => setTimeout(r, 20)); await __i2.esperar(() => __i2.quietos(), 10000); await __i2.fotograma(); return performance.now() - t0;`);
   comprobar(ms14 <= 300, `pasar de 1 a 4 vistas: ${ms14.toFixed(0)} ms (≤ 300)`);
   void t1;
   await captura("8-cuatro-vistas");

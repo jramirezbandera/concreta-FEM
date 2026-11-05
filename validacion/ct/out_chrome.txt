@@ -1,27 +1,27 @@
 ## Criterio 1: pilares puestos con Tab y distancias tecleadas
-BIEN  Tab elige la cota de la izquierda, desde P1: «x 5,2 · y 0,3 m · Cota izquierda, desde P1: 5,20»
-BIEN  cuatro Tab llegan a la de arriba, desde P3: «x 0,2 · y 6 m · Cota arriba, desde P3: 0,25»
+BIEN  Tab elige la cota de la izquierda, desde P1: «x 5,200 · y 0,300 m · Cota izquierda, desde P1: 5,20»
+BIEN  cuatro Tab llegan a la de arriba, desde P3: «x 0,200 · y 6,000 m · Cota arriba, desde P3: 0,25»
 BIEN  Esc suelta lo fijado y sigue en Pilar (true); el segundo vuelve a Elegir (true)
 BIEN  sin errores de la herramienta
 BIEN  guardados, los pilares están donde se tecleó, bit a bit: [[0,0],[5.4,0],[5.4,6.25],[0,6.25]]
 
 ## Criterio 5: las cotas temporales en el edificio objetivo (7 plantas, 80 pilares por planta)
-BIEN  mover el ratón y pintar las cotas: mediana 0.200 ms, p95 0.400 ms, máx. 1.300 ms (≤ 2 ms); la primera vez (índice y referencias), 6.0 ms
+BIEN  mover el ratón y pintar las cotas: mediana 0.200 ms, p95 0.500 ms, máx. 1.200 ms (≤ 2 ms); la primera vez (índice y referencias), 6.4 ms
 BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
 
 ## CT2: estirar el edificio objetivo desde la cota 3–4
-BIEN  al pasar por el número, la barra lo ofrece: «x 15 · y -1 m · Cota 3–4: 6,00 m · clic para cambiarla»
+BIEN  al pasar por el número, la barra lo ofrece: «x 15,000 · y −1,000 m · Cota 3–4: 6,00 m · clic para cambiarla»
 BIEN  un clic en el número elige la cota: «Cota 3–4 (6,00 m): elija la flecha del lado que se mueve. Esc anula.»
 BIEN  la flecha del 4 abre el campo con el valor: «6,00», «Cota 3–4, se mueve el 4»
-BIEN  pintar lo que se mueve en una planta: la primera vez 0.3 ms, luego mediana 0.20 ms y máx. 0.50 ms (≤ 16 ms); 0 tareas largas
+BIEN  pintar lo que se mueve en una planta: la primera vez 0.3 ms, luego mediana 0.10 ms y máx. 0.40 ms (≤ 16 ms); 0 tareas largas
 BIEN  ← y → cambian de lado: «Cota 3–4, se mueve el 3», «Cota 3–4, se mueve el 4»
 BIEN  guardado, el proyecto es el de `estirar` en Node, byte a byte (469 objetos cambiados)
 BIEN  deshecho y guardado, los bytes del de partida (en el formato canónico)
 
 ## CT3: mover un pilar del edificio objetivo desde sus cotas
 BIEN  elegido P-x54-y0 (2 vigas de N3 por su punto fijo), la barra ofrece sus cotas: «P-x54-y0: un clic en el número de una cota (o Tab) para moverlo.»
-BIEN  mover el ratón y pintar las cotas del pilar: mediana 0.100 ms, p95 0.200 ms, máx. 0.900 ms (≤ 2 ms)
-BIEN  al pasar por el número de la izquierda, la barra lo ofrece: «x 51 · y 0 m · Cota izquierda, desde eje 9: 6,00 m · clic para cambiarla»
+BIEN  mover el ratón y pintar las cotas del pilar: mediana 0.100 ms, p95 0.200 ms, máx. 1.000 ms (≤ 2 ms)
+BIEN  al pasar por el número de la izquierda, la barra lo ofrece: «x 51,000 · y 0,000 m · Cota izquierda, desde eje 9: 6,00 m · clic para cambiarla»
 BIEN  un clic abre el campo con el valor: «6,00», «Cota izquierda, desde eje 9 · P-x54-y0»
 BIEN  con 6,35 e Intro, guardado, el proyecto es el de `moverPilar` en Node, byte a byte (P-x54-y0 y 14 vigas)
 BIEN  deshecho y guardado, los bytes del de partida

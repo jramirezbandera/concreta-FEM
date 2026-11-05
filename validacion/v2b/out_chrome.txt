@@ -1,11 +1,11 @@
 Criterio 5 · edificio reticular de V2 (C4: 7 plantas, 80 pilares, reticular con ábacos)
-  abierto y calculado en 11.8 s
-BIEN  escribir el intereje de una losa: el dibujo de la versión nueva sale en 0.32 s (≤ 1,5 s)
-  escribir el intereje de una losa: los diagnósticos, tras compilar, en 6.00 s (información)
+  abierto y calculado en 13.7 s
+BIEN  escribir el intereje de una losa: el dibujo de la versión nueva sale en 0.34 s (≤ 1,5 s)
+  escribir el intereje de una losa: los diagnósticos, tras compilar, en 5.55 s (información)
 BIEN  escribir una celda: tareas largas > 50 ms en el hilo principal: 0 (máx. 0 ms)
 BIEN  pegar 80 filas: entran todas
-BIEN  pegar 80 filas: el dibujo sale en 0.29 s (≤ 1,5 s)
-  pegar 80 filas: los diagnósticos, tras compilar, en 6.86 s (información)
+BIEN  pegar 80 filas: el dibujo sale en 0.27 s (≤ 1,5 s)
+  pegar 80 filas: los diagnósticos, tras compilar, en 5.75 s (información)
 BIEN  pegar 80 filas: tareas largas > 50 ms: 0 (máx. 0 ms)
 
 Todo bien

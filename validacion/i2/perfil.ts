@@ -154,11 +154,21 @@ try {
   await pagina(`window.__largas = [];`);
   const espacio = (n: string) => `__i1.boton("${n}", document.querySelector("nav")).click()`;
   await accion(`{ const s = document.querySelector('select[aria-label=Planta]'); s.value = "N3"; s.dispatchEvent(new Event("change", { bubbles: true })); }`);
+  // De 1 a 4 vistas en Modelo (la tarea larga del banco de I2, 2026-11-05); la disposición, en el menú «Vistas»
+  const disposicion = (n: string) => `document.querySelector('button[aria-label^="Disposición"]').click(); await __i1.esperar(() => document.querySelector("[role=menuitemradio]")); [...document.querySelectorAll("[role=menuitemradio]")].find((b) => b.textContent.trim().startsWith("${n}")).click()`;
+  const antes4 = await pagina<string[]>(`return window.__motorVistas.programas();`);
+  await perfilar("cuatro vistas (Modelo)", disposicion("Cuatro"), `document.querySelectorAll(".celda").length === 4`);
+  const despues4 = await pagina<string[]>(`return window.__motorVistas.programas();`);
+  log(`
+Programas nuevos al pasar a cuatro vistas (de ${antes4.length}):`);
+  for (const x of despues4.filter((y) => !antes4.includes(y))) log(`  ${x}`);
+  log(`Las vistas: ${await pagina<string>(`return [...document.querySelectorAll(".celda")].map((c) => c.getAttribute("data-tipo")).join(", ");`)}`);
+  await accion(disposicion("Una vista"), `document.querySelectorAll(".celda").length === 1`);
   await accion(espacio("Resultados"), "document.querySelector('[data-extremo]')");
   await accion(`__i1.boton("M11").click()`);
   await pagina(`window.__largas = [];`);
   const antes = await pagina<string[]>(`return window.__motorVistas.programas();`);
-  await perfilar("modo Diagramas", `__i1.boton("Diagramas").click()`, `document.querySelector("#estacion")`);
+  await perfilar("modo Diagramas", `__i1.boton("Diagramas").click()`, `document.body.innerText.includes("Vanos de cara a cara")` /* UI-46: el alzado de la pieza se abre al elegirla; al entrar, la primera viga en Propiedades */);
   const despues = await pagina<string[]>(`return window.__motorVistas.programas();`);
   log(`
 Programas nuevos al entrar en Diagramas (de ${antes.length}):`);

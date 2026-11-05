@@ -1,198 +1,251 @@
 
-## modo Diagramas: 575 ms · tareas largas: ninguna
+## cuatro vistas (Modelo): 141 ms · tareas largas: ninguna
   propio:
-    467.3 ms  (idle) :-1
-    18.0 ms  (program) :-1
-    10.5 ms  getParameters index-B0W2gSla.js:46998
-    5.4 ms  fotograma index-B0W2gSla.js:55346
-    3.5 ms  (garbage collector) :-1
-    3.3 ms  getProgram index-B0W2gSla.js:53140
-    2.3 ms  renderWithHooks index-B0W2gSla.js:3806
-    2.3 ms  superponer index-B0W2gSla.js:55874
-    2.2 ms  setProgram index-B0W2gSla.js:53241
-    2.2 ms  t8 index-B0W2gSla.js:60340
-    2.2 ms  WebGLRenderer.setSize index-B0W2gSla.js:52369
-    1.8 ms  (anónima) index-B0W2gSla.js:60368
+    40.5 ms  (idle) :-1
+    18.1 ms  getProgramParameter :-1
+    15.6 ms  (program) :-1
+    7.7 ms  (garbage collector) :-1
+    5.0 ms  getBoundingClientRect :-1
+    2.2 ms  fillText :-1
+    2.2 ms  colores index-b6FLMSIn.js:88807
+    1.8 ms  colocarRotulos index-b6FLMSIn.js:86735
+    1.6 ms  ClienteSesion.worker.onmessage index-b6FLMSIn.js:48112
+    1.1 ms  compose index-b6FLMSIn.js:59331
+    1.1 ms  (anónima) index-b6FLMSIn.js:88839
+    1.1 ms  bufferData :-1
+    1.1 ms  setup index-b6FLMSIn.js:74292
+    1.1 ms  setAttribute :-1
+    1.1 ms  renderWithHooks index-b6FLMSIn.js:3806
+  total (con lo que llama):
+    49.3 ms  fotograma index-b6FLMSIn.js:86388
+    49.3 ms  (anónima) index-b6FLMSIn.js:86380
+    33.7 ms  WebGLRenderer.render index-b6FLMSIn.js:83401
+    29.2 ms  renderObject index-b6FLMSIn.js:83615
+    29.2 ms  renderObjects index-b6FLMSIn.js:83605
+    29.2 ms  renderScene index-b6FLMSIn.js:83530
+    28.7 ms  WebGLRenderer.renderBufferDirect index-b6FLMSIn.js:83191
+    26.5 ms  render index-b6FLMSIn.js:89758
+    25.4 ms  setProgram index-b6FLMSIn.js:83733
+    20.4 ms  pintar index-b6FLMSIn.js:85825
+    18.1 ms  getProgramParameter :-1
+    18.1 ms  WebGLUniforms index-b6FLMSIn.js:76797
+    18.1 ms  onFirstUse index-b6FLMSIn.js:77326
+    18.1 ms  WebGLProgram.getUniforms index-b6FLMSIn.js:77365
+    15.0 ms  performWorkOnRoot index-b6FLMSIn.js:7778
+    13.8 ms  processRootScheduleInMicrotask index-b6FLMSIn.js:8542
+    13.8 ms  (anónima) index-b6FLMSIn.js:8612
+    13.2 ms  performSyncWorkOnRoot index-b6FLMSIn.js:8607
+    13.2 ms  flushSyncWorkAcrossRoots_impl index-b6FLMSIn.js:8516
+    13.1 ms  flushPassiveEffects index-b6FLMSIn.js:8401
+    12.5 ms  commitHookEffectListMount index-b6FLMSIn.js:6154
+    12.5 ms  commitPassiveMountOnFiber index-b6FLMSIn.js:7463
+    12.5 ms  recursivelyTraversePassiveMountEffects index-b6FLMSIn.js:7458
+    11.6 ms  render index-b6FLMSIn.js:87138
+    8.2 ms  performWorkUntilDeadline index-b6FLMSIn.js:515
+    7.7 ms  (garbage collector) :-1
+    7.3 ms  commitRoot index-b6FLMSIn.js:8234
+    7.3 ms  completeRoot index-b6FLMSIn.js:8217
+    7.3 ms  completeRootWhenReady index-b6FLMSIn.js:7857
+    7.2 ms  workLoopSync index-b6FLMSIn.js:8028
+
+Programas nuevos al pasar a cuatro vistas (de 49):
+   basic,highp,srgb,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1024,8519682,srgb,onBeforeCompile() {}
+Las vistas: planta, 3d, alzado, alzado
+
+## modo Diagramas: 3016 ms · tareas largas: 62
+  propio:
+    2876.9 ms  (idle) :-1
+    26.4 ms  (program) :-1
+    9.5 ms  (garbage collector) :-1
+    6.5 ms  bufferData :-1
+    6.0 ms  getParameters index-b6FLMSIn.js:77490
+    5.9 ms  fotograma index-b6FLMSIn.js:86388
+    3.9 ms  setFromBufferAttribute index-b6FLMSIn.js:62743
+    3.4 ms  getPropertyValue :-1
+    3.4 ms  Object3D index-b6FLMSIn.js:60014
+    3.3 ms  a3D index-b6FLMSIn.js:86465
+    3.3 ms  getProgram index-b6FLMSIn.js:83632
+    2.7 ms  colocarRotulos index-b6FLMSIn.js:86735
+    2.7 ms  measureText :-1
+    2.3 ms  WebGLRenderer.setSize index-b6FLMSIn.js:82861
+    2.3 ms  getProgramCacheKey index-b6FLMSIn.js:77709
+  total (con lo que llama):
+    65.0 ms  fotograma index-b6FLMSIn.js:86388
+    65.0 ms  (anónima) index-b6FLMSIn.js:86380
+    49.0 ms  WebGLRenderer.render index-b6FLMSIn.js:83401
+    49.0 ms  render index-b6FLMSIn.js:87138
+    34.7 ms  renderObject index-b6FLMSIn.js:83615
+    34.7 ms  renderObjects index-b6FLMSIn.js:83605
+    34.7 ms  renderScene index-b6FLMSIn.js:83530
+    33.1 ms  WebGLRenderer.renderBufferDirect index-b6FLMSIn.js:83191
+    25.6 ms  performWorkUntilDeadline index-b6FLMSIn.js:515
+    21.2 ms  flushPassiveEffects index-b6FLMSIn.js:8401
+    20.7 ms  commitHookEffectListMount index-b6FLMSIn.js:6154
+    20.7 ms  commitPassiveMountOnFiber index-b6FLMSIn.js:7463
+    20.7 ms  recursivelyTraversePassiveMountEffects index-b6FLMSIn.js:7458
+    20.1 ms  performWorkOnRoot index-b6FLMSIn.js:7778
+    18.7 ms  setProgram index-b6FLMSIn.js:83733
+    15.4 ms  getProgram index-b6FLMSIn.js:83632
+    15.1 ms  (anónima) index-b6FLMSIn.js:8241
+    13.9 ms  ponerEscena index-b6FLMSIn.js:86924
+    13.9 ms  (anónima) index-b6FLMSIn.js:91396
+    13.3 ms  Capas2D index-b6FLMSIn.js:86621
+    13.3 ms  reconstruir index-b6FLMSIn.js:86992
+    13.1 ms  projectObject index-b6FLMSIn.js:83485
+    12.3 ms  capa index-b6FLMSIn.js:86632
+    11.1 ms  renderRootSync index-b6FLMSIn.js:7980
+    10.5 ms  workLoopSync index-b6FLMSIn.js:8028
+    10.2 ms  superponer index-b6FLMSIn.js:87197
+    10.1 ms  performSyncWorkOnRoot index-b6FLMSIn.js:8607
+    10.1 ms  flushSyncWorkAcrossRoots_impl index-b6FLMSIn.js:8516
+    10.1 ms  processRootScheduleInMicrotask index-b6FLMSIn.js:8542
+    10.1 ms  (anónima) index-b6FLMSIn.js:8612
+
+Programas nuevos al entrar en Diagramas (de 50):
+
+## modo Pilares: 161 ms · tareas largas: ninguna
+  propio:
+    70.3 ms  (idle) :-1
+    57.7 ms  (program) :-1
+    3.9 ms  getPropertyValue :-1
+    2.8 ms  WebGLRenderer.setSize index-b6FLMSIn.js:82861
+    2.3 ms  setProp index-b6FLMSIn.js:9041
+    2.2 ms  deleteVertexArray :-1
+    2.2 ms  appendChild :-1
+    1.7 ms  renderWithHooks index-b6FLMSIn.js:3806
+    1.6 ms  fmt index-b6FLMSIn.js:22335
+    1.6 ms  setTextContent index-b6FLMSIn.js:1823
+    1.6 ms  ClienteSesion.worker.onmessage index-b6FLMSIn.js:48112
+    1.1 ms  releaseStatesOfGeometry index-b6FLMSIn.js:74515
+    1.1 ms  setAttribute :-1
+    1.1 ms  remove index-b6FLMSIn.js:60570
+    1.1 ms  setValueForStyle index-b6FLMSIn.js:1834
+  total (con lo que llama):
+    31.8 ms  performWorkOnRoot index-b6FLMSIn.js:7778
+    16.3 ms  performSyncWorkOnRoot index-b6FLMSIn.js:8607
+    16.3 ms  flushSyncWorkAcrossRoots_impl index-b6FLMSIn.js:8516
+    16.3 ms  processRootScheduleInMicrotask index-b6FLMSIn.js:8542
+    16.3 ms  (anónima) index-b6FLMSIn.js:8612
+    16.1 ms  performWorkUntilDeadline index-b6FLMSIn.js:515
+    16.0 ms  workLoopSync index-b6FLMSIn.js:8028
+    16.0 ms  renderRootSync index-b6FLMSIn.js:7980
+    15.8 ms  commitRoot index-b6FLMSIn.js:8234
+    15.8 ms  completeRoot index-b6FLMSIn.js:8217
+    15.8 ms  completeRootWhenReady index-b6FLMSIn.js:7857
+    15.5 ms  performWorkOnRootViaSchedulerTask index-b6FLMSIn.js:8596
+    13.0 ms  flushPassiveEffects index-b6FLMSIn.js:8401
+    12.4 ms  flushPendingEffects index-b6FLMSIn.js:8394
+    12.4 ms  flushSpawnedWork index-b6FLMSIn.js:8351
+    8.4 ms  commitHookEffectListMount index-b6FLMSIn.js:6154
+    8.2 ms  completeWork index-b6FLMSIn.js:5816
+    7.9 ms  commitPassiveMountOnFiber index-b6FLMSIn.js:7463
+    7.9 ms  recursivelyTraversePassiveMountEffects index-b6FLMSIn.js:7458
+    7.7 ms  beginWork index-b6FLMSIn.js:5627
+    7.2 ms  renderWithHooks index-b6FLMSIn.js:3806
+    6.7 ms  Motor index-b6FLMSIn.js:86174
+    6.7 ms  (anónima) index-b6FLMSIn.js:90290
+    6.6 ms  updateFunctionComponent index-b6FLMSIn.js:5205
+    6.2 ms  setProp index-b6FLMSIn.js:9041
+    5.5 ms  setInitialProperties index-b6FLMSIn.js:9275
+    5.1 ms  liberar index-b6FLMSIn.js:86646
+    5.1 ms  liberar index-b6FLMSIn.js:87384
+    5.1 ms  quitar index-b6FLMSIn.js:86306
+    5.1 ms  quitar index-b6FLMSIn.js:86321
+
+## elegir un pilar (cuadro): 44 ms · tareas largas: ninguna
+  propio:
+    14.3 ms  (program) :-1
+    3.8 ms  (anónima) index-b6FLMSIn.js:100058
+    3.3 ms  fmt index-b6FLMSIn.js:22335
+    3.0 ms  commitHostUpdate index-b6FLMSIn.js:6307
+    2.9 ms  updateProperties index-b6FLMSIn.js:9434
+    2.1 ms  (garbage collector) :-1
+    1.7 ms  renderWithHooks index-b6FLMSIn.js:3806
+    1.7 ms  createWorkInProgress index-b6FLMSIn.js:2654
+    1.1 ms  isCustomElement index-b6FLMSIn.js:1846
+    1.1 ms  beginWork index-b6FLMSIn.js:5627
+    1.1 ms  reconcileChildrenArray index-b6FLMSIn.js:3389
+    1.1 ms  strokeText :-1
+    1.1 ms  colocarRotulos index-b6FLMSIn.js:86735
+    1.0 ms  updateSlot index-b6FLMSIn.js:3358
+    1.0 ms  (idle) :-1
+  total (con lo que llama):
+    28.4 ms  performWorkOnRoot index-b6FLMSIn.js:7778
+    22.5 ms  performWorkUntilDeadline index-b6FLMSIn.js:515
+    22.3 ms  performWorkOnRootViaSchedulerTask index-b6FLMSIn.js:8596
+    18.8 ms  workLoopSync index-b6FLMSIn.js:8028
+    18.8 ms  renderRootSync index-b6FLMSIn.js:7980
+    17.5 ms  beginWork index-b6FLMSIn.js:5627
+    9.8 ms  renderWithHooks index-b6FLMSIn.js:3806
+    9.6 ms  commitRoot index-b6FLMSIn.js:8234
+    9.6 ms  completeRoot index-b6FLMSIn.js:8217
+    9.6 ms  completeRootWhenReady index-b6FLMSIn.js:7857
+    9.2 ms  updateFunctionComponent index-b6FLMSIn.js:5205
+    8.7 ms  commitMutationEffectsOnFiber index-b6FLMSIn.js:6993
+    8.7 ms  recursivelyTraverseMutationEffects index-b6FLMSIn.js:6957
+    8.7 ms  flushMutationEffects index-b6FLMSIn.js:8272
+    7.2 ms  commitHostUpdate index-b6FLMSIn.js:6307
+    7.1 ms  (anónima) index-b6FLMSIn.js:100058
+    7.1 ms  t11 index-b6FLMSIn.js:100040
+    7.1 ms  TablaTernas index-b6FLMSIn.js:99965
+    6.5 ms  fotograma index-b6FLMSIn.js:86388
+    6.5 ms  (anónima) index-b6FLMSIn.js:86380
+    6.1 ms  performSyncWorkOnRoot index-b6FLMSIn.js:8607
+    6.1 ms  flushSyncWorkAcrossRoots_impl index-b6FLMSIn.js:8516
+    6.1 ms  processRootScheduleInMicrotask index-b6FLMSIn.js:8542
+    6.1 ms  (anónima) index-b6FLMSIn.js:8612
+    4.9 ms  reconcileChildFibersImpl index-b6FLMSIn.js:3444
+    4.9 ms  (anónima) index-b6FLMSIn.js:3514
+    4.9 ms  reconcileChildren index-b6FLMSIn.js:5026
+    4.9 ms  superponer index-b6FLMSIn.js:87197
+    4.3 ms  reconcileChildrenArray index-b6FLMSIn.js:3389
+    4.2 ms  updateProperties index-b6FLMSIn.js:9434
+
+## modo Deformada: 99 ms · tareas largas: ninguna
+  propio:
+    13.4 ms  posicionesAnalitico index-b6FLMSIn.js:88736
+    10.1 ms  colores index-b6FLMSIn.js:88807
+    9.8 ms  (idle) :-1
+    7.0 ms  (program) :-1
+    6.5 ms  fotograma index-b6FLMSIn.js:86388
+    5.6 ms  ModoDeformada index-b6FLMSIn.js:98908
+    4.5 ms  removeChild :-1
+    4.4 ms  v index-b6FLMSIn.js:88747
+    4.4 ms  filtrarAnalitico index-b6FLMSIn.js:88229
+    3.2 ms  computeBoundingSphere index-b6FLMSIn.js:64557
+    2.9 ms  bufferData :-1
+    2.8 ms  construirAnalitico index-b6FLMSIn.js:88683
+    2.7 ms  setFromBufferAttribute index-b6FLMSIn.js:62743
+    2.2 ms  (garbage collector) :-1
     1.7 ms  getPropertyValue :-1
-    1.7 ms  bindBuffer :-1
-    1.6 ms  colocarRotulos index-B0W2gSla.js:55598
   total (con lo que llama):
-    52.6 ms  fotograma index-B0W2gSla.js:55346
-    52.6 ms  (anónima) index-B0W2gSla.js:55338
-    40.0 ms  WebGLRenderer.render index-B0W2gSla.js:52909
-    40.0 ms  render index-B0W2gSla.js:55858
-    31.8 ms  renderScene index-B0W2gSla.js:53038
-    31.2 ms  renderObjects index-B0W2gSla.js:53113
-    30.6 ms  renderObject index-B0W2gSla.js:53123
-    30.0 ms  WebGLRenderer.renderBufferDirect index-B0W2gSla.js:52699
-    26.3 ms  performWorkUntilDeadline index-B0W2gSla.js:515
-    24.5 ms  performWorkOnRoot index-B0W2gSla.js:7778
-    20.9 ms  setProgram index-B0W2gSla.js:53241
-    18.9 ms  workLoopSync index-B0W2gSla.js:8028
-    18.9 ms  renderRootSync index-B0W2gSla.js:7980
-    18.1 ms  getProgram index-B0W2gSla.js:53140
-    16.7 ms  performWorkOnRootViaSchedulerTask index-B0W2gSla.js:8596
-    15.5 ms  beginWork index-B0W2gSla.js:5627
-    14.0 ms  commitHookEffectListMount index-B0W2gSla.js:6154
-    14.0 ms  commitPassiveMountOnFiber index-B0W2gSla.js:7463
-    14.0 ms  recursivelyTraversePassiveMountEffects index-B0W2gSla.js:7458
-    14.0 ms  flushPassiveEffects index-B0W2gSla.js:8401
-    13.4 ms  updateFunctionComponent index-B0W2gSla.js:5205
-    13.3 ms  renderWithHooks index-B0W2gSla.js:3806
-    12.1 ms  getParameters index-B0W2gSla.js:46998
-    9.7 ms  (anónima) index-B0W2gSla.js:8241
-    8.5 ms  Capas2D index-B0W2gSla.js:55562
-    8.5 ms  reconstruir index-B0W2gSla.js:55776
-    8.5 ms  ponerEscena index-B0W2gSla.js:55747
-    8.5 ms  (anónima) index-B0W2gSla.js:57457
-    8.0 ms  setup index-B0W2gSla.js:43800
-    7.9 ms  capa index-B0W2gSla.js:55565
-
-Programas nuevos al entrar en Diagramas (de 13):
-
-## modo Pilares: 61 ms · tareas largas: ninguna
-  propio:
-    27.7 ms  (idle) :-1
-    15.9 ms  (program) :-1
-    2.2 ms  WebGLRenderer.setSize index-B0W2gSla.js:52369
-    2.0 ms  getBoundingClientRect :-1
-    1.6 ms  measureText :-1
-    1.1 ms  deleteVertexArray :-1
-    1.1 ms  reconcileChildFibersImpl index-B0W2gSla.js:3444
-    1.1 ms  renderWithHooks index-B0W2gSla.js:3806
-    0.8 ms  rect :-1
-    0.7 ms  getPropertyValue :-1
-    0.6 ms  querySelector :-1
-    0.6 ms  setFromBufferAttribute index-B0W2gSla.js:32251
-    0.6 ms  bubbleProperties index-B0W2gSla.js:5808
-    0.6 ms  removeChild :-1
-    0.6 ms  createElement :-1
-  total (con lo que llama):
-    14.1 ms  performWorkOnRoot index-B0W2gSla.js:7778
-    11.5 ms  performSyncWorkOnRoot index-B0W2gSla.js:8607
-    11.5 ms  flushSyncWorkAcrossRoots_impl index-B0W2gSla.js:8516
-    11.5 ms  processRootScheduleInMicrotask index-B0W2gSla.js:8542
-    11.5 ms  (anónima) index-B0W2gSla.js:8612
-    9.3 ms  commitRoot index-B0W2gSla.js:8234
-    9.3 ms  completeRoot index-B0W2gSla.js:8217
-    9.3 ms  completeRootWhenReady index-B0W2gSla.js:7857
-    8.8 ms  flushPassiveEffects index-B0W2gSla.js:8401
-    8.2 ms  flushPendingEffects index-B0W2gSla.js:8394
-    8.2 ms  flushSpawnedWork index-B0W2gSla.js:8351
-    6.1 ms  commitHookEffectListMount index-B0W2gSla.js:6154
-    6.1 ms  commitPassiveMountOnFiber index-B0W2gSla.js:7463
-    6.1 ms  recursivelyTraversePassiveMountEffects index-B0W2gSla.js:7458
-    5.4 ms  Motor index-B0W2gSla.js:55157
-    5.4 ms  (anónima) index-B0W2gSla.js:57185
-    4.8 ms  workLoopSync index-B0W2gSla.js:8028
-    4.8 ms  renderRootSync index-B0W2gSla.js:7980
-    4.7 ms  medir index-B0W2gSla.js:55310
-    3.7 ms  beginWork index-B0W2gSla.js:5627
-    3.4 ms  fotograma index-B0W2gSla.js:55346
-    3.4 ms  (anónima) index-B0W2gSla.js:55338
-    3.2 ms  performWorkUntilDeadline index-B0W2gSla.js:515
-    2.8 ms  traverse index-B0W2gSla.js:30263
-    2.8 ms  liberar index-B0W2gSla.js:55582
-    2.8 ms  liberar index-B0W2gSla.js:56025
-    2.8 ms  quitar index-B0W2gSla.js:55275
-    2.8 ms  quitar index-B0W2gSla.js:55290
-    2.8 ms  liberar index-B0W2gSla.js:55378
-    2.8 ms  (anónima) index-B0W2gSla.js:57197
-
-## elegir un pilar (cuadro): 33 ms · tareas largas: ninguna
-  propio:
-    17.8 ms  (idle) :-1
-    7.7 ms  (program) :-1
-    1.2 ms  colocarRotulos index-B0W2gSla.js:55598
-    1.1 ms  propagateParentContextChanges index-B0W2gSla.js:2997
-    0.9 ms  (anónima) index-B0W2gSla.js:55338
-    0.7 ms  (anónima) index-B0W2gSla.js:8796
-    0.6 ms  commitMutationEffectsOnFiber index-B0W2gSla.js:6993
-    0.6 ms  commitHostUpdate index-B0W2gSla.js:6307
-    0.6 ms  createBindingState index-B0W2gSla.js:43850
-    0.5 ms  ModoPilares index-B0W2gSla.js:59975
-    0.5 ms  updateProperties index-B0W2gSla.js:9434
-    0.5 ms  t11 index-B0W2gSla.js:15016
-    0.5 ms  clear :-1
-    0.5 ms  superponer index-B0W2gSla.js:55874
-    0.5 ms  renderWithHooks index-B0W2gSla.js:3806
-  total (con lo que llama):
-    4.5 ms  performWorkOnRoot index-B0W2gSla.js:7778
-    4.2 ms  (anónima) index-B0W2gSla.js:55338
-    3.3 ms  performWorkOnRootViaSchedulerTask index-B0W2gSla.js:8596
-    3.3 ms  performWorkUntilDeadline index-B0W2gSla.js:515
-    3.3 ms  fotograma index-B0W2gSla.js:55346
-    2.7 ms  beginWork index-B0W2gSla.js:5627
-    2.7 ms  workLoopSync index-B0W2gSla.js:8028
-    2.7 ms  renderRootSync index-B0W2gSla.js:7980
-    2.2 ms  superponer index-B0W2gSla.js:55874
-    1.7 ms  commitMutationEffectsOnFiber index-B0W2gSla.js:6993
-    1.7 ms  recursivelyTraverseMutationEffects index-B0W2gSla.js:6957
-    1.7 ms  flushMutationEffects index-B0W2gSla.js:8272
-    1.7 ms  commitRoot index-B0W2gSla.js:8234
-    1.7 ms  completeRoot index-B0W2gSla.js:8217
-    1.7 ms  completeRootWhenReady index-B0W2gSla.js:7857
-    1.6 ms  renderWithHooks index-B0W2gSla.js:3806
-    1.6 ms  updateFunctionComponent index-B0W2gSla.js:5205
-    1.2 ms  colocarRotulos index-B0W2gSla.js:55598
-    1.2 ms  performSyncWorkOnRoot index-B0W2gSla.js:8607
-    1.2 ms  flushSyncWorkAcrossRoots_impl index-B0W2gSla.js:8516
-    1.2 ms  processRootScheduleInMicrotask index-B0W2gSla.js:8542
-    1.2 ms  (anónima) index-B0W2gSla.js:8612
-    1.1 ms  commitHostUpdate index-B0W2gSla.js:6307
-    1.1 ms  propagateParentContextChanges index-B0W2gSla.js:2997
-    1.1 ms  bailoutOnAlreadyFinishedWork index-B0W2gSla.js:5554
-    1.1 ms  attemptEarlyBailoutIfNoScheduledUpdate index-B0W2gSla.js:5575
-    0.7 ms  (anónima) index-B0W2gSla.js:8796
-    0.7 ms  batchedUpdates$1 index-B0W2gSla.js:1984
-    0.7 ms  dispatchEventForPluginEventSystem index-B0W2gSla.js:8770
-    0.7 ms  dispatchEvent index-B0W2gSla.js:11000
-
-## modo Deformada: 64 ms · tareas largas: ninguna
-  propio:
-    18.1 ms  posicionesAnalitico index-B0W2gSla.js:56519
-    10.9 ms  getProgramParameter :-1
-    5.5 ms  (program) :-1
-    5.0 ms  v index-B0W2gSla.js:56530
-    5.0 ms  colores index-B0W2gSla.js:56590
-    3.7 ms  fotograma index-B0W2gSla.js:55346
-    2.7 ms  ModoDeformada index-B0W2gSla.js:59050
-    2.6 ms  construirAnalitico index-B0W2gSla.js:56468
-    2.2 ms  setFromBufferAttribute index-B0W2gSla.js:32251
-    2.0 ms  (garbage collector) :-1
-    1.9 ms  bufferData :-1
-    1.7 ms  WebGLRenderer.setSize index-B0W2gSla.js:52369
-    1.6 ms  (idle) :-1
-    1.6 ms  fromBufferAttribute index-B0W2gSla.js:25287
-    1.1 ms  dibujarCubo index-B0W2gSla.js:56990
-  total (con lo que llama):
-    33.7 ms  (anónima) index-B0W2gSla.js:56347
-    29.6 ms  (anónima) index-B0W2gSla.js:55338
-    29.1 ms  fotograma index-B0W2gSla.js:55346
-    23.6 ms  render index-B0W2gSla.js:57078
-    23.4 ms  posicionesAnalitico index-B0W2gSla.js:56519
-    23.0 ms  WebGLRenderer.render index-B0W2gSla.js:52909
-    19.3 ms  construirAnalitico index-B0W2gSla.js:56468
-    19.3 ms  analiticoNuevo index-B0W2gSla.js:56352
-    19.3 ms  (anónima) index-B0W2gSla.js:56341
-    14.6 ms  renderScene index-B0W2gSla.js:53038
-    14.6 ms  renderObject index-B0W2gSla.js:53123
-    14.6 ms  renderObjects index-B0W2gSla.js:53113
-    14.4 ms  (anónima) index-B0W2gSla.js:56382
-    14.4 ms  WebGLRenderer.renderBufferDirect index-B0W2gSla.js:52699
-    14.0 ms  setProgram index-B0W2gSla.js:53241
-    13.0 ms  performWorkOnRoot index-B0W2gSla.js:7778
-    11.0 ms  WebGLProgram.getUniforms index-B0W2gSla.js:46873
-    10.9 ms  getProgramParameter :-1
-    10.9 ms  WebGLUniforms index-B0W2gSla.js:46305
-    10.9 ms  onFirstUse index-B0W2gSla.js:46834
-    8.5 ms  performWorkUntilDeadline index-B0W2gSla.js:515
-    7.8 ms  workLoopSync index-B0W2gSla.js:8028
-    7.8 ms  renderRootSync index-B0W2gSla.js:7980
-    7.7 ms  projectObject index-B0W2gSla.js:52993
-    6.7 ms  beginWork index-B0W2gSla.js:5627
-    6.7 ms  performSyncWorkOnRoot index-B0W2gSla.js:8607
-    6.7 ms  flushSyncWorkAcrossRoots_impl index-B0W2gSla.js:8516
-    6.7 ms  processRootScheduleInMicrotask index-B0W2gSla.js:8542
-    6.7 ms  (anónima) index-B0W2gSla.js:8612
-    6.3 ms  performWorkOnRootViaSchedulerTask index-B0W2gSla.js:8596
+    36.1 ms  analiticoNuevo index-b6FLMSIn.js:87994
+    36.1 ms  (anónima) index-b6FLMSIn.js:87983
+    36.1 ms  (anónima) index-b6FLMSIn.js:87989
+    35.6 ms  construirAnalitico index-b6FLMSIn.js:88683
+    26.7 ms  performWorkOnRoot index-b6FLMSIn.js:7778
+    22.1 ms  fotograma index-b6FLMSIn.js:86388
+    22.1 ms  (anónima) index-b6FLMSIn.js:86380
+    17.7 ms  posicionesAnalitico index-b6FLMSIn.js:88736
+    14.4 ms  performWorkUntilDeadline index-b6FLMSIn.js:515
+    14.2 ms  performSyncWorkOnRoot index-b6FLMSIn.js:8607
+    14.2 ms  flushSyncWorkAcrossRoots_impl index-b6FLMSIn.js:8516
+    14.2 ms  processRootScheduleInMicrotask index-b6FLMSIn.js:8542
+    14.2 ms  (anónima) index-b6FLMSIn.js:8612
+    14.1 ms  commitRoot index-b6FLMSIn.js:8234
+    14.1 ms  completeRoot index-b6FLMSIn.js:8217
+    14.1 ms  completeRootWhenReady index-b6FLMSIn.js:7857
+    13.9 ms  render index-b6FLMSIn.js:89758
+    12.8 ms  WebGLRenderer.render index-b6FLMSIn.js:83401
+    12.6 ms  workLoopSync index-b6FLMSIn.js:8028
+    12.6 ms  renderRootSync index-b6FLMSIn.js:7980
+    12.5 ms  performWorkOnRootViaSchedulerTask index-b6FLMSIn.js:8596
+    10.5 ms  colores index-b6FLMSIn.js:88807
+    10.3 ms  projectObject index-b6FLMSIn.js:83485
+    9.9 ms  beginWork index-b6FLMSIn.js:5627
+    8.8 ms  flushPassiveEffects index-b6FLMSIn.js:8401
+    8.7 ms  renderWithHooks index-b6FLMSIn.js:3806
+    8.7 ms  updateFunctionComponent index-b6FLMSIn.js:5205
+    7.2 ms  recursivelyTraverseMutationEffects index-b6FLMSIn.js:6957
+    7.2 ms  commitMutationEffectsOnFiber index-b6FLMSIn.js:6993
+    7.2 ms  flushMutationEffects index-b6FLMSIn.js:8272
