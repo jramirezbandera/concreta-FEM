@@ -356,7 +356,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .lienzo > svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; }
 
 /* ── Zona de vistas (I2): 1, 2 o 4 celdas sobre un lienzo WebGL ─────────── */
-.zona-vistas { position: relative; flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--color-border-main); }
+.zona-vistas { position: relative; flex: 1; min-height: 0; overflow: hidden; display: grid; gap: 1px; background: var(--color-border-main); }
 .zona-vistas[data-disposicion="1"] { grid-template: 1fr / 1fr; }
 .zona-vistas[data-disposicion="1|1"] { grid-template: 1fr / 1fr 1fr; }
 .zona-vistas[data-disposicion="1/1"] { grid-template: 1fr 1fr / 1fr; }

@@ -193,6 +193,8 @@ export class Motor {
   private readonly celdas = new Map<number, Celda>();
   private readonly ro: ResizeObserver;
   private pendiente = 0;
+  /** El alto del búfer de WebGL, px CSS (`medir`). */
+  private altoBufer = 0;
   private temaV: Theme;
   private coloresV: Colores;
   private readonly medidas = new Map<string, number>();
@@ -211,7 +213,8 @@ export class Motor {
     this.ctx = this.disponible ? this.lienzo2D.getContext("2d") : null;
     if (this.renderer) {
       const c = this.renderer.domElement;
-      Object.assign(c.style, { position: "absolute", inset: "0", width: "100%", height: "100%", pointerEvents: "none", zIndex: "1" });
+      // Arriba a la izquierda y con el tamaño de su búfer, que sólo crece (`medir`): la zona recorta lo que sobra
+      Object.assign(c.style, { position: "absolute", left: "0", top: "0", pointerEvents: "none", zIndex: "1" });
       contenedor.prepend(this.lienzo2D);
       contenedor.prepend(c);
     }
@@ -376,8 +379,16 @@ export class Motor {
     const [w, h] = [Math.max(1, Math.round(r0.width)), Math.max(1, Math.round(r0.height))];
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     if (this.renderer) {
+      // El búfer del renderer compartido sólo crece. Redimensionarlo al cambiar de disposición (otro
+      // modo con el panel inferior, otro espacio) cuesta ~1 ms en reposo, pero justo después de un
+      // fotograma Chrome espera al compositor y se lleva 50–80 ms del hilo principal (banco de f, el
+      // clic en Armado). Así sólo se redimensiona cuando la zona pasa del mayor tamaño que ha tenido.
       const s = this.renderer.getSize(new Vector2());
-      if (s.x !== w || s.y !== h) this.renderer.setSize(w, h, false);
+      const [bw, bh] = [Math.max(s.x, w), Math.max(s.y, h)];
+      if (s.x !== bw || s.y !== bh) this.renderer.setSize(bw, bh, false);
+      const c = this.renderer.domElement.style;
+      if (c.width !== `${bw}px` || c.height !== `${bh}px`) Object.assign(c, { width: `${bw}px`, height: `${bh}px` });
+      this.altoBufer = bh;
     }
     if (this.lienzo2D.width !== Math.round(w * dpr) || this.lienzo2D.height !== Math.round(h * dpr)) {
       this.lienzo2D.width = Math.round(w * dpr);
@@ -408,7 +419,8 @@ export class Motor {
   private fotograma(): void {
     const r = this.renderer!;
     const ctx = this.ctx;
-    const H = this.contenedor.clientHeight;
+    // El origen de setViewport es la esquina inferior del búfer, que puede ser más alto que la zona
+    const H = this.altoBufer;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     r.setScissorTest(false);
     r.setClearColor(this.coloresV.fondo, 1);

@@ -1,9 +1,9 @@
 Edificio objetivo: 20720 triángulos y 15372 aristas en Node; pilar de prueba P-x0-y0; rango N1 → N3 (8880 triángulos)
-Reticular V2: 718354 triángulos y 289646 aristas, 4008 ms en Node
+Reticular V2: 718354 triángulos y 289646 aristas, 3122 ms en Node
 GPU de Chrome: ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Ti (0x00002803) Direct3D11 vs_5_0 ps_5_0, D3D11)
 
 ## El sólido del edificio objetivo
-     hasta verlo: 5528 ms
+     hasta verlo: 7525 ms
      tareas largas al llegar el sólido: 0
 BIEN  ninguna tarea de más de 50 ms al llegar el sólido
 BIEN  los triángulos y las aristas tienen el sha256 de Node (c9f26fb97443…, 3c37b14aaf41…)
@@ -40,7 +40,7 @@ BIEN  orbitar con la caja: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
      tareas largas al orbitar con la caja: 0
 
 ## El reticular grande (V2 de C4)
-     hasta verlo: 8034 ms
+     hasta verlo: 11212 ms
      tareas largas al llegar el sólido: 0
 BIEN  ninguna tarea de más de 50 ms al llegar el sólido
 BIEN  los triángulos (718354) y las aristas del reticular tienen el sha256 de Node

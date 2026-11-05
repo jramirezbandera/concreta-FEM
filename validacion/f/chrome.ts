@@ -10,7 +10,8 @@
  * - el detalle de una franja sale en ≤ 1 s, con los valores de Node bit a bit.
  *
  *   node validacion/f/chrome.ts --pedidos   además, los pedidos al worker mientras sale el mapa
- *   PERFIL=<fichero> node validacion/f/chrome.ts   además, el perfil de CPU del hilo principal mientras sale
+ *   PERFIL=<fichero> node validacion/f/chrome.ts   además, el perfil de CPU del hilo principal mientras sale (la app sin minificar)
+ *   TRAZA=<fichero> node validacion/f/chrome.ts    además, la traza de Chrome (estilos, layout, pintado) mientras sale
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -44,7 +45,7 @@ const comprobar = (ok: boolean, que: string) => {
 
 // ─── 1. La app compilada y los proyectos ────────────────────────────────────────────────────────
 
-execFileSync("bunx", ["vite", "build", "--logLevel", "warn"], { cwd: APP, stdio: "inherit", shell: true });
+execFileSync("bunx", ["vite", "build", "--logLevel", "warn", ...(process.env.PERFIL ? ["--minify", "false"] : [])], { cwd: APP, stdio: "inherit", shell: true });
 const DIST = join(APP, "dist");
 const datos = mkdtempSync(join(tmpdir(), "f-proyectos-"));
 const escribirProyecto = (nombre: string, p: Proyecto) => {
@@ -95,10 +96,14 @@ await new Promise((r) => (ws.onopen = r));
 let nId = 0;
 const pendientes = new Map<number, (r: { result?: unknown; error?: { message: string } }) => void>();
 let alCargar: (() => void) | null = null;
+const traza: unknown[] = [];
+let alAcabarTraza: (() => void) | null = null;
 ws.onmessage = (e) => {
-  const m = JSON.parse(String(e.data)) as { id?: number; method?: string; result?: unknown; error?: { message: string } };
+  const m = JSON.parse(String(e.data)) as { id?: number; method?: string; params?: { value?: unknown[] }; result?: unknown; error?: { message: string } };
   if (m.id !== undefined) pendientes.get(m.id)?.(m);
   if (m.method === "Page.loadEventFired") alCargar?.();
+  if (m.method === "Tracing.dataCollected") traza.push(...(m.params?.value ?? []));
+  if (m.method === "Tracing.tracingComplete") alAcabarTraza?.();
 };
 const cdp = (method: string, params: Record<string, unknown> = {}) =>
   new Promise<unknown>((res, rej) => {
@@ -136,6 +141,12 @@ window.__pedidos = [];
   };
 }
 new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__largas.push({ t: e.startTime, ms: e.duration }); }).observe({ type: "longtask", buffered: true });
+// --pedidos: los fotogramas largos con lo que los ocupa (Long Animation Frames: scripts, estilos y layout forzados, render)
+window.__loaf = [];
+try {
+  new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__loaf.push({ t: e.startTime, ms: e.duration, bloqueo: e.blockingDuration, render: e.renderStart, estilos: e.styleAndLayoutStart,
+    scripts: e.scripts.map((x) => ({ t: x.startTime, ms: x.duration, forzado: x.forcedStyleAndLayoutDuration, compilar: x.executionStart - x.startTime, quien: x.invoker, tipo: x.invokerType, fn: x.sourceFunctionName, url: x.sourceURL, car: x.sourceCharPosition })) }); }).observe({ type: "long-animation-frame", buffered: true });
+} catch {}
 window.__v2 = {
   esperar: async (f, ms = 180000) => { const t0 = performance.now(); for (;;) { const v = f(); if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 10)); } },
   estado: () => document.querySelector("[data-estado]")?.dataset.estado ?? null,
@@ -193,23 +204,39 @@ try {
   // ─── 3. Criterios 7 y 8: Resultados · Armado en el edificio objetivo ────────────────────────
   log("Criterios 7 y 8 · Resultados · Armado en el edificio objetivo de A2 (losa maciza con vigas)");
   await abrir("edificio");
+  if (PEDIDOS) log(`  GPU de Chrome: ${await pagina<string>(`const g = document.createElement("canvas").getContext("webgl2"); const d = g.getExtension("WEBGL_debug_renderer_info"); return d ? g.getParameter(d.UNMASKED_RENDERER_WEBGL) : "?";`)}`);
+  // el perfilador, desde antes de entrar en Resultados: arrancarlo bloquea el hilo y entre los dos clics hace de espera
+  if (process.env.PERFIL) { await cdp("Profiler.enable"); await cdp("Profiler.setSamplingInterval", { interval: 100 }); await cdp("Profiler.start"); }
   const tR = await ahora();
   await pagina(`__v2.boton("Resultados").click(); await __v2.esperar(() => __v2.boton("Armado"));`);
   const t4 = await ahora();
-  if (process.env.PERFIL) { await cdp("Profiler.enable"); await cdp("Profiler.setSamplingInterval", { interval: 100 }); await cdp("Profiler.start"); }
+  if (process.env.TRAZA) await cdp("Tracing.start", { categories: "devtools.timeline,disabled-by-default-devtools.timeline,v8.execute,blink.user_timing", transferMode: "ReportEvents" });
   const ms4 = await pagina<number>(`
     const t0 = performance.now();
     __v2.boton("Armado").click();
     await __v2.esperar(() => document.querySelectorAll("table[aria-label='Franjas de la planta'] tbody tr").length > 0);
     return performance.now() - t0;`);
   const l4 = await largasDesde(t4);
-  if (process.env.PERFIL) { const { profile } = (await cdp("Profiler.stop")) as { profile: unknown }; writeFileSync(process.env.PERFIL, JSON.stringify(profile)); }
+  if (process.env.PERFIL) { const { profile } = (await cdp("Profiler.stop")) as { profile: unknown }; writeFileSync(process.env.PERFIL, JSON.stringify({ ...(profile as object), t4: (t4 - tR) * 1000 })); }
+  if (process.env.TRAZA) {
+    const fin = new Promise<void>((r) => (alAcabarTraza = r));
+    await cdp("Tracing.end");
+    await fin;
+    writeFileSync(process.env.TRAZA, JSON.stringify({ traceEvents: traza }));
+  }
   if (PEDIDOS) {
     // Desde que se entra en Resultados: lo que el worker atiende antes y durante el mapa
     const ps = await pagina<{ tipo: string; t0: number; fin: number; ms: number }[]>(`return window.__pedidos;`);
     log(`  pedidos (tipo: proceso en el worker / desde el envío, ms; t desde el clic en Armado):`);
     for (const p of ps.filter((p) => p.fin >= tR)) log(`    t=${(p.t0 - t4).toFixed(0)} ${p.tipo} ${p.ms.toFixed(0)}/${(p.fin - p.t0).toFixed(0)}`);
+    log(`  al entrar en Resultados: ${(await largasDesde(tR)).filter((x) => x.t < t4).map((x) => `t=${(x.t - t4).toFixed(0)} ${x.ms.toFixed(0)} ms`).join(", ") || "ninguna"}`);
     log(`  tareas largas: ${l4.map((x) => `t=${(x.t - t4).toFixed(0)} ${x.ms.toFixed(0)} ms`).join(", ") || "ninguna"}`);
+    const fs = await pagina<{ t: number; ms: number; bloqueo: number; render: number; estilos: number; scripts: { t: number; ms: number; forzado: number; compilar: number; quien: string; tipo: string; fn: string; url: string; car: number }[] }[]>(`return window.__loaf;`);
+    for (const f of fs.filter((f) => f.t >= t4 - 50 && f.bloqueo > 0)) {
+      const fin = f.t + f.ms;
+      log(`  fotograma t=${(f.t - t4).toFixed(0)} ${f.ms.toFixed(0)} ms (bloqueo ${f.bloqueo.toFixed(0)}; render desde t=${f.render ? (f.render - t4).toFixed(0) : "—"}, estilos y layout ${f.estilos ? (fin - f.estilos).toFixed(0) : 0} ms)`);
+      for (const x of f.scripts) log(`    script t=${(x.t - t4).toFixed(0)} ${x.ms.toFixed(0)} ms (compilar ${x.compilar.toFixed(0)}, estilos forzados ${x.forzado.toFixed(0)}) ${x.tipo} ${x.quien} ${x.fn}@${x.url.split("/").pop()}:${x.car}`);
+    }
   }
   comprobar(ms4 <= 3000, `el mapa y la tabla de las franjas de la planta salen en ${(ms4 / 1000).toFixed(2)} s (≤ 3 s)`);
   comprobar(l4.every((x) => x.ms <= 50), `tareas largas > 50 ms en el hilo principal: ${largas(l4)}`);
