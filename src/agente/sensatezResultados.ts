@@ -19,7 +19,6 @@ import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones 
 import { diagramaCombinado, type Resumen } from "./consultas.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { ModeloFisico, OpcionesCompilacion, Pilar } from "../compilador/fisico.ts";
-import { EsfuerzosPiezas } from "../compilador/resultados.ts";
 import { bajadaTributaria, type TramoTributario } from "./tributaria.ts";
 import { ACCIONES_NO_GRAVITATORIAS, anchoSeccion, areaSeccion, cantoSeccion, num, Plantas, Registro, separacion, tipoCaso, UMBRALES, type Comprobacion } from "./sensatez.ts";
 
@@ -102,7 +101,7 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
   const P = new Plantas(f);
   const grav = casosGravedad(f, res);
   const { flechas: cjFlechas, axil: cjAxil, desplome: cjDesplome } = conjuntosSensatez(q, res);
-  const ep = new EsfuerzosPiezas(q.modelo, q.mapeo, q.casos);
+  const ep = q.esfuerzosPiezas;
   const seccion = new Map(f.secciones.map((s) => [s.id, s]));
   const material = new Map(f.materiales.map((m) => [m.id, m]));
   const pilar = new Map((f.pilares ?? []).map((p) => [p.id, p]));

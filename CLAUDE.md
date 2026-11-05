@@ -760,7 +760,16 @@
   - **Pasan 16 de 18.** Fallan i1 y f por tiempo; son regresiones reales desde que se subieron (2026-10-12 y 2026-10-13), con la malla del edificio objetivo ×2,5 (LV, LV2, HR):
     - i1: entrar en Diagramas, de 0,76 a 11,4 s; en Revisión, de 2,7 a 18,7 s; y 9 tareas largas de 50 a 123 ms;
     - f: el mapa de franjas, de 1,89 a 3,42 s, y una tarea larga de 62 ms.
-  - **Pendiente del usuario:** decidir qué se hace con esos tiempos; y la banda «Calculado · Ver resultados», que mueve el dibujo 39 px al aparecer y al irse (i1 la cierra antes de medir).
+  - **Visto el mismo día** (abajo): i1 se arregló y la banda «Calculado · Ver resultados», que movía el dibujo 39 px, flota; f queda pendiente del usuario.
+- **2026-11-05: i1 vuelve a pasar** (a petición del usuario; mismos bits). La mayor parte de lo medido en i1 era la máquina, cargada por otras sesiones: repetido en calma, Diagramas 3,4 s, Revisión 7,8 s y ninguna tarea larga. Lo que quedaba era trabajo repetido en el worker, no el cálculo (`validacion/i1/chrome.ts --pedidos` da ahora los pedidos de cada paso, con la espera y el proceso):
+  - **`EsfuerzosPiezas`, uno por cálculo:** el render, la sensatez de resultados y las envolventes y flechas del agente hacían cada uno el suyo, con los diagramas de todas las barras y casos (~1 s cada uno en el edificio objetivo). Ahora todos usan `Consultas.esfuerzosPiezas`;
+  - **`DiagramasBarras` perezoso:** cada barra y sus cargas de cada caso se preparan cuando se piden, con las mismas cuentas (`cargasDeBarrasDelCaso` con las cargas de esa barra, en su orden). Una vista de una planta ya no prepara el edificio entero;
+  - **Revisión, una vez por resultados** (`datosRevision`, con el resumen que la sesión ya tiene).
+  - **Resultado:** en Chrome, Diagramas de 3,4 a 0,61 s y la primera Revisión de 7,8 a 5,0 s (las siguientes, al momento). En Node, las envolventes de 4,1 a 0,85 s. Los sha256 de las escenas de diagramas de todas las plantas, las vigas, la revisión, las envolventes, las piezas, las flechas y las franjas coinciden con HEAD; pasan `visor.test.ts` (fidelidad con la CLI) y la batería entera.
+  - **La banda «Calculado»** flota ahora abajo en el centro (`.aviso-calculado`) y ya no mueve el dibujo.
+  - **Lo que queda:**
+    - en la primera Revisión, el peso propio calculado recompila el modelo (~2 s; `pesoPropioCalculado`, sin las cargas y sin LV-d, para que el reparto por plantas sea el del esperado) y los diagramas de todas las vigas en las combinaciones de flecha, que hay que hacer;
+    - f sigue fallando: el mapa de franjas de N7 en ~3,4–4,0 s frente a los 2 s del criterio. Su tiempo se aceptó el 2026-10-13 (C5-4) y el umbral se quedó corto al crecer la malla. Además, una tarea larga de 62–87 ms en el hilo principal al pintarlo, sin investigar.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

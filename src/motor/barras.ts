@@ -459,38 +459,78 @@ export function esfuerzosDeExtremo(f: Float64Array, cargas: CargasDeBarra | unde
 
 /**
  * Diagramas exactos de las barras de un modelo calculado: esfuerzos y desplazamientos a lo largo
- * del tramo flexible, por caso o combinando casos (`DiagramaBarra.combinar`). Prepara las barras y
- * las cargas una sola vez.
+ * del tramo flexible, por caso o combinando casos (`DiagramaBarra.combinar`). Prepara cada barra, y
+ * sus cargas de cada caso, una sola vez y cuando se piden: una vista de una planta no prepara las
+ * del edificio entero (en el objetivo con vigas, ~1 s por cada `DiagramasBarras`). Las cuentas son
+ * las de prepararlo todo de una vez: `cargasDeBarrasDelCaso` con las cargas de esa barra, en su orden.
  */
 export class DiagramasBarras {
-  private readonly barras: (BarraPreparada | undefined)[] = [];
-  private readonly cargas: Map<number, CargasDeBarra>[];
+  /** undefined: sin preparar; null: no es una barra del modelo. */
+  private readonly barras: (BarraPreparada | null | undefined)[] = [];
+  /** Por caso, las cargas de cada barra (en el orden del caso) y, cuando se piden, convertidas (null: sin cargas). */
+  private readonly cargasDe: Map<number, CargaBarra[]>[];
+  private readonly cargas: Map<number, CargasDeBarra | null>[];
+  private readonly geo: Geometria;
   readonly modelo: ModeloAnalitico;
 
   constructor(modelo: ModeloAnalitico) {
     this.modelo = modelo;
-    const geo = geometria(modelo);
-    // Los diagramas suponen un modelo ya calculado y válido: un error aquí es un mal uso
-    const diag = new Diagnosticos();
-    (modelo.barras ?? []).forEach((b, k) => {
-      this.barras[k] = prepararBarra(b, k, modelo, geo, diag) ?? undefined;
+    this.geo = geometria(modelo);
+    this.cargasDe = modelo.casos.map((caso) => {
+      const m = new Map<number, CargaBarra[]>();
+      for (const c of caso.barras ?? []) {
+        const l = m.get(c.barra);
+        if (l) l.push(c);
+        else m.set(c.barra, [c]);
+      }
+      return m;
     });
-    this.cargas = modelo.casos.map((caso) => cargasDeBarrasDelCaso(caso.id, caso.barras ?? [], this.barras, modelo, geo, diag).porBarra);
+    this.cargas = modelo.casos.map(() => new Map());
+  }
+
+  // Los diagramas suponen un modelo ya calculado y válido: un error aquí es un mal uso
+  private comprobar(diag: Diagnosticos): void {
     if (diag.hayErrores) throw new Error(`DiagramasBarras: el modelo tiene errores (${diag.lista[0]!.mensaje}); calcúlalo antes con calcular()`);
   }
 
   /** Barra preparada (ejes locales, tramo flexible…). */
   barra(b: number): BarraPreparada {
-    const pb = this.barras[b];
+    let pb = this.barras[b];
+    if (pb === undefined) {
+      const mb = Number.isInteger(b) ? this.modelo.barras?.[b] : undefined;
+      const diag = new Diagnosticos();
+      pb = mb ? prepararBarra(mb, b, this.modelo, this.geo, diag) : null;
+      this.comprobar(diag);
+      if (Number.isInteger(b) && b >= 0) this.barras[b] = pb;
+    }
     if (!pb) throw new Error(`DiagramasBarras: no hay barra ${b}`);
     return pb;
+  }
+
+  /** Las cargas de la barra `b` en el caso `k`, convertidas y con sus FER; undefined si no tiene. */
+  private cargasDeBarra(b: number, k: number): CargasDeBarra | undefined {
+    const m = this.cargas[k]!;
+    let x = m.get(b);
+    if (x === undefined) {
+      const l = this.cargasDe[k]!.get(b);
+      if (!l) x = null;
+      else {
+        const solo: BarraPreparada[] = [];
+        solo[b] = this.barra(b);
+        const diag = new Diagnosticos();
+        x = cargasDeBarrasDelCaso(this.modelo.casos[k]!.id, l, solo, this.modelo, this.geo, diag).porBarra.get(b) ?? null;
+        this.comprobar(diag);
+      }
+      m.set(b, x);
+    }
+    return x ?? undefined;
   }
 
   /** Diagrama de la barra `b` en el caso `k`, con el resultado de ese caso (de un cálculo válido). */
   diagrama(b: number, k: number, resultado: ResultadoCaso): DiagramaBarra {
     const pb = this.barra(b);
     const [i, j] = this.modelo.barras![b]!.nudos;
-    const cargas = this.cargas[k]!.get(b);
+    const cargas = this.cargasDeBarra(b, k);
     const dc = cargas ? cargas.dc : diagramaDeCargas(pb.L, []);
     if (pb.mezcla) return this.diagramaMezcla(pb, i, j, resultado.u, cargas, dc);
     const ul = desplazamientosLocales(pb, resultado.u, i, j, cargas);

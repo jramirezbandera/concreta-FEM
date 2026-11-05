@@ -256,7 +256,7 @@ export function envolventes(q: Consultas, conjunto: ConjuntoCombinaciones, o: { 
   const { modelo, mapeo } = q;
   if (o.tipo && !(o.tipo in EXTREMOS)) return no("consulta/tipo", `El tipo de pieza «${o.tipo}» no existe: pilar, viga, vigueta o barra.`);
   if (o.planta && !q.fisico.plantas.some((p) => p.id === o.planta)) return no("consulta/no-existe", `La planta ${o.planta} no existe.`, [o.planta]);
-  const ep = new EsfuerzosPiezas(modelo, mapeo, q.casos);
+  const ep = q.esfuerzosPiezas;
   const plantaDe = (b: number) => {
     const m = mapeo.barras[b]!;
     return m.tipo === "pilar" ? q.fisico.plantas[m.tramo]!.id : mapeo.nudos[modelo.barras![b]!.nudos[0]]!.planta;
@@ -378,7 +378,7 @@ export function flechas(q: Consultas, conjunto: ConjuntoCombinaciones, o: { losa
     r.push({ id: l.id, planta: l.planta, tipo: "losa", maxima: maxima!, relativa });
   }
   if (panos.length) {
-    const ep = new EsfuerzosPiezas(q.modelo, q.mapeo, q.casos);
+    const ep = q.esfuerzosPiezas;
     for (const p of panos) {
       let maxima: Extremo | undefined;
       let relativa: Extremo | null = null;

@@ -703,23 +703,31 @@ export interface DatosRevision {
 }
 
 /** La revisión de A3, como `fem revisar`. */
+/**
+ * La revisión de unos resultados, hecha una vez: sólo depende de ellos (las consultas son de un
+ * cálculo de una compilación de un proyecto), y en el edificio objetivo cuesta varios segundos.
+ */
+const REVISIONES = new WeakMap<object, DatosRevision>();
+
 export function datosRevision(s: Sesion): Resultado<DatosRevision> {
   const q = s.q;
   const c = s.compilado;
   const cab = s.cabeceraResultados;
   if (!q || !c || !cab) return no("visor/sin-resultados", "No hay resultados de esta huella.");
+  const hecha = REVISIONES.get(q);
+  if (hecha) return { valido: true, valor: hecha };
   const rev = revisar(s.proyecto, c, q, {
     motor: s.motor,
     diagnosticos: [...c.diagnosticos, ...cab.diagnosticos],
     equilibrio: cab.casos.map((x) => ({ id: x.id, ...x.equilibrio })),
+    ...(s.resumen ? { resumen: s.resumen } : {}),
   });
-  return {
-    valido: true,
-    valor: {
-      documento: rev.documento,
-      comprobaciones: rev.comprobaciones.map((x) => ({ codigo: x.codigo, titulo: x.titulo, estado: x.estado, ...(x.peor ? { peor: x.peor } : {}) })),
-      avisos: rev.avisos.length,
-      sha256: sha256(rev.markdown),
-    },
+  const valor: DatosRevision = {
+    documento: rev.documento,
+    comprobaciones: rev.comprobaciones.map((x) => ({ codigo: x.codigo, titulo: x.titulo, estado: x.estado, ...(x.peor ? { peor: x.peor } : {}) })),
+    avisos: rev.avisos.length,
+    sha256: sha256(rev.markdown),
   };
+  REVISIONES.set(q, valor);
+  return { valido: true, valor };
 }

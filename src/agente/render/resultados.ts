@@ -85,7 +85,8 @@ export class ResultadosRender {
   }
 
   get ep(): EsfuerzosPiezas {
-    return (this.epC ??= new EsfuerzosPiezas(this.c.modelo, this.c.mapeo, this.q.casos));
+    // Los de las consultas, como los campos: los diagramas se preparan una vez para las vistas y las consultas
+    return (this.epC ??= this.q.modelo === this.c.modelo && this.q.mapeo === this.c.mapeo ? this.q.esfuerzosPiezas : new EsfuerzosPiezas(this.c.modelo, this.c.mapeo, this.q.casos));
   }
 
   /**

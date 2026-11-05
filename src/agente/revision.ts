@@ -32,20 +32,22 @@ export interface Revision {
 
 /**
  * Comprueba y arma el informe. `q`: las consultas del cálculo de `c`; `diagnosticos`, los avisos de
- * la compilación y del cálculo; `equilibrio`, el de cada caso.
+ * la compilación y del cálculo; `equilibrio`, el de cada caso; `resumen`, el de `c` si ya se tiene
+ * (el visor lo hace al compilar; en el edificio objetivo, ~0,5 s).
  */
 export function revisar(
   p: Proyecto,
   c: Extract<ResultadoCompilacion, { valido: true }>,
   q: Consultas,
-  datos: { motor: string; diagnosticos: readonly Diagnostico[]; equilibrio: readonly { id: string; fuerzas: number; momentos: number }[] },
+  datos: { motor: string; diagnosticos: readonly Diagnostico[]; equilibrio: readonly { id: string; fuerzas: number; momentos: number }[]; resumen?: Resumen },
 ): Revision {
-  const res = resumen(p, c);
+  const { resumen: dado, ...otros } = datos;
+  const res = dado ? { valido: true as const, valor: dado } : resumen(p, c);
   if (!res.valido) throw new Error("revisar: el resumen de un modelo compilado no puede fallar");
   const modelo = sensatezModelo(p.modelo, p.opciones, res.valor);
   const resultados = sensatezResultados(q, res.valor, p.opciones);
   const figuras = figurasInforme(p, c, q, res.valor);
-  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res.valor, hipotesis: c.hipotesis, modelo, resultados, cimentacion: cimentacion(q), figuras, ...datos });
+  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res.valor, hipotesis: c.hipotesis, modelo, resultados, cimentacion: cimentacion(q), figuras, ...otros });
   const comprobaciones = [...modelo.comprobaciones, ...resultados.comprobaciones];
   return {
     comprobaciones,

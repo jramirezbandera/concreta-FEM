@@ -4,6 +4,8 @@
  *
  *   node validacion/i1/chrome.ts                      escribe out_chrome.txt
  *   node validacion/i1/chrome.ts --capturas <carpeta> además, una PNG por espacio y modo
+ *   node validacion/i1/chrome.ts --pedidos            además, los pedidos al worker de cada paso
+ *                                                     (espera en la cola y tiempo de proceso)
  *
  * - Criterio 1: en Modelo, con los paneles por defecto y nada elegido, la vista ocupa ≥ 70 % de la
  *   ventana en 1920×1080 y ≥ 60 % en 1366×768 (el rectángulo de `.vista` frente a la ventana).
@@ -23,6 +25,7 @@ const PUERTO = 8777;
 const PUERTO_CDP = 9337;
 const iCap = process.argv.indexOf("--capturas");
 const CAPTURAS = iCap > 0 ? resolve(process.argv[iCap + 1] ?? "capturas") : null;
+const PEDIDOS = process.argv.includes("--pedidos");
 const salida: string[] = [];
 const log = (s: string) => {
   console.log(s);
@@ -101,6 +104,27 @@ async function pagina<T>(expr: string): Promise<T> {
 
 const AYUDAS = `
 window.__largas = [];
+// --pedidos: cada pedido al worker de la sesión, con su envío, su contestación y su «ms» de proceso
+window.__pedidos = [];
+{
+  const W = window.Worker;
+  window.Worker = class extends W {
+    constructor(...a) {
+      super(...a);
+      const enviados = new Map();
+      const pm = this.postMessage.bind(this);
+      this.postMessage = (m, t) => {
+        if (m && m.id !== undefined && m.pedido) enviados.set(m.id, { tipo: m.pedido.tipo, t0: performance.now() });
+        return pm(m, t);
+      };
+      this.addEventListener("message", (e) => {
+        const d = e.data;
+        const x = d && d.id !== undefined && !d.tipo ? enviados.get(d.id) : undefined;
+        if (x) window.__pedidos.push({ ...x, fin: performance.now(), ms: d.ms ?? 0 });
+      });
+    }
+  };
+}
 new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__largas.push({ t: e.startTime, ms: e.duration }); }).observe({ type: "longtask", buffered: true });
 window.__i1 = {
   esperar: async (f, ms = 120000) => { const t0 = performance.now(); for (;;) { const v = f(); if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 15)); } },
@@ -141,7 +165,7 @@ try {
     [1366, 768, 0.6],
   ] as const) {
     await abrir("edificio", w, h);
-    // El aviso «Calculado · Ver resultados» (P-27) es pasajero (se va a los 12 s): se mide sin él
+    // El aviso «Calculado · Ver resultados» (P-27) flota sobre la vista (no cambia su rectángulo), pero la tapa: se cierra
     await pagina(`document.querySelector('button[aria-label="Cerrar el aviso"]')?.click(); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));`);
     const a = await pagina<number>(`return __i1.area();`);
     comprobar(a >= min, `${w}×${h}: la vista ocupa el ${(a * 100).toFixed(1)} % de la ventana (≥ ${min * 100} %)`);
@@ -187,6 +211,14 @@ try {
   for (const [que, t0, ms] of pasos) log(`  ${que}: ${ms.toFixed(0)} ms${largas.some((l) => l.t >= t0 && l.t < t0 + ms + 50) ? ` · tareas largas: ${largas.filter((l) => l.t >= t0 && l.t < t0 + ms + 50).map((l) => l.ms.toFixed(0)).join(", ")} ms` : ""}`);
   const peor = Math.max(0, ...largas.map((l) => l.ms));
   comprobar(peor <= 50, `ninguna tarea larga de más de 50 ms en el recorrido (la peor, ${peor.toFixed(0)} ms; ${largas.length} en total)`);
+  if (PEDIDOS) {
+    const ps = await pagina<{ tipo: string; t0: number; fin: number; ms: number }[]>(`return window.__pedidos;`);
+    log("\n## Pedidos al worker de cada paso (tipo: proceso en el worker / desde el envío, ms)");
+    for (const [que, t0, ms] of pasos) {
+      const de = ps.filter((p) => p.t0 >= t0 && p.t0 < t0 + ms);
+      if (de.length) log(`  ${que}: ${de.map((p) => `${p.tipo} ${p.ms.toFixed(0)}/${(p.fin - p.t0).toFixed(0)}`).join(" · ")}`);
+    }
+  }
 } catch (e) {
   comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {

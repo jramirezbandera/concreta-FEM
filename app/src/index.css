@@ -599,6 +599,14 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
   background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 13px; box-shadow: var(--shadow-pop);
 }
 
+/* «Calculado · Ver resultados» (P-27): abajo en el centro, flotando, para no mover el dibujo ni pisar el aviso de versión */
+.aviso-calculado {
+  position: fixed; left: 50%; bottom: 40px; z-index: 44; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  width: max-content; max-width: min(640px, calc(100vw - 32px)); padding: 6px 6px 6px 14px;
+  border: 1px solid var(--color-border-main); border-left: 4px solid var(--color-state-ok-text); border-radius: 8px;
+  background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 13px; box-shadow: var(--shadow-pop);
+}
+
 /* ── Armazón (I1, docs/fem3d/interfaz.md §3 y §13) ─────────────────────────── */
 
 .ib {

@@ -3,29 +3,44 @@ BIEN  1920×1080: la vista ocupa el 72.7 % de la ventana (≥ 70 %)
 BIEN  1366×768: la vista ocupa el 65.6 % de la ventana (≥ 60 %)
 
 ## Criterio 4: espacios, modos, paneles y paleta en el edificio objetivo (1440×900)
-  planta N3: 315 ms
-  3D: 92 ms
-  planta: 36 ms
-  elegir un pilar (navegador): 108 ms
-  Esc: 103 ms · tareas largas: 80 ms
-  tablas: 108 ms · tareas largas: 80 ms
-  plegar el panel inferior: 46 ms
-  espacio Cargas: 66 ms
-  espacio Resultados (losas): 213 ms
-  M11: 484 ms
-  modo Diagramas: 11431 ms · tareas largas: 123 ms
-  modo Pilares: 509 ms · tareas largas: 52 ms
-  elegir un pilar (cuadro): 79 ms
-  modo Deformada: 323 ms · tareas largas: 50, 116 ms
-  plegar las propiedades: 76 ms · tareas largas: 73 ms
-  abrir las propiedades: 49 ms
-  espacio Revisión: 18681 ms · tareas largas: 95, 51 ms
-  paleta: 60 ms
-  buscar en la paleta: 51 ms
-  elegir desde la paleta: 50 ms · tareas largas: 56 ms
-  espacio Modelo: 97 ms · tareas largas: 56 ms
-  tema oscuro: 104 ms
-  tema claro: 51 ms
-FALLA ninguna tarea larga de más de 50 ms en el recorrido (la peor, 123 ms; 9 en total)
+  planta N3: 286 ms
+  3D: 66 ms
+  planta: 34 ms
+  elegir un pilar (navegador): 100 ms
+  Esc: 50 ms
+  tablas: 39 ms
+  plegar el panel inferior: 42 ms
+  espacio Cargas: 40 ms
+  espacio Resultados (losas): 184 ms
+  M11: 316 ms
+  modo Diagramas: 608 ms
+  modo Pilares: 125 ms
+  elegir un pilar (cuadro): 39 ms
+  modo Deformada: 68 ms
+  plegar las propiedades: 54 ms
+  abrir las propiedades: 40 ms
+  espacio Revisión: 4966 ms
+  paleta: 35 ms
+  buscar en la paleta: 39 ms
+  elegir desde la paleta: 33 ms
+  espacio Modelo: 54 ms
+  tema oscuro: 40 ms
+  tema claro: 38 ms
+BIEN  ninguna tarea larga de más de 50 ms en el recorrido (la peor, 0 ms; 0 en total)
 
-1 FALLOS
+## Pedidos al worker de cada paso (tipo: proceso en el worker / desde el envío, ms)
+  planta N3: escena 5/281
+  3D: alambrico 2/8 · solido 54/57
+  planta: escena 0/2
+  elegir un pilar (navegador): elegir 0/18 · objeto 0/18
+  espacio Cargas: escena 3/4
+  espacio Resultados (losas): losas 144/147 · precalentar 228/228
+  M11: losas 96/309
+  modo Diagramas: escena 534/536 · piezas 0/536 · elegir 0/37 · viga 9/38 · estacion 0/0
+  modo Pilares: pilares 51/53 · pilares 15/65
+  elegir un pilar (cuadro): elegir 0/9 · pilar 0/9
+  modo Deformada: escena 1/5 · elegir 0/5 · desplomes 1/5 · alambrico 1/2 · geometria 14/15 · deformada 10/40
+  espacio Revisión: revision 4774/4777
+  espacio Modelo: alambrico 1/3 · solido 0/4 · objeto 0/4
+
+TODO BIEN

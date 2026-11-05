@@ -228,6 +228,15 @@ export class Consultas {
     return (this.piezasC ??= new EsfuerzosPiezas(this.modelo, this.mapeo, this.casos));
   }
 
+  /**
+   * Los esfuerzos de las piezas de este cálculo (con los pares de la losa repartidos), los mismos
+   * para todo lo que los lea: cada uno guarda sus diagramas, y rehacerlos en cada consumidor (render,
+   * sensatez, envolventes…) costaba en el edificio objetivo ~1 s por consumidor.
+   */
+  get esfuerzosPiezas(): EsfuerzosPiezas {
+    return this.piezas();
+  }
+
   private no<T>(codigo: string, mensaje: string, ids: string[]): Respuesta<T> {
     const d = new Diagnosticos();
     d.error(codigo, mensaje, ids);

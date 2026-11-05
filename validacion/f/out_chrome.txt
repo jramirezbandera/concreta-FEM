@@ -1,8 +1,8 @@
 Criterios 7 y 8 · Resultados · Armado en el edificio objetivo de A2 (losa maciza con vigas)
-FALLA el mapa y la tabla de las franjas de la planta salen en 3.42 s (≤ 2 s)
-FALLA tareas largas > 50 ms en el hilo principal: 1 (máx. 62 ms)
+FALLA el mapa y la tabla de las franjas de la planta salen en 3.98 s (≤ 2 s)
+FALLA tareas largas > 50 ms en el hilo principal: 1 (máx. 87 ms)
 BIEN  las demandas de las 35 franjas X de N7 son las de Node bit a bit
-BIEN  el detalle de L-N7:X18 (diagrama y estaciones) sale en 0.02 s (≤ 1 s)
+BIEN  el detalle de L-N7:X18 (diagrama y estaciones) sale en 0.01 s (≤ 1 s)
 BIEN  el detalle, sin tareas largas > 50 ms
 BIEN  las 34 caras y apoyos de L-N7:X18: la demanda superior de la página es la de Node bit a bit
 
