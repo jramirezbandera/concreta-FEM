@@ -10,11 +10,15 @@
  *   · el texto tiene que pasar `leerProyecto` (el esquema): si no, 422 y no se escribe;
  *   · se escribe en un temporal de la misma carpeta y se renombra, así que nunca queda medio
  *     escrito.
+ * - PUT de `.fem/app.json` (`docs/fem3d/agente.md` §13): lo que se mira en la app, para el agente.
+ *   Desde la página, como el proyecto; sin sello (es derivado), con el esquema de `estadoApp.ts` y
+ *   de `MAX_BYTES_APP` como mucho.
  */
-import { existsSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, normalize, sep } from "node:path";
 import { leerProyecto } from "../src/agente/proyecto.ts";
+import { FICHERO_APP, leerEstadoApp, MAX_BYTES_APP } from "../src/agente/estadoApp.ts";
 
 /** Tamaño máximo de un proyecto que se acepta por PUT. */
 export const MAX_BYTES = 64 * 1024 * 1024;
@@ -56,6 +60,23 @@ export function manejadorCarpeta(carpeta: string, fichero: string) {
       void (async () => {
         const host = req.headers.host ?? "";
         if (!HOSTS.test(host) || req.headers.origin !== `http://${host}`) return responder(403, { mensaje: "Sólo la página del visor puede guardar el proyecto." });
+        if (nombre === `.fem/${FICHERO_APP}`) {
+          const cuerpo = await leerCuerpo(req);
+          if (!cuerpo || cuerpo.length > MAX_BYTES_APP) return responder(413, { mensaje: "Demasiado grande." });
+          const texto = cuerpo.toString("utf8");
+          if (!leerEstadoApp(texto)) return responder(422, { mensaje: "No es un estado de la app." });
+          const d = join(carpeta, ".fem");
+          const tmp = join(d, `.${FICHERO_APP}.${process.pid}.tmp`);
+          try {
+            mkdirSync(d, { recursive: true });
+            writeFileSync(tmp, texto, "utf8");
+            renameSync(tmp, f);
+          } catch (e) {
+            if (existsSync(tmp)) unlinkSync(tmp);
+            return responder(500, { mensaje: `No se pudo escribir: ${e instanceof Error ? e.message : String(e)}` });
+          }
+          return responder(200, { ok: true });
+        }
         if (nombre !== fichero || !dentro) return responder(403, { mensaje: `Sólo se puede escribir ${fichero}.` });
         const actual = existsSync(f) ? sello(f) : null;
         if (req.headers["x-forzar"] !== "si" && (req.headers["if-match"] ?? null) !== actual) return responder(412, { mensaje: "El fichero cambió en el disco desde que se leyó.", sello: actual }, actual ? { etag: actual } : {});

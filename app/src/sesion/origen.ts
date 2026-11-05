@@ -1,7 +1,9 @@
 /**
  * De dónde lee el visor un proyecto (V1, §3.1): el `proyecto.json` y los resultados que guardó la
  * CLI en `.fem/<huella>/`. Desde V2a (V-d) se escribe también el proyecto (y, al sobrescribir, su
- * copia `.bak`): nunca `.fem/`.
+ * copia `.bak`). En `.fem/` sólo se escribe lo derivado (`escribirDerivado`, `agente.md` §13): los
+ * resultados al pasar un proyecto del navegador a una carpeta y lo que se mira en la app
+ * (`.fem/app.json`), para el agente.
  *
  * Al escribir se compara el sello del fichero con el que tenía al leerlo: si cambió (el agente, o el
  * ingeniero a mano), no se escribe y se dice (conflicto, criterio 4 de V2a); «sobrescribir» es
@@ -25,7 +27,7 @@ export interface Directorio extends Entrada {
   getFileHandle(nombre: string, o?: { create?: boolean }): Promise<Fichero>;
   queryPermission?(o: { mode: "read" | "readwrite" }): Promise<PermissionState>;
   requestPermission?(o: { mode: "read" | "readwrite" }): Promise<PermissionState>;
-  getDirectoryHandle(nombre: string): Promise<Directorio>;
+  getDirectoryHandle(nombre: string, o?: { create?: boolean }): Promise<Directorio>;
   values(): AsyncIterable<Entrada>;
 }
 interface Fichero extends Entrada {
@@ -80,6 +82,12 @@ export interface Origen {
    * antes de pisarlo. Sin él (el servidor local), no se puede.
    */
   escribirFichero?(nombre: string, texto: string): Promise<{ ok: true } | { ok: false; mensaje: string }>;
+  /**
+   * Escribe un fichero derivado en `.fem/` (`ruta` sin ese prefijo: «<huella>/resultados.bin»,
+   * «app.json»), creando las carpetas. Sólo si ya hay permiso de escritura: nunca lo pide (lo usa
+   * también la selección de la app, a cada clic). true si quedó escrito.
+   */
+  escribirDerivado?(ruta: string, datos: string | Uint8Array): Promise<boolean>;
 }
 
 // ─── Carpeta ────────────────────────────────────────────────────────────────────────────────────
@@ -193,6 +201,25 @@ export function origenCarpeta(dir: Directorio, fichero: string): Origen {
         return false;
       }
     },
+    async escribirDerivado(ruta, datos) {
+      try {
+        if (((await dir.queryPermission?.({ mode: "readwrite" })) ?? "granted") !== "granted") return false;
+        const partes = [".fem", ...ruta.split("/").filter(Boolean)];
+        let d = dir;
+        for (const p of partes.slice(0, -1)) d = await d.getDirectoryHandle(p, { create: true });
+        const w = await (await d.getFileHandle(partes[partes.length - 1]!, { create: true })).createWritable();
+        try {
+          await w.write(datos);
+          await w.close();
+        } catch (e) {
+          await w.abort().catch(() => {});
+          throw e;
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    },
     async guardados(huella) {
       try {
         const d = await (await dir.getDirectoryHandle(".fem")).getDirectoryHandle(huella);
@@ -243,6 +270,16 @@ export function origenUrl(url: string): Origen {
       const cab = await pedir(`.fem/${huella}/resultados.json`, "GET");
       const bin = cab && (await pedir(`.fem/${huella}/resultados.bin`, "GET"));
       return cab && bin ? { cabecera: await cab.text(), bytes: new Uint8Array(await bin.arrayBuffer()) } : null;
+    },
+    async escribirDerivado(ruta, datos) {
+      // El servidor del visor sólo acepta lo que se mira en la app (`.fem/app.json`)
+      if (ruta !== "app.json" || typeof datos !== "string") return false;
+      try {
+        const r = await fetch(`${base}.fem/app.json`, { method: "PUT", body: datos, headers: { "content-type": "application/json" }, cache: "no-store" });
+        return r.ok;
+      } catch {
+        return false;
+      }
     },
     async escribir(texto, o) {
       try {

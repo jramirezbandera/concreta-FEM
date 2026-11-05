@@ -13,7 +13,7 @@
  * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, FolderOpen, History, Moon, MoreHorizontal, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2, X } from "lucide-react";
+import { Check, Download, FolderInput, FolderOpen, History, Moon, MoreHorizontal, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2, X } from "lucide-react";
 import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
 import { MenuFlotante, ejeVecino } from "./armazon/Disposicion.tsx";
@@ -30,7 +30,8 @@ import { EspacioResultados } from "./espacios/Resultados.tsx";
 import { cota, fmt } from "./fmt.ts";
 import { Inicio, abrirDesdeUrl } from "./Inicio.tsx";
 import { EspacioRevision } from "./pantallas/Revision.tsx";
-import { useProyecto, type ProyectoAbierto } from "./sesion/useProyecto.ts";
+import { useProyecto, type ACarpeta, type ProyectoAbierto } from "./sesion/useProyecto.ts";
+import { claveEstadoApp, FICHERO_APP, textoEstadoApp } from "../../src/agente/estadoApp.ts";
 import { ContextoVistas, DISPOSICIONES, useEstadoVistas } from "./vistas/estado.ts";
 import { encuadrarActiva } from "./vistas/Zona.tsx";
 import { useTheme } from "./tema/useTheme.ts";
@@ -51,6 +52,9 @@ const MODOS: { id: ModoResultados; nombre: string; claves: string }[] = [
   { id: "deformada", nombre: "Deformada y desplomes", claves: "deriva desplome viento sismo" },
   { id: "reacciones", nombre: "Reacciones", claves: "cimentacion apoyos cargas en cimentacion" },
 ];
+
+/** Pausa tras un cambio de lo elegido antes de dejarlo para el agente (`.fem/app.json`). */
+export const PAUSA_ESTADO_APP_MS = 300;
 
 /** `?espacio=…&modo=…` o, como en V1, `?pantalla=…`. */
 function inicial(): { espacio: Espacio; modo: ModoResultados } {
@@ -133,6 +137,8 @@ export function App() {
   const [paleta, setPaleta] = useState(false);
   const [versionesAbiertas, setVersionesAbiertas] = useState(false);
   const [sobrescribir, setSobrescribir] = useState(false);
+  /** `agente.md` §13: lo que dijo «Pasar a una carpeta», hasta que se cierra la banda. */
+  const [enCarpeta, setEnCarpeta] = useState<ACarpeta | null>(null);
   const [tablaPedida, setTablaPedida] = useState<{ tabla: NombreTabla; n: number } | null>(null);
 
   // ?proyecto=<url> o ?ejemplo=<nombre>: abrir al cargar
@@ -191,6 +197,26 @@ export function App() {
   // La planta elegida se conserva al recargar si sigue existiendo; si no, la primera
   const plantas = e?.plantas;
   const plantaValida = plantas?.some((p) => p.id === planta) ? planta : (plantas?.[0]?.id ?? null);
+
+  // `agente.md` §13: lo que se mira, en `.fem/app.json` junto al proyecto, para el agente (`fem
+  // seleccion`). Sólo en una carpeta o con el servidor local, tras una pausa y si cambió algo
+  const origenApp = proyecto.fuente?.tipo === "origen" && proyecto.fuente.origen.escribirDerivado ? proyecto.fuente.origen : null;
+  const estadoParaAgente = useMemo(
+    () => (origenApp ? { proyecto: origenApp.fichero, huella: e?.huella ?? null, sinGuardar: !!ed?.sinGuardar, espacio: espacioValido, ...(espacioValido === "resultados" ? { modo } : {}), planta: plantaValida, elegidos } : null),
+    [origenApp, e?.huella, ed?.sinGuardar, espacioValido, modo, plantaValida, elegidos],
+  );
+  const escritoParaAgente = useRef<string | null>(null);
+  useEffect(() => {
+    if (!origenApp || !estadoParaAgente) return;
+    const clave = claveEstadoApp(estadoParaAgente);
+    if (clave === escritoParaAgente.current) return;
+    const t = window.setTimeout(() => {
+      void origenApp.escribirDerivado!(FICHERO_APP, textoEstadoApp(estadoParaAgente, new Date())).then((ok) => {
+        if (ok) escritoParaAgente.current = clave;
+      });
+    }, PAUSA_ESTADO_APP_MS);
+    return () => window.clearTimeout(t);
+  }, [origenApp, estadoParaAgente]);
 
   // Atajos
   useEffect(() => {
@@ -262,6 +288,7 @@ export function App() {
 
   const navegador = proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.navegador : undefined;
   // Lo que aún no se ha guardado, antes de ver las versiones (restaurar parte de lo guardado)
+  const pasarACarpeta = () => void ed?.aCarpeta?.().then((r) => r && setEnCarpeta(r));
   const abrirVersiones = () => void (ed?.sinGuardar ? ed.guardar() : Promise.resolve()).then(() => setVersionesAbiertas(true));
 
   // Órdenes de la paleta
@@ -287,6 +314,7 @@ export function App() {
       ...(ed?.modo === "escribir" ? [{ id: "guardar", grupo: "Proyecto", nombre: "Guardar", atajo: "Ctrl S", hacer: () => void ed.guardar(), deshabilitada: !ed.sinGuardar }] : []),
       ...(ed?.modo === "descargar" && hayAlmacen() ? [{ id: "al-navegador", grupo: "Proyecto", nombre: "Guardar en mis proyectos (en este navegador)", atajo: "Ctrl S", hacer: () => void ed.alNavegador() }] : []),
       { id: "exportar", grupo: "Proyecto", nombre: "Exportar el proyecto (.json)", hacer: () => ed?.exportar(), deshabilitada: !ed },
+      ...(ed?.aCarpeta ? [{ id: "a-carpeta", grupo: "Proyecto", nombre: "Pasar a una carpeta… (para trabajar con el agente)", claves: "disco agente fem", hacer: pasarACarpeta }] : []),
       ...(ed?.modo === "auto" ? [{ id: "versiones", grupo: "Proyecto", nombre: "Versiones anteriores…", hacer: abrirVersiones }] : []),
       { id: "deshacer", grupo: "Proyecto", nombre: ed?.deshacerEtiqueta ? `Deshacer: ${ed.deshacerEtiqueta}` : "Deshacer", atajo: "Ctrl Z", hacer: () => ed?.deshacer(), deshabilitada: !ed?.deshacerEtiqueta },
       { id: "rehacer", grupo: "Proyecto", nombre: ed?.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta}` : "Rehacer", atajo: "Ctrl Y", hacer: () => ed?.rehacer(), deshabilitada: !ed?.rehacerEtiqueta },
@@ -433,6 +461,11 @@ export function App() {
                 <button type="button" className="ib ancho-1100" onClick={ed.exportar} aria-label="Exportar el proyecto (.json)" title="Exportar el proyecto: descarga su .json, con el nombre del proyecto">
                   <Download size={16} />
                 </button>
+                {ed.aCarpeta && (
+                  <button type="button" className="ib ancho-1100" onClick={pasarACarpeta} aria-label="Pasar a una carpeta" title="Pasar a una carpeta del disco, para trabajar con el agente: desde ahí se guarda en su proyecto.json y lo que cambie el agente se ve aquí">
+                    <FolderInput size={16} />
+                  </button>
+                )}
               </>
             ) : (
               <span className="pill neu" title="Este fichero no es un proyecto válido: no se puede editar">
@@ -475,6 +508,11 @@ export function App() {
                   <Download size={15} /> Exportar el proyecto (descargarlo)
                 </button>
               )}
+              {ed?.aCarpeta && (
+                <button type="button" role="menuitem" onClick={pasarACarpeta}>
+                  <FolderInput size={15} /> Pasar a una carpeta (para el agente)
+                </button>
+              )}
               <button type="button" role="menuitem" onClick={() => location.assign(location.pathname)}>
                 <FolderOpen size={15} /> Mis proyectos
               </button>
@@ -484,6 +522,28 @@ export function App() {
             </MenuFlotante>
           </header>
 
+          {enCarpeta && (
+            <div className={`banda ${enCarpeta.ok ? "ok" : "fail"}`} role={enCarpeta.ok ? "status" : "alert"}>
+              <span className="min-w-0 flex-1">
+                {enCarpeta.ok ? (
+                  <>
+                    <strong>
+                      En la carpeta {enCarpeta.carpeta}, como {enCarpeta.fichero}.
+                    </strong>{" "}
+                    Desde ahora se guarda ahí, y lo que cambie el agente en ese fichero se ve aquí solo.
+                    {enCarpeta.plantillas ? ` Con ${enCarpeta.plantillas === 1 ? "su plantilla DXF" : `sus ${enCarpeta.plantillas} plantillas DXF`}.` : ""}
+                    {enCarpeta.resultados ? " Con lo calculado: el agente no tiene que recalcular." : ""}
+                    {enCarpeta.faltan.length ? ` No se encontró ${enCarpeta.faltan.join(", ")}: cópielo a la carpeta a mano.` : ""} La copia de «Mis proyectos» se queda como estaba.
+                  </>
+                ) : (
+                  <strong>{enCarpeta.mensaje}</strong>
+                )}
+              </span>
+              <button type="button" className="ib" onClick={() => setEnCarpeta(null)} aria-label="Cerrar" title="Cerrar">
+                <X size={15} />
+              </button>
+            </div>
+          )}
           {ed?.conflicto && (
             <div className="banda warn" role="alert">
               <span className="min-w-0 flex-1">

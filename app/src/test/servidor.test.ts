@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { proyectoNuevo } from "../../../src/editor/plantilla.ts";
 import { serializar } from "../../../src/editor/serializar.ts";
 import { manejadorCarpeta } from "../../servidor.ts";
+import { textoEstadoApp } from "../../../src/agente/estadoApp.ts";
 
 let dir: string;
 let servidor: Server;
@@ -97,5 +98,20 @@ describe("PUT del servidor local", () => {
     expect((await fetch(base + "proyecto.json")).status).toBe(200);
     expect((await fetch(base + "no-existe.json", { method: "HEAD" })).headers.get("x-existe")).toBe("no");
     expect((await fetch(base + "..%2F..%2Fsecreto", {})).status).toBe(404);
+  });
+});
+
+describe("PUT de lo que se mira en la app (.fem/app.json, agente.md §13)", () => {
+  const estado = textoEstadoApp({ proyecto: "proyecto.json", huella: null, sinGuardar: false, espacio: "modelo", planta: "N1", elegidos: ["P1"] }, new Date());
+  it("lo escribe desde la página, sin sello", async () => {
+    const r = await put(".fem/app.json", estado, {});
+    expect(r.status).toBe(200);
+    expect(readFileSync(join(dir, ".fem", "app.json"), "utf8")).toBe(estado);
+  });
+  it("no desde otra web, ni lo que no es un estado de la app, ni otro fichero de .fem", async () => {
+    const otra = await fetch(base + ".fem/app.json", { method: "PUT", body: estado, headers: { origin: "http://malo.example" } });
+    expect(otra.status).toBe(403);
+    expect((await put(".fem/app.json", "{}", {})).status).toBe(422);
+    expect((await put(".fem/otro.json", estado, {})).status).toBe(403);
   });
 });

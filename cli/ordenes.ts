@@ -19,6 +19,8 @@ import { revisar, type Revision } from "../src/agente/revision.ts";
 import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaArmado, vistaAxiles, vistaBandas, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Armadura, type Campo, type Envolvente, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { importarDxf, type OpcionesImportar } from "../src/agente/importarDxf.ts";
+import { FICHERO_APP, leerEstadoApp, seleccionApp } from "../src/agente/estadoApp.ts";
+import { huellaSinCompilar } from "../src/compilador/compilar.ts";
 import { aplanarDxf } from "../src/dxf/aplanar.ts";
 import { ErrorDxf, leerDxf } from "../src/dxf/lector.ts";
 import { serializar } from "../src/editor/serializar.ts";
@@ -95,6 +97,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem importar-dxf <plano.dxf> [--salida proyecto.json] [--capa-pilares C] [--capa-losas C] [--capa-ejes C]
       [--planta id:cota]… [--planta-losas id] [--material HA-30] [--espesor 0.30] [--unidades m|cm|mm] [--nombre N]
       sin --salida, sólo dice lo que reconoce (y las capas); con ella, escribe el proyecto (nunca encima de otro)
+  fem seleccion <proyecto.json>            lo que el ingeniero tiene elegido en la app (planta, espacio y objetos, tal como están en el fichero)
   fem esquema
   fem visor <proyecto.json> [--nuevo]      abre la app sobre el proyecto (no escribe JSON; Ctrl+C la cierra)
 
@@ -191,9 +194,10 @@ async function calculado(orden: string, ruta: string, p: Proyecto, recalcular: b
     try {
       const cabecera = JSON.parse(readFileSync(fCab, "utf8")) as CabeceraResultados & { motor?: string; sha256?: string };
       const bin = new Uint8Array(readFileSync(fBin));
-      // Misma huella, mismo núcleo y los mismos bytes que se guardaron (el visor comprueba lo mismo, V1)
-      const casos = cabecera.huella === c.huella && cabecera.motor === huellaMotor() && cabecera.sha256 === sha256Bytes(bin) ? desempaquetarResultados(cabecera, bin) : null;
-      if (casos) return { compilacion: c, casos, cabecera, reutilizados: true, tiempos: { compilar: tCompilar } };
+      // Misma huella, mismo núcleo, los mismos bytes que se guardaron y el mismo modelo analítico (el
+      // visor comprueba lo mismo, V1): si no, se recalcula
+      const r = cabecera.huella === c.huella && cabecera.motor === huellaMotor() && cabecera.sha256 === sha256Bytes(bin) ? desempaquetarResultados(cabecera, bin, c.modelo) : null;
+      if (r && "casos" in r) return { compilacion: c, casos: r.casos, cabecera, reutilizados: true, tiempos: { compilar: tCompilar } };
     } catch {
       // resultados rotos: se recalculan
     }
@@ -204,7 +208,7 @@ async function calculado(orden: string, ruta: string, p: Proyecto, recalcular: b
   const tCalcular = (performance.now() - t1) / 1000;
   const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
   if (!r.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos([...c.diagnosticos, ...diags]) } };
-  const { cabecera, bytes } = empaquetarResultados(c.huella, r.casos, r.estadisticas, diags);
+  const { cabecera, bytes } = empaquetarResultados(c.huella, c.modelo, r.casos, r.estadisticas, diags);
   guardar(carpeta, { ...cabecera, motor: huellaMotor(), sha256: sha256Bytes(bytes) }, bytes);
   return { compilacion: c, casos: r.casos, cabecera, reutilizados: false, tiempos: { compilar: tCompilar, calcular: tCalcular } };
 }
@@ -466,6 +470,19 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
     }
     case "importar-dxf":
       return importarDxfOrden(a, mal);
+    case "seleccion": {
+      const l = leer(orden, a.posicionales[0]);
+      if ("codigo" in l) return l;
+      const f = join(dirname(l.ruta), ".fem", FICHERO_APP);
+      const nada = (mensaje: string): Salida => ({ codigo: CODIGO.errores, json: { orden, ok: false, diagnosticos: [{ codigo: "seleccion/sin-app", severidad: "error", mensaje }] } });
+      if (!existsSync(f)) return nada("La app no ha dejado lo que tiene elegido junto a este proyecto. Tiene que tenerlo abierto desde su carpeta (o con fem visor), no en «Mis proyectos» del navegador: allí, «Pasar a una carpeta».");
+      const e = leerEstadoApp(readFileSync(f, "utf8"));
+      if (!e) return nada(`${rel(f)} no es un estado de la app.`);
+      if (e.proyecto !== basename(l.ruta)) return nada(`La app tiene abierto ${e.proyecto}, no ${basename(l.ruta)}.`);
+      const s = seleccionApp(e, l.proyecto, huellaSinCompilar(l.proyecto.modelo, l.proyecto.opciones), new Date());
+      const { avisos, ...valor } = s;
+      return { codigo: CODIGO.bien, json: { orden, ok: true, valor, diagnosticos: avisos.map((m) => ({ codigo: "seleccion/aviso", severidad: "aviso", mensaje: m })) } };
+    }
     default:
       return mal(`orden desconocida «${orden}». ${AYUDA}`);
   }

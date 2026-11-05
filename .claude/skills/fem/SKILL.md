@@ -142,7 +142,18 @@ fem visor proyecto.json                # escribe una URL local (127.0.0.1) que a
 fem visor nuevo.json --nuevo           # crea un proyecto con la plantilla y lo abre
 ```
 
-Si el ingeniero tiene el proyecto guardado en el navegador (en la app web, «Mis proyectos»), tú no lo ves: pídele que lo exporte a la carpeta de la obra y lo abra desde ahí con `fem visor`.
+Si el ingeniero tiene el proyecto guardado en el navegador (en la app web, «Mis proyectos»), tú no lo ves: pídele que lo pase a la carpeta de la obra con **«Pasar a una carpeta»** (el icono de la carpeta con la flecha, en la barra de arriba, o Ctrl+K). Deja allí su `proyecto.json`, sus plantillas DXF y lo calculado en `.fem/`, y la app sigue abierta sobre ese fichero: desde entonces se guarda ahí y ve tus cambios. Si su navegador no tiene carpetas (Firefox, Safari), que lo exporte y lo abra con `fem visor`.
+
+**Lo que el ingeniero tiene elegido en la app** («esta viga», «el pilar que tengo marcado», «mira lo que tengo seleccionado»):
+
+```
+fem seleccion proyecto.json            # la planta, el espacio y lo elegido, con cada objeto tal como está en el fichero
+```
+
+- `valor.elegidos` lleva cada objeto con su `coleccion` y el objeto entero del fichero, en el orden en que lo eligió (el último es el que tiene en Propiedades).
+- Si `valor.alDia` es `false`, la app enseña otra versión que la del fichero (tiene cambios sin guardar, o aún no ha recargado los tuyos): los avisos lo dicen. Pídele que guarde antes de cambiar nada.
+- Sólo funciona si la app tiene el proyecto abierto desde su carpeta (abierto con «Abrir carpeta» o tras «Pasar a una carpeta», en Chrome o Edge) o con `fem visor`. Con una carpeta abierta sólo para leer, la app no escribe hasta que el ingeniero guarde una vez (el navegador pide el permiso entonces).
+- Es lo que tenía elegido la última vez que cambió algo (`valor.antiguedad`, en segundos): si hace mucho, pregúntale si sigue siendo eso.
 
 La app vigila el fichero: cada vez que lo editas, se recarga sola (o usa lo que dejó `fem calcular` en `.fem/`). El ingeniero también puede editar y guardar el mismo `proyecto.json` desde ella, así que:
 

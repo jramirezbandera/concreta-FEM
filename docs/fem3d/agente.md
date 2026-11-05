@@ -376,3 +376,25 @@ La skill `fem` sólo estaba en `.claude/skills/` de este repo, y `fem` era `bun 
 - **La skill** dice que se trabaja en la carpeta de la obra, que `fem` sale de `bun run instalar` y que un proyecto guardado en el navegador no lo ve el agente (hay que exportarlo a la carpeta).
 - **Prueba:** `src/agente/instalar.test.ts`. Instala en carpetas temporales y lanza `fem esquema` desde una carpeta fuera del repo.
 - **Dentro del repo** la skill aparece dos veces (la del proyecto y la del usuario), con el mismo texto.
+
+## 13. La app y el agente, juntos (2026-11-05)
+
+A petición del usuario, para trabajar con el agente sobre lo que se tiene abierto en la app. Las decisiones de esta sección las tomó Claude; quedan para confirmar.
+
+### 13.1 Pasar un proyecto del navegador a una carpeta
+
+Un proyecto de «Mis proyectos» vive en IndexedDB y el agente no lo ve (§12). «Pasar a una carpeta» (icono en la barra de arriba, el menú «⋯» y la paleta; sólo con carpetas, Chrome y Edge) elige una carpeta para escribir y deja en ella:
+
+- el `proyecto.json` en su forma canónica. Si la carpeta ya tiene uno, con el nombre del proyecto («Nave Málaga.json»); si también está, no escribe nada y lo dice (**nunca se pisa un proyecto**);
+- sus plantillas DXF (del navegador, por su sha256);
+- lo calculado, en `.fem/<huella>/` con los bytes de la caché, que llevan el núcleo y el sha256 como los deja la CLI: el agente no recalcula. Si es de una versión anterior a lo editado, la CLI no lo usa (busca la huella del fichero).
+
+Desde entonces la sesión es la de la carpeta: se guarda en su `proyecto.json` y lo vigila, así que lo que cambie el agente se ve en la app. **La copia del navegador se queda como estaba** (decisión de Claude: borrarla sería irreversible; el ingeniero la quita en «Mis proyectos» si quiere). Prueba: `app/src/test/aCarpeta.test.tsx` (una File System Access API en memoria).
+
+### 13.2 Lo que se tiene elegido en la app
+
+La app deja en `.fem/app.json`, junto al proyecto, lo que se mira: la planta, el espacio (y el modo en Resultados), lo elegido en orden, la huella de la versión que tiene compilada y si tiene cambios sin guardar (`src/agente/estadoApp.ts`). Lo escribe 300 ms después de cada cambio, si cambió algo, y sólo si el proyecto está en una carpeta (con permiso de escritura ya dado: nunca lo pide) o en el servidor local de `fem visor` (`PUT /proyecto/.fem/app.json`, desde la página y con el esquema; `app/servidor.ts`). Es derivado: no entra en la huella.
+
+`fem seleccion <proyecto.json>` lo lee y da cada objeto elegido con su colección, tal como está en el fichero, los ids que no están en él y `alDia` (misma huella y nada sin guardar), con avisos si no. La skill dice cuándo usarla («esta viga», «lo que tengo elegido»). Pruebas: `src/agente/estadoApp.test.ts` y `app/src/test/servidor.test.ts`.
+
+- **Límite:** una carpeta abierta con «Abrir carpeta» se abre para leer; la app no escribe `app.json` hasta el primer guardado, cuando el navegador pide el permiso.

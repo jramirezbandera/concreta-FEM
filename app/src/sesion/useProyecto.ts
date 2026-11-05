@@ -31,8 +31,8 @@ import { aplicar, type Aplicacion, type Operacion } from "../../../src/editor/op
 import { serializar } from "../../../src/editor/serializar.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
-import { descargar, type Origen } from "./origen.ts";
-import { crear, origenNavegador, versionar } from "./almacen.ts";
+import { descargar, elegirCarpeta, hayCarpetas, origenCarpeta, type Origen } from "./origen.ts";
+import { crear, leerDxfGuardado, origenNavegador, versionar } from "./almacen.ts";
 import { ClienteSesion, ErrorObsoleto } from "./cliente.ts";
 
 export type Fase = "vacio" | "abriendo" | "calculando" | "listo" | "error";
@@ -68,6 +68,12 @@ export interface Edicion {
   exportar: () => void;
   /** AL: un proyecto sin sitio (un ejemplo) pasa al navegador, en esta pestaña y sin perder el deshacer. */
   alNavegador: () => Promise<void>;
+  /**
+   * `agente.md` §13: el proyecto (del navegador o sin sitio) pasa a una carpeta del disco, para
+   * trabajar con el agente: su `proyecto.json`, sus plantillas DXF y lo calculado en `.fem/`. Desde
+   * entonces se guarda y se vigila ahí. Sólo con carpetas (Chrome y Edge); null si se canceló.
+   */
+  aCarpeta?: () => Promise<ACarpeta | null>;
   guardado: EstadoGuardado;
   /** El fichero cambió en el disco con cambios sin guardar, o al guardar: no se ha recargado ni sobrescrito. */
   conflicto: string | null;
@@ -81,6 +87,9 @@ export interface Edicion {
   /** Hay un cambio que el worker aún no ha compilado (también mientras compila). */
   pendiente: boolean;
 }
+
+/** Lo que hizo «Pasar a una carpeta». */
+export type ACarpeta = { ok: true; carpeta: string; fichero: string; plantillas: number; resultados: boolean; faltan: string[] } | { ok: false; mensaje: string };
 
 export interface ProyectoAbierto {
   fase: Fase;
@@ -666,6 +675,64 @@ export function useProyecto(): ProyectoAbierto {
     }
   }, []);
 
+  const aCarpeta = useCallback(async (): Promise<ACarpeta | null> => {
+    const h = histRef.current;
+    const f = fuenteRef.current;
+    if (!h || creando.current) return null;
+    const dir = await elegirCarpeta("readwrite");
+    if (!dir) return null;
+    creando.current = true;
+    try {
+      const texto = serializar(h.actual);
+      // El nombre: proyecto.json, o el del proyecto si la carpeta ya tiene uno; nunca encima de otro
+      const libre = async (n: string) => {
+        try {
+          await dir.getFileHandle(n);
+          return false;
+        } catch {
+          return true;
+        }
+      };
+      const candidatos = ["proyecto.json", nombreFichero(h.actual.nombre)];
+      let fichero: string | null = null;
+      for (const n of candidatos) if (await libre(n)) (fichero ??= n);
+      if (!fichero) return { ok: false, mensaje: `La carpeta ${dir.name} ya tiene ${candidatos.filter((x, i) => candidatos.indexOf(x) === i).join(" y ")}: no se pisa. Elija otra carpeta (una por obra).` };
+      const nuevo = origenCarpeta(dir, fichero);
+      const w = await nuevo.escribir(texto, { sello: null });
+      if (!w.ok) return { ok: false, mensaje: w.mensaje };
+      // Las plantillas DXF, junto al proyecto (del navegador o de la carpeta de antes)
+      let plantillas = 0;
+      const faltan: string[] = [];
+      for (const t of h.actual.plantillas ?? []) {
+        const bytes = (f?.tipo === "origen" ? await f.origen.leerBytes?.(t.fichero).catch(() => null) : null) ?? (await leerDxfGuardado(t.sha256).catch(() => null));
+        if (bytes && (await nuevo.dejarFichero!(t.fichero, bytes))) plantillas++;
+        else faltan.push(t.fichero);
+      }
+      // Lo calculado, en `.fem/<huella>/` como lo deja la CLI: el agente no recalcula. Si es de una
+      // versión anterior a lo editado, la CLI no lo usa (busca la huella del fichero)
+      let resultados = false;
+      const huella = clienteRef.current?.huella;
+      if (huella && f?.tipo === "origen") {
+        const g = await f.origen.guardados(huella).catch(() => null);
+        if (g) resultados = (await nuevo.escribirDerivado!(`${huella}/resultados.bin`, g.bytes)) && (await nuevo.escribirDerivado!(`${huella}/resultados.json`, g.cabecera));
+      }
+      ultimo.current = { texto, sello: w.sello };
+      setEnDisco(h.actual);
+      setGuardado({ tipo: "guardado", ms: 0 });
+      setConflicto(null);
+      const nf: Fuente = { tipo: "origen", origen: nuevo };
+      setFuente(nf);
+      fuenteRef.current = nf;
+      // La URL ya no es la de un proyecto del navegador (recargar volvería a él)
+      if (location.search.includes("local=")) history.replaceState(null, "", location.pathname);
+      return { ok: true, carpeta: dir.name, fichero, plantillas, resultados, faltan };
+    } catch (e) {
+      return { ok: false, mensaje: `No se pudo pasar a la carpeta: ${e instanceof Error ? e.message : String(e)}` };
+    } finally {
+      creando.current = false;
+    }
+  }, []);
+
   // Avisar al cerrar la página con cambios sin guardar, también con lo que se está escribiendo en un
   // campo que aún no se ha confirmado (UI-26: se perdía al recargar con la barra diciendo «Guardado»)
   useEffect(() => {
@@ -703,6 +770,7 @@ export function useProyecto(): ProyectoAbierto {
         recargarDisco,
         exportar,
         alNavegador,
+        ...(hayCarpetas() && !(fuente?.tipo === "origen" && !fuente.origen.navegador) ? { aCarpeta } : {}),
         modo: auto ? "auto" : fuente?.tipo === "origen" ? "escribir" : "descargar",
         pendiente,
       }
