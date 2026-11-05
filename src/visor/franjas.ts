@@ -65,10 +65,10 @@ export function datosArmado(s: Sesion, planta: string, e: EleccionCombinaciones,
   if (!esc.valido) return esc;
   const conj = s.conjunto(e, "esfuerzos");
   if (!conj.valido) return conj;
-  const r = consultaFranjas(q, conj.valor, { planta });
-  if (!r.valido) return r;
   const direccion = armadura[0] === "x" ? 1 : 2;
-  const filas = r.valor.franjas.filter((f) => f.direccion === direccion).map((f): FilaArmado => ({ ...f, ancho: f.t[1] - f.t[0] }));
+  const r = consultaFranjas(q, conj.valor, { planta, direccion });
+  if (!r.valido) return r;
+  const filas = r.valor.franjas.map((f): FilaArmado => ({ ...f, ancho: f.t[1] - f.t[0] }));
   const plantas = q.fisico.plantas.map((p) => p.id).filter((p) => (q.fisico.losas ?? []).some((l) => l.planta === p));
   // Las zonas, con los tramos que ya calculó el mapa (las mismas que «fem consultar refuerzos»)
   const fs = tramosPlanta(q, planta, armadura, conj.valor);

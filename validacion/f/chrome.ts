@@ -8,6 +8,9 @@
  * - Resultados · Armado: el mapa y la tabla de las franjas de la planta salen en ≤ 2 s, sin tareas
  *   largas, con las demandas de Node bit a bit;
  * - el detalle de una franja sale en ≤ 1 s, con los valores de Node bit a bit.
+ *
+ *   node validacion/f/chrome.ts --pedidos   además, los pedidos al worker mientras sale el mapa
+ *   PERFIL=<fichero> node validacion/f/chrome.ts   además, el perfil de CPU del hilo principal mientras sale
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -27,6 +30,7 @@ const APP = join(RAIZ, "app");
 const CHROME = process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const PUERTO = 8777;
 const PUERTO_CDP = 9337;
+const PEDIDOS = process.argv.includes("--pedidos");
 const salida: string[] = [];
 const log = (s: string) => {
   console.log(s);
@@ -110,6 +114,27 @@ async function pagina<T>(expr: string): Promise<T> {
 
 const AYUDAS = `
 window.__largas = [];
+// --pedidos: cada pedido al worker de la sesión, con su envío, su contestación y su «ms» de proceso
+window.__pedidos = [];
+{
+  const W = window.Worker;
+  window.Worker = class extends W {
+    constructor(...a) {
+      super(...a);
+      const enviados = new Map();
+      const pm = this.postMessage.bind(this);
+      this.postMessage = (m, t) => {
+        if (m && m.id !== undefined && m.pedido) enviados.set(m.id, { tipo: m.pedido.tipo, t0: performance.now() });
+        return pm(m, t);
+      };
+      this.addEventListener("message", (e) => {
+        const d = e.data;
+        const x = d && d.id !== undefined && !d.tipo ? enviados.get(d.id) : undefined;
+        if (x) window.__pedidos.push({ ...x, fin: performance.now(), ms: d.ms ?? 0 });
+      });
+    }
+  };
+}
 new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__largas.push({ t: e.startTime, ms: e.duration }); }).observe({ type: "longtask", buffered: true });
 window.__v2 = {
   esperar: async (f, ms = 180000) => { const t0 = performance.now(); for (;;) { const v = f(); if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 10)); } },
@@ -168,14 +193,24 @@ try {
   // ─── 3. Criterios 7 y 8: Resultados · Armado en el edificio objetivo ────────────────────────
   log("Criterios 7 y 8 · Resultados · Armado en el edificio objetivo de A2 (losa maciza con vigas)");
   await abrir("edificio");
+  const tR = await ahora();
   await pagina(`__v2.boton("Resultados").click(); await __v2.esperar(() => __v2.boton("Armado"));`);
   const t4 = await ahora();
+  if (process.env.PERFIL) { await cdp("Profiler.enable"); await cdp("Profiler.setSamplingInterval", { interval: 100 }); await cdp("Profiler.start"); }
   const ms4 = await pagina<number>(`
     const t0 = performance.now();
     __v2.boton("Armado").click();
     await __v2.esperar(() => document.querySelectorAll("table[aria-label='Franjas de la planta'] tbody tr").length > 0);
     return performance.now() - t0;`);
   const l4 = await largasDesde(t4);
+  if (process.env.PERFIL) { const { profile } = (await cdp("Profiler.stop")) as { profile: unknown }; writeFileSync(process.env.PERFIL, JSON.stringify(profile)); }
+  if (PEDIDOS) {
+    // Desde que se entra en Resultados: lo que el worker atiende antes y durante el mapa
+    const ps = await pagina<{ tipo: string; t0: number; fin: number; ms: number }[]>(`return window.__pedidos;`);
+    log(`  pedidos (tipo: proceso en el worker / desde el envío, ms; t desde el clic en Armado):`);
+    for (const p of ps.filter((p) => p.fin >= tR)) log(`    t=${(p.t0 - t4).toFixed(0)} ${p.tipo} ${p.ms.toFixed(0)}/${(p.fin - p.t0).toFixed(0)}`);
+    log(`  tareas largas: ${l4.map((x) => `t=${(x.t - t4).toFixed(0)} ${x.ms.toFixed(0)} ms`).join(", ") || "ninguna"}`);
+  }
   comprobar(ms4 <= 2000, `el mapa y la tabla de las franjas de la planta salen en ${(ms4 / 1000).toFixed(2)} s (≤ 2 s)`);
   comprobar(l4.every((x) => x.ms <= 50), `tareas largas > 50 ms en el hilo principal: ${largas(l4)}`);
   await new Promise((r) => setTimeout(r, 500));

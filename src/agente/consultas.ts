@@ -683,9 +683,10 @@ export interface FilaFranja {
 
 /**
  * Las franjas de armado de una losa, de una planta o de todas, con la mayor demanda de Wood–Armer
- * de su armadura inferior y superior en las combinaciones del conjunto (kN·m/m).
+ * de su armadura inferior y superior en las combinaciones del conjunto (kN·m/m). Con `direccion`,
+ * sólo las de esa dirección (las otras no se cortan: el mapa de una armadura sólo pide las suyas).
  */
-export function franjas(q: Consultas, conjunto: ConjuntoCombinaciones, o: Pick<OpcionesConsulta, "losa" | "planta">): Respuesta<{ combinaciones: string; franjas: FilaFranja[] }> {
+export function franjas(q: Consultas, conjunto: ConjuntoCombinaciones, o: Pick<OpcionesConsulta, "losa" | "planta"> & { direccion?: 1 | 2 }): Respuesta<{ combinaciones: string; franjas: FilaFranja[] }> {
   if (o.losa !== undefined && !(q.fisico.losas ?? []).some((l) => l.id === o.losa)) return no("consulta/no-existe", `La losa «${o.losa}» no existe en el modelo (las franjas son de las losas macizas y reticulares).`, [o.losa]);
   const losas = (q.fisico.losas ?? []).filter((l) => (o.losa === undefined || l.id === o.losa) && (o.planta === undefined || l.planta === o.planta));
   const filas: FilaFranja[] = [];
@@ -694,6 +695,7 @@ export function franjas(q: Consultas, conjunto: ConjuntoCombinaciones, o: Pick<O
     const fs = q.franjas(l.id);
     if (!fs.valido) return fs;
     for (const f of fs.valor) {
+      if (o.direccion !== undefined && f.direccion !== o.direccion) continue;
       const r = q.franja(f.id);
       const a = q.armadoFranja(f.id, conjunto.factores);
       if (!r.valido) return r;

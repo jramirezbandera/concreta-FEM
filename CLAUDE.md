@@ -779,6 +779,11 @@
   - **Lo que queda:**
     - en la primera Revisión, el peso propio calculado recompila el modelo (~2 s; `pesoPropioCalculado`, sin las cargas y sin LV-d, para que el reparto por plantas sea el del esperado) y los diagramas de todas las vigas en las combinaciones de flecha, que hay que hacer;
     - f sigue fallando: el mapa de franjas de N7 en ~3,4–4,0 s frente a los 2 s del criterio. Su tiempo se aceptó el 2026-10-13 (C5-4) y el umbral se quedó corto al crecer la malla. Además, una tarea larga de 62–87 ms en el hilo principal al pintarlo, sin investigar.
+- **2026-11-05: el mapa de franjas, de 4,1 a 2,8 s en Chrome** (mismos bits; A/B alternado con un worktree, mínimo de 3; `validacion/f/chrome.ts --pedidos` da los pedidos al worker y `PERFIL=` el perfil del hilo principal):
+  - `FuerzasNodales` prepara las cargas equivalentes de cada barra cuando se piden, como las de las láminas: el corte de una franja sólo pide láminas, y antes preparaba las de todas las barras en cada caso (un tercio del primer mapa);
+  - la tabla de franjas de la planta corta sólo las de la dirección que se mira (`franjas(…, { direccion })`); antes cortaba también las de la otra y las tiraba. Las de Y se pagan al pasar a Y (~0,6 s en Node);
+  - mismos sha256 en los 14 mapas del edificio objetivo, el detalle de una franja por planta y `fem consultar franjas` entero.
+  - **Sigue fallando f:** 2,8 s frente a 2 s (el worker, 2,2 s cortando las estaciones; ~0,45 s esperando el mapa de Losas, que el banco deja en marcha al entrar). La tarea larga (75–111 ms) no es al pintar el mapa sino al pulsar Armado: el montaje de la pantalla; al llegar el mapa, ~56 ms repartidos en varias tareas.
 - **2026-11-05: el peso propio de los forjados, revisado** (revisión del usuario, `pesoForjado.ts`; decisiones del usuario: relleno por peso aparente o por piezas, excluyentes; procedencia con su fuente; el peso medio con ábacos sólo informativo):
   - **Lo que ya cumplía:**
     - las fórmulas son las de la revisión (reticular de retícula cuadrada y unidireccional con vigueta en T; 25+5 a 80/12 de casetón de hormigón, 4,3390625 kN/m²; recuperable, 2,984375);
