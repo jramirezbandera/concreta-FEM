@@ -13,7 +13,7 @@
  *
  * Puro: sin IO.
  */
-import type { AccionCaso, ApoyoFisico, ApoyoLineal, Barra, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Viga } from "../compilador/fisico.ts";
+import type { AbacosPilares, AccionCaso, ApoyoFisico, ExceptoBorde, ApoyoLineal, Barra, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Vec2, Viga } from "../compilador/fisico.ts";
 import { gammaMaterial } from "../agente/sensatez.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
@@ -203,7 +203,7 @@ const plantas: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sótano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
+    { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sótano, cubierta o escalón (un forjado a poca altura del de debajo, como el escalón entre dos cubiertas: no se avisa de esa altura)", opciones: fijas(["planta", "sotano", "cubierta", "escalon"], "planta") },
     { clave: "altura", titulo: "altura", unidad: "m", ayuda: "la del tramo de debajo: de su forjado al de la planta de debajo, como en un alzado; vacía en la más baja. En una fila nueva, que va abajo del todo, la del tramo que la une a la de encima" },
     {
       clave: "cota",
@@ -231,7 +231,7 @@ const plantas: DefTabla = {
       ...base,
       id: L.texto("id") ?? "",
       nombre: L.texto("nombre"),
-      tipo: L.opcion("tipo", ["planta", "sotano", "cubierta"] as const),
+      tipo: L.opcion("tipo", ["planta", "sotano", "cubierta", "escalon"] as const),
       altura: ya ? ya.altura : (L.numero("altura", { mayorQue: 0 }) ?? null),
       diafragma: L.opcion("diafragma", ["rigido", "ninguno"] as const),
     };
@@ -607,7 +607,23 @@ const MULT = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"] as const;
 export const TIPOS_FORJADO = ["maciza", "reticular", "unidireccional"] as const;
 export type TipoForjado = (typeof TIPOS_FORJADO)[number];
 
-const DEL_RETICULAR = ["nervio", "capa", "caseton", "abacos", "multiplicadores"] as const;
+/** «2» o «2 x 1,6» (MA2). */
+function textoAbacosPilares(a: AbacosPilares | undefined): string {
+  if (!a) return "";
+  return "lado" in a ? n(a.lado) : `${n(a.lados[0])} x ${n(a.lados[1])}`;
+}
+
+/** Lee «2» o «2 x 1,6» (también con «×» o «*»): los ábacos en los pilares (MA2). */
+function abacosPilaresFila(L: Lector, f: Fila): AbacosPilares | undefined {
+  const t = (f.abacosPilares ?? "").trim();
+  if (!t) return undefined;
+  const v = t.split(/\s*[x×*]\s*/i).map((p) => leerNumero(p));
+  if ((v.length === 1 || v.length === 2) && v.every((x) => typeof x === "number" && x > 0 && x <= 10)) return v.length === 1 ? { lado: v[0] as number } : { lados: [v[0] as number, v[1] as number] };
+  L.errores.push({ columna: "abacosPilares", mensaje: "un número («2», cuadrados de 2 m) o dos («2 x 1,6», según los nervios por la perpendicular), mayores que 0 y de 10 m como mucho" });
+  return undefined;
+}
+
+const DEL_RETICULAR = ["nervio", "capa", "caseton", "abacos", "abacosPilares", "multiplicadores"] as const;
 
 /** Las columnas propias de cada tipo; las demás (id, planta, contorno, pp, dirección…) son de todos. */
 const PROPIAS: Readonly<Record<TipoForjado, readonly string[]>> = {
@@ -727,7 +743,7 @@ const forjados: DefTabla = {
       titulo: "pp",
       unidad: "kN/m²",
       ayuda:
-        "peso propio. Vacío, sale solo: γ·canto en una maciza; en un reticular, el hormigón de nervios y capa más el casetón en el hueco (los ábacos, γ·canto); en un unidireccional, la vigueta en T y la capa más la bovedilla. Lo escrito manda (en un reticular, el medio de toda la losa con los ábacos). Obligatorio con un casetón «perdido de otro material» o una vigueta que no es una T",
+        "peso propio. Vacío, sale solo: γ·canto en una maciza; en un reticular, el hormigón de nervios y capa más el casetón en el hueco (los ábacos, γ·canto); en un unidireccional, la vigueta en T y la capa más la bovedilla. Lo escrito manda (en un reticular, es el de la zona aligerada: los ábacos pesan γ·canto). Obligatorio con un casetón «perdido de otro material» o una vigueta que no es una T",
       defecto: ppPorDefecto,
     },
     {
@@ -741,7 +757,8 @@ const forjados: DefTabla = {
     { clave: "nervio", titulo: "nervio", unidad: "m", ayuda: "reticular: ancho del nervio (bw)" },
     { clave: "capa", titulo: "capa", unidad: "m", ayuda: "reticular: espesor de la capa de compresión (hf)" },
     { clave: "caseton", titulo: "casetón", ayuda: "reticular: de qué es el casetón, para el peso propio. Perdido de hormigón (por defecto), cerámico o de poliestireno, recuperable o perdido de otro material (entonces se escribe el pp)", opciones: opcionesCaseton },
-    { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado", defecto: () => "ninguno" },
+    { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado. Los que se tocan o quedan a menos de media malla se unen en su rectángulo", defecto: () => "ninguno" },
+    { clave: "abacosPilares", titulo: "ábacos en pilares", unidad: "m", ayuda: "reticular: un ábaco centrado en cada pilar que llega al forjado, «2» (cuadrado) o «2 x 1,6» (según los nervios por la perpendicular); siguen a los pilares y se unen si se tocan", defecto: () => "ninguno" },
     {
       clave: "multiplicadores",
       titulo: "multiplicadores",
@@ -771,6 +788,7 @@ const forjados: DefTabla = {
         capa: "",
         caseton: "",
         abacos: "",
+        abacosPilares: "",
         multiplicadores: "",
         seccion: p.seccion,
         bovedilla: s(p.bovedilla),
@@ -794,6 +812,7 @@ const forjados: DefTabla = {
       capa: n(r?.capa),
       caseton: s(r?.caseton),
       abacos: r?.abacos?.length ? textoPoligonos(r.abacos) : "",
+      abacosPilares: textoAbacosPilares(r?.abacosPilares),
       multiplicadores: r?.multiplicadores ? textoClaves(r.multiplicadores as Record<string, number>, MULT) : "",
       seccion: "",
       bovedilla: "",
@@ -829,6 +848,7 @@ const forjados: DefTabla = {
         capa: L.longitud("capa", { obligatorio: true, max: LONGITUD_MAXIMA.nervio }),
         caseton: L.opcion("caseton", CASETONES),
         abacos: L.poligonos("abacos"),
+        abacosPilares: abacosPilaresFila(L, f),
         multiplicadores: L.claves("multiplicadores", MULT, { max: 100 }),
       }) as Losa["reticular"];
     const r = resultado(L, {
@@ -1080,8 +1100,8 @@ const casos: DefTabla = {
 
 // ─── Cargas ─────────────────────────────────────────────────────────────────────────────────────
 
-const CARGA = ["planta", "sobre", "ejes", "x", "y", "F", "M", "q", "qb", "desde", "hasta", "puntos", "lado", "z0", "z1", "p0", "p1"] as const;
-const TIPOS_CARGA = ["puntual", "viga", "pilar", "barra", "superficie", "lineal", "empuje"] as const;
+const CARGA = ["planta", "sobre", "ejes", "x", "y", "F", "M", "q", "qb", "desde", "hasta", "puntos", "huecos", "excepto", "lado", "z0", "z1", "p0", "p1"] as const;
+const TIPOS_CARGA = ["puntual", "viga", "pilar", "barra", "superficie", "lineal", "borde", "empuje"] as const;
 /** Las columnas de cada tipo de carga (además de id, tipo y caso); las demás van vacías. */
 const PROPIAS_CARGA: Readonly<Record<(typeof TIPOS_CARGA)[number], readonly (typeof CARGA)[number][]>> = {
   puntual: ["planta", "x", "y", "F", "M"],
@@ -1090,8 +1110,30 @@ const PROPIAS_CARGA: Readonly<Record<(typeof TIPOS_CARGA)[number], readonly (typ
   barra: ["sobre", "ejes", "q", "qb", "desde", "hasta"],
   superficie: ["planta", "sobre", "q", "puntos"],
   lineal: ["planta", "puntos", "q"],
+  borde: ["sobre", "q", "huecos", "excepto"],
   empuje: ["sobre", "lado", "z0", "z1", "p0", "p1"],
 };
+/** Lee «x y; x y | junto L2 | …»: los tramos sin la carga de borde (MA4). */
+function exceptoFila(L: Lector, f: Fila): ExceptoBorde[] | undefined {
+  const t = (f.excepto ?? "").trim();
+  if (!t) return undefined;
+  const r: ExceptoBorde[] = [];
+  for (const parte of t.split("|").map((p) => p.trim())) {
+    const j = /^junto\s+(.+)$/i.exec(parte);
+    if (j) {
+      r.push({ junto: j[1]!.trim() });
+      continue;
+    }
+    const ps = parte.split(";").map((q) => q.trim().split(/\s+/).map(leerNumero));
+    if (ps.length === 2 && ps.every((q) => q.length === 2 && q.every((x) => typeof x === "number"))) r.push([ps[0] as unknown as Vec2, ps[1] as unknown as Vec2]);
+    else {
+      L.errores.push({ columna: "excepto", mensaje: `«${parte}»: un segmento «x y; x y» o «junto <losa>»` });
+      return undefined;
+    }
+  }
+  return r;
+}
+
 const tipoCarga = (f: Fila) => (f.tipo ?? "").trim().toLowerCase() as (typeof TIPOS_CARGA)[number];
 const cargas: DefTabla = {
   nombre: "cargas",
@@ -1102,13 +1144,13 @@ const cargas: DefTabla = {
   prefijoDe: (f) => `${(f.caso ?? "").trim() || "C"}-`,
   columnas: [
     id,
-    { clave: "tipo", titulo: "tipo", ayuda: "puntual (en un punto de la planta), viga, pilar o barra (repartida a lo largo de la pieza), superficie (por m² de forjado), lineal (por metro de una línea de la planta) o empuje (del terreno sobre un muro)", opciones: fijas(TIPOS_CARGA) },
+    { clave: "tipo", titulo: "tipo", ayuda: "puntual (en un punto de la planta), viga, pilar o barra (repartida a lo largo de la pieza), superficie (por m² de forjado), lineal (por metro de una línea de la planta), borde (por metro del borde de una losa: un peto, una fachada) o empuje (del terreno sobre un muro)", opciones: fijas(TIPOS_CARGA) },
     { clave: "caso", titulo: "caso", ayuda: "el caso de carga en que va: peso, uso, viento…", opciones: casos_(), referencia: "casos" },
     { clave: "planta", titulo: "planta", ayuda: "la planta en que está la carga (en viga, pilar, barra y empuje, la de su pieza)", opciones: (ctx) => [{ valor: "", texto: "(la de la pieza)" }, ...opcionesPlantas(ctx)], referencia: "plantas" },
     {
       clave: "sobre",
       titulo: "sobre",
-      ayuda: "la pieza que carga: la viga, el pilar, la barra, el muro de un empuje, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)",
+      ayuda: "la pieza que carga: la viga, el pilar, la barra, el muro de un empuje, la losa de una de borde, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)",
       defecto: (f) => (tipoCarga(f) === "superficie" && (f.puntos ?? "").trim() ? "los forjados de la zona" : undefined),
     },
     { clave: "ejes", titulo: "ejes", ayuda: "en qué ejes van las componentes: global (los de la planta, z hacia arriba) o local (los de la pieza: x a lo largo de ella, z según su canto)", opciones: fijas(["global", "local"], "global") },
@@ -1127,6 +1169,8 @@ const cargas: DefTabla = {
       ayuda: "lineal: la línea por la que va, «x y; x y; …»; superficie: la zona, si no es el forjado entero",
       defecto: (f) => (tipoCarga(f) === "superficie" && (f.sobre ?? "").trim() ? "todo el forjado" : undefined),
     },
+    { clave: "huecos", titulo: "huecos", ayuda: "borde: también por el borde de los huecos de la losa", opciones: fijas(["sí", "no"], "no") },
+    { clave: "excepto", titulo: "excepto", unidad: "m", ayuda: "borde: los tramos que no la llevan, separados por «|»: un segmento «x y; x y» o «junto L2» (lo que toca la losa L2 en planta, como el encuentro de dos cubiertas)", defecto: (f) => (tipoCarga(f) === "borde" ? "todo el borde" : undefined) },
     { clave: "lado", titulo: "lado", ayuda: "la cara del muro donde está el terreno, mirando de su primer punto al último; empuja hacia la otra", opciones: fijas(["izquierdo", "derecho"], "sólo empuje") },
     { clave: "z0", titulo: "z0", unidad: "m", ayuda: "altura sobre la base del muro donde vale p0" },
     { clave: "z1", titulo: "z1", unidad: "m", ayuda: "altura donde vale p1; nula fuera de z0–z1" },
@@ -1162,6 +1206,9 @@ const cargas: DefTabla = {
         break;
       case "lineal":
         Object.assign(r, { planta: c.planta, q: textoVector(c.q), puntos: textoPuntos(c.puntos) });
+        break;
+      case "borde":
+        Object.assign(r, { sobre: c.losa, q: textoVector(c.q), huecos: c.huecos ? "sí" : "", excepto: (c.excepto ?? []).map((e) => (Array.isArray(e) ? textoPuntos(e as readonly Vec2[]) : `junto ${(e as { junto: string }).junto}`)).join(" | ") });
         break;
       case "empuje":
         Object.assign(r, { sobre: c.muro, lado: c.lado, z0: n(c.z0), z1: n(c.z1), p0: n(c.p0), p1: n(c.p1) });
@@ -1200,6 +1247,12 @@ const cargas: DefTabla = {
       case "lineal":
         usa(["planta", "puntos", "q"]);
         return resultado(L, { ...comun, planta: L.texto("planta", { obligatorio: true }), puntos: L.puntos("puntos", { obligatorio: true, min: 2 }), q: L.vector("q", { obligatorio: true }) });
+      case "borde": {
+        usa(["sobre", "q", "huecos", "excepto"]);
+        const h = (f.huecos ?? "").trim().toLowerCase();
+        if (h && !["sí", "si", "no"].includes(h)) L.errores.push({ columna: "huecos", mensaje: "sí o no" });
+        return resultado(L, { ...comun, losa: L.texto("sobre", { obligatorio: true }), q: L.vector("q", { obligatorio: true }), huecos: h === "sí" || h === "si" ? true : undefined, excepto: exceptoFila(L, f) });
+      }
       case "empuje": {
         usa(["sobre", "lado", "z0", "z1", "p0", "p1"]);
         const z0 = L.numero("z0", { obligatorio: true, min: 0 });
@@ -1225,6 +1278,10 @@ const cargas: DefTabla = {
     if (c.tipo === "empuje") {
       const m = lista(ctx.modelo, "muros").find((v) => v.id === c.muro);
       return m ? rango(ctx.modelo, m.desde, m.hasta) : [];
+    }
+    if (c.tipo === "borde") {
+      const l = lista(ctx.modelo, "losas").find((v) => v.id === c.losa);
+      return l ? [l.planta as string] : [];
     }
     return [c.planta];
   },

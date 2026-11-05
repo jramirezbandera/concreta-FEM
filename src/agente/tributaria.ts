@@ -21,6 +21,8 @@
  * Sólo cargas verticales (hacia abajo positivas, kN) y sólo los casos que se piden (los
  * gravitatorios). Puro.
  */
+import { resolverAbacos } from "../compilador/abacos.ts";
+import { resolverBordes } from "../compilador/bordes.ts";
 import type { CargaFisica, Losa, ModeloFisico, PanoUnidireccional, Vec2 } from "../compilador/fisico.ts";
 import { momentosInterseccion, type Region } from "../compilador/poligonos.ts";
 import { ejesBarra, puntosBarra } from "../compilador/barras.ts";
@@ -122,6 +124,8 @@ export interface TramoTributario {
 
 /** Bajada tributaria de cada tramo de pilar con la suma de los casos `casos` (ids). */
 export function bajadaTributaria(f: ModeloFisico, casos: ReadonlySet<string>, epsSnap = 0.05): TramoTributario[] {
+  // MA2: con los ábacos que usa el compilador (los de los pilares y los unidos)
+  f = resolverBordes(resolverAbacos(f).modelo, epsSnap).modelo;
   const P = new Plantas(f);
   const material = new Map(f.materiales.map((m) => [m.id, m]));
   const seccion = new Map(f.secciones.map((s) => [s.id, s]));

@@ -267,6 +267,14 @@ function cargaTransformada(tr: Transformador, c: CargaFisica, geometria = true):
       if (puntos.every((p, i) => p === c.puntos[i]) && vec3Igual(q, c.q)) return c;
       return { ...c, puntos, q };
     }
+    case "borde": {
+      // MA4: va por el borde de su losa; se mueven sus excepciones por segmentos
+      const excepto = c.excepto && geometria ? c.excepto.map((e) => (Array.isArray(e) ? ([tr.punto(e[0] as Vec2), tr.punto(e[1] as Vec2)] as const) : e)) : c.excepto;
+      const q = v(c.q);
+      const igual = excepto === c.excepto || excepto!.every((e, i) => e === c.excepto![i] || (Array.isArray(e) && e.every((p, j) => p === (c.excepto![i] as readonly Vec2[])[j])));
+      if (igual && vec3Igual(q, c.q)) return c;
+      return { ...c, q, ...(excepto ? { excepto } : {}) };
+    }
     case "superficie": {
       const zona = c.zona && geometria ? c.zona.map((p) => tr.punto(p)) : c.zona;
       const q = v(c.q);

@@ -24,7 +24,7 @@ import { cota, fmt } from "../fmt.ts";
 
 const ICONO: Record<TipoPieza, typeof IcForjado> = { losa: IcForjado, pano: IcForjado, viga: IcViga, pilar: IcPilar, muro: IcMuro };
 const NOMBRE: Record<TipoPieza, string> = { losa: "Forjado", pano: "Forjado", viga: "Viga", pilar: "Pilar", muro: "Muro" };
-const NOMBRE_CARGA: Record<CargaFisica["tipo"], string> = { superficie: "Superficie", lineal: "Lineal", puntual: "Puntual", viga: "En viga", pilar: "En pilar", barra: "En barra", empuje: "Empuje" };
+const NOMBRE_CARGA: Record<CargaFisica["tipo"], string> = { superficie: "Superficie", lineal: "Lineal", borde: "Borde", puntual: "Puntual", viga: "En viga", pilar: "En pilar", barra: "En barra", empuje: "Empuje" };
 
 const num = (x: number) => fmt(x, 2);
 
@@ -41,6 +41,8 @@ function textoCarga(c: CargaFisica, parte: boolean): string {
       return `${valor(c.q, "kN/m²")}${c.zona ? " · en una zona" : ""}${de}`;
     case "lineal":
       return `${valor(c.q, "kN/m")}${de}`;
+    case "borde":
+      return `${valor(c.q, "kN/m")} · por el borde${de}`;
     case "puntual":
       return [c.F && valor(c.F, "kN"), c.M && componentes(c.M, ["Mx", "My", "Mz"], "kN·m", num)].filter(Boolean).join(" · ");
     case "viga":

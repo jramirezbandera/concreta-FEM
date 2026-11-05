@@ -82,6 +82,9 @@ export function referenciasDe(coleccion: Coleccion, o: Objeto): Referencia[] {
         case "superficie":
           r.push(...ref("plantas", c.planta, "planta"), ...ref("losas", c.losa, "losa"), ...ref("panos", c.pano, "pano"));
           break;
+        case "borde":
+          r.push(...ref("losas", c.losa, "losa"));
+          break;
         case "viga":
           r.push(...ref("vigas", c.viga, "viga"));
           break;

@@ -333,3 +333,30 @@ describe("MA5: alinear", () => {
     expect(fem(["alinear", ruta, "--tolerancia", "tres"]).codigo).toBe(2);
   });
 });
+
+describe("MA: vigas-borde", () => {
+  it("sólo propone lo de «Vigas de borde» del editor; con --escribir, lo pone, deja el .bak y valida sin bordes libres", () => {
+    const m = reticulaConNucleo();
+    const ruta = escribir({ ...m, vigas: [] });
+    const antes = readFileSync(ruta, "utf8");
+    const v = fem(["validar", ruta]);
+    expect((v.json.diagnosticos as { codigo: string }[]).some((d) => d.codigo === "sensatez/borde-sin-viga")).toBe(true);
+    const a = fem(["vigas-borde", ruta]);
+    expect(a.codigo).toBe(0);
+    expect(a.json.escrito).toBe(false);
+    const losas = a.json.losas as { losa: string; vigas: { id: string }[]; seccion: string }[];
+    expect(losas.length).toBe(m.losas!.length);
+    expect(losas.every((l) => l.vigas.length > 0 && l.seccion)).toBe(true);
+    expect(readFileSync(ruta, "utf8")).toBe(antes);
+    const b = fem(["vigas-borde", ruta, "--escribir", "--ancho", "0,3"]);
+    expect(b.codigo).toBe(0);
+    expect(b.json.escrito).toBe(true);
+    expect(b.json.valido).toBe(true);
+    expect(readFileSync(`${ruta}.bak`, "utf8")).toBe(antes);
+    expect((fem(["validar", ruta]).json.diagnosticos as { codigo: string }[]).some((d) => d.codigo === "sensatez/borde-sin-viga")).toBe(false);
+    // Ya no queda nada que poner; una losa que no existe o un ancho que no es un número son órdenes mal dadas
+    expect((fem(["vigas-borde", ruta]).json.losas as { vigas?: unknown[] }[]).every((l) => !l.vigas?.length)).toBe(true);
+    expect(fem(["vigas-borde", ruta, "--losa", "NO"]).codigo).toBe(2);
+    expect(fem(["vigas-borde", ruta, "--ancho", "ancho"]).codigo).toBe(2);
+  });
+});

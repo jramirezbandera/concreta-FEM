@@ -38,6 +38,7 @@
  *
  * Puro: sin IO.
  */
+import { resolverAbacos } from "../compilador/abacos.ts";
 import { ejesBarra, puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
@@ -698,6 +699,8 @@ function cantoPano(f: ModeloFisico, seccion: string): number | null {
  * paños con sus viguetas; sin él, como placas.
  */
 export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null): { piezas: PiezaSolida[]; notas: string[] } {
+  // MA2: los ábacos que usa el compilador (los de los pilares y los unidos)
+  f = resolverAbacos(f).modelo;
   const plantas = (f.plantas ?? []).map((p) => p.id);
   const indice = new Map(plantas.map((p, i) => [p, i]));
   const cotas = cotasPlantas(f.plantas ?? []);

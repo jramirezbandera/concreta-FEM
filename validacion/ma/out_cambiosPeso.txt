@@ -1,0 +1,10 @@
+MA3: modelos de las referencias congeladas que cambian (el resto, idénticos)
+
+C3: 0 de 11
+C4: 4 de 8
+  aleatorio-6-reticular: Σ Rz del primer caso 1837.444 → 1957.018 kN (6.51 %)
+  aleatorio-5-mixto: Σ Rz del primer caso 2140.354 → 2227.870 kN (4.09 %)
+  aleatorio-5-mixto-lv: Σ Rz del primer caso 2140.354 → 2227.870 kN (4.09 %)
+  aleatorio-5-mixto-lv2: Σ Rz del primer caso 2140.354 → 2227.870 kN (4.09 %)
+C5: 0 de 4
+F: 0 de 18

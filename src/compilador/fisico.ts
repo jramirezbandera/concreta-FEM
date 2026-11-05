@@ -54,7 +54,7 @@ import type { PerfilCatalogo } from "../secciones/seccion3D.ts";
 
 export type Vec2 = readonly [number, number];
 
-export type TipoPlanta = "cubierta" | "planta" | "sotano";
+export type TipoPlanta = "cubierta" | "planta" | "sotano" | "escalon";
 
 export interface Planta {
   id: string;
@@ -63,7 +63,9 @@ export interface Planta {
    * Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, "planta". Sólo
    * cambia el origen de las cotas: la cota 0 es la planta más baja que no es sótano. El cálculo no
    * cambia: con la cimentación como sótano o como planta, los mismos resultados (salvo el redondeo)
-   * con otras cotas.
+   * con otras cotas. "escalon" (MA5) es un forjado a poca altura del de debajo, como el escalón entre
+   * dos cubiertas: la sensatez no avisa de la altura del tramo que llega a él (sí si es nula o
+   * negativa); en lo demás, como "planta".
    */
   tipo?: TipoPlanta;
   /** m, de forjado a forjado hasta la planta de encima; la de arriba del todo no la necesita. */
@@ -312,6 +314,27 @@ export type CargaFisica =
     }
   | {
       /**
+       * Carga lineal uniforme por el borde de una losa (MA4, `bordes.ts`), en kN/m y ejes globales: un
+       * peto, una fachada. Va por su contorno y, con `huecos`, también por el de sus huecos, menos los
+       * tramos de `excepto`; el compilador la lleva como cargas lineales sobre esos tramos, que ya
+       * están en la malla. Sigue a la losa si se cambia su contorno.
+       */
+      tipo: "borde";
+      id: string;
+      caso: string;
+      losa: string;
+      q: Vec3;
+      /** También por el borde de los huecos de la losa. Por defecto, no. */
+      huecos?: boolean;
+      /**
+       * Tramos del borde que no la llevan: un segmento [desde, hasta] (lo del borde que va por él) o
+       * `{ junto }`, lo del borde que toca en planta otra losa o cae sobre ella (el encuentro de dos
+       * cubiertas, aunque estén a otra cota).
+       */
+      excepto?: readonly ExceptoBorde[];
+    }
+  | {
+      /**
        * Empuje sobre un muro (C3-h): presión normal a su cara del lado `lado` (donde está el terreno
        * o el agua), que empuja hacia el otro lado. Vale `p0` a la altura `z0` y `p1` a la `z1` (sobre
        * la base del muro, m), varía linealmente entre ellas y es nula fuera; kN/m². Va sobre el muro
@@ -327,6 +350,9 @@ export type CargaFisica =
       p0: number;
       p1: number;
     };
+
+/** Un tramo del borde sin la carga de borde (MA4): un segmento del borde o lo que toca otra losa. */
+export type ExceptoBorde = readonly [Vec2, Vec2] | { junto: string };
 
 /** Losa maciza (C2): una lámina plana en el plano de su planta. */
 export interface Losa {
@@ -352,10 +378,14 @@ export interface Losa {
   reticular?: Reticular;
 }
 
+/** Ábacos en los pilares de un reticular (MA2): cuadrados de `lado` o rectángulos de `lados` m. */
+export type AbacosPilares = { lado: number } | { lados: readonly [number, number] };
+
 /**
  * Nervios de un forjado reticular (C4, D3), en m, iguales en las dos direcciones. Con ellos el
  * compilador calcula los multiplicadores de la zona aligerada (`reticular.ts`, C4-h). El `pp` de la
- * losa, si se da, es el peso medio de toda ella con los ábacos (C4-i).
+ * losa, si se da, es el de su zona aligerada; los ábacos pesan γ·canto (MA3, desde el 2026-11-05;
+ * antes era el medio de toda la losa con los ábacos).
  */
 export interface Reticular {
   /** Distancia entre ejes de nervios. */
@@ -374,9 +404,18 @@ export interface Reticular {
   caseton?: "hormigon" | "ceramica" | "poliestireno" | "recuperable" | "perdido";
   /**
    * Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su
-   * parte dentro. No pueden solaparse entre sí.
+   * parte dentro. Los que se solapan o quedan a menos de h/2 (la mitad del tamaño de malla) se unen
+   * en su envolvente rectangular según los ejes de la losa, con el aviso `reticular/abacos-unidos`
+   * (MA2, `abacos.ts`; antes de MA2, dos solapados eran un error).
    */
   abacos?: readonly (readonly Vec2[])[];
+  /**
+   * Ábacos en los pilares (MA2): un rectángulo centrado en cada pilar que llega a la losa (en el eje
+   * del tramo que la atraviesa), de `lado` × `lado` m o de `lados` [según el eje1, según su
+   * perpendicular]. Un pilar con el eje dentro de un ábaco de `abacos` no lleva otro. Se unen con los
+   * demás como los de `abacos`. Siguen a los pilares si se mueven.
+   */
+  abacosPilares?: AbacosPilares;
   /**
    * Multiplicadores de la zona aligerada dados por el usuario: sustituyen a los calculados y se
    * aplican sobre la maciza con el ν del material (C4-h). Cada uno en (0, 100].

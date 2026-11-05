@@ -397,7 +397,7 @@ describe("C4: reticular", () => {
     expect(r.hipotesis.some((h) => h.includes("Forjado reticular L"))).toBe(true);
   });
 
-  it("peso propio: γ·volumen en la zona aligerada y γ·h en los ábacos; con pp, el mismo en toda la losa", () => {
+  it("peso propio: γ·volumen en la zona aligerada y γ·h en los ábacos; con pp, el pp en la zona aligerada y γ·h en los ábacos (MA3)", () => {
     const peso = (f: ModeloFisico) => {
       const r = valido(compilar(f));
       const [g] = casosValidos(calcular(r.modelo));
@@ -408,8 +408,8 @@ describe("C4: reticular", () => {
     const v = 25 * volumenReticular({ h: 0.35, hf: 0.05, bw: 0.12, s: 0.82 });
     const abaco = momentosInterseccion({ contorno: rect(0, 0, 6, 6), huecos: [] }, rect(2, 2, 4, 4)).A + 1;
     expect(peso(reticular())).toBeCloseTo(v * (36 - abaco) + 25 * 0.35 * abaco, 8);
-    expect(peso(reticular(4.5))).toBeCloseTo(4.5 * 36, 8);
-    expect(peso(reticular(4.5, undefined, "recuperable"))).toBeCloseTo(4.5 * 36, 8);
+    expect(peso(reticular(4.5))).toBeCloseTo(4.5 * (36 - abaco) + 25 * 0.35 * abaco, 8);
+    expect(peso(reticular(4.5, undefined, "recuperable"))).toBeCloseTo(4.5 * (36 - abaco) + 25 * 0.35 * abaco, 8);
   });
 
   it("con un casetón perdido de otro material el pp es obligatorio (C4-i); sin decirlo, el casetón es de hormigón", () => {

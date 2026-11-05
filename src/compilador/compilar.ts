@@ -19,7 +19,9 @@
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
+import { avisarAbacosUnidos, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
+import { resolverBordes } from "./bordes.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
 import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PERDIDAS } from "./cargas.ts";
@@ -171,7 +173,11 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const fallo = (): ResultadoCompilacion => ({ valido: false, diagnosticos: diag.lista, huella });
 
   camposDesconocidos(fisico, opciones, diag);
-  const ctx = validar(fisico, op, diag);
+  // MA2: los ábacos en los pilares y los que se tocan, unidos, antes de validar
+  const abacos = resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom);
+  avisarAbacosUnidos(abacos.porLosa, op.tamanoMalla / 2, diag);
+  // MA4: las cargas de borde, en lineales por los tramos del borde que las llevan
+  const ctx = validar(resolverBordes(abacos.modelo, op.epsSnap).modelo, op, diag);
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
   avisarApoyosBandas(ctx, diag);
@@ -596,7 +602,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       );
     if (aPilar.length) h.push(`Los apoyos que llegan a la huella de un pilar (${aPilar.join(", ")}) acaban en su cara: lo que cae en la huella, o en la zona rígida de una viga en el pilar, es del pilar.`);
     h.push(
-      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo lo que su ancho no pesa ya como forjado: en una maciza, su descuelgue (C2-g, H24); en un aligerado, también γ·t menos el pp en su ancho, que es macizo (AU-4).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,
+      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos (C4-i, MA3)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo lo que su ancho no pesa ya como forjado: en una maciza, su descuelgue (C2-g, H24); en un aligerado, también γ·t menos el pp en su ancho, que es macizo (AU-4).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,
     );
     for (const l of ctx.losas) {
       const r = l.reticular;

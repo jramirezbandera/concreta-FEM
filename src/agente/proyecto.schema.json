@@ -53,6 +53,46 @@
   ],
   "additionalProperties": false,
   "$defs": {
+    "AbacosPilares": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "lado": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "lado"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lados": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "lados"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Ábacos en los pilares de un reticular (MA2): cuadrados de `lado` o rectángulos de `lados` m."
+    },
     "AccionCaso": {
       "type": "object",
       "properties": {
@@ -629,6 +669,46 @@
           "type": "object",
           "properties": {
             "tipo": {
+              "const": "borde",
+              "description": "Carga lineal uniforme por el borde de una losa (MA4, `bordes.ts`), en kN/m y ejes globales: un\npeto, una fachada. Va por su contorno y, con `huecos`, también por el de sus huecos, menos los\ntramos de `excepto`; el compilador la lleva como cargas lineales sobre esos tramos, que ya\nestán en la malla. Sigue a la losa si se cambia su contorno."
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "losa": {
+              "type": "string"
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "huecos": {
+              "type": "boolean",
+              "description": "También por el borde de los huecos de la losa. Por defecto, no."
+            },
+            "excepto": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptoBorde"
+              },
+              "description": "Tramos del borde que no la llevan: un segmento [desde, hasta] (lo del borde que va por él) o\n`{ junto }`, lo del borde que toca en planta otra losa o cae sobre ella (el encuentro de dos\ncubiertas, aunque estén a otra cota)."
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "losa",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
               "const": "empuje",
               "description": "Empuje sobre un muro (C3-h): presión normal a su cara del lado `lado` (donde está el terreno\no el agua), que empuja hacia el otro lado. Vale `p0` a la altura `z0` y `p1` a la `z1` (sobre\nla base del muro, m), varía linealmente entre ellas y es nula fuera; kN/m². Va sobre el muro\nentero, sin sus huecos."
             },
@@ -734,6 +814,37 @@
       ],
       "additionalProperties": false,
       "description": "Eje de replanteo (I2, `docs/fem3d/interfaz.md` §9): una recta en planta para los alzados, las\nburbujas y las cotas del dibujo, y para nombrar posiciones. Se ve en todas las plantas. El\ncompilador lo ignora, así que no cambia la huella ni los resultados; sin ejes, el dibujo usa los\nque propone `ejes.ts` con las alineaciones de los pilares."
+    },
+    "ExceptoBorde": {
+      "anyOf": [
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/Vec2"
+            },
+            {
+              "$ref": "#/$defs/Vec2"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "object",
+          "properties": {
+            "junto": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "junto"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Un tramo del borde sin la carga de borde (MA4): un segmento del borde o lo que toca otra losa."
     },
     "ExtremoBarra": {
       "type": "object",
@@ -1609,7 +1720,7 @@
         },
         "tipo": {
           "$ref": "#/$defs/TipoPlanta",
-          "description": "Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, \"planta\". Sólo\ncambia el origen de las cotas: la cota 0 es la planta más baja que no es sótano. El cálculo no\ncambia: con la cimentación como sótano o como planta, los mismos resultados (salvo el redondeo)\ncon otras cotas."
+          "description": "Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, \"planta\". Sólo\ncambia el origen de las cotas: la cota 0 es la planta más baja que no es sótano. El cálculo no\ncambia: con la cimentación como sótano o como planta, los mismos resultados (salvo el redondeo)\ncon otras cotas. \"escalon\" (MA5) es un forjado a poca altura del de debajo, como el escalón entre\ndos cubiertas: la sensatez no avisa de la altura del tramo que llega a él (sí si es nula o\nnegativa); en lo demás, como \"planta\"."
         },
         "altura": {
           "type": [
@@ -1802,7 +1913,11 @@
               "$ref": "#/$defs/Vec2"
             }
           },
-          "description": "Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su\nparte dentro. No pueden solaparse entre sí."
+          "description": "Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su\nparte dentro. Los que se solapan o quedan a menos de h/2 (la mitad del tamaño de malla) se unen\nen su envolvente rectangular según los ejes de la losa, con el aviso `reticular/abacos-unidos`\n(MA2, `abacos.ts`; antes de MA2, dos solapados eran un error)."
+        },
+        "abacosPilares": {
+          "$ref": "#/$defs/AbacosPilares",
+          "description": "Ábacos en los pilares (MA2): un rectángulo centrado en cada pilar que llega a la losa (en el eje\ndel tramo que la atraviesa), de `lado` × `lado` m o de `lados` [según el eje1, según su\nperpendicular]. Un pilar con el eje dentro de un ábaco de `abacos` no lleva otro. Se unen con los\ndemás como los de `abacos`. Siguen a los pilares si se mueven."
         },
         "multiplicadores": {
           "$ref": "#/$defs/MultiplicadoresLamina",
@@ -1815,7 +1930,7 @@
         "capa"
       ],
       "additionalProperties": false,
-      "description": "Nervios de un forjado reticular (C4, D3), en m, iguales en las dos direcciones. Con ellos el\ncompilador calcula los multiplicadores de la zona aligerada (`reticular.ts`, C4-h). El `pp` de la\nlosa, si se da, es el peso medio de toda ella con los ábacos (C4-i)."
+      "description": "Nervios de un forjado reticular (C4, D3), en m, iguales en las dos direcciones. Con ellos el\ncompilador calcula los multiplicadores de la zona aligerada (`reticular.ts`, C4-h). El `pp` de la\nlosa, si se da, es el de su zona aligerada; los ábacos pesan γ·canto (MA3, desde el 2026-11-05;\nantes era el medio de toda la losa con los ábacos)."
     },
     "Seccion": {
       "anyOf": [
@@ -2001,6 +2116,7 @@
     "TipoPlanta": {
       "enum": [
         "cubierta",
+        "escalon",
         "planta",
         "sotano"
       ]

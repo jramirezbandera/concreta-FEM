@@ -10,6 +10,8 @@
  *
  * Puro: sin IO.
  */
+import { resolverAbacos } from "../../compilador/abacos.ts";
+import { tramosBorde } from "../../compilador/bordes.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { ejePilar, ejeSeccion, medidasSeccion } from "../../compilador/puntoFijo.ts";
 import { puntoEnPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "../../compilador/poligonos.ts";
@@ -36,7 +38,9 @@ export class PlantaFisica {
   private readonly cotas: (number | null)[];
 
   constructor(f: ModeloFisico, planta: string) {
-    this.f = f;
+    // MA2: los ábacos que usa el compilador (los de los pilares y los unidos)
+    this.f = resolverAbacos(f).modelo;
+    f = this.f;
     this.id = planta;
     (f.plantas ?? []).forEach((p, i) => this.indice.set(p.id, i));
     this.k = this.indice.get(planta) ?? -1;
@@ -636,6 +640,18 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         rot(p, g.id, valorCarga(g.q, "kN/m"), { giro: giroTexto(dir), ancla: "medio", dy: -8 });
         return;
       }
+      case "borde": {
+        // MA4: por los tramos del borde que la llevan, rotulada en el más largo
+        if (f.losas?.find((l) => l.id === g.losa)?.planta !== planta) return;
+        const tramos = tramosBorde(f, g) ?? [];
+        for (const t of tramos) poner({ tipo: "linea", puntos: t, estilo: "carga-lineal", objeto: g.id });
+        const largo = tramos.reduce<Vec2[] | null>((m, t) => (!m || longitud(t) > longitud(m) ? t : m), null);
+        if (largo) {
+          const { p, d: dir } = puntoEnPolilinea(largo, longitud(largo) / 2);
+          rot(p, g.id, `${valorCarga(g.q, "kN/m")} (borde)`, { giro: giroTexto(dir), ancla: "medio", dy: -8 });
+        }
+        return;
+      }
       case "puntual": {
         if (g.planta !== planta) return;
         const F = g.F ?? [0, 0, 0];
@@ -728,6 +744,10 @@ export function situar(pl: PlantaFisica, id: string): Vec2 | null {
         return situar(pl, g.losa ?? g.pano ?? "");
       case "lineal":
         return g.planta === pl.id ? puntoEnPolilinea(g.puntos, longitud(g.puntos) / 2).p : null;
+      case "borde": {
+        const t = f.losas?.find((l) => l.id === g.losa)?.planta === pl.id ? tramosBorde(f, g)?.[0] : undefined;
+        return t ? puntoEnPolilinea(t, longitud(t) / 2).p : null;
+      }
       case "puntual":
         return g.planta === pl.id ? [g.x, g.y] : null;
       case "viga":

@@ -81,12 +81,13 @@ export const viguetaPesable = (t: ViguetaT, intereje: number): boolean => t.bw >
 
 /**
  * El pp de una losa en su zona maciza o aligerada y en sus ábacos (C4-i), con γ el peso específico
- * de su material: el `pp` escrito (en las dos), γ·canto en una maciza y, en un reticular, el de su
- * casetón (y γ·h en los ábacos). undefined si es un reticular con casetón "perdido" sin `pp`.
+ * de su material: en una maciza, el `pp` escrito o γ·canto; en un reticular, el `pp` escrito o el de
+ * su casetón en la zona aligerada, y γ·h en los ábacos (MA3). undefined si es un reticular con casetón "perdido" sin `pp`.
  */
 export function ppLosa(l: Losa, gamma: number): { pp: number; ppAbaco: number } | undefined {
-  if (l.pp !== undefined) return { pp: l.pp, ppAbaco: l.pp };
   const maciza = gamma * l.espesor;
+  // MA3 (MA-b): en un reticular, el pp escrito es el de la zona aligerada; los ábacos, γ·h
+  if (l.pp !== undefined) return { pp: l.pp, ppAbaco: l.reticular ? maciza : l.pp };
   if (!l.reticular) return { pp: maciza, ppAbaco: maciza };
   const r = l.reticular;
   const d = pesoReticular({ h: l.espesor, hf: r.capa, bw: r.nervio, s: r.intereje }, gamma, r.caseton);

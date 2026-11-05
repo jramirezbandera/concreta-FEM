@@ -39,6 +39,7 @@ const TIPOS: readonly [TipoPlanta | "", string][] = [
   ["", "planta"],
   ["sotano", "sótano"],
   ["cubierta", "cubierta"],
+  ["escalon", "escalón"],
 ];
 
 type Modo = "inicio" | "anadir" | "datos";
@@ -458,7 +459,7 @@ function Alzado({ plantas, nuevas, elegida, onElegir }: { plantas: readonly Plan
           const nueva = nuevas.has(p.id);
           const sel = p.id === elegida;
           const arriba = i > 0 ? ys[i - 1]! : null;
-          const sub = nueva ? "nueva" : p.nombre ? p.nombre : i === ultima ? "cimentación" : p.tipo && p.tipo !== "planta" ? (p.tipo === "sotano" ? "sótano" : p.tipo) : null;
+          const sub = nueva ? "nueva" : p.nombre ? p.nombre : i === ultima ? "cimentación" : p.tipo && p.tipo !== "planta" ? (p.tipo === "sotano" ? "sótano" : p.tipo === "escalon" ? "escalón" : p.tipo) : null;
           return (
             <g
               key={p.id}

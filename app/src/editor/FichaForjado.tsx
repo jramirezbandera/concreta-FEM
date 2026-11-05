@@ -60,7 +60,7 @@ export function PesoForjado({ fila, ctx, escribir }: Props) {
       )}
       {escrito !== undefined && Number.isFinite(escrito) && (
         <p className="mt-1">
-          Manda el escrito, {n(escrito, 2)} kN/m²{tipo === "reticular" ? ", en todo el forjado con los ábacos" : ""}.{" "}
+          Manda el escrito, {n(escrito, 2)} kN/m²{tipo === "reticular" ? ", en la zona aligerada (los ábacos, γ·canto)" : ""}.{" "}
           <button type="button" className="text-accent hover:underline" onClick={() => escribir("pp", "")}>
             Usar el calculado
           </button>

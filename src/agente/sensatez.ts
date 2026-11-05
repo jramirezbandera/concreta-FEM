@@ -15,6 +15,7 @@
  *
  * Unidades kN y m (D1); fck en MPa; pesos específicos en kN/m³. Puro: sin IO.
  */
+import { resolverAbacos, TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { direccionEjes } from "../compilador/ejes.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
@@ -22,7 +23,7 @@ import { puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { cuerdaHuella, distanciaAHuella, huellaPilar } from "../compilador/geometria2d.ts";
 import { compilarSeccion } from "../compilador/secciones.ts";
-import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesCompilacion, PanoUnidireccional, Seccion, Vec2 } from "../compilador/fisico.ts";
+import { TAMANO_MALLA, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type OpcionesCompilacion, type PanoUnidireccional, type Seccion, type Vec2 } from "../compilador/fisico.ts";
 import { ppLosa as ppLosaFisica, ppPano } from "../compilador/pesoForjado.ts";
 import { areaConSigno, momentosInterseccion, puntoEnRegion, recorteRegionConvexo, type Region } from "../compilador/poligonos.ts";
 import { TIRA_MAXIMA } from "../compilador/anchosVigas.ts";
@@ -272,7 +273,9 @@ function datos(f: ModeloFisico): Registro[] {
   f.plantas.forEach((p, i) => {
     if (i === 0 || p.altura === null) return; // la de arriba del todo no la usa
     const ultima = i === f.plantas.length - 1;
-    const r: [number, number] = ultima ? [0, U.altura[1]] : [U.altura[0], U.altura[1]];
+    // MA5: el tramo que llega a un escalón (dos cubiertas a poca altura) sólo tiene que ser positivo
+    const escalon = f.plantas[i - 1]!.tipo === "escalon";
+    const r: [number, number] = escalon ? [0.01, U.altura[1]] : ultima ? [0, U.altura[1]] : [U.altura[0], U.altura[1]];
     // UI-15: la altura de una planta es la del tramo hasta la de encima; el aviso dice el tramo
     const arriba = f.plantas[i - 1]!.id;
     alt.peor(salida(p.altura, r), `${p.id}–${arriba}: ${num(p.altura)} m`);
@@ -370,6 +373,7 @@ function verticales(c: CargaFisica): number[] {
       return c.F ? [c.F[2]] : [];
     case "superficie":
     case "lineal":
+    case "borde":
       return [c.q[2]];
     case "viga": // z local = +Z
       return [c.q[2], ...(c.qb ? [c.qb[2]] : [])];
@@ -611,7 +615,9 @@ export function pesoLibre(f: ModeloFisico, planta: string, q: Vec2, h: number, g
  * entre dos niveles (fase BN) pesa γ·A por su longitud real, en la planta de su extremo alto salvo su
  * zona rígida en el extremo bajo (CB-f, la que el compilador lleva al nudo de esa planta).
  */
-export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omit<PesoPropioPlanta, "calculado">[] {
+export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, toleranciaAbacos = TOLERANCIA_ABACOS): Omit<PesoPropioPlanta, "calculado">[] {
+  // MA2: con los ábacos que usa el compilador (los de los pilares y los unidos)
+  f = resolverAbacos(f, toleranciaAbacos).modelo;
   const material = new Map(f.materiales.map((m) => [m.id, m]));
   const seccion = new Map(f.secciones.map((s) => [s.id, s]));
   const conBarras = !!f.barras?.length;
@@ -775,7 +781,7 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
   const caso = f.casos.find((c) => c.pesoPropio);
   if (!caso) return { registro: reg, desglose: null };
   const calc = pesoPropioCalculado(f, opciones);
-  const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P, opciones?.epsSnap).map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
+  const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P, opciones?.epsSnap, (opciones?.tamanoMalla ?? TAMANO_MALLA) / 2).map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
   const total = { pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, ...(f.barras?.length ? { barras: 0 } : {}), solapes: 0, esperado: 0, calculado: calc ? 0 : null } as DesglosePesoPropio["total"];
   for (const x of plantas) {
     for (const k of ["pilares", "vigas", "losas", "panos", "muros", "solapes", "esperado"] as const) total[k] += x[k];

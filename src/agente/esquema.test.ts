@@ -115,7 +115,7 @@ describe("mensajes del validador", () => {
     expect(d.map((x) => x.codigo)).toEqual(["esquema/campo-desconocido"]);
     expect(d[0]!.mensaje).toContain('"loza" no es un campo de CargaFisica; ¿quería decir "losa"?');
     const e = errores((f) => (f.cargas as unknown[]).push({ tipo: "puntal", id: "p1", caso: "Q", planta: "P1", x: 0, y: 0 }));
-    expect(e[0]!.mensaje).toContain('vale "puntal", que no es ninguno de los admitidos: "puntual", "viga", "pilar", "barra", "superficie", "lineal", "empuje"');
+    expect(e[0]!.mensaje).toContain('vale "puntal", que no es ninguno de los admitidos: "puntual", "viga", "pilar", "barra", "superficie", "lineal", "borde", "empuje"');
     expect(e[0]!.ids).toEqual(["p1"]);
   });
 
@@ -123,7 +123,7 @@ describe("mensajes del validador", () => {
     expect(errores((f) => ((f.vigas![0] as unknown as Record<string, unknown>).puntos = [[0, 0], [6, 0, 1]]))[0]!.mensaje).toBe("En modelo.vigas[0].puntos[1] (Viga X0P1): tiene 3 elementos y admite 2.");
     expect(errores((f) => ((f.pilares![0] as unknown as Record<string, unknown>).x = "0"))[0]!.mensaje).toBe('En modelo.pilares[0].x (Pilar A): tiene que ser un número y es un texto ("0").');
     expect(errores((f) => ((f.plantas[1] as unknown as Record<string, unknown>).altura = "3"))[0]!.mensaje).toBe('En modelo.plantas[1].altura (Planta P1): tiene que ser un número o null y es un texto ("3").');
-    expect(errores((f) => ((f.plantas[1] as unknown as Record<string, unknown>).tipo = "garaje"))[0]!.mensaje).toBe('En modelo.plantas[1].tipo (Planta P1): vale "garaje", que no es ninguno de los admitidos: "cubierta", "planta", "sotano".');
+    expect(errores((f) => ((f.plantas[1] as unknown as Record<string, unknown>).tipo = "garaje"))[0]!.mensaje).toBe('En modelo.plantas[1].tipo (Planta P1): vale "garaje", que no es ninguno de los admitidos: "cubierta", "escalon", "planta", "sotano".');
   });
 
   it("opciones mal escritas", () => {

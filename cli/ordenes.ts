@@ -25,6 +25,7 @@ import { aplanarDxf } from "../src/dxf/aplanar.ts";
 import { ErrorDxf, leerDxf } from "../src/dxf/lector.ts";
 import { serializar } from "../src/editor/serializar.ts";
 import { proponerAlinear, textoGrupo, TOLERANCIA_ALINEAR } from "../src/editor/alinear.ts";
+import { operacionVigasBorde, proponerVigasBorde } from "../src/editor/vigasBorde.ts";
 import { aplicar } from "../src/editor/operaciones.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
@@ -59,7 +60,7 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "vista", "escala", "armadura", "envolvente", "salida", "capa-pilares", "capa-losas", "capa-ejes", "unidades", "planta-losas", "material", "espesor", "lado-maximo", "nombre", "tolerancia"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "vista", "escala", "armadura", "envolvente", "salida", "capa-pilares", "capa-losas", "capa-ejes", "unidades", "planta-losas", "material", "espesor", "lado-maximo", "nombre", "tolerancia", "ancho", "canto"]);
 const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda", "escribir"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
@@ -103,6 +104,9 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem alinear <proyecto.json> [--tolerancia 0.03] [--escribir]
       pilares y vértices casi alineados según los ejes (a menos de la tolerancia, en m, sin coincidir) y adónde los llevaría;
       sólo propone: con --escribir, los mueve y reescribe el proyecto (deja el de antes en <proyecto>.json.bak)
+  fem vigas-borde <proyecto.json> [--losa L]… [--ancho 0.30] [--canto <el de la losa>] [--escribir]
+      los zunchos de los bordes libres de cada losa, como «Vigas de borde» del editor (por el eje de los pilares del lado o enrasados por fuera);
+      sólo propone: con --escribir, los pone y reescribe el proyecto (deja el de antes en <proyecto>.json.bak)
   fem esquema
   fem visor <proyecto.json> [--nuevo]      abre la app sobre el proyecto (no escribe JSON; Ctrl+C la cierra)
 
@@ -477,6 +481,8 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       return importarDxfOrden(a, mal);
     case "alinear":
       return alinearOrden(a, mal);
+    case "vigas-borde":
+      return vigasBordeOrden(a, mal);
     case "seleccion": {
       const l = leer(orden, a.posicionales[0]);
       if ("codigo" in l) return l;
@@ -601,6 +607,57 @@ function alinearOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
   writeFileSync(`${l.ruta}.bak`, readFileSync(l.ruta));
   writeFileSync(l.ruta, serializar(r.proyecto), "utf8");
   const c = compilar(r.proyecto.modelo, r.proyecto.opciones);
+  Object.assign(json, { escrito: true, proyecto: rel(l.ruta), copia: rel(`${l.ruta}.bak`), huella: c.huella, valido: c.valido, ...listaDiagnosticos(c.diagnosticos.filter((x) => x.severidad === "error")) });
+  return { codigo: CODIGO.bien, json };
+}
+
+/**
+ * `fem vigas-borde` (MA, `docs/fem3d/modelado.md` §8): «Vigas de borde» del editor
+ * (`proponerVigasBorde`) en todas las losas o en las de `--losa`, con la sección ancho × canto (por
+ * defecto, 0,30 × el canto de cada losa). Como `fem alinear`, sólo propone; con `--escribir`, aplica
+ * las vigas, deja el fichero de antes en `.bak` y escribe el formato canónico.
+ */
+function vigasBordeOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
+  const orden = "vigas-borde";
+  const l = leer(orden, a.posicionales[0]);
+  if ("codigo" in l) return l;
+  const num = (k: string): number | null | undefined => {
+    const t = a.banderas.get(k)?.at(-1);
+    if (t === undefined) return undefined;
+    const x = Number(t.replace(",", "."));
+    return Number.isFinite(x) && x > 0 && x <= 3 ? x : null;
+  };
+  const [ancho, canto] = [num("ancho"), num("canto")];
+  if (ancho === null || canto === null) return mal("--ancho y --canto tienen que ser números positivos, en m (como mucho 3).");
+  const todas = l.proyecto.modelo.losas ?? [];
+  const pedidas = a.banderas.get("losa") ?? todas.map((x) => x.id);
+  const faltan = pedidas.filter((id) => !todas.some((x) => x.id === id));
+  if (faltan.length) return mal(`No hay ninguna losa ${faltan.map((x) => `«${x}»`).join(", ")}.`);
+  let proyecto = l.proyecto;
+  const losas: Record<string, unknown>[] = [];
+  for (const id of pedidas) {
+    const losa = proyecto.modelo.losas!.find((x) => x.id === id)!;
+    const p = proponerVigasBorde(proyecto.modelo, id, ancho ?? 0.3, canto ?? losa.espesor);
+    if ("error" in p) {
+      losas.push({ losa: id, error: p.error });
+      continue;
+    }
+    losas.push({ losa: id, seccion: p.seccion.id, ...(p.nueva ? { seccionNueva: p.seccion } : {}), vigas: p.vigas.map((v) => ({ id: v.id, puntos: v.puntos, regla: v.regla, ...(v.pilares.length ? { pilares: v.pilares } : {}) })), ...(p.avisos.length ? { avisos: p.avisos } : {}) });
+    // Las de cada losa, sobre el proyecto con las de las anteriores: sus ids y su sección no se repiten
+    const op = operacionVigasBorde(proyecto.modelo, p);
+    if (!op) continue;
+    const r = aplicar(proyecto, op);
+    if (!r.ok) return { codigo: CODIGO.errores, json: { orden, ok: false, escrito: false, losas, ...listaDiagnosticos(r.errores) } };
+    proyecto = r.proyecto;
+  }
+  const json: Record<string, unknown> = { orden, ok: true, losas };
+  if (!a.banderas.has("escribir") || proyecto === l.proyecto) {
+    json.escrito = false;
+    return { codigo: CODIGO.bien, json };
+  }
+  writeFileSync(`${l.ruta}.bak`, readFileSync(l.ruta));
+  writeFileSync(l.ruta, serializar(proyecto), "utf8");
+  const c = compilar(proyecto.modelo, proyecto.opciones);
   Object.assign(json, { escrito: true, proyecto: rel(l.ruta), copia: rel(`${l.ruta}.bak`), huella: c.huella, valido: c.valido, ...listaDiagnosticos(c.diagnosticos.filter((x) => x.severidad === "error")) });
   return { codigo: CODIGO.bien, json };
 }

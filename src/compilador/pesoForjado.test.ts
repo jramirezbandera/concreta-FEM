@@ -103,14 +103,16 @@ describe("el peso propio que sale solo", () => {
     }
   });
 
-  it("con ábacos, lo aligerado pesa el del casetón y los ábacos γ·canto; un pp escrito, en toda la losa (C4-i)", () => {
+  it("con ábacos, lo aligerado pesa el del casetón y los ábacos γ·canto; un pp escrito es el de lo aligerado (MA3)", () => {
     const f = reticular({ abacos: true });
     const l = f.losas![0]!;
     const pp = pesoReticular({ h: 0.3, hf: 0.05, bw: 0.12, s: 0.8 }, 25)!.pp;
     expect(ppLosa(l, 25)).toEqual({ pp, ppAbaco: 25 * 0.3 });
     expect(pesoLosa(l, f.materiales[0]!)).toBeCloseTo(pp * 32 + 25 * 0.3 * 4, 9);
-    expect(ppLosa({ ...l, pp: 4.5 }, 25)).toEqual({ pp: 4.5, ppAbaco: 4.5 });
+    expect(ppLosa({ ...l, pp: 4.5 }, 25)).toEqual({ pp: 4.5, ppAbaco: 25 * 0.3 });
     expect(compilar(f).valido).toBe(true);
+    // Con ábacos, sin pp da el mismo modelo que con el pp calculado escrito (antes de MA3, no)
+    expect(JSON.stringify(valido(compilar(f)).modelo)).toBe(JSON.stringify(valido(compilar(reticular({ abacos: true, pp }))).modelo));
   });
 
   it("un paño sin pp con una vigueta que no es una T no compila, y lo dice", () => {

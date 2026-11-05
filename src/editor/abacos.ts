@@ -7,15 +7,15 @@
  * - Llega al forjado un pilar que pasa por su planta (también si arranca o acaba en ella) y cuyo eje
  *   está en el forjado (dentro o en su borde, no en un hueco).
  * - Un pilar cuyo eje ya está en un ábaco se deja como está.
- * - Un ábaco nuevo que se solaparía con otro (nuevo o de antes) no se crea: el compilador no admite
- *   ábacos solapados.
+ * - Un ábaco nuevo que se solaparía con otro (nuevo o de antes) no se crea. (Desde MA2 el compilador
+ *   une los que se tocan, y `reticular.abacosPilares` los pone él solo en cada pilar, sin esta orden.)
  * - Un ábaco puede salirse del forjado (cuenta su parte dentro): se dice, sin más.
  *
  * Puro: sin IO.
  */
 import type { Losa, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
-import { areaConSigno, areaInterseccionRegiones, distanciaABorde, puntoEnPoligono, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
-import { ejeSeccion } from "../compilador/puntoFijo.ts";
+import { pilaresEnLosa, rectanguloAbaco } from "../compilador/abacos.ts";
+import { areaConSigno, areaInterseccionRegiones, puntoEnPoligono, type Region } from "../compilador/poligonos.ts";
 import type { Operacion } from "./operaciones.ts";
 
 export interface PropuestaAbacos {
@@ -30,7 +30,6 @@ export interface PropuestaAbacos {
   fuera: string[];
 }
 
-const r6 = (v: number) => Math.round(v * 1e6) / 1e6 + 0;
 const region = (p: readonly Vec2[]): Region => ({ contorno: p, huecos: [] });
 
 /** Los ábacos de `a` × `b` m (según los nervios y su perpendicular) en los pilares que llegan al reticular `losaId`. */
@@ -39,35 +38,25 @@ export function proponerAbacos(m: ModeloFisico, losaId: string, a: number, b: nu
   if (!l) return { error: `No hay ninguna losa «${losaId}».` };
   if (!l.reticular) return { error: `${losaId} no es un forjado reticular: sólo los reticulares tienen ábacos.` };
   if (!(a > 0 && b > 0)) return { error: "El ábaco tiene que tener las dos medidas mayores que 0." };
-  const ids = m.plantas.map((p) => p.id);
-  const k = ids.indexOf(l.planta);
   const R: Region = { contorno: l.contorno, huecos: l.huecos ?? [] };
-  const enForjado = (q: Vec2) => (puntoEnRegion(q, R) || distanciaABorde(q, l.contorno) < 1e-6) && !(l.huecos ?? []).some((h) => puntoEnPoligono(q, h) && distanciaABorde(q, h) > 1e-6);
   const g = ((l.eje1 ?? 0) * Math.PI) / 180;
   const d: Vec2 = [Math.cos(g), Math.sin(g)];
   const n: Vec2 = [-d[1], d[0]];
   const existentes = (l.reticular.abacos ?? []).map((p) => p as Vec2[]);
   const r: PropuestaAbacos = { losa: losaId, nuevos: [], conAbaco: [], solapados: [], fuera: [] };
-  for (const p of m.pilares ?? []) {
-    // Las plantas van de arriba abajo: el pilar ocupa de la de su cabeza (hasta) a la de su base (desde)
-    const [ia, ib] = [ids.indexOf(p.hasta), ids.indexOf(p.desde)];
-    if (ia < 0 || ib < 0 || k < Math.min(ia, ib) || k > Math.max(ia, ib)) continue;
-    // El ábaco, centrado en el eje del tramo que atraviesa el forjado (o, en la planta de su base, el de encima; PF)
-    const cabeza = ids[k === ib ? k - 1 : k];
-    const c = ejeSeccion(p, m.secciones.find((x) => x.id === (p.tramos?.find((t) => t.planta === cabeza)?.seccion ?? p.seccion)));
-    if (!enForjado(c)) continue;
+  // Los pilares que llegan al forjado, con el eje del tramo que lo atraviesa (la regla de MA2)
+  for (const { pilar, eje: c } of pilaresEnLosa(m, l)) {
     if (existentes.some((e) => puntoEnPoligono(c, e))) {
-      r.conAbaco.push(p.id);
+      r.conAbaco.push(pilar);
       continue;
     }
-    const v = (s: number, t: number): Vec2 => [r6(c[0] + (s * a * d[0] + t * b * n[0]) / 2), r6(c[1] + (s * a * d[1] + t * b * n[1]) / 2)];
-    const poligono = [v(-1, -1), v(1, -1), v(1, 1), v(-1, 1)];
+    const poligono = rectanguloAbaco(c, a, b, d, n);
     if ([...existentes, ...r.nuevos.map((x) => x.poligono)].some((e) => areaInterseccionRegiones(region(e), region(poligono)) > 1e-9)) {
-      r.solapados.push(p.id);
+      r.solapados.push(pilar);
       continue;
     }
-    r.nuevos.push({ pilar: p.id, poligono });
-    if (areaInterseccionRegiones(R, region(poligono)) < Math.abs(areaConSigno(poligono)) - 1e-9) r.fuera.push(p.id);
+    r.nuevos.push({ pilar, poligono });
+    if (areaInterseccionRegiones(R, region(poligono)) < Math.abs(areaConSigno(poligono)) - 1e-9) r.fuera.push(pilar);
   }
   return r;
 }

@@ -69,6 +69,7 @@ export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
       }
       if (c.tipo === "superficie") return { ...c, q: t.v(c.q), zona: c.zona?.map(t.p) };
       if (c.tipo === "lineal") return { ...c, q: t.v(c.q), puntos: c.puntos.map(t.p) };
+      if (c.tipo === "borde") return { ...c, q: t.v(c.q), ...(c.excepto ? { excepto: c.excepto.map((e) => (Array.isArray(e) ? ([t.p(e[0] as Vec2), t.p(e[1] as Vec2)] as const) : e)) } : {}) };
       if (c.tipo === "empuje") return c;
       return c.ejes === "global" ? { ...c, q: t.v(c.q), qb: v3(c.qb) } : c;
     }),

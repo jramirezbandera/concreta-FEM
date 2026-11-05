@@ -7,6 +7,8 @@ import { PSI_NOMBRES, type PsiNombrado } from "../combinaciones/psi.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
+import { ladosAbacos } from "./abacos.ts";
+import { problemaBorde } from "./bordes.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type Barra, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
 import { BOVEDILLAS, CASETONES, desglosePano, pesoReticular } from "./pesoForjado.ts";
@@ -407,7 +409,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   const planta = new Map<string, number>();
   plantas.forEach((p, i) => {
     planta.set(p.id, i);
-    if (p.tipo !== undefined && p.tipo !== "cubierta" && p.tipo !== "planta" && p.tipo !== "sotano") mal(p.id, "el tipo de planta tiene que ser cubierta, planta o sotano");
+    if (p.tipo !== undefined && p.tipo !== "cubierta" && p.tipo !== "planta" && p.tipo !== "sotano" && p.tipo !== "escalon") mal(p.id, "el tipo de planta tiene que ser cubierta, planta, sotano o escalon");
     if (p.altura !== null && !(num(p.altura) && p.altura >= 0)) mal(p.id, "la altura tiene que ser un número ≥ 0 (o null si falta)");
     if (p.diafragma !== undefined && p.diafragma !== "rigido" && p.diafragma !== "ninguno") mal(p.id, "el diafragma tiene que ser rigido o ninguno");
   });
@@ -645,7 +647,12 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       if (c.lado !== "izquierdo" && c.lado !== "derecho") mal(c.id, "el lado tiene que ser izquierdo o derecho");
       if (![c.z0, c.z1, c.p0, c.p1].every(num)) mal(c.id, "z0, z1, p0 y p1 tienen que ser números (m y kN/m²)");
       else if (!(c.z1 > c.z0)) mal(c.id, "z1 tiene que ser mayor que z0");
-    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga, pilar, barra, superficie, lineal o empuje");
+    } else if (c.tipo === "borde") {
+      // MA4: las que se pueden resolver llegan como lineales (`resolverBordes`); ésta no
+      const p = problemaBorde(fisico, c);
+      if (p?.startsWith("no hay ninguna losa") || p?.startsWith("excepto: no hay")) diag.error("fisico/referencia", `${c.id}: ${p}.`, [c.id]);
+      else mal(c.id, p ?? "la carga de borde se queda sin ningún tramo: sus excepciones cubren todo el borde");
+    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga, pilar, barra, superficie, lineal, borde o empuje");
   }
 
   // Losas, apoyos lineales y bandas (C2)
@@ -744,7 +751,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
         dados,
         ...(uniforme ? { abaco: { multiplicadores: multiplicadoresAbacoUniforme(nu), nu: 0 } } : {}),
         ppAligerada,
-        ppAbaco: l.pp ?? peso * l.espesor,
+        ppAbaco: peso * l.espesor,
         abacos: reticular.abacos,
       },
     });
@@ -1071,7 +1078,7 @@ const MULTIPLICADORES = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"]
 function validarReticular(l: Losa, region: Region, mal: (id: string, que: string) => void, op: OpcionesResueltas, diag: Diagnosticos): { abacos: Vec2[][] } | null {
   const r = l.reticular as unknown;
   if (!esObjeto(r)) {
-    mal(l.id, "el reticular tiene que ser { intereje, nervio, capa, caseton?, abacos?, multiplicadores? }");
+    mal(l.id, "el reticular tiene que ser { intereje, nervio, capa, caseton?, abacos?, abacosPilares?, multiplicadores? }");
     return null;
   }
   let bien = true;
@@ -1089,7 +1096,7 @@ function validarReticular(l: Losa, region: Region, mal: (id: string, que: string
   else if (r.caseton === "perdido" && l.pp === undefined)
     diag.error(
       "reticular/sin-pp",
-      `${l.id}: un reticular con caseton: "perdido" (de un material sin decir) necesita su peso propio pp (C4-i). Dé el pp medio de la losa con los ábacos o diga el casetón ("hormigon", "ceramica", "poliestireno" o "recuperable") y el peso saldrá de él.`,
+      `${l.id}: un reticular con caseton: "perdido" (de un material sin decir) necesita su peso propio pp (C4-i). Dé el pp de la zona aligerada (los ábacos pesan γ·canto) o diga el casetón ("hormigon", "ceramica", "poliestireno" o "recuperable") y el peso saldrá de él.`,
       [l.id],
     );
   if (r.multiplicadores !== undefined) {
@@ -1097,6 +1104,8 @@ function validarReticular(l: Losa, region: Region, mal: (id: string, que: string
     if (!esObjeto(m) || Object.keys(m).some((k) => !(MULTIPLICADORES as readonly string[]).includes(k)) || Object.values(m).some((x) => x !== undefined && !(num(x) && x > 0 && x <= 100)))
       no(`los multiplicadores del reticular van por ${MULTIPLICADORES.join(", ")}, cada uno en (0, 100]`);
   }
+  // MA2: `abacosPilares` lo resuelve `resolverAbacos` antes de validar; si sigue aquí, está mal formado
+  if (r.abacosPilares !== undefined) no(ladosAbacos(r.abacosPilares as never) ? "los ábacos en los pilares no se pudieron poner (los ábacos dados o la losa están mal formados)" : "los ábacos en los pilares (abacosPilares) tienen que ser { lado } o { lados: [a, b] }, con medidas > 0 (m)");
   const abacos = r.abacos ?? [];
   if (!Array.isArray(abacos)) {
     no("los ábacos tienen que ser una lista de polígonos");

@@ -155,3 +155,50 @@ A petición del usuario, MA1 y MA6 van antes que MA2–MA5 (y antes de la puerta
 **Pruebas:** `src/editor/alinear.test.ts` (lo anterior, más enrasados, tramo casi recto, eje guardado, estaciones de muro, vértices que se juntan y la tolerancia), `src/agente/cli.test.ts` («MA5: alinear», la CLI en un proceso aparte) y `app/src/test/editor.test.tsx` («Alinear (MA5)»). El sondeo de los modelos de referencia, en `validacion/ma/sondeo.ts`.
 
 **Queda de MA5:** el escalón de cubierta (`"tipo": "escalon"`). **Para la puerta de uso:** con el proyecto «51», ver que tras «Alinear» la malla queda sin racimos.
+
+
+## 8. MA2, MA3, MA4 y el escalón de MA5, hechos (2026-11-05)
+
+En el orden de MA-a (MA3, MA2, MA4, MA5). Lo que cambia de lo que decía §2, y por qué, va marcado **(cambio)**.
+
+### 8.1 MA3 — el `pp` escrito de un reticular es el de su zona aligerada
+
+- **Regla** (`pesoForjado.ts`, `validar.ts`): en un reticular, el `pp` escrito es el de la zona aligerada y los ábacos pesan γ·canto. **(cambio)** MA-b lo decía «con casetón perdido»; se aplica a todos los casetones, porque desde el 2026-10-28 el pp calculado (el que sale sin `pp`) ya es el de la zona aligerada con cualquier casetón, y Propiedades compara el escrito con él («Usar el calculado»): con dos significados según el casetón, esa comparación no tendría sentido. Con casetón recuperable y `pp` escrito, antes los ábacos pesaban el `pp`; ahora γ·h.
+- Lo dicen el comentario del campo (y con él el esquema), la tabla Forjados, la plantilla de Forjado, Propiedades, la hipótesis del compilador, el error `reticular/sin-pp` y la skill. La sensatez de A3 y la tributaria usan las mismas funciones.
+- **La vivienda**, sin sus 21 cargas de +3 kN/m² en los ábacos (`PPA-*`). **Criterio 3, medido** (`validacion/ma/volcar.ts` y `comparar.ts`, el «antes» con un worktree en el commit anterior, HR-8): la misma malla; Q y N, idénticos (7e-15); **G, −19,37 kN (−0,88 %)**, no a 1e-9. Es un error del modelo de antes, no de MA3: esas cargas caían también en el ancho de las vigas, que desde AU-4 ya pesa macizo (la viga se descuenta (b/2)·pp por lado, hasta γ·(b/2)·min(h, t)), así que el ancho de viga dentro de los ábacos pesaba 3 kN/m² de más. Comprobado: el área de las bandas de las vigas dentro de los ábacos y de la losa es 6,4525 m², × 3 = 19,36 kN (a 0,06 %).
+- **El muestrario** (L2, `pp` 4,6 con 12 ábacos y sin cargas en ellos): sus ábacos pasan de pesar 4,6 a 7,5 kN/m². **El usuario tiene que confirmar** que 4,6 es el peso de su zona aligerada (MA-b ya lo pedía).
+- **Referencias congeladas** (`validacion/ma/cambiosPeso.ts`, `out_cambiosPeso.txt`): de C3, C5 y F, ninguna cambia; de C4, las cuatro con reticular, `pp` escrito y ábacos (`aleatorio-6-reticular` +6,51 % de peso propio, `aleatorio-5-mixto` y sus `-lv` y `-lv2` +4,09 %), regeneradas a sabiendas. Sólo cambia el peso de los ábacos.
+
+### 8.2 MA2 — ábacos en los pilares y unidos
+
+- **`reticular.abacosPilares`: `{ "lado": 2 }` o `{ "lados": [a, b] }`** (`src/compilador/abacos.ts`). **(cambio)** §2.2 lo ponía en `abacos` como alternativa a la lista; va en un campo propio para que los dos convivan (los de los pilares y alguno dado a mano, como el de un pilar que no está en el centro), para que `abacos` siga siendo una lista de polígonos en todo lo que la lee (dibujo, alinear, estirar, girar, tablas) y para que los ábacos de los pilares no se muevan con «Alinear» ni con «Mover»: siguen a su pilar.
+  - Un rectángulo a × b (a según el `eje1`) centrado en el eje del tramo que atraviesa el forjado, en cada pilar que llega a la losa (la regla de «Ábacos» del editor, que ahora usa la misma función, `pilaresEnLosa`). Un pilar con el eje en un ábaco dado no lleva otro.
+- **Unión** (MA-c, MA-d): los que se solapan o quedan a menos de h/2 (0,375 m por defecto; la mitad de `tamanoMalla`) van en su envolvente rectangular según los nervios, hasta que no quede ninguno así (el resultado no depende del orden: las envolventes sólo crecen). Aviso `reticular/abacos-unidos` con lo unido y su tamaño. Antes, dos ábacos solapados eran un error; la entrada del catálogo de no válidos de C4 pasa a ser dos de `abacosPilares` mal formado.
+- `resolverAbacos` se aplica antes de validar y en lo que pesa o dibuja sin compilar (peso esperado de A3, tributaria, planta, sólido). Sin `abacosPilares` y sin nada que unir, devuelve el mismo objeto: los proyectos de antes salen bit a bit (las referencias congeladas no cambian por MA2). En la tabla Forjados, la columna «ábacos en pilares» («2» o «2 x 1,6»). **Queda:** el croquis de Propiedades dibuja sólo los dados.
+- **Criterio 2** (`abacosPilares.test.ts`): la vivienda con `{ "lado": 2 }` en lugar de sus 21 ábacos a mano da los mismos ábacos (los tres pares unidos: P1+P7, P18+P22 y P19+P23) y **el mismo modelo analítico, bit a bit**. Además: los solapados dados dan el modelo de su envolvente dada a mano; la tolerancia (a 0,374 se unen, a 0,376 no; con h = 0,5, a la mitad); ejes girados; el orden de los pilares; la sensatez pesa lo del compilador; los mal formados, error.
+- La vivienda conserva sus ábacos a mano (dan lo mismo).
+
+### 8.3 MA4 — la carga de borde
+
+- **`{ "tipo": "borde", "losa", "q", "huecos"?, "excepto"? }`** (`src/compilador/bordes.ts`). **(cambio)** §2.4 la ponía como variante de `lineal` (con `losa` y `borde` en lugar de `puntos`); va como tipo propio, por lo mismo que los ábacos: `puntos` sigue siendo obligatorio en las lineales para todo lo que las lee, y la de borde sigue a su losa sin que Mover o Alinear la toquen.
+  - Va por el contorno (y, con `huecos: true`, por los huecos). `excepto`: un segmento `[[x, y], [x, y]]` quita lo del borde que va por él (a ≤ ε_snap); `{ "junto": "L2" }` quita lo que toca en planta otra losa o cae sobre ella, aunque esté en otra planta (el encuentro de dos cubiertas).
+  - Se resuelve antes de validar en cargas lineales por los tramos que la llevan (`<id>`, o `<id>:1`, `<id>:2`… si son varios), con los puntos en los vértices del contorno salvo donde empieza o acaba una excepción. La rechaza el validador, diciendo por qué, si su losa no existe, una excepción está mal o se queda sin tramos.
+  - En el dibujo (planta, alzado, 3D), las tablas (tipo «borde», columnas «huecos» y «excepto»), las cargas de una pieza y la tributaria.
+- **Criterio 4** (`bordes.test.ts`): los petos de la vivienda como dos cargas de borde (`L-CUB` sin el tramo de x = 4,26 de y = 1,87 arriba, `L-CUB-S` entera) dan **los mismos desplazamientos que sus 16 cargas de viga a mano (a 6e-16)** y la misma malla. «La misma malla» es a un ulp: sembrar otra vez el contorno cambia el orden de creación de los puntos del arreglo y un nudo se mueve 5e-17 m, como con «Renumerar» (LV2 §17). Además: los tramos de cada excepción, el modelo bit a bit igual que el de las mismas lineales escritas a mano, y los errores.
+- La vivienda conserva sus petos como cargas de viga (dan lo mismo).
+- **No está:** que el aviso `losa/ajuste` de una lineal proponga `borde` (§2.4, último punto); la skill lo dice.
+
+### 8.4 MA5 — el escalón
+
+- **`"tipo": "escalon"`** en la planta de encima de un tramo corto (la cubierta superior de la vivienda, a 0,90 m de la otra): la sensatez no avisa de la altura de ese tramo salvo si es menor de 1 cm. En lo demás, como una planta. En el validador, la tabla Plantas y el gestor de plantas.
+- **Criterio 5** (`src/agente/escalon.test.ts`): la vivienda lleva ya `CUB-S` como escalón y no da `sensatez/altura` (sin el tipo, sí); el modelo analítico no cambia. La parte de alinear del criterio, en §7.
+
+### 8.5 Fuera del plan: `fem vigas-borde`
+
+Para la puerta: sin ella, un agente tiene que escribir a mano cada zuncho (16 en la vivienda), y eso es lo que MA quiere quitar. `fem vigas-borde proyecto.json [--losa L]… [--ancho 0.30] [--canto …] [--escribir]` es «Vigas de borde» del editor (`proponerVigasBorde`) en la CLI: como `fem alinear`, sólo propone, y con `--escribir` pone las vigas, deja el `.bak` y compila. Prueba en `cli.test.ts`. Con el DXF crudo de la vivienda, una de las dos cubiertas da su error de geometría («los ejes de las vigas de borde no forman un polígono»: un lado más corto que su retranqueo), que el agente tiene que resolver en el contorno.
+
+### 8.6 Lo que decide el usuario
+
+- **MA3:** el 4,6 del muestrario como peso de su zona aligerada; y que la regla valga para todos los casetones, no sólo los perdidos.
+- **MA2 y MA4:** los campos propios (`abacosPilares`, `tipo: "borde"`) en lugar de las variantes de §2.2 y §2.4.
+- **`fem vigas-borde`**, que no estaba en el plan.

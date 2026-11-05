@@ -4,6 +4,45 @@
   "title": "Modelo físico de Concreta FEM 3D (estructura)",
   "$ref": "#/$defs/ModeloFisico",
   "$defs": {
+    "AbacosPilares": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "lado": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "lado"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lados": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "lados"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "AccionCaso": {
       "type": "object",
       "properties": {
@@ -519,6 +558,43 @@
           "type": "object",
           "properties": {
             "tipo": {
+              "const": "borde"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "losa": {
+              "type": "string"
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "huecos": {
+              "type": "boolean"
+            },
+            "excepto": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptoBorde"
+              }
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "losa",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
               "const": "empuje"
             },
             "id": {
@@ -616,6 +692,36 @@
         "hasta"
       ],
       "additionalProperties": false
+    },
+    "ExceptoBorde": {
+      "anyOf": [
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/Vec2"
+            },
+            {
+              "$ref": "#/$defs/Vec2"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "object",
+          "properties": {
+            "junto": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "junto"
+          ],
+          "additionalProperties": false
+        }
+      ]
     },
     "ExtremoBarra": {
       "type": "object",
@@ -1450,6 +1556,9 @@
             }
           }
         },
+        "abacosPilares": {
+          "$ref": "#/$defs/AbacosPilares"
+        },
         "multiplicadores": {
           "$ref": "#/$defs/MultiplicadoresLamina"
         }
@@ -1640,6 +1749,7 @@
     "TipoPlanta": {
       "enum": [
         "cubierta",
+        "escalon",
         "planta",
         "sotano"
       ]

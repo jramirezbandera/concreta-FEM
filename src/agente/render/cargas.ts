@@ -35,6 +35,7 @@
  * Puro: sin IO.
  */
 import { ejesBarra, puntosBarra } from "../../compilador/barras.ts";
+import { tramosBorde } from "../../compilador/bordes.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { conPuntoFijo } from "../../compilador/puntoFijo.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
@@ -48,7 +49,7 @@ export type V3 = [number, number, number];
 
 /** Cómo se dibuja una carga (su color): como en la planta, las de vigas, pilares, barras y muros son «pieza». */
 export type ClaseCarga = "superficie" | "lineal" | "puntual" | "pieza";
-export const CLASE_CARGA: Record<CargaFisica["tipo"], ClaseCarga> = { superficie: "superficie", lineal: "lineal", puntual: "puntual", viga: "pieza", pilar: "pieza", barra: "pieza", empuje: "pieza" };
+export const CLASE_CARGA: Record<CargaFisica["tipo"], ClaseCarga> = { superficie: "superficie", lineal: "lineal", borde: "lineal", puntual: "puntual", viga: "pieza", pilar: "pieza", barra: "pieza", empuje: "pieza" };
 
 /** La parte de P (anillos, par-impar) dentro de alguna de las `capas` (null: P entera), a la cota z, con q (kN/m², globales). */
 export interface RegionCarga {
@@ -145,14 +146,18 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
         } else notas.push(`${g.id}: carga de superficie sin zona, losa ni paño.`);
         break;
       }
-      case "lineal": {
-        const z = cota(g.planta);
+      case "lineal":
+      case "borde": {
+        // MA4: la de borde, por sus tramos (los de `tramosBorde`, como el compilador)
+        const planta = g.tipo === "lineal" ? g.planta : f.losas?.find((l) => l.id === g.losa)?.planta;
+        const z = planta === undefined ? null : cota(planta);
         if (z === null) break;
         const q: V3 = [g.q[0], g.q[1], g.q[2]];
-        for (let i = 1; i < g.puntos.length; i++) {
-          const [a, b] = [g.puntos[i - 1]!, g.puntos[i]!];
-          if (a[0] !== b[0] || a[1] !== b[1]) x.lineas.push({ a: [a[0], a[1], z], b: [b[0], b[1], z], qa: q, qb: q });
-        }
+        for (const puntos of g.tipo === "lineal" ? [g.puntos] : (tramosBorde(f, g) ?? []))
+          for (let i = 1; i < puntos.length; i++) {
+            const [a, b] = [puntos[i - 1]!, puntos[i]!];
+            if (a[0] !== b[0] || a[1] !== b[1]) x.lineas.push({ a: [a[0], a[1], z], b: [b[0], b[1], z], qa: q, qb: q });
+          }
         break;
       }
       case "puntual": {
@@ -283,6 +288,8 @@ export function textoCarga(g: CargaFisica): string {
       return `${g.id}: ${valorCarga(g.q, "kN/m²")}`;
     case "lineal":
       return `${g.id}: ${valorCarga(g.q, "kN/m")}`;
+    case "borde":
+      return `${g.id}: ${valorCarga(g.q, "kN/m")} por el borde de ${g.losa}`;
     case "puntual":
       return `${g.id}: ${valorPuntual(g.F, g.M)}`;
     case "viga":

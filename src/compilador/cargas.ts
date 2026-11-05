@@ -951,9 +951,10 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       sobrePieza(c, carga.viga, piezas.rectasDe.get(carga.viga) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
     } else if (carga.tipo === "barra") {
       sobrePieza(c, carga.barra, piezas.rectasDe.get(carga.barra) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
-    } else {
+    } else if (carga.tipo === "pilar") {
       sobrePieza(c, carga.pilar, piezas.rectasDe.get(carga.pilar) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
     }
+    // Las de borde (MA4) llegan resueltas en lineales (`bordes.ts`)
   }
   return { casos, fisicas, alDiafragma: deDiafragma };
 }

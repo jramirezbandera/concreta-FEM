@@ -96,6 +96,8 @@ export function cargas3D(f: ModeloFisico, origen: [number, number, number], caso
     switch (g.tipo) {
       case "superficie":
         return g.losa ? [g.losa, "losa"] : g.pano ? [g.pano, "pano"] : [null, "losa"];
+      case "borde":
+        return [g.losa, "losa"];
       case "lineal":
       case "puntual":
         return [null, null];
@@ -115,6 +117,10 @@ export function cargas3D(f: ModeloFisico, origen: [number, number, number], caso
       case "lineal":
       case "puntual":
         return [g.planta];
+      case "borde": {
+        const l = f.losas?.find((x) => x.id === g.losa);
+        return l ? [l.planta] : [];
+      }
       case "viga": {
         const v = f.vigas?.find((x) => x.id === g.viga);
         return v ? [v.planta] : [];

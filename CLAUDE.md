@@ -740,6 +740,13 @@
   - **Aviso `sensatez/casi-alineados`** en `fem validar`, el informe y Diagnósticos, con lo que les falta. **`fem alinear proyecto.json [--tolerancia 0.03] [--escribir]`** (MA-e: sólo propone; con `--escribir`, deja `.bak`). **«Alinear»** en Modelo · Editar y en la paleta.
   - **Medido:** ningún aviso en los modelos de A3, los ejemplos, las geometrías de G y las 24 retículas al azar; el DXF crudo de la vivienda da 7 rectas y queda alineado sin restos; con ruido al azar (1 372 casos), el modelo vuelve bit a bit.
   - **Pruebas:** `src/editor/alinear.test.ts`, `cli.test.ts` y `app/src/test/editor.test.tsx`. **Queda de MA5:** el escalón de cubierta.
+- **2026-11-05: MA2, MA3, MA4 y el escalón de MA5** (`modelado.md` §8). Sólo falta de MA la puerta con tres agentes (criterio 1).
+  - **MA3:** en un reticular, el `pp` escrito es el de la zona aligerada y los ábacos pesan γ·canto, con todos los casetones (MA-b decía «perdido»; el calculado ya era así). La vivienda, sin sus 21 cargas en los ábacos: −0,88 % de G, el doble conteo de antes en el ancho de las vigas (AU-4). Cuatro referencias de C4 regeneradas (`validacion/ma/out_cambiosPeso.txt`). **Pendiente del usuario:** el 4,6 del muestrario como peso de su zona aligerada.
+  - **MA2** (`src/compilador/abacos.ts`): `reticular.abacosPilares` (`{ lado }` o `{ lados }`), un ábaco por pilar que llega a la losa, y los que se solapan o quedan a menos de h/2 se unen en su envolvente con el aviso `reticular/abacos-unidos` (antes, error). La vivienda con `{ lado: 2 }` da sus ábacos a mano y el mismo modelo analítico bit a bit.
+  - **MA4** (`src/compilador/bordes.ts`): la carga `{ tipo: "borde", losa, q, huecos?, excepto? }` (segmentos o `{ junto: L }`), resuelta en lineales antes de validar. Los petos de la vivienda así dan lo de sus cargas de viga a 6e-16.
+  - **MA5:** `"tipo": "escalon"` en una planta (la vivienda lo lleva en `CUB-S`): sin aviso de altura del tramo que llega a ella.
+  - **Fuera del plan:** `fem vigas-borde` («Vigas de borde» del editor en la CLI, sólo propone salvo `--escribir`).
+  - **Pendiente del usuario:** los campos propios de MA2 y MA4 en lugar de las variantes de `modelado.md` §2, y `fem vigas-borde`.
 - **2026-11-05: la auditoría del motor, puntos 5 y 6 (`auditoria.md` §8), y los bancos de Chrome otra vez:**
   - **Auditoría:**
     - AU-5: las caras de banda fuera de la malla y el reparto lo avisan;
