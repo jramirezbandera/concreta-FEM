@@ -1,3 +1,5 @@
-AC1014: 2000 ficheros → ErrorDxf 29, con objetos en fallos 1956, el mismo dibujo 15, distinto sin aviso 0, otra excepción 0 (el más lento, 126 ms)
-AC1015: 2000 ficheros → ErrorDxf 27, con objetos en fallos 1958, el mismo dibujo 15, distinto sin aviso 0, otra excepción 0 (el más lento, 17 ms)
+AC1014: 2000 ficheros → ErrorDxf 29, con objetos en fallos 1956, el mismo dibujo 15, distinto sin aviso 0, otra excepción 0 (el más lento, 331 ms)
+AC1015: 2000 ficheros → ErrorDxf 27, con objetos en fallos 1958, el mismo dibujo 15, distinto sin aviso 0, otra excepción 0 (el más lento, 250 ms)
+AC1018: 2000 ficheros → ErrorDxf 1985, con objetos en fallos 0, el mismo dibujo 15, distinto sin aviso 0, otra excepción 0 (el más lento, 18 ms)
+AC1032: 2000 ficheros → ErrorDxf 1984, con objetos en fallos 0, el mismo dibujo 16, distinto sin aviso 0, otra excepción 0 (el más lento, 23 ms)
 Pasa.

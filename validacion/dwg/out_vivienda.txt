@@ -1,0 +1,9 @@
+DWG AC1032 (144 KB), leído en 16 ms (el mínimo de 3, en caliente).
+$INSUNITS: DWG 4, DXF 4. Página de códigos: windows-1252.
+Objetos que no se pudieron leer: 0.
+Espacio modelo: 1665 entidades en el DWG y 1665 en el DXF; bloques: 22 y 21; capas: 5 y 5.
+Entidades emparejadas por handle: 1845. Error máximo de lo aplanado: 1.07e-14 (tolerancia 1.62e-8), en modelo: SPLINE A70.
+Bloques regenerados por AutoCAD: ninguno. Anónimos huérfanos (sólo en el DWG, sin uso): *D18.
+Dibujo: 2238 segmentos, 13211 cuerdas, 4145 puntos para enganchar, 50 textos; no leído: {}.
+
+Pasa: el DWG dibuja lo mismo que su DXF.

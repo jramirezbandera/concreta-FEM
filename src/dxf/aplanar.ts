@@ -163,6 +163,13 @@ export function textoMtext(s: string): string {
       i++;
       continue;
     }
+    // Un carácter de control en notación de acento circunflejo («^J», el salto de línea): así lo
+    // escriben el DXF y el DWG hasta 2000; desde 2004, el DWG lleva el carácter (DW3-4)
+    if (ch === "^" && i + 1 < s.length && /[@A-Z[\\\]^_]/.test(s[i + 1]!)) {
+      r += String.fromCharCode(s.charCodeAt(i + 1) - 64);
+      i += 2;
+      continue;
+    }
     if (ch !== "\\" || i + 1 >= s.length) {
       r += ch;
       i++;

@@ -32,6 +32,20 @@ describe("lector de DXF frente a ezdxf", () => {
     expect(d.entidades[0]!.valores.filter((_, i) => d.entidades[0]!.codigos[i] === 3)).toEqual(["uno dos ", " tres"]);
   });
 
+  it("lo de detrás de «101 Embedded Object» (2018) no es de la entidad (DW3-7)", () => {
+    // En la copia incrustada de un MTEXT, el 10 es la dirección y el 11 la inserción: no deben girar el texto
+    const l = ["0", "SECTION", "2", "ENTITIES", "0", "MTEXT", "8", "0", "10", "100", "20", "5", "40", "1", "1", "hola", "101", "Embedded Object", "70", "1", "10", "1", "20", "0", "11", "100", "21", "5", "0", "ENDSEC", "0", "EOF"];
+    const d = dibujoDxf(new TextEncoder().encode(l.join("\n")));
+    expect(d.textos.map((t) => [t.texto, t.x, t.y, t.giro])).toEqual([["hola", 100, 5, 0]]);
+  });
+
+  it("los caracteres de control en notación ^ de un MTEXT: ^J es un salto de línea (DW3-4)", () => {
+    expect(textoMtext("uno^Jdos")).toBe("uno\ndos");
+    expect(textoMtext("uno\ndos")).toBe("uno\ndos");
+    // En una fracción apilada, ^ es el separador y se queda
+    expect(textoMtext("\\S1^2;")).toBe("1^2");
+  });
+
   it("los doubles del fichero, sin transformar, salen tal cual", () => {
     const d = dibujoDxf(leer("basico.dxf"));
     const xs = Array.from(d.lineas);

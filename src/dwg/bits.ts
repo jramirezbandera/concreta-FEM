@@ -28,6 +28,7 @@ import { ErrorDxf } from "../dxf/lector.ts";
 export const DWG_CORTADO = "El DWG está cortado o dañado: se lee más allá del final de una sección.";
 
 const vista = new DataView(new ArrayBuffer(8));
+const UTF16 = new TextDecoder("utf-16le");
 
 /** La tabla del CRC-16 del DWG (el de polinomio reflejado 0xA001: la de `CRC.CrcTable` de ACadSharp). */
 const TABLA_CRC = (() => {
@@ -307,10 +308,36 @@ export class Bits {
     throw new ErrorDxf(`El DWG está dañado: una referencia a un handle con el código ${codigo}.`);
   }
 
+  /** TU (desde 2007): BS con el número de caracteres y el texto en UTF-16LE (sin los \0). */
+  TU(): string {
+    const n = this.BS();
+    if (n <= 0) return "";
+    return UTF16.decode(this.bytes(2 * n)).replaceAll("\0", "");
+  }
+
   /** TV: BS con el número de bytes y el texto en la página de códigos (sin los \0). */
   TV(decodificador: TextDecoder): string {
     const n = this.BS();
     if (n <= 0) return "";
     return decodificador.decode(this.bytes(n)).replaceAll("\0", "");
   }
+}
+
+/**
+ * El flujo de cadenas de un objeto o una sección desde 2007 (`SetPositionByFlag` de ACadSharp): el
+ * bit en `fin` dice si hay cadenas; si las hay, 16 bits antes está su tamaño en bits (con 0x8000,
+ * otros 16 antes, la parte alta) y empiezan ese tamaño antes. Sin cadenas, null (todas valen «»).
+ */
+export function flujoCadenas(buf: Uint8Array, fin: number): Bits | null {
+  if (new Bits(buf, fin).B() === 0) return null;
+  let l = fin - 16;
+  let tam = new Bits(buf, l).RSu();
+  if (tam & 0x8000) {
+    l -= 16;
+    const alto = new Bits(buf, l).RSu();
+    tam = (tam & 0x7fff) + alto * 2 ** 15;
+  }
+  const inicio = l - tam;
+  if (inicio < 0) throw new ErrorDxf(DWG_CORTADO);
+  return new Bits(buf, inicio, l);
 }

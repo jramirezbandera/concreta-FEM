@@ -16,10 +16,11 @@
  */
 
 import { type Bloque, type CapaLeida, type Dxf, type Entidad, ErrorDxf } from "../dxf/lector.ts";
-import { Bits, crc16 } from "./bits.ts";
-import { type CabeceraDwg, leerCabecera } from "./cabecera.ts";
+import { Bits, crc16, flujoCadenas } from "./bits.ts";
+import { type CabeceraDwg, type Flujos, hacerFlujos, leerCabecera } from "./cabecera.ts";
 import { soloTipo, type Traducida, traducir } from "./entidades.ts";
 import { abrir, type CabeceraBloque, cabeceraBloque, capa, type CapaDwg, control, entidad, esEntidadFija, leerClases, leerMapa, nombreBloque, TIPO } from "./objetos.ts";
+import { leerSecciones2004 } from "./secciones2004.ts";
 import { type Version, version } from "./version.ts";
 
 /** Lo que da `leerDwg`, además del `Dxf`. */
@@ -130,6 +131,26 @@ function cabeceraFichero15(bytes: Uint8Array): { pagina: number; secciones: Map<
   return { pagina, secciones };
 }
 
+/**
+ * Los flujos de la sección de la cabecera (AcDb:Header), comprobada: su marca, su tamaño (RL; en 2010
+ * y 2013 con mantenimiento > 3, y desde 2018, un RL más) y su CRC. Desde 2007, las cadenas y los
+ * handles van aparte, con un RL de tamaño en bits delante de los datos.
+ */
+function flujosCabecera(v: Version, s: Bits, mantenimiento: number, dec: TextDecoder): Flujos {
+  const inicio = s.pos >> 3;
+  const marca = s.bytes(16);
+  if (!SENTINELA_CABECERA.every((x, i) => marca[i] === x)) throw new ErrorDxf("El DWG está dañado: la sección de la cabecera no empieza por su marca.");
+  const tam = s.RLu();
+  if ((v.r2010 && mantenimiento > 3) || v.r2018) s.RL();
+  const desde = inicio + 16;
+  const hasta = (s.pos >> 3) + tam;
+  if (s.en(hasta * 8).RSu() !== crc16(s.buf, desde, hasta)) throw new ErrorDxf("El DWG está dañado: la sección de la cabecera no pasa su CRC.");
+  const d = s.en(s.pos, hasta * 8);
+  if (!v.r2007) return hacerFlujos(v, d, d, d, dec);
+  const ultimo = d.pos + d.RLu() - 1;
+  return hacerFlujos(v, d, flujoCadenas(s.buf, ultimo), d.en(ultimo + 1, hasta * 8), dec);
+}
+
 function seccion(secciones: Map<number, Seccion>, num: number, nombre: string, bytes: Uint8Array): Seccion {
   const sec = secciones.get(num);
   if (!sec || sec.posicion + sec.tamano > bytes.length) throw new ErrorDxf(`El DWG está dañado: le falta la sección ${nombre}.`);
@@ -140,30 +161,45 @@ export function leerDwg(bytes: Uint8Array): Dwg {
   if (!esDwg(bytes)) throw new ErrorDxf("No es un DWG.");
   const v: Version = version(String.fromCharCode(...bytes.subarray(0, 6)));
 
-  const { pagina, secciones } = cabeceraFichero15(bytes);
+  // Hasta 2000, las secciones están en el fichero por sus localizadores; desde 2004, en páginas
+  // comprimidas (secciones2004.ts), y las posiciones de los objetos son de AcDb:AcDbObjects.
+  let pagina: number;
+  let mantenimiento = 0;
+  /** Una sección: el buffer y el bit donde empieza. */
+  let deSeccion: (num: number, nombre: string, descripcion: string) => Bits;
+  let objetos: Uint8Array;
+  if (v.r2004) {
+    const s = leerSecciones2004(bytes);
+    pagina = s.pagina;
+    mantenimiento = s.mantenimiento;
+    deSeccion = (_num, nombre, descripcion) => {
+      const b = s.seccion(nombre);
+      if (!b) throw new ErrorDxf(`El DWG está dañado: le falta la sección ${descripcion}.`);
+      return new Bits(b);
+    };
+    const o = s.seccion("AcDb:AcDbObjects");
+    if (!o) throw new ErrorDxf("El DWG está dañado: le falta la sección de los objetos.");
+    objetos = o;
+  } else {
+    const f = cabeceraFichero15(bytes);
+    pagina = f.pagina;
+    deSeccion = (num, _nombre, descripcion) => {
+      const sec = seccion(f.secciones, num, descripcion, bytes);
+      return new Bits(bytes, sec.posicion * 8, (sec.posicion + sec.tamano) * 8);
+    };
+    objetos = bytes;
+  }
   const codificacion = paginaDwg(pagina);
   const dec = new TextDecoder(codificacion);
 
   // AcDb:Header
-  const sc = seccion(secciones, 0, "de la cabecera", bytes);
-  const hc = new Bits(bytes, sc.posicion * 8, (sc.posicion + sc.tamano) * 8);
-  const sentinela = hc.bytes(16);
-  if (!SENTINELA_CABECERA.every((x, i) => sentinela[i] === x)) throw new ErrorDxf("El DWG está dañado: la sección de la cabecera no empieza por su marca.");
-  const tamCabecera = hc.RLu();
-  const dc = hc.en(hc.pos, hc.pos + tamCabecera * 8);
-  // RS: el CRC del tamaño y los datos, desde detrás de la marca
-  const desde = sc.posicion + 16;
-  const hasta = desde + 4 + tamCabecera;
-  if (hc.en(hasta * 8).RSu() !== crc16(bytes, desde, hasta)) throw new ErrorDxf("El DWG está dañado: la sección de la cabecera no pasa su CRC.");
-  const cabeceraDwg = leerCabecera(v, { d: dc, t: dc, h: dc }, dec);
+  const cabeceraDwg = leerCabecera(v, flujosCabecera(v, deSeccion(0, "AcDb:Header", "de la cabecera"), mantenimiento, dec));
 
   // AcDb:Classes: el nombre de DXF de los tipos ≥ 500
-  const sk = seccion(secciones, 1, "de las clases", bytes);
-  const clases = leerClases(v, new Bits(bytes, sk.posicion * 8, (sk.posicion + sk.tamano) * 8), dec);
+  const clases = leerClases(v, deSeccion(1, "AcDb:Classes", "de las clases"), dec, mantenimiento);
 
   // AcDb:Handles
-  const sm = seccion(secciones, 2, "del mapa de objetos", bytes);
-  const mapa = leerMapa(new Bits(bytes, sm.posicion * 8, (sm.posicion + sm.tamano) * 8));
+  const mapa = leerMapa(deSeccion(2, "AcDb:Handles", "del mapa de objetos"));
 
   const capasPorHandle = new Map<number, CapaDwg>();
   let ordenCapas: number[] = [];
@@ -185,6 +221,8 @@ export function leerDwg(bytes: Uint8Array): Dwg {
     capa: number;
     t: Traducida;
   }
+  /** Desde 2004, el orden de lo de cada propietario (bloques, polilíneas e inserciones). */
+  const propiasDe = new Map<number, number[]>();
   const leidas = new Map<number, Leida>();
 
   const handles = [...mapa.keys()].sort((a, b) => a - b);
@@ -192,27 +230,29 @@ export function leerDwg(bytes: Uint8Array): Dwg {
     const offset = mapa.get(handle)!;
     let tipo = -1;
     try {
-      const a = abrir(v, bytes, offset);
+      const a = abrir(v, objetos, offset, dec);
       tipo = a.tipo;
       const clase = tipo >= 500 ? clases.get(tipo) : undefined;
       if (tipo === TIPO.LAYER_CONTROL) ordenCapas = control(v, a).entradas;
       else if (tipo === TIPO.BLOCK_CONTROL) ordenBloques = control(v, a).entradas;
       else if (tipo === TIPO.LAYER) {
-        const c = capa(v, a, dec);
+        const c = capa(v, a);
         capasPorHandle.set(c.handle, c);
       } else if (tipo === TIPO.BLOCK_HEADER) {
-        const c = cabeceraBloque(v, a, dec);
+        const c = cabeceraBloque(v, a);
         cabeceras.set(c.handle, c);
+        if (c.propias) propiasDe.set(c.handle, c.propias);
       } else if (esEntidadFija(tipo) || clase?.entidad) {
         const e = entidad(v, a);
         if (e.modo === 1) continue; // espacio papel
         let t: Traducida;
         if (tipo === TIPO.BLOCK) {
-          nombresBlock.set(e.handle, nombreBloque(e, dec));
+          nombresBlock.set(e.handle, nombreBloque(e));
           t = soloTipo("BLOCK");
-        } else if (clase && CLASES_FIJAS[clase.nombreDxf] !== undefined) t = traducir(v, { ...e, tipo: CLASES_FIJAS[clase.nombreDxf]! }, dec);
+        } else if (clase && CLASES_FIJAS[clase.nombreDxf] !== undefined) t = traducir(v, { ...e, tipo: CLASES_FIJAS[clase.nombreDxf]! });
         else if (clase) t = soloTipo(clase.nombreDxf);
-        else t = traducir(v, e, dec);
+        else t = traducir(v, e);
+        if (t.propias) propiasDe.set(e.handle, t.propias);
         leidas.set(e.handle, { handle: e.handle, tipo, modo: e.modo, propietario: e.propietario, anterior: e.anterior, siguiente: e.siguiente, capa: e.capa, t });
       }
     } catch (err) {
@@ -241,8 +281,26 @@ export function leerDwg(bytes: Uint8Array): Dwg {
     return c.nombre || nombresBlock.get(c.inicio) || "";
   };
 
-  /** Las entidades de una lista (el espacio modelo o lo de un propietario), en su orden: desde las que no tienen anterior en ella. */
-  const ordenar = (lista: Leida[]): Leida[] => {
+  /**
+   * Las entidades de una lista (el espacio modelo o lo de un propietario), en su orden: desde 2004,
+   * el de la lista de su propietario; hasta 2000, de una a la siguiente, desde las que no tienen
+   * anterior en ella. Lo que la lista no tiene, detrás, por handle.
+   */
+  const ordenar = (lista: Leida[], propias?: number[]): Leida[] => {
+    if (propias) {
+      const por = new Map(lista.map((e) => [e.handle, e]));
+      const r: Leida[] = [];
+      const puestas = new Set<number>();
+      for (const h of propias) {
+        const e = por.get(h);
+        if (e && !puestas.has(h)) {
+          puestas.add(h);
+          r.push(e);
+        }
+      }
+      for (const e of [...lista].sort((a, b) => a.handle - b.handle)) if (!puestas.has(e.handle)) r.push(e);
+      return r;
+    }
     const por = new Map(lista.map((e) => [e.handle, e]));
     const orden: Leida[] = [];
     const puestas = new Set<number>();
@@ -284,15 +342,16 @@ export function leerDwg(bytes: Uint8Array): Dwg {
     // Los VERTEX de una POLYLINE y los ATTRIB de un INSERT
     if (t.tipo === "POLYLINE" || (t.tipo === "INSERT" && codigos.includes(66))) {
       const hijo = t.tipo === "POLYLINE" ? "VERTEX" : "ATTRIB";
-      r.hijos = ordenar(hijos.get(e.handle) ?? [])
+      r.hijos = ordenar(hijos.get(e.handle) ?? [], propiasDe.get(e.handle))
         .filter((x) => x.t.tipo === hijo)
         .map(aDxf);
     }
     return r;
   };
-  const lista = (l: Leida[]): Entidad[] => ordenar(l.filter((e) => !NO_EN_LISTAS.has(e.tipo) && e.t.tipo !== "VERTEX" && e.t.tipo !== "ATTRIB")).map(aDxf);
+  const lista = (l: Leida[], propias?: number[]): Entidad[] => ordenar(l.filter((e) => !NO_EN_LISTAS.has(e.tipo) && e.t.tipo !== "VERTEX" && e.t.tipo !== "ATTRIB"), propias).map(aDxf);
 
-  const entidades = lista(modelo);
+  const modelSpace = [...cabeceras.values()].find((c) => /^\*model_space$/i.test(c.nombre));
+  const entidades = lista(modelo, modelSpace ? propiasDe.get(modelSpace.handle) : undefined);
 
   // Los bloques. Lo de los espacios papel no se lee, como en el DXF (código 67)
   const bloques = new Map<string, Bloque>();
@@ -300,7 +359,7 @@ export function leerDwg(bytes: Uint8Array): Dwg {
     if (c.xref) continue;
     const nombre = nombreDe(c);
     const papel = /^\*paper_space/i.test(nombre);
-    bloques.set(nombre, { nombre, base: c.base, entidades: papel ? [] : lista(hijos.get(c.handle) ?? []) });
+    bloques.set(nombre, { nombre, base: c.base, entidades: papel ? [] : lista(hijos.get(c.handle) ?? [], propiasDe.get(c.handle)) });
   }
 
   return {

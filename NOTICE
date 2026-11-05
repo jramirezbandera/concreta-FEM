@@ -42,9 +42,12 @@ Portado a TypeScript (fase DW, el lector de DWG; sólo la lectura de lo que usa 
                           cabeceras de bloque)
   src/dwg/entidades.ts ←  src/ACadSharp/IO/DWG/DwgStreamReaders/DwgObjectReader.cs y
                           DwgObjectReader.Entities.cs (las entidades que dibuja la plantilla)
+  src/dwg/secciones2004.ts ← src/ACadSharp/IO/DwgReader.cs (readFileHeaderAC18, readFileMetaData,
+                          getSectionBuffer18, decryptDataSection), DwgLZ77AC18Decompressor.cs,
+                          CRC32StreamHandler.cs y DwgCheckSumCalculator.cs
   src/dwg/lector.ts    ←  src/ACadSharp/IO/DwgReader.cs (cabecera del fichero de R13–R2000);
                           la tabla de páginas de códigos de src/ACadSharp/CadUtils.cs
-Código propio: la comprobación de los CRC al leer, la traducción a pares de DXF, el orden de las
+Código propio: la comprobación de los CRC y las sumas de las páginas al leer, la traducción a pares de DXF, el orden de las
 listas y el nombre de los bloques anónimos por su posición en la tabla. Las muestras de AutoCAD
 de su carpeta samples/ se usan como oráculo
 (validacion/dwg/muestras.ts) y no se versionan.

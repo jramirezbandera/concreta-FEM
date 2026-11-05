@@ -713,6 +713,12 @@
   - **DW2-2:** los anónimos se llaman por su posición en la tabla de bloques, como hace AutoCAD (ACadSharp no). **DW2-3:** en R14, `LWPOLYLINE` y `HATCH` son clases.
   - **Robustez:** con 2 000 ficheros dañados por versión, o se avisa o sale el mismo dibujo.
   - **Sigue DW3** (2004+). El DWG del cliente (`ejemplos/Proyectos/modelo.dwg`) es de 2018: su criterio 3, con DW3.
+- **2026-11-05: DW3 hecho** (`dwg.md` §11): 2004, 2010, 2013 y 2018, con páginas comprimidas (LZ77), cabecera cifrada, cadenas en UTF-16 en su propio flujo (`src/dwg/secciones2004.ts`).
+  - **Comprobado al leer, y ACadSharp no lo hace:** el CRC32 de la cabecera y las sumas de todas las páginas. DW3-1: los campos de suma de una página de datos están un RL más allá de donde los lee ACadSharp.
+  - **Frente al DXF de AutoCAD:** las cuatro versiones dibujan lo mismo, a 2,3e-12. Fuera, el gancho del `LEADER` y, desde 2013, la `SPLINE` por ajuste (DW3-5: el DWG sólo guarda el ajuste; los puntos de control los calcula AutoCAD al exportar).
+  - **El DWG real de la vivienda (2018) frente a su DXF:** el dibujo entero igual, 1 845 entidades a 1,1e-14, leído en 16 ms (`validacion/dwg/vivienda.ts`).
+  - **Dos fallos más del lector de DXF de V2c-4, corregidos:** el «^J» de los `MTEXT` (DW3-4) y lo de detrás de «101 Embedded Object» en los DXF de 2018, que giraba los textos (DW3-7).
+  - **Sigue DW4** (el DWG en la app); DW5 (2007) después.
 - **2026-11-05: sin firma** (decisión del usuario: «no tiene sentido que se firmen los resultados del programa»; `agente.md` §11). Fuera `fem firmar`, el fichero `<proyecto>.revision.json`, el campo `firma` de `fem revisar`, la sección «Firma» del informe (cambia su sha256) y el formulario de firmar de Revisión. Se quedan `fem revisar`, el informe de sensatez ligado a la huella y la pantalla Revisión con sus comprobaciones.
 - **2026-11-05: el agente fuera del repo** (`agente.md` §12). `bun run instalar` enlaza la skill `fem` en `~/.claude/skills/fem` (junction al repo, no copia) y deja la orden `fem` en `~/.local/bin` (`--quitar` lo deshace); `fem visor <proyecto> [--nuevo]` abre la app desde cualquier carpeta. La skill dice que se trabaja en la carpeta de la obra y que un proyecto del navegador hay que exportarlo. Prueba: `src/agente/instalar.test.ts`.
 - **2026-11-05: la app y el agente, juntos, y fem sin terminal** (a petición del usuario; `agente.md` §13, `modelado.md` §6):

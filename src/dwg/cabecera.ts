@@ -19,22 +19,40 @@ export interface CabeceraDwg {
   extmax: [number, number, number];
 }
 
-/** Los tres flujos de un objeto o de la cabecera: datos, textos y handles. Hasta R2007 son el mismo. */
+/**
+ * Los flujos de un objeto o de la cabecera: datos, cadenas y handles. Hasta 2007, las cadenas van en
+ * los datos; desde 2007, aparte (null si no tiene ninguna). `tv` lee un texto de donde toca: TV en
+ * la página de códigos hasta 2007 y TU (UTF-16) desde entonces.
+ */
 export interface Flujos {
   d: Bits;
-  t: Bits;
+  t: Bits | null;
   h: Bits;
+  tv(): string;
 }
 
-/** Un color CMC. Hasta R2000, BS con el índice. */
+export function hacerFlujos(v: Version, d: Bits, t: Bits | null, h: Bits, dec: TextDecoder): Flujos {
+  return { d, t, h, tv: () => (t === null ? "" : v.r2007 ? t.TU() : t.TV(dec)) };
+}
+
+/**
+ * Un color CMC: su índice (256 = por capa). Hasta 2000, BS con el índice. Desde 2004, BS (0), BL con
+ * el RGB y un RC con lo que sigue: el nombre del color y el del libro (texto, en las cadenas).
+ */
 export function cmc(v: Version, f: Flujos): number {
-  if (v.r2004) throw new Error("CMC de R2004+: DW3");
-  return f.d.BS();
+  if (!v.r2004) return f.d.BS();
+  f.d.BS();
+  const rgb = f.d.BL() >>> 0;
+  const id = f.d.RC();
+  if (id & 1) f.tv();
+  if (id & 2) f.tv();
+  if (rgb === 0xc0000000) return 256;
+  return rgb & 0x01000000 ? rgb & 0xff : 0;
 }
 
-export function leerCabecera(v: Version, f: Flujos, decodificador: TextDecoder): CabeceraDwg {
+export function leerCabecera(v: Version, f: Flujos): CabeceraDwg {
   const { d, h } = f;
-  const tv = () => f.t.TV(decodificador);
+  const tv = () => f.tv();
   const bd = (n: number) => {
     for (let i = 0; i < n; i++) d.BD();
   };

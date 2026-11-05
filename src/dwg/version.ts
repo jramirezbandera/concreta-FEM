@@ -34,7 +34,7 @@ export const VERSIONES_DWG: Readonly<Record<string, string>> = {
 };
 
 /** Las que se leen ya (los tramos de DW: R13–R2000 en DW1 y DW2; 2004+ en DW3; 2007 en DW5). */
-export const VERSIONES_LEIDAS: readonly string[] = ["AC1012", "AC1014", "AC1015"];
+export const VERSIONES_LEIDAS: readonly string[] = ["AC1012", "AC1014", "AC1015", "AC1018", "AC1024", "AC1027", "AC1032"];
 
 export function version(nombre: string): Version {
   const n = /^AC1\d{3}$/.test(nombre) ? Number(nombre.slice(2)) : NaN;
@@ -43,7 +43,7 @@ export function version(nombre: string): Version {
     throw new ErrorDxf(`Es un DWG de una versión que no se conoce (${nombre.replace(/[^\x20-\x7e]/g, "?")}): guárdalo como DWG 2018 o como DXF.`);
   }
   if (!VERSIONES_LEIDAS.includes(nombre))
-    throw new ErrorDxf(`Todavía no se leen los DWG ${VERSIONES_DWG[nombre]} (${nombre}): guárdalo como DWG 2000 o como DXF.`);
+    throw new ErrorDxf(`Todavía no se leen los DWG ${VERSIONES_DWG[nombre]} (${nombre}): guárdalo como DWG 2010 o 2018, o como DXF.`);
   return {
     nombre,
     n,

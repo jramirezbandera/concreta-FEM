@@ -24,6 +24,8 @@ export interface ComparacionDwg {
   tolerancia: number;
   /** Bloques que AutoCAD regeneró al escribir el DXF (otros handles): se emparejan por posición. */
   regenerados: string[];
+  /** Bloques anónimos del DWG que nada usa y que AutoCAD no escribe en el DXF (DW3-8). */
+  huerfanos: string[];
   fallos: string[];
 }
 
@@ -86,6 +88,7 @@ export function compararDwgConDxf(dwg0: Dxf, dxf0: Dxf, tol = 1e-9, excluir: Rea
   const dxf = sin(dxf0, fuera);
   const fallos: string[] = [];
   const regenerados: string[] = [];
+  const huerfanos: string[] = [];
   const fallo = (s: string) => {
     if (fallos.length < 60) fallos.push(s);
   };
@@ -144,7 +147,13 @@ export function compararDwgConDxf(dwg0: Dxf, dxf0: Dxf, tol = 1e-9, excluir: Rea
   listas("modelo", dwg.entidades, dxf.entidades, (ents, de) => ({ ...de, entidades: ents }));
 
   // Los bloques: los mismos, con la misma base y las mismas entidades en el mismo orden
-  const nw = [...dwg.bloques.keys()].sort();
+  // Un anónimo que ninguna inserción ni cota usa, AutoCAD no lo escribe en el DXF: no cuenta
+  const usados = new Set<string>();
+  const usar = (l: Entidad[]) => l.forEach((e) => (e.tipo === "INSERT" || e.tipo === "DIMENSION") && usados.add(texto(e, 2)));
+  usar(dwg.entidades);
+  for (const b of dwg.bloques.values()) usar(b.entidades);
+  for (const n of dwg.bloques.keys()) if (!dxf.bloques.has(n) && n.startsWith("*") && !usados.has(n) && !/^\*(model|paper)_space/i.test(n)) huerfanos.push(n);
+  const nw = [...dwg.bloques.keys()].filter((n) => !huerfanos.includes(n)).sort();
   const nx = [...dxf.bloques.keys()].sort();
   if (nw.join("|") !== nx.join("|")) {
     const sx = new Set(nx);
@@ -166,5 +175,5 @@ export function compararDwgConDxf(dwg0: Dxf, dxf0: Dxf, tol = 1e-9, excluir: Rea
     donde = "dibujo entero";
   }
 
-  return { emparejadas, errorMaximo, donde, tolerancia: t, regenerados, fallos };
+  return { emparejadas, errorMaximo, donde, tolerancia: t, regenerados, huerfanos, fallos };
 }

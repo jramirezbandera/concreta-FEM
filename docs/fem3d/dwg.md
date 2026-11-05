@@ -1,6 +1,6 @@
 # DW: la plantilla desde un DWG (plan)
 
-> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, propuestas (DW-d, puesta en DW1 como se proponía). **DW1 hecho el 2026-11-05** (§9); **DW2, el mismo día** (§10).
+> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, propuestas (DW-d, puesta en DW1 como se proponía). **DW1 hecho el 2026-11-05** (§9); **DW2 y DW3, el mismo día** (§10 y §11).
 >
 > **Origen:** el usuario: «lo de tener que trabajar en DXF en lugar de DWG es un latazo». El 2026-10-28 se dejó el DWG sin decidir porque LibreDWG es GPL y el SDK de la ODA es de pago. Al mirarlo otra vez, apareció ACadSharp (MIT), que lee DWG, y se puede portar con la regla 6.
 
@@ -144,3 +144,48 @@ Tiempo, como información: la muestra de 1,3 MB, ~17 ms en Bun.
 ### 10.4 Lo siguiente
 
 DW3: 2004 y posteriores (AC1018, AC1024, AC1027, AC1032). Hay que añadir el mapa de páginas con su cabecera cifrada, la descompresión LZ77, el flujo de cadenas aparte (desde 2007) y los colores CMC y ENC de 2004. Con eso se puede hacer el criterio 3 con el DWG del cliente.
+
+## 11. DW3 hecho (2026-11-05)
+
+2004, 2010, 2013 y 2018 (AC1018, AC1024, AC1027 y AC1032), con todo lo de DW2. Pasan los criterios 1 y 2 en las cuatro, el 3 con el DWG del cliente y el 4.
+
+### 11.1 Qué hay
+
+- **`src/dwg/secciones2004.ts`:** la cabecera del fichero (los 0x6C bytes en 0x80, descifrados con la secuencia de `rand()` y comprobados con su CRC32), el mapa de páginas, el mapa de secciones y cada sección como la concatenación de sus páginas, descomprimidas con el LZ77 de 2004 (`lz77`). Comprueba todo lo que el fichero trae para comprobarse: la suma de las dos páginas del sistema, y la de los datos y la de la cabecera de cada página de datos. ACadSharp no comprueba nada de esto. Un DWG con contraseña (sección cifrada) se rechaza con un mensaje.
+- **`bits.ts`:** `TU` (texto en UTF-16, desde 2007) y `flujoCadenas` (el flujo de cadenas aparte, con su bandera y su tamaño detrás).
+- **`cabecera.ts`:** `Flujos.tv()` lee cada texto de donde toca (TV en la página de códigos hasta 2007, TU en las cadenas desde entonces), y el CMC de 2004 (índice, RGB y los nombres de color y libro).
+- **`objetos.ts`:** los objetos de 2010+ (el MC con el tamaño de los handles, el tipo en BB + RC o RS, las cadenas delante de los handles), el ENC de 2004 (color de libro con su handle, RGB, transparencia), las listas de objetos propios de los bloques, y las clases de 2004 y de 2007+ (con el RL extra de 2010 y 2013 con mantenimiento > 3, y de 2018).
+- **`entidades.ts`:** las listas propias de polilíneas e inserciones; el atributo de varias líneas de 2018 se lee hasta su texto principal (DW3-6).
+- **`lector.ts`:** las secciones de 2000 o de 2004+ según la versión. Los objetos se buscan en AcDb:AcDbObjects y, desde 2004, cada lista va en el orden de su propietario (el bloque, la polilínea o la inserción; el espacio modelo, el de `*Model_Space`).
+- **`comparar.ts`:** `huerfanos`, los anónimos del DWG que nada usa (DW3-8).
+- **`validacion/dwg/vivienda.ts`** (criterio 3, con los ficheros del cliente fuera de git; `out_vivienda.txt`) y `danados.ts` con 2004 y 2018.
+- **La 2007 (AC1021)** sigue diciendo «Todavía no se leen los DWG 2007: guárdalo como DWG 2010 o 2018, o como DXF» (DW5).
+
+### 11.2 Criterios
+
+| Criterio | Resultado |
+|---|---|
+| 1. Frente al DXF de AutoCAD | **Pasa en las cuatro:** 163 entidades en el espacio modelo y 27 bloques, como en el DXF; el dibujo entero igual; cada entidad por su handle dibuja lo mismo (334, y 333 en 2013 y 2018), a 2,3e-12. Fuera, el gancho del `LEADER` (DW2-4) y, en 2013 y 2018, la `SPLINE` por ajuste (DW3-5). Ningún objeto sin leer. |
+| 2. Entre versiones | **Pasa con lo explicado:** frente al DWG 2000, la geometría de lo que está en los dos es la misma bit a bit (sin textos ni nombres, que AutoCAD cambia al guardar en otra versión: DW3-9). Lo que falta, en los anónimos regenerados. |
+| 3. Un proyecto real | **Pasa:** el DWG 2018 de la vivienda de Alhaurín frente al DXF que exportó el cliente. 1 665 entidades en el espacio modelo, 1 845 emparejadas por handle, error máximo 1,1e-14; el dibujo entero igual (2 238 segmentos, 13 211 cuerdas, 4 145 puntos, 50 textos). Sobra un anónimo huérfano, `*D18` (DW3-8). Se lee en 16 ms. |
+| 4. Robustez | **Pasa:** 2 000 ficheros dañados por versión en 2004 y 2018 (`out_danados.txt`): casi todos dan un `ErrorDxf` del fichero entero (cada página comprimida lleva sus sumas; una página dañada invalida su sección, no un objeto), y los demás salen con el mismo dibujo. Nunca un dibujo distinto sin aviso ni otra excepción. En vitest, una tanda de 150 en 2018. |
+
+Tiempo, como información: las muestras de 1,1 MB, en 11–24 ms; la vivienda, 16 ms.
+
+### 11.3 Hallazgos
+
+- **DW3-1: la cabecera de una página de datos lleva la posición en 8 bytes (0x10–0x17), la suma de la cabecera en 0x18 y la de los datos en 0x1C.** ACadSharp lee estos campos un RL antes, pero no los usa. La suma de los datos es la de los bytes comprimidos con semilla 0; la de la cabecera, la de sus 32 bytes con su campo a 0 y con la de los datos como semilla. La de las páginas del sistema, la de sus datos con la de su cabecera (con su campo a 0) como semilla. Las tres se comprobaron en las cuatro muestras.
+- **DW3-2: cada página se descomprime a su tamaño máximo (0x7400),** con relleno detrás de lo que es de la sección. Con un tope del tamaño de la sección, el LZ77 se pasaba (ACadSharp escribe en un stream que crece y no lo nota).
+- **DW3-3: un color de libro (ENC con 0x4000) no lleva RGB, sólo su handle.** Con el RGB, un `CIRCLE` de la muestra de 2004 se leía más allá de su final. Esta vez ACadSharp acertaba y el recuerdo de la especificación no.
+- **DW3-4 (fallo del dibujo de V2c-4): el salto de línea de un `MTEXT` en notación `^`.** El DXF y el DWG hasta 2000 lo escriben «^J»; el DWG desde 2004, como carácter. `textoMtext` (como `plain_mtext` de ezdxf) descodifica ahora `^` seguido de `@`…`_` como un carácter de control, salvo dentro de una fracción apilada. Antes, un texto de varias líneas de un DXF salía con «^J» en la plantilla.
+- **DW3-5 (diferencia conocida): desde 2013, una `SPLINE` hecha por ajuste sólo guarda su ajuste** (los puntos y las tangentes de los extremos; comprobado al bit con lo que mide el objeto). Los puntos de control que trae el DXF los calcula AutoCAD al exportar, con su método. Se dibuja como `aplanar.ts` dibuja hoy una spline sin puntos de control: tramos rectos entre los puntos de ajuste, con sus extremos para enganchar. Rehacer los puntos de control de AutoCAD necesitaría su algoritmo de interpolación (las tangentes interiores y su parametrización); está en lo que queda (§11.4).
+- **DW3-6: un atributo de varias líneas (2018)** lleva su texto en un `MTEXT` incrustado y el principal, vacío; el DXF igual. Ni el DWG ni el DXF lo dibujan; en 2000 es un atributo de una línea.
+- **DW3-7 (fallo del lector de DXF de V2c-4): lo que va detrás de «101 Embedded Object»** (desde 2018, en `MTEXT` y atributos de varias líneas) es una copia con otro significado de los códigos: allí el 11 es la inserción. El lector de DXF lo tomaba como la dirección del texto y lo giraba (0,03–0,08 rad en la muestra). Ahora se ignora. La vivienda sigue igual frente a ezdxf.
+- **DW3-8: AutoCAD no escribe en el DXF los anónimos que nada usa** (en la vivienda, el `*D18`, una cota borrada). El DWG los guarda; no se dibujan y el comparador los dice aparte.
+- **DW3-9: al guardar en otra versión, AutoCAD cambia textos y nombres** (la capa «0 @ 1» de 2000 es «0» desde 2010; los saltos de línea de `MTEXT`, `\P` o un carácter; el formato de la fracción de una cota; el nombre del anónimo del bloque dinámico desde 2010), pero no la geometría.
+
+### 11.4 Lo que queda
+
+- **DW4:** el DWG en la app (los selectores, el texto de DW-e y la lectura en el worker) y los criterios 5 y 6 en Chrome. `NavPlantillas.tsx` lo estaba tocando otra sesión: hay que mirarlo antes.
+- **DW5:** la 2007 (AC1021), con su Reed-Solomon y su LZ77.
+- **Para el usuario:** si se rehacen los puntos de control de las splines por ajuste (DW3-5) y el gancho de los `LEADER` (DW2-4). Los dos son raros en planos de estructura.

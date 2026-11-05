@@ -12,8 +12,8 @@
  */
 
 import { ErrorDxf } from "../dxf/lector.ts";
-import { Bits, crc16, DWG_CORTADO } from "./bits.ts";
-import { cmc, type Flujos } from "./cabecera.ts";
+import { Bits, crc16, DWG_CORTADO, flujoCadenas } from "./bits.ts";
+import { cmc, type Flujos, hacerFlujos } from "./cabecera.ts";
 import type { Version } from "./version.ts";
 
 /** Los tipos fijos de objeto (Open Design Specification §20.4.1; `Types/ObjectType.cs` de ACadSharp). */
@@ -118,40 +118,61 @@ export interface Objeto {
   f: Flujos;
 }
 
-/** Posición del primer bit de los datos (justo detrás del MS del tamaño) y su tope. */
-interface Abierto {
+/** Un objeto con su tipo leído: dónde empiezan y acaban sus datos y, desde 2010, sus flujos. */
+export interface Abierto {
   tipo: number;
   inicio: number;
   fin: number;
   d: Bits;
+  /** Desde 2010, los flujos ya están (el tamaño de los handles va delante); antes, los da el RL de la cabecera común. */
+  f: Flujos | null;
+  v: Version;
+  dec: TextDecoder;
 }
 
-/** Abre el objeto que empieza en el byte `offset` de `buf` y lee su tipo. */
-export function abrir(v: Version, buf: Uint8Array, offset: number): Abierto {
+/**
+ * Abre el objeto que empieza en el byte `offset` de `buf` (el fichero hasta 2000; la sección
+ * AcDb:AcDbObjects desde 2004) y lee su tipo. Comprueba su CRC: el del tamaño (MS), el tamaño de
+ * los handles (MC, desde 2010) y los datos.
+ */
+export function abrir(v: Version, buf: Uint8Array, offset: number, dec: TextDecoder): Abierto {
   if (!Number.isInteger(offset) || offset < 0 || offset >= buf.length) throw new ErrorDxf(DWG_CORTADO);
   const c = new Bits(buf, offset * 8);
   const tam = c.MS();
   if (tam <= 0) throw new ErrorDxf("El DWG está dañado: un objeto de tamaño 0.");
+  const bitsHandles = v.r2010 ? c.MC() : 0;
   const inicio = c.pos;
   const fin = inicio + tam * 8;
-  if (v.r2010) throw new Error("objetos de R2010+: DW3");
-  // RS: el CRC del tamaño y los datos, detrás de ellos
+  // RS: el CRC, detrás de los datos
   const crc = crc16(buf, offset, fin >> 3);
   if (c.en(fin, buf.length * 8).RSu() !== crc) throw new ErrorDxf("El objeto no pasa su CRC: el DWG está dañado.");
-  const d = c.en(inicio, fin);
-  return { tipo: d.BS(), inicio, fin, d };
+  if (!v.r2010) {
+    const d = c.en(inicio, fin);
+    return { tipo: d.BS(), inicio, fin, d, f: null, v, dec };
+  }
+  // Desde 2010: los handles, al final; las cadenas, delante de ellos (con su bandera justo antes)
+  const finDatos = fin - bitsHandles;
+  if (bitsHandles > tam * 8 || finDatos <= inicio) throw new ErrorDxf("El DWG está dañado: un objeto con más handles que datos.");
+  const d = c.en(inicio, finDatos);
+  const h = c.en(finDatos, fin);
+  const t = flujoCadenas(buf, finDatos - 1);
+  // El tipo (desde 2010): BB y un RC, 0x1F0 más un RC, o un RS
+  const par = d.BB();
+  const tipo = par === 0 ? d.RC() : par === 1 ? 0x1f0 + d.RC() : d.RSu();
+  return { tipo, inicio, fin, d, f: hacerFlujos(v, d, t, h, dec), v, dec };
 }
 
-/** RL con el tamaño de los datos en bits: el flujo de handles empieza ahí. */
+/** Hasta 2007: el RL con el tamaño de los datos en bits; el flujo de handles empieza ahí. */
 function flujos(a: Abierto): Flujos {
   const bits = a.d.RL();
   const h = a.d.en(a.inicio + bits, a.fin);
-  return { d: a.d, t: a.d, h };
+  if (a.v.r2007) throw new Error("objetos de 2007 (AC1021): DW5");
+  return hacerFlujos(a.v, a.d, a.d, h, a.dec);
 }
 
-/** El handle del objeto y sus datos extendidos (EED), que se saltan. Hasta R2007 lleva el tamaño de los datos. */
+/** El handle del objeto y sus datos extendidos (EED), que se saltan. De 2000 a 2007, antes va el tamaño de los datos. */
 function comun(v: Version, a: Abierto): { handle: number; f: Flujos | null } {
-  const f = v.r2000 && !v.r2010 ? flujos(a) : null;
+  const f = a.f ?? (v.r2000 ? flujos(a) : null);
   const handle = a.d.H();
   for (let tam = a.d.BS(), k = 0; tam !== 0; tam = a.d.BS(), k++) {
     if (tam < 0 || k > 1e5) throw new ErrorDxf("El DWG está dañado: datos extendidos con un tamaño negativo.");
@@ -184,7 +205,7 @@ export interface Entidad extends Objeto {
   modo: number;
   propietario: number;
   capa: number;
-  /** La anterior y la siguiente de la lista (hasta R2000). */
+  /** La anterior y la siguiente de la lista (hasta 2000; desde 2004, el orden lo da el propietario). */
   anterior: number;
   siguiente: number;
   invisible: boolean;
@@ -210,8 +231,17 @@ export function entidad(v: Version, a: Abierto): Entidad {
     anterior = h.H(c.handle);
     siguiente = h.H(c.handle);
   }
-  if (v.r2004) throw new Error("color de entidad de R2004+: DW3");
-  d.BS(); // color
+  if (!v.r2004) d.BS(); // color
+  else {
+    // ENC: BS con el índice y las banderas. 0x4000: color de libro (un handle, sin RGB; DW3-3); si no,
+    // 0x8000: RGB (BL). 0x2000: transparencia (BL).
+    const n = d.BS() & 0xffff;
+    if (n !== 0) {
+      if (n & 0x4000) h.H();
+      else if (n & 0x8000) d.BL();
+      if (n & 0x2000) d.BL();
+    }
+  }
   d.BD(); // escala del tipo de línea
   if (v.r2000) {
     capa = h.H();
@@ -240,8 +270,8 @@ export function control(v: Version, a: Abierto): { objeto: Objeto; entradas: num
 }
 
 /** El nombre de una entrada de tabla y sus banderas de referencia externa. */
-function nombreEntrada(v: Version, o: Objeto, dec: TextDecoder): string {
-  const nombre = o.f.t.TV(dec);
+function nombreEntrada(v: Version, o: Objeto): string {
+  const nombre = o.f.tv();
   if (v.r2007) o.f.d.BS();
   else {
     o.f.d.B();
@@ -258,9 +288,9 @@ export interface CapaDwg {
   congelada: boolean;
 }
 
-export function capa(v: Version, a: Abierto, dec: TextDecoder): CapaDwg {
+export function capa(v: Version, a: Abierto): CapaDwg {
   const o = objeto(v, a);
-  const nombre = nombreEntrada(v, o, dec);
+  const nombre = nombreEntrada(v, o);
   const { d } = o.f;
   let congelada = false;
   let apagada = false;
@@ -278,7 +308,6 @@ export function capa(v: Version, a: Abierto, dec: TextDecoder): CapaDwg {
   return { handle: o.handle, nombre, apagada: apagada || color < 0, congelada };
 }
 
-
 // ─── Bloques ────────────────────────────────────────────────────────────────────────────────────
 
 export interface CabeceraBloque {
@@ -289,27 +318,34 @@ export interface CabeceraBloque {
   base: [number, number, number];
   /** El BLOCK que abre su definición. */
   inicio: number;
+  /** Desde 2004, sus entidades en su orden (hasta 2000, la lista va de una a la siguiente). */
+  propias: number[] | null;
 }
 
-export function cabeceraBloque(v: Version, a: Abierto, dec: TextDecoder): CabeceraBloque {
+export function cabeceraBloque(v: Version, a: Abierto): CabeceraBloque {
   const o = objeto(v, a);
-  const nombre = nombreEntrada(v, o, dec);
+  const nombre = nombreEntrada(v, o);
   const { d, h } = o.f;
   d.B(); // anónimo
   d.B(); // con atributos
   const xref = d.B() === 1;
   const superpuesto = d.B() === 1;
   if (v.r2000) d.B(); // cargado
-  if (v.r2004 && !xref && !superpuesto) d.BL(); // objetos propios
+  const n = v.r2004 && !xref && !superpuesto ? h.cuenta(d.BL(), 8) : 0;
   const base = d.BD3();
   h.H(); // NULL
   const inicio = h.H();
-  return { handle: o.handle, nombre, xref: xref || superpuesto, base, inicio };
+  let propias: number[] | null = null;
+  if (v.r2004) {
+    propias = [];
+    for (let i = 0; i < n; i++) propias.push(h.H());
+  }
+  return { handle: o.handle, nombre, xref: xref || superpuesto, base, inicio, propias };
 }
 
-/** El nombre de un BLOCK (TV, detrás de la cabecera común de entidad). */
-export function nombreBloque(e: Entidad, dec: TextDecoder): string {
-  return e.f.t.TV(dec);
+/** El nombre de un BLOCK (un texto, detrás de la cabecera común de entidad). */
+export function nombreBloque(e: Entidad): string {
+  return e.f.tv();
 }
 
 // ─── Clases ─────────────────────────────────────────────────────────────────────────────────────
@@ -323,27 +359,52 @@ export interface Clase {
   entidad: boolean;
 }
 
-/** AcDb:Classes de R13–R2000: las clases (tipo ≥ 500) con su nombre de DXF. */
-export function leerClases(v: Version, s: Bits, dec: TextDecoder): Map<number, Clase> {
-  if (v.r2004) throw new Error("clases de R2004+: DW3");
+/**
+ * AcDb:Classes: las clases (tipo ≥ 500) con su nombre de DXF. `mantenimiento` es el del fichero
+ * (en 2010 y 2013, con > 3 lleva un RL más tras el tamaño, como la cabecera).
+ */
+export function leerClases(v: Version, s: Bits, dec: TextDecoder, mantenimiento = 0): Map<number, Clase> {
   const inicio = s.pos >> 3;
   const marca = s.bytes(16);
   if (!SENTINELA_CLASES.every((x, i) => marca[i] === x)) throw new ErrorDxf("El DWG está dañado: la sección de las clases no empieza por su marca.");
   const tam = s.RLu();
-  const datos = (s.pos >> 3);
+  const extra = (v.r2010 && mantenimiento > 3) || v.r2018;
+  if (extra) s.RL();
+  const datos = s.pos >> 3;
   const fin = datos + tam;
   const clases = new Map<number, Clase>();
   const d = s.en(s.pos, fin * 8);
-  while (Math.ceil(d.pos / 8) < fin) {
+  let t: Bits | null = d;
+  let finDatos = fin * 8;
+  if (v.r2007) {
+    // RL con el tamaño en bits; la bandera de las cadenas, en su último bit
+    const bandera = d.pos + d.RLu() - 1;
+    t = flujoCadenas(s.buf, bandera);
+    finDatos = t ? t.pos : bandera;
+    d.BL(); // 0
+    d.B();
+  }
+  if (v.r2004 && !v.r2007) {
+    d.BS(); // el mayor número de clase
+    d.RC();
+    d.RC();
+    d.B();
+  }
+  const f = hacerFlujos(v, d, t, d, dec);
+  const queda = () => (v.r2007 ? d.pos < finDatos : Math.ceil(d.pos / 8) < fin);
+  for (let k = 0; queda(); k++) {
+    if (k > 1e5) throw new ErrorDxf("El DWG está dañado: la sección de las clases no acaba.");
     const numero = d.BS();
     d.BS(); // banderas de proxy
-    d.TV(dec); // aplicación
-    d.TV(dec); // clase de C++
-    const nombreDxf = d.TV(dec);
+    f.tv(); // aplicación
+    f.tv(); // clase de C++
+    const nombreDxf = f.tv();
     d.B(); // zombi
     const id = d.BS();
+    if (v.r2004) for (let i = 0; i < 5; i++) d.BL(); // instancias, versión, mantenimiento y dos más
     clases.set(numero, { numero, nombreDxf, entidad: id === 0x1f2 });
   }
+  // RS: el CRC del tamaño y los datos, desde detrás de la marca
   const crc = crc16(s.buf, inicio + 16, fin);
   if (s.en(fin * 8).RSu() !== crc) throw new ErrorDxf("El DWG está dañado: la sección de las clases no pasa su CRC.");
   return clases;

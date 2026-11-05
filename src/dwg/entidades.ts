@@ -24,6 +24,8 @@ export interface Traducida {
   valores: string[];
   /** El handle del BLOCK_HEADER de un INSERT o una DIMENSION: su nombre va en el código 2. */
   bloque?: number;
+  /** Desde 2004, los vértices de una POLYLINE o los atributos de un INSERT, en su orden. */
+  propias?: number[];
 }
 
 /** El nombre de DXF de cada tipo fijo de entidad. */
@@ -83,6 +85,7 @@ class Pares implements Traducida {
   codigos: number[] = [];
   valores: string[] = [];
   bloque?: number;
+  propias?: number[];
   readonly tipo: string;
   constructor(tipo: string) {
     this.tipo = tipo;
@@ -115,9 +118,14 @@ export function soloTipo(tipo: string): Traducida {
  * La traducción de la entidad `e` (con su cabecera común ya leída), o sólo su tipo si `aplanar.ts`
  * no la dibuja. Lee los flujos de `e` en su orden.
  */
-export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
+export function traducir(v: Version, e: Entidad): Traducida {
   const { d, h } = e.f;
-  const tv = () => e.f.t.TV(dec);
+  const tv = () => e.f.tv();
+  /** Desde 2004: n handles de lo que es suyo (vértices o atributos). */
+  const propias = (n: number) => {
+    r.propias = [];
+    for (let i = 0; i < n; i++) r.propias.push(h.H());
+  };
   const nombre = NOMBRE_DXF[e.tipo];
   if (!nombre) throw new ErrorDxf(`Tipo de entidad sin nombre: ${e.tipo}.`);
   const r = new Pares(nombre);
@@ -272,6 +280,7 @@ export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
       const espesor = d.BT(v.r2000);
       const elevacion = d.BD();
       const normal = d.BE(v.r2000);
+      if (v.r2004) propias(h.cuenta(d.BL(), 8));
       r.pt(10, [0, 0, elevacion]);
       r.si(39, espesor, 0);
       r.p(70, flags);
@@ -282,6 +291,7 @@ export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
     case TIPO.POLYLINE_3D: {
       const curva = d.RC();
       const cerrada = d.RC();
+      if (v.r2004) propias(h.cuenta(d.BL(), 8));
       r.pt(10, [0, 0, 0]);
       r.p(70, 8 | (cerrada & 1) | (curva & 3 ? 4 : 0));
       return r;
@@ -321,6 +331,7 @@ export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
       if (v.r2013) {
         const f1 = d.BL();
         const nudo = d.BL();
+        // Desde 2013, una spline hecha por ajuste guarda sólo el ajuste (DW3-5: los puntos de control del DXF los calcula AutoCAD al exportar)
         escenario = nudo === 15 || (f1 & 8) === 0 ? 1 : 2;
       }
       const grado = d.BL();
@@ -378,11 +389,13 @@ export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
     case TIPO.ATTRIB:
     case TIPO.ATTDEF: {
       if (e.tipo === TIPO.ATTDEF) return r; // no se dibuja
-      texto(v, e, r, dec);
+      texto(v, e, r);
       if (e.tipo === TIPO.ATTRIB) {
         // Lo común de los atributos: etiqueta, longitud y banderas (70)
         if (v.r2010) d.RC();
-        if (v.r2018 && d.RC() > 1) throw new Error("ATTRIB multilínea de R2018+: DW3");
+        // De varias líneas (2018): su texto va en un MTEXT incrustado y el principal, vacío, como en el
+        // DXF; ni uno ni otro lo dibujan (DW3-6). Se queda con lo leído.
+        if (v.r2018 && d.RC() > 1) return r;
         r.p(2, tv());
         d.BS();
         r.p(70, d.RC());
@@ -439,7 +452,7 @@ export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
       const giro = d.BD();
       const normal = d.BD3();
       const atributos = d.B() === 1;
-      if (v.r2004 && atributos) d.BL();
+      const nAtributos = v.r2004 && atributos ? h.cuenta(d.BL(), 8) : 0;
       r.p(2, "");
       r.pt(10, p);
       r.si(41, s[0]!, 1);
@@ -455,6 +468,7 @@ export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
         r.si(45, d.BD(), 0);
       }
       r.bloque = h.H();
+      if (v.r2004 && atributos) propias(nAtributos);
       return r;
     }
 
@@ -503,7 +517,7 @@ export function traducir(v: Version, e: Entidad, dec: TextDecoder): Traducida {
 }
 
 /** TEXT y ATTRIB: lo común de los textos de una línea (DXF 10, 11, 40, 1, 50, 41, 51, 71, 72, 73 o 74). */
-function texto(v: Version, e: Entidad, r: Pares, dec: TextDecoder): void {
+function texto(v: Version, e: Entidad, r: Pares): void {
   const { d } = e.f;
   const vertical = e.tipo === TIPO.ATTRIB ? 74 : 73;
   if (v.r13_14) {
@@ -516,7 +530,7 @@ function texto(v: Version, e: Entidad, r: Pares, dec: TextDecoder): void {
     const giro = d.BD();
     const alto = d.BD();
     const ancho = d.BD();
-    const s = e.f.t.TV(dec);
+    const s = e.f.tv();
     const gen = d.BS();
     const ah = d.BS();
     const av = d.BS();
@@ -544,7 +558,7 @@ function texto(v: Version, e: Entidad, r: Pares, dec: TextDecoder): void {
   const giro = flags & 0x8 ? 0 : d.RD();
   const alto = d.RD();
   const ancho = flags & 0x10 ? 1 : d.RD();
-  const s = e.f.t.TV(dec);
+  const s = e.f.tv();
   const gen = flags & 0x20 ? 0 : d.BS();
   const ah = flags & 0x40 ? 0 : d.BS();
   const av = flags & 0x80 ? 0 : d.BS();

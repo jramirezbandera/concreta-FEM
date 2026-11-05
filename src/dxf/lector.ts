@@ -157,8 +157,13 @@ export function leerDxf(bytes: Uint8Array): Dxf {
   const entidad = (k: number): { e: Entidad; sig: number } => {
     const e: Entidad = { tipo: valores[k]!.trim(), capa: "0", codigos: [], valores: [] };
     let j = k + 1;
+    let incrustado = false;
     for (; j < n && codigos[j] !== 0; j++) {
       const c = codigos[j]!;
+      // Desde 2018, un MTEXT (o un atributo de varias líneas) lleva detrás de «101 Embedded Object»
+      // una copia con otro significado de los códigos (el 11 es la inserción): no es de la entidad (DW3-7)
+      if (c === 101) incrustado = true;
+      if (incrustado) continue;
       // El 3 de un MTEXT es un trozo de su texto (de 250 caracteres): sus espacios cuentan (DW2-1)
       const v = NOMBRES.has(c) && !(c === 3 && e.tipo === "MTEXT") ? valores[j]!.trim() : valores[j]!;
       e.codigos.push(c);

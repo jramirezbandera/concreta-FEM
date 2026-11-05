@@ -16,7 +16,7 @@ const veces = Number(process.argv[2] ?? 2000);
 const firma = (d: DibujoDxf) => JSON.stringify(d, (_, x) => (ArrayBuffer.isView(x) ? Array.from(x as Float64Array) : x));
 let malos = 0;
 
-for (const v of ["AC1014", "AC1015"]) {
+for (const v of ["AC1014", "AC1015", "AC1018", "AC1032"]) {
   const original = muestra(`sample_${v}.dwg`);
   const bien = firma(aplanarDxf(leerDwg(original)));
   let semilla = 7;
