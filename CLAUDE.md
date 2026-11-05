@@ -747,6 +747,10 @@
   - **MA5:** `"tipo": "escalon"` en una planta (la vivienda lo lleva en `CUB-S`): sin aviso de altura del tramo que llega a ella.
   - **Fuera del plan:** `fem vigas-borde` («Vigas de borde» del editor en la CLI, sólo propone salvo `--escribir`).
   - **Pendiente del usuario:** los campos propios de MA2 y MA4 en lugar de las variantes de `modelado.md` §2, y `fem vigas-borde`.
+- **2026-11-05: la puerta de MA** (criterio 1, `modelado.md` §9–§10, `validacion/ma/puerta/`). Tres agentes con la skill, la CLI y el DXF real rehicieron la vivienda: **una ronda de preguntas cada uno, sin código propio**, y el modelo que piden las respuestas (la cubierta alta, a ≤ 0,16 % del ejemplo). El criterio tal como está escrito no pasa por dos cosas del dibujo: la fila de x = 0 a −0,02 m por «Alinear» (5 pilares a 2 cm) y hasta dónde llega la cubierta baja bajo la alta (la cara de los pilares, como el DXF, o su eje, como el ejemplo: −1 % / +2,3 %).
+  - **Fallo destapado y corregido:** `fem revisar` y `fem consultar` acababan en error interno con `abacosPilares` o cargas `borde` (`Consultas` validaba sin resolverlos). Ahora `validar` los resuelve (`fisicoResuelto`).
+  - **Para MA:** la pregunta del escalón en la lista de MA1, y `fem vigas-borde` en el lado que da a otra losa en otra planta (propone el zuncho enrasado por dentro, lejos de los pilares).
+  - **Pendiente del usuario:** dar el criterio 1 por cumplido con esas dos diferencias o repetirlo tras añadir la pregunta del escalón.
 - **2026-11-05: la auditoría del motor, puntos 5 y 6 (`auditoria.md` §8), y los bancos de Chrome otra vez:**
   - **Auditoría:**
     - AU-5: las caras de banda fuera de la malla y el reparto lo avisan;

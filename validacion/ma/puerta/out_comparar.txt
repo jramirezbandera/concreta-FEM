@@ -1,0 +1,51 @@
+## validacion/ma/puerta/proyectos/agente1.json
+
+Pilares: 23 (ejemplo 23); distancia máxima 2.0 cm; a más de 1 cm: P3 2.0 cm, P11 2.0 cm, P14 2.0 cm, P18 2.0 cm, P22 2.0 cm → NO pasa
+Losa a +3.40: L2, reticular 0.3 m, 0.72/0.12/0.05, casetón perdido, pp 4.5; área 119.68 m² (ejemplo 109.03, a ejes de los zunchos) → datos iguales
+  ábacos: 8 (ejemplo 11); peor diferencia de caja 428.0 cm, 8 dados → NO pasa
+Losa a +4.30: L1, reticular 0.3 m, 0.72/0.12/0.05, casetón perdido, pp 4.5; área 102.71 m² (ejemplo 93.54, a ejes de los zunchos) → datos iguales
+  ábacos: 10 (ejemplo 10); peor diferencia de caja 0.4 cm, 10 dados → pasa
+Cargas por planta y caso: peor 1.24 % → NO pasa
+  +4.30 G: 961.82 kN (ejemplo 960.90; +0.10 %)
+  +4.30 Q: 102.71 kN (ejemplo 102.54; +0.16 %)
+  +4.30 S: 20.54 kN (ejemplo 20.51; +0.16 %)
+  +3.40 G: 1209.13 kN (ejemplo 1224.31; -1.24 %)
+  +3.40 Q: 119.68 kN (ejemplo 119.75; -0.06 %)
+  +3.40 S: 23.94 kN (ejemplo 23.95; -0.06 %)
+
+**NO pasa (3)**
+
+## validacion/ma/puerta/proyectos/agente2.json
+
+Pilares: 23 (ejemplo 23); distancia máxima 2.0 cm; a más de 1 cm: P3 2.0 cm, P11 2.0 cm, P14 2.0 cm, P18 2.0 cm, P22 2.0 cm → NO pasa
+Losa a +3.40: L2, reticular 0.3 m, 0.72/0.12/0.05, casetón perdido, pp 4.5; área 119.68 m² (ejemplo 109.03, a ejes de los zunchos) → datos iguales
+  ábacos: 8 (ejemplo 11); peor diferencia de caja 428.0 cm, con abacosPilares {"lado":2} → NO pasa
+Losa a +4.30: L1, reticular 0.3 m, 0.72/0.12/0.05, casetón perdido, pp 4.5; área 102.71 m² (ejemplo 93.54, a ejes de los zunchos) → datos iguales
+  ábacos: 10 (ejemplo 10); peor diferencia de caja 0.4 cm, con abacosPilares {"lado":2} → pasa
+Cargas por planta y caso: peor 0.99 % → NO pasa
+  +4.30 G: 961.82 kN (ejemplo 960.90; +0.10 %)
+  +4.30 Q: 102.71 kN (ejemplo 102.54; +0.16 %)
+  +4.30 S: 20.54 kN (ejemplo 20.51; +0.16 %)
+  +3.40 G: 1212.13 kN (ejemplo 1224.31; -0.99 %)
+  +3.40 Q: 119.68 kN (ejemplo 119.75; -0.06 %)
+  +3.40 S: 23.94 kN (ejemplo 23.95; -0.06 %)
+
+**NO pasa (3)**
+
+## validacion/ma/puerta/proyectos/agente3.json
+
+Pilares: 23 (ejemplo 23); distancia máxima 2.0 cm; a más de 1 cm: P3 2.0 cm, P11 2.0 cm, P14 2.0 cm, P18 2.0 cm, P22 2.0 cm → NO pasa
+Losa a +3.40: L2, reticular 0.3 m, 0.72/0.12/0.05, casetón perdido, pp 4.5; área 122.47 m² (ejemplo 109.03, a ejes de los zunchos) → datos iguales
+  ábacos: 11 (ejemplo 11); peor diferencia de caja 2.0 cm, 11 dados → NO pasa
+Losa a +4.30: L1, reticular 0.3 m, 0.72/0.12/0.05, casetón perdido, pp 4.5; área 102.71 m² (ejemplo 93.54, a ejes de los zunchos) → datos iguales
+  ábacos: 10 (ejemplo 10); peor diferencia de caja 1.0 cm, 10 dados → pasa
+Cargas por planta y caso: peor 2.27 % → NO pasa
+  +4.30 G: 961.82 kN (ejemplo 960.90; +0.10 %)
+  +4.30 Q: 102.71 kN (ejemplo 102.54; +0.16 %)
+  +4.30 S: 20.54 kN (ejemplo 20.51; +0.16 %)
+  +3.40 G: 1233.19 kN (ejemplo 1224.31; +0.73 %)
+  +3.40 Q: 122.47 kN (ejemplo 119.75; +2.27 %)
+  +3.40 S: 24.49 kN (ejemplo 23.95; +2.27 %)
+
+**NO pasa (3)**
+

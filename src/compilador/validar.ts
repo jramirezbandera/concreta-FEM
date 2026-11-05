@@ -7,11 +7,11 @@ import { PSI_NOMBRES, type PsiNombrado } from "../combinaciones/psi.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
-import { ladosAbacos } from "./abacos.ts";
-import { problemaBorde } from "./bordes.ts";
+import { ladosAbacos, resolverAbacos } from "./abacos.ts";
+import { problemaBorde, resolverBordes } from "./bordes.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type Barra, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
-import { BOVEDILLAS, CASETONES, desglosePano, pesoReticular } from "./pesoForjado.ts";
+import { BOVEDILLAS, CASETONES, desglosePano, pesoReticular, textoOrigenPp } from "./pesoForjado.ts";
 import { areaConSigno, areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { flexionUniforme, multiplicadoresAbacoUniforme, multiplicadoresReticular, volumenReticular } from "./reticular.ts";
 import { compilarSeccion, materialElastico, type SeccionCompilada } from "./secciones.ts";
@@ -51,6 +51,8 @@ export interface ReticularCompilado {
 export interface PanoCompilado {
   /** El paño, con su pp (el escrito o el de `pesoForjado.ts`). */
   pano: PanoUnidireccional & { pp: number };
+  /** Cómo sale su pp, en una frase (`textoOrigenPp`), para las hipótesis. */
+  origenPp: string;
   region: Region;
   /** Planta (índice). */
   k: number;
@@ -155,6 +157,27 @@ export interface Contexto {
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/**
+ * Lo que está mal en un `relleno` (2026-11-05), o null: o un peso aparente ≥ 0 (kN/m³ de hueco, no más
+ * que el hormigón macizo) o el peso de pieza y las piezas por m² (> 0), nunca las dos; y su procedencia.
+ */
+function rellenoNoValido(r: unknown): string | null {
+  if (!esObjeto(r)) return "el relleno tiene que ser { pesoAparente } (kN/m³ de hueco) o { pesoPieza, piezasM2 } (kg y piezas por m²)";
+  const aparente = r.pesoAparente !== undefined;
+  const piezas = r.pesoPieza !== undefined || r.piezasM2 !== undefined;
+  if (aparente === piezas) return aparente ? "el relleno es o un peso aparente (pesoAparente) o el de sus piezas (pesoPieza y piezasM2), no los dos: se contaría dos veces" : "el relleno necesita pesoAparente (kN/m³ de hueco) o pesoPieza y piezasM2";
+  if (aparente && !(num(r.pesoAparente) && r.pesoAparente >= 0 && r.pesoAparente <= 30)) return "el peso aparente del relleno tiene que ser un número entre 0 y 30 kN/m³ (más que el hormigón macizo no puede pesar)";
+  if (piezas && !(num(r.pesoPieza) && r.pesoPieza > 0 && num(r.piezasM2) && r.piezasM2 > 0)) return "el relleno por piezas necesita pesoPieza (kg) y piezasM2 (piezas por m²), los dos números > 0";
+  return r.procedencia === undefined ? null : procedenciaNoValida(r.procedencia);
+}
+
+/** Lo que está mal en una `procedencia`, o null. */
+function procedenciaNoValida(p: unknown): string | null {
+  if (!esObjeto(p) || !["estimado", "fabricante", "usuario"].includes(p.origen as string)) return "la procedencia tiene que ser { origen: «estimado», «fabricante» o «usuario», fuente? }";
+  if (p.fuente !== undefined && typeof p.fuente !== "string") return "la fuente de la procedencia tiene que ser un texto";
+  return null;
+}
 const pos = (v: unknown): v is number => num(v) && v > 0;
 const vec3 = (v: unknown): boolean => Array.isArray(v) && v.length === 3 && v.every(num);
 const vec2 = (v: unknown): boolean => Array.isArray(v) && v.length === 2 && v.every(num);
@@ -255,7 +278,15 @@ function ranura(p: readonly Vec2[], eps: number): { i: number; j: number; d: num
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
 
+/** El modelo con los ábacos de los pilares (MA2) y las cargas de borde (MA4) resueltos, como lo valida y compila el compilador. */
+export function fisicoResuelto(fisico: ModeloFisico, op: Pick<OpcionesResueltas, "tamanoMalla" | "epsGeom" | "epsSnap">): ModeloFisico {
+  return resolverBordes(resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom).modelo, op.epsSnap).modelo;
+}
+
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
+  // MA2 y MA4: los ábacos de los pilares y las cargas de borde, resueltos (idempotente: el compilador
+  // ya los trae resueltos; las consultas, las bandas y los muros validan el modelo tal como se guarda)
+  fisico = fisicoResuelto(fisico, op);
   const f = fisico as unknown as Record<string, unknown>;
   if (!esObjeto(f)) {
     diag.error("fisico/no-valido", "El modelo físico no es un objeto.");
@@ -661,6 +692,11 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     usaPlanta(l.id, l.planta);
     if (!pos(l.espesor)) mal(l.id, "el espesor tiene que ser un número > 0 (m)");
     if (l.pp !== undefined && !(num(l.pp) && l.pp >= 0)) mal(l.id, "el peso propio pp tiene que ser un número ≥ 0 (kN/m²)");
+    if (l.ppProcedencia !== undefined) {
+      const e = procedenciaNoValida(l.ppProcedencia);
+      if (e) mal(l.id, e);
+      else if (l.pp === undefined) mal(l.id, "la procedencia del pp (ppProcedencia) es la de un pp escrito, y no lo hay");
+    }
     if (l.eje1 !== undefined && !num(l.eje1)) mal(l.id, "el eje 1 tiene que ser un número (grados)");
     const m = typeof l.material === "string" ? material.get(l.material) : undefined;
     if (!m) diag.error("fisico/referencia", `${l.id}: el material «${String(l.material)}» no existe.`, [l.id]);
@@ -735,7 +771,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     const g = { h: l.espesor, hf: r.capa, bw: r.nervio, s: r.intereje };
     const dados = r.multiplicadores !== undefined;
     // Sin pp, el de su casetón (`pesoForjado.ts`); con "perdido" sin pp ya hay un error (reticular/sin-pp)
-    const ppAligerada = l.pp ?? pesoReticular(g, peso, r.caseton)?.pp ?? peso * volumenReticular(g);
+    const ppAligerada = l.pp ?? pesoReticular(g, peso, r.caseton, r.relleno)?.pp ?? peso * volumenReticular(g);
     // CY3: con «uniforme», la flexión y la torsión de CYPECAD en las dos zonas; la membrana y el cortante, por zonas
     const uniforme = !dados && op.rigidezReticular === "uniforme";
     const calculados = multiplicadoresReticular(g, nu);
@@ -796,9 +832,19 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     const okS = num(p.intereje) && p.intereje > 2 * op.epsSnap;
     const okBov = p.bovedilla === undefined || (BOVEDILLAS as readonly unknown[]).includes(p.bovedilla);
     if (!okBov) mal(p.id, `la bovedilla tiene que ser ${BOVEDILLAS.map((x) => `«${x}»`).join(", ")}`);
+    const malRelleno = p.relleno === undefined ? null : rellenoNoValido(p.relleno);
+    if (malRelleno) mal(p.id, malRelleno);
+    else if (p.relleno !== undefined && p.pp !== undefined)
+      diag.aviso("forjado/relleno-sin-efecto", `${p.id}: tiene el pp escrito y un relleno; manda el pp, y el relleno no se usa (no se suman). Quite uno de los dos.`, [p.id]);
+    if (p.ppProcedencia !== undefined) {
+      const e = procedenciaNoValida(p.ppProcedencia);
+      if (e) mal(p.id, e);
+      else if (p.pp === undefined) mal(p.id, "la procedencia del pp (ppProcedencia) es la de un pp escrito, y no lo hay");
+    }
     // Sin pp, el de su vigueta en T y su bovedilla (`pesoForjado.ts`)
     const sv = typeof p.seccion === "string" ? seccionFisica.get(p.seccion) : undefined;
-    const pp = p.pp !== undefined ? p.pp : okBov && num(p.intereje) ? desglosePano(p, sv, sv && materiales.find((x) => x.id === sv.material))?.pp : undefined;
+    const dp = p.pp === undefined && okBov && !malRelleno && num(p.intereje) ? desglosePano(p, sv, sv && materiales.find((x) => x.id === sv.material)) : undefined;
+    const pp = p.pp !== undefined ? p.pp : dp?.pp;
     const okPp = num(pp) && pp >= 0;
     if (!okDir) mal(p.id, "la dirección de las viguetas tiene que ser un número (grados)");
     if (!okS) mal(p.id, `el intereje tiene que ser un número mayor que 2·ε_snap (${2 * op.epsSnap} m)`);
@@ -817,7 +863,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     if (!huecosValidos(p.id, p.contorno, huecos, mal)) continue;
     if (!okP || !okDir || !okS || !okPp || !okBov || typeof p.seccion !== "string" || !seccionFisica.has(p.seccion)) continue;
     const d = direccionGrados(p.direccion);
-    panosC.push({ pano: { ...p, pp: pp! }, region: { contorno: p.contorno, huecos }, k: planta.get(p.planta)!, seccion: null as unknown as SeccionCompilada, d, n: [-d[1], d[0]] });
+    panosC.push({ pano: { ...p, pp: pp! }, origenPp: textoOrigenPp({ pp: p.pp, ppProcedencia: p.ppProcedencia, tipo: "unidireccional", caseton: p.bovedilla ?? "hormigon" }, dp), region: { contorno: p.contorno, huecos }, k: planta.get(p.planta)!, seccion: null as unknown as SeccionCompilada, d, n: [-d[1], d[0]] });
   }
   // Paños solapados entre sí o con una losa de su planta
   for (let i = 0; i < panosC.length; i++) {
@@ -1091,9 +1137,16 @@ function validarReticular(l: Losa, region: Region, mal: (id: string, que: string
     if (!((r.nervio as number) < (r.intereje as number))) no("el nervio del reticular tiene que ser más estrecho que su intereje");
     if (pos(l.espesor) && !((r.capa as number) < l.espesor)) no("la capa de compresión del reticular tiene que ser más delgada que el canto total (el espesor de la losa)");
   }
+  if (r.relleno !== undefined) {
+    const e = rellenoNoValido(r.relleno);
+    if (e) no(e);
+    else if (r.caseton === "recuperable") no("un casetón recuperable deja el hueco vacío: no lleva relleno. Quite el relleno o diga de qué es el casetón perdido");
+    else if (l.pp !== undefined)
+      diag.aviso("forjado/relleno-sin-efecto", `${l.id}: tiene el pp escrito y un relleno; manda el pp, y el relleno no se usa (no se suman). Quite uno de los dos.`, [l.id]);
+  }
   if (r.caseton !== undefined && !(CASETONES as readonly unknown[]).includes(r.caseton)) no(`el casetón del reticular tiene que ser ${CASETONES.map((x) => `«${x}»`).join(", ")}`);
-  // C4-i: con un casetón perdido de otro material, el peso sólo lo sabe el usuario
-  else if (r.caseton === "perdido" && l.pp === undefined)
+  // C4-i: con un casetón perdido de otro material, el peso sólo lo sabe el usuario (su pp o su relleno)
+  else if (r.caseton === "perdido" && l.pp === undefined && r.relleno === undefined)
     diag.error(
       "reticular/sin-pp",
       `${l.id}: un reticular con caseton: "perdido" (de un material sin decir) necesita su peso propio pp (C4-i). Dé el pp de la zona aligerada (los ábacos pesan γ·canto) o diga el casetón ("hormigon", "ceramica", "poliestireno" o "recuperable") y el peso saldrá de él.`,

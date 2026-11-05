@@ -19,6 +19,7 @@ import { casosValidos } from "../pruebas/comparar.ts";
 import { valido } from "../pruebas/metamorficasFisicas.ts";
 import { lineasBorde, resolverBordes, tramosBorde, type CargaBorde } from "./bordes.ts";
 import { compilar } from "./compilar.ts";
+import { Consultas } from "./consultas.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "./fisico.ts";
 
 beforeAll(async () => {
@@ -135,6 +136,23 @@ describe("MA4: la carga de borde de losa", () => {
     expect(JSON.stringify(a.modelo)).toBe(JSON.stringify(b.modelo));
     // Sin excepciones, el borde ya está en la malla: no siembra nada
     mismaMalla(valido(compilar(losa([]))).modelo, valido(compilar(losa([borde({ huecos: true })]))).modelo);
+  });
+
+  it("las consultas aceptan el modelo tal como se guarda, con cargas de borde, ábacos en los pilares y ábacos unidos", () => {
+    // Antes, Consultas validaba el modelo sin resolverlos y acababa en error interno (puerta de MA)
+    const r = leerProyecto(readFileSync(join(import.meta.dirname, "..", "..", "ejemplos", "vivienda", "proyecto.json"), "utf8"));
+    if (!r.valido) throw new Error("la vivienda no es válida");
+    const f = r.proyecto.modelo;
+    const g: ModeloFisico = {
+      ...f,
+      losas: f.losas!.map((l, i) => ({ ...l, reticular: i === 0 ? { ...l.reticular!, abacos: undefined, abacosPilares: { lado: 2 } } : { ...l.reticular!, abacos: [...l.reticular!.abacos!, [[4, 14], [5, 14], [5, 15], [4, 15]]] } })),
+      cargas: [...(f.cargas ?? []).filter((c) => !c.id.startsWith("PETO")), borde({ id: "PETO-CUB-S", losa: "L-CUB-S" })],
+    };
+    delete (g.losas![0]!.reticular as { abacos?: unknown }).abacos;
+    const c = valido(compilar(g));
+    expect(c.diagnosticos.some((d) => d.codigo === "reticular/abacos-unidos")).toBe(true);
+    const q = new Consultas(g, c, casosValidos(calcular(c.modelo)));
+    expect(q.nc).toBe(3);
   });
 
   it("sin cargas de borde, el mismo objeto", () => {

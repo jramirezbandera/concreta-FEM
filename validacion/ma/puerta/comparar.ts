@@ -7,7 +7,8 @@
  * - **Losas:** por planta, cuántas, de qué tipo, su canto, sus nervios y su área.
  * - **Ábacos** (los que usa el cálculo, `abacosLosa`, con los de los pilares y los unidos): cada uno
  *   del ejemplo con el más cercano del agente en su planta, por la caja. Criterio: los mismos.
- * - **Cargas por planta y caso** (las del resumen, con el peso propio): criterio ≤ 0,5 %.
+ * - **Cargas por planta y tipo de acción** (las del resumen, con el peso propio; los casos del mismo
+ *   tipo, sumados): criterio ≤ 0,5 %.
  *
  *   bun validacion/ma/puerta/comparar.ts <proyecto del agente>… > validacion/ma/puerta/out_comparar.txt
  */
@@ -107,8 +108,14 @@ function comparar(ruta: string): string[] {
     if (!c.valido) throw new Error(`no compila: ${c.diagnosticos.filter((d) => d.severidad === "error").map((d) => d.mensaje).join(" | ")}`);
     const r = resumen(p, c);
     if (!r.valido) throw new Error("sin resumen");
+    // Por tipo de acción (G, Q, S…), no por id de caso: un agente puede separar las permanentes en otro caso
+    const tipo = new Map(p.modelo.casos.map((x) => [x.id, x.accion?.tipo ?? (x.pesoPropio ? "G" : x.id)]));
     const m = new Map<string, number>();
-    for (const pl of r.valor.plantas) for (const [k, v] of Object.entries(pl.cargas ?? {})) m.set(`${f2(z.get(pl.id)!)}|${k}`, v);
+    for (const pl of r.valor.plantas)
+      for (const [k, v] of Object.entries(pl.cargas ?? {})) {
+        const clave = `${f2(z.get(pl.id)!)}|${tipo.get(k) ?? k}`;
+        m.set(clave, (m.get(clave) ?? 0) + v);
+      }
     return m;
   };
   const [ce, ca] = [cargas(ejemplo, ze), cargas(ag, za)];

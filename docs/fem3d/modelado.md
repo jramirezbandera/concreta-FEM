@@ -211,3 +211,50 @@ Para la puerta: sin ella, un agente tiene que escribir a mano cada zuncho (16 en
 - **Lo que ya se sabe que puede separarse del ejemplo, y no es un fallo del agente:**
   - el ejemplo es de antes de TB: sus losas van a ejes de los zunchos, con la banda hasta el borde real como cargas de viga (`TIRA-*`); un agente con la skill de hoy las lleva hasta el borde real. Las áreas no se comparan; las cargas por planta, sí (la banda pesa lo mismo de las dos maneras si el agente pone los mismos pesos);
   - «Alinear» lleva la fila de x = 0 a −0,02 m (la mayoría del dibujo, §7), y el agente de 2026-10-15 la llevó a 0 a mano: tres pilares a 2 cm del ejemplo.
+
+## 10. La puerta: resultado (2026-11-05)
+
+**Veredicto: el criterio 1, tal como está escrito, no pasa con ninguno de los tres; lo que mide del agente (una ronda, sin código propio, el modelo que piden las respuestas) pasa con los tres.** Lo que separa sus modelos del ejemplo son dos cosas del dibujo que el ejemplo resolvió de otra manera, no errores de modelado. Y la puerta destapó un fallo grave del programa, ya corregido (§10.3).
+
+### 10.1 Cómo trabajaron
+
+| Agente | Rondas | Preguntas | Código propio | Órdenes `fem` (las nuevas) | Fin |
+|---|---|---|---|---|---|
+| 1 | 1 | 16 | No (Grep y sed para leer el DXF) | importar-dxf, alinear --escribir, vigas-borde --escribir, validar, resumen, render, calcular, revisar | Revisó, rodeando el fallo de §10.3 (ábacos y petos escritos a mano, el mismo modelo compilado) |
+| 2 | 1 | 20 | No (Grep para leer el DXF) | las mismas, con `abacosPilares` y `borde` | Se paró en el fallo, como dice la skill; revisó tras el arreglo |
+| 3 | 1 | 16 | No (Grep para leer el DXF) | las mismas | Revisó, rodeando el fallo (como el 1) |
+
+- Los tres preguntaron **todo en una ronda**, con propuesta en cada punto, y no sacaron de memoria ningún dato de norma (uso, nieve, permanentes).
+- Los tres encontraron y preguntaron lo mismo del dibujo: la pestaña de 32 cm al sur de la cubierta baja (que hace fallar `fem vigas-borde`), el saliente de 0,50 × 0,70 m junto a P6 (una chimenea), los pilares del encuentro de las dos cubiertas, los 24 rectángulos sin cruz y la pérgola. Las respuestas no decían nada de la pestaña ni del saliente: los tres los quitaron y lo dijeron.
+- Dos (1 y 2) corrigieron a mano la propuesta de `fem vigas-borde` en el encuentro: la orden ponía el zuncho de la cubierta baja enrasado por dentro (x = 3,96), lejos de P4, P12 y P15, y lo llevaron al eje de los pilares. **Es un hallazgo de la orden** (§10.4).
+- Los tres avisaron de P1 (`sensatez/tributaria`): con el ábaco unido de P1 y P7, la esquina tiende a levantarse con Q. Es del modelo que pide el ingeniero; lo dejaron para él.
+
+### 10.2 Frente al ejemplo (`validacion/ma/puerta/comparar.ts`, `out_comparar.txt`; los proyectos, en `proyectos/`)
+
+| | Agente 1 | Agente 2 | Agente 3 |
+|---|---|---|---|
+| Pilares (≤ 1 cm) | 18 a 0; 5 a 2,0 cm | igual | igual |
+| Cubierta alta: datos, ábacos (10) | iguales, a 0,4 cm | iguales, a 0,4 cm | iguales, a 1,0 cm |
+| Cubierta alta: G, Q, S | +0,10 / +0,16 / +0,16 % | igual | igual |
+| Cubierta baja: ábacos (11) | 8 | 8 | 11, a 2,0 cm |
+| Cubierta baja: G, Q, S | −1,24 / −0,06 / −0,06 % | −0,99 / −0,06 / −0,06 % | +0,73 / +2,27 / +2,27 % |
+
+- **Los 5 pilares a 2 cm** son la fila de x = 0, que «Alinear» lleva a −0,02 (la mayoría del dibujo) y el agente de 2026-10-15 llevó a 0 a mano: lo que §7 y §9 ya decían. Las respuestas sólo decían «ponlo bien».
+- **La cubierta baja junto a la alta** es lo único que de verdad se separa. El DXF dibuja la cubierta baja hasta x = 4,11, la cara de los pilares P4, P12 y P15 (en x = 4,26); el ejemplo la llevó hasta su eje y le puso los ábacos de esos tres pilares.
+  - Los agentes 1 y 2 siguieron el dibujo: los ejes quedan fuera de la losa, no hay ábaco (−3 ábacos) y la cubierta baja pesa un 1 % menos (lo que no es losa ni ábaco en esa franja).
+  - El 3 la llevó a la cara de fuera del zuncho (x = 4,41), 30 cm por debajo de la alta: tiene los 11 ábacos, pero cuenta uso y nieve en 2,7 m² que tapa la cubierta alta (+2,27 %).
+  - Las dos lecturas son defendibles y las respuestas no decían nada: es una pregunta que falta en la lista de MA1 («en un escalón de cubierta, ¿hasta dónde llega la baja: la cara de los pilares, su eje o pasa por debajo?»).
+- Con esas dos cosas aparte, **los tres modelos son el del ejemplo**: el mismo forjado, los mismos ábacos donde hay losa, las mismas cargas por m², los mismos petos (con `borde` o escritos a mano en el contorno) y la misma pérgola; la cubierta alta, a ≤ 0,16 %.
+
+### 10.3 El fallo que destapó: las consultas con `abacosPilares` o `borde`
+
+`Consultas` (y `EsfuerzosMuros` y las bandas) validaba el modelo físico tal como se guarda, sin resolver antes los ábacos de los pilares ni las cargas de borde, y acababa en `cli/error-interno`: `fem validar`, `resumen` y `calcular` funcionaban, pero `fem revisar` y todo `fem consultar` no. Las pruebas de §8 compilaban y calculaban, pero no consultaban. **Corregido:** `validar` resuelve las dos cosas al empezar (`fisicoResuelto`; idempotente, así que el compilador da los mismos bits), y `bordes.test.ts` lleva la prueba con `Consultas` (la vivienda con `abacosPilares`, un ábaco unido y una carga de borde).
+
+### 10.4 Lo que sale para MA
+
+- **MA1:** añadir a la lista la pregunta del escalón (hasta dónde llega la cubierta baja bajo la alta).
+- **`fem vigas-borde`:** en el lado de una losa que da a otra losa en otra planta, propone el zuncho enrasado por dentro aunque haya pilares en el eje del lado (no los cuenta porque su huella no pisa la banda del enrasado). Dos agentes lo corrigieron a mano.
+- **`fem vigas-borde` con la pestaña de 32 cm:** el error («los ejes no forman un polígono») no dice qué lado sobra; los agentes lo encontraron mirando el render.
+- **Alinear:** «la mayoría» frente a «el número redondo» (§7) sigue abierto: es lo que pone a 2 cm la fila de x = 0.
+
+**Para el usuario:** decidir si el criterio 1 se da por cumplido con estas dos diferencias explicadas o se repite tras añadir la pregunta del escalón a MA1.

@@ -1,0 +1,514 @@
+{
+  "esquema": "concreta-fem/proyecto@1",
+  "nombre": "Vivienda unifamiliar en Alhaurín el Grande",
+  "modelo": {
+    "plantas": [
+      {
+        "id": "CUB-A",
+        "nombre": "Cubierta alta",
+        "tipo": "escalon",
+        "altura": null
+      },
+      {
+        "id": "CUB-B",
+        "nombre": "Cubierta baja",
+        "altura": 0.9
+      },
+      {
+        "id": "Cim",
+        "altura": 3.4
+      }
+    ],
+    "materiales": [
+      {
+        "id": "HA-30",
+        "tipo": "hormigon",
+        "fck": 30
+      }
+    ],
+    "secciones": [
+      {
+        "id": "P30x30",
+        "material": "HA-30",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.3
+      },
+      {
+        "id": "V30x30",
+        "material": "HA-30",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.3
+      }
+    ],
+    "pilares": [
+      {
+        "id": "P1",
+        "x": -8.8,
+        "y": 15.054,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P2",
+        "x": -5.75,
+        "y": 15.054,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P3",
+        "x": -0.02,
+        "y": 14.557,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P4",
+        "x": 4.26,
+        "y": 14.557,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P5",
+        "x": 9,
+        "y": 14.557,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P6",
+        "x": 14.26,
+        "y": 14.557,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P7",
+        "x": -8.8,
+        "y": 12.994,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P8",
+        "x": 9,
+        "y": 12.174,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P9",
+        "x": 14.26,
+        "y": 11.274,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P10",
+        "x": -5.75,
+        "y": 8.788,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P11",
+        "x": -0.02,
+        "y": 8.788,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P12",
+        "x": 4.26,
+        "y": 8.788,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P13",
+        "x": 7.591,
+        "y": 8.788,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P14",
+        "x": -0.02,
+        "y": 5.794,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P15",
+        "x": 4.26,
+        "y": 5.794,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P16",
+        "x": 7.591,
+        "y": 5.794,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P17",
+        "x": 14.26,
+        "y": 5.794,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P18",
+        "x": -0.02,
+        "y": 1.874,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P19",
+        "x": 4.26,
+        "y": 1.874,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P20",
+        "x": 7.591,
+        "y": 1.874,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P21",
+        "x": 14.26,
+        "y": 1.874,
+        "desde": "Cim",
+        "hasta": "CUB-A",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P22",
+        "x": -0.02,
+        "y": 0.002,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "P23",
+        "x": 4.26,
+        "y": 0.002,
+        "desde": "Cim",
+        "hasta": "CUB-B",
+        "seccion": "P30x30"
+      }
+    ],
+    "vigas": [
+      {
+        "id": "VP-1",
+        "planta": "CUB-A",
+        "puntos": [[4.26, 1.874], [7.591, 1.874], [14.26, 1.874]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "VP-2",
+        "planta": "CUB-A",
+        "puntos": [[14.26, 1.874], [14.26, 5.794]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L1-1",
+        "planta": "CUB-A",
+        "puntos": [[4.26, 14.557], [4.26, 5.794]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L1-2",
+        "planta": "CUB-A",
+        "puntos": [[4.26, 5.794], [14.26, 5.794]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L1-3",
+        "planta": "CUB-A",
+        "puntos": [[14.26, 5.794], [14.26, 15.674]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L1-4",
+        "planta": "CUB-A",
+        "puntos": [[14.26, 15.674], [9, 15.674]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L1-5",
+        "planta": "CUB-A",
+        "puntos": [[9, 15.674], [9, 14.557]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L1-6",
+        "planta": "CUB-A",
+        "puntos": [[9, 14.557], [4.26, 14.557]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-1",
+        "planta": "CUB-B",
+        "puntos": [[4.26, 0.002], [4.26, 1.874], [4.26, 5.794], [4.26, 8.788], [4.26, 14.557], [4.26, 15.674]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-6",
+        "planta": "CUB-B",
+        "puntos": [[4.26, 15.674], [-0.02, 15.674]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-7",
+        "planta": "CUB-B",
+        "puntos": [[-0.02, 15.674], [-0.02, 15.054]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-8",
+        "planta": "CUB-B",
+        "puntos": [[-0.02, 15.054], [-8.8, 15.054]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-9",
+        "planta": "CUB-B",
+        "puntos": [[-8.8, 15.054], [-8.8, 12.994]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-10",
+        "planta": "CUB-B",
+        "puntos": [[-8.8, 12.994], [-5.75, 12.994]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-11",
+        "planta": "CUB-B",
+        "puntos": [[-5.75, 12.994], [-5.75, 8.788]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-12",
+        "planta": "CUB-B",
+        "puntos": [[-5.75, 8.788], [-0.02, 8.788]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-13",
+        "planta": "CUB-B",
+        "puntos": [[-0.02, 8.788], [-0.02, 0.002]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-L2-14",
+        "planta": "CUB-B",
+        "puntos": [[-0.02, 0.002], [4.26, 0.002]],
+        "seccion": "V30x30"
+      }
+    ],
+    "losas": [
+      {
+        "id": "L1",
+        "planta": "CUB-A",
+        "contorno": [[4.11, 14.824], [4.11, 5.524], [14.53, 5.524], [14.53, 15.824], [8.73, 15.824], [8.73, 14.824]],
+        "espesor": 0.3,
+        "material": "HA-30",
+        "pp": 4.5,
+        "reticular": {
+          "intereje": 0.72,
+          "nervio": 0.12,
+          "capa": 0.05,
+          "caseton": "perdido",
+          "abacosPilares": {
+            "lado": 2
+          }
+        }
+      },
+      {
+        "id": "L2",
+        "planta": "CUB-B",
+        "contorno": [
+          [4.41, -0.273],
+          [4.41, 5.524],
+          [4.11, 5.524],
+          [4.11, 14.824],
+          [4.53, 14.824],
+          [4.53, 15.824],
+          [-0.27, 15.824],
+          [-0.27, 15.324],
+          [-9.07, 15.324],
+          [-9.07, 12.724],
+          [-6.02, 12.724],
+          [-6.02, 8.527],
+          [-0.27, 8.527],
+          [-0.27, -0.273]
+        ],
+        "espesor": 0.3,
+        "material": "HA-30",
+        "pp": 4.5,
+        "reticular": {
+          "intereje": 0.72,
+          "nervio": 0.12,
+          "capa": 0.05,
+          "caseton": "perdido",
+          "abacosPilares": {
+            "lado": 2
+          }
+        }
+      }
+    ],
+    "casos": [
+      {
+        "id": "G",
+        "nombre": "Permanentes",
+        "pesoPropio": true,
+        "accion": {
+          "tipo": "G"
+        }
+      },
+      {
+        "id": "Q",
+        "nombre": "Uso (cubierta sólo conservación, G)",
+        "accion": {
+          "tipo": "Q",
+          "psi": "uso-G"
+        }
+      },
+      {
+        "id": "N",
+        "nombre": "Nieve",
+        "accion": {
+          "tipo": "S",
+          "psi": "nieve-hasta-1000"
+        }
+      }
+    ],
+    "cargas": [
+      {
+        "tipo": "superficie",
+        "id": "G-CM-L1",
+        "caso": "G",
+        "planta": "CUB-A",
+        "q": [0, 0, -2],
+        "losa": "L1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "G-CM-L2",
+        "caso": "G",
+        "planta": "CUB-B",
+        "q": [0, 0, -2],
+        "losa": "L2"
+      },
+      {
+        "tipo": "borde",
+        "id": "G-PETO-L1",
+        "caso": "G",
+        "losa": "L1",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "borde",
+        "id": "G-PETO-L2",
+        "caso": "G",
+        "losa": "L2",
+        "q": [0, 0, -3],
+        "excepto": [
+          {
+            "junto": "L1"
+          },
+          [[4.41, 1.874], [4.41, 5.524]]
+        ]
+      },
+      {
+        "tipo": "viga",
+        "id": "G-LAMAS-VP1",
+        "caso": "G",
+        "viga": "VP-1",
+        "ejes": "global",
+        "q": [0, 0, -1]
+      },
+      {
+        "tipo": "viga",
+        "id": "G-LAMAS-VP2",
+        "caso": "G",
+        "viga": "VP-2",
+        "ejes": "global",
+        "q": [0, 0, -1]
+      },
+      {
+        "tipo": "superficie",
+        "id": "Q-L1",
+        "caso": "Q",
+        "planta": "CUB-A",
+        "q": [0, 0, -1],
+        "losa": "L1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "Q-L2",
+        "caso": "Q",
+        "planta": "CUB-B",
+        "q": [0, 0, -1],
+        "losa": "L2"
+      },
+      {
+        "tipo": "superficie",
+        "id": "N-L1",
+        "caso": "N",
+        "planta": "CUB-A",
+        "q": [0, 0, -0.2],
+        "losa": "L1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "N-L2",
+        "caso": "N",
+        "planta": "CUB-B",
+        "q": [0, 0, -0.2],
+        "losa": "L2"
+      }
+    ]
+  },
+  "plantillas": [
+    {
+      "nombre": "plano",
+      "fichero": "plano.dxf",
+      "sha256": "462a6fd6c1badb0e9735c99fa5fac553ef339caa3151d5e13e1405123c6c7357",
+      "unidades": "m",
+      "plantas": ["CUB-A", "CUB-B", "Cim"]
+    }
+  ]
+}
