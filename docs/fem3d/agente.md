@@ -398,3 +398,16 @@ La app deja en `.fem/app.json`, junto al proyecto, lo que se mira: la planta, el
 `fem seleccion <proyecto.json>` lo lee y da cada objeto elegido con su colección, tal como está en el fichero, los ids que no están en él y `alDia` (misma huella y nada sin guardar), con avisos si no. La skill dice cuándo usarla («esta viga», «lo que tengo elegido»). Pruebas: `src/agente/estadoApp.test.ts` y `app/src/test/servidor.test.ts`.
 
 - **Límite:** una carpeta abierta con «Abrir carpeta» se abre para leer; la app no escribe `app.json` hasta el primer guardado, cuando el navegador pide el permiso.
+
+### 13.3 El servidor MCP, para usarlo sin terminal
+
+`cli/mcp.ts`: la CLI como herramientas MCP por stdio, para Claude Desktop o cualquier cliente MCP, sin abrir una terminal.
+
+- **Protocolo:** JSON-RPC 2.0, un mensaje por línea; `initialize` (con la versión del cliente si es 2025-06-18, 2025-03-26 o 2024-11-05), `ping`, `tools/list` y `tools/call`, `resources/list` y `resources/read`, y `prompts/list` vacío. **Escrito a mano, sin el SDK** (decisión de Claude: es poco y no añade dependencias; el SDK es MIT si un día hace falta).
+- **Herramientas:** `validar`, `compilar`, `resumen`, `calcular`, `consultar`, `render`, `revisar`, `seleccion` e `importar_dxf` son `ejecutar` de `cli/ordenes.ts` con los mismos argumentos (la misma salida JSON, con `carpetaProyecto`), de una en una y con la carpeta del proyecto como carpeta de trabajo. `render` devuelve además las PNG (4 por defecto, 12 como mucho). Las rutas, absolutas.
+- **El fichero**, porque Claude Desktop no tiene herramientas de ficheros: `leer_proyecto` (el texto y su sello, el sha256), `editar` (las operaciones del editor de la app en un lote: o todas o ninguna, sin referencias rotas) y `escribir_proyecto` (el texto entero; encima de uno que existe, sólo con el sello de la lectura). Si el fichero cambió desde que se leyó, no se escribe. Los dos escriben la forma canónica y dejan `.bak`, como la app.
+- **La guía:** la skill, con un preámbulo que dice que cada `fem X` es la herramienta X, en las instrucciones de `initialize`, en el recurso `fem://skill` y en la herramienta `guia`. También `fem://ejemplo`, `fem://esquema` y la herramienta `esquema` (la raíz y la lista de tipos, o la definición de uno).
+- **`visor`:** arranca `app/visor.ts` sobre el proyecto (el servidor local) y abre el navegador; se cierra con el servidor MCP.
+- **`bun run instalar`** lo registra en Claude Desktop: la entrada `concreta-fem` de `mcpServers` (bun y la ruta de `cli/mcp.ts`), en `%APPDATA%\Claude` y, el de la Tienda, en `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude`. No toca el resto del fichero (deja `.bak`), no pisa una entrada `concreta-fem` ajena ni un JSON roto, y `--quitar` sólo quita la suya; `--sin-mcp` no lo registra. Hay que reiniciar Claude Desktop.
+- **Pruebas:** `src/agente/mcp.test.ts` (protocolo, la salida de la CLI, el fichero con su sello, `render` con imágenes y un intercambio por stdio) y `src/agente/instalar.test.ts`.
+- **Pendiente:** registrarlo en este equipo (`bun run instalar`: el agente no pudo escribir la configuración de Claude Desktop) y probarlo con Claude Desktop de verdad.

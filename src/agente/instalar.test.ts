@@ -86,4 +86,41 @@ describe("bun run instalar", () => {
       expect(instalar({ ...o, path: gitBash }).avisos).toEqual([]);
     }
   });
+
+  it("registra el servidor MCP en Claude Desktop sin tocar lo demás; reinstalar no cambia nada; lo ajeno no se pisa; --quitar lo quita", () => {
+    const o = sitio();
+    const desktop = temporal();
+    const f = join(desktop, "claude_desktop_config.json");
+    const antes = { preferencias: { tema: "oscuro" }, mcpServers: { otro: { command: "x", args: [] } } };
+    writeFileSync(f, JSON.stringify(antes));
+    const r = instalar({ ...o, claudeDesktop: [desktop], bun: "C:/bun/bun.exe" });
+    expect(r.errores).toEqual([]);
+    const c = JSON.parse(readFileSync(f, "utf8")) as { preferencias: unknown; mcpServers: Record<string, { command: string; args: string[] }> };
+    expect(c.preferencias).toEqual(antes.preferencias);
+    expect(c.mcpServers.otro).toEqual(antes.mcpServers.otro);
+    expect(c.mcpServers["concreta-fem"]).toEqual({ command: "C:/bun/bun.exe", args: [join(REPO, "cli", "mcp.ts")] });
+    expect(JSON.parse(readFileSync(`${f}.bak`, "utf8"))).toEqual(antes);
+    const texto = readFileSync(f, "utf8");
+    expect(instalar({ ...o, claudeDesktop: [desktop], bun: "C:/bun/bun.exe" }).hecho.some((x) => x.includes("MCP ya estaba"))).toBe(true);
+    expect(readFileSync(f, "utf8")).toBe(texto);
+    // Sin fichero, se crea; con un JSON roto o una entrada ajena, no se toca
+    const vacia = temporal();
+    instalar({ ...o, claudeDesktop: [vacia], bun: "bun" });
+    expect(Object.keys((JSON.parse(readFileSync(join(vacia, "claude_desktop_config.json"), "utf8")) as { mcpServers: object }).mcpServers)).toEqual(["concreta-fem"]);
+    const rota = temporal();
+    writeFileSync(join(rota, "claude_desktop_config.json"), "{ no");
+    expect(instalar({ ...o, claudeDesktop: [rota], bun: "bun" }).errores.join(" ")).toContain("no es un JSON");
+    expect(readFileSync(join(rota, "claude_desktop_config.json"), "utf8")).toBe("{ no");
+    const ajena = temporal();
+    const otra = JSON.stringify({ mcpServers: { "concreta-fem": { command: "python", args: ["otro.py"] } } });
+    writeFileSync(join(ajena, "claude_desktop_config.json"), otra);
+    expect(instalar({ ...o, claudeDesktop: [ajena], bun: "bun" }).errores.join(" ")).toContain("no se pisa");
+    expect(readFileSync(join(ajena, "claude_desktop_config.json"), "utf8")).toBe(otra);
+    // Quitar: sólo la suya
+    const q = instalar({ ...o, quitar: true, claudeDesktop: [desktop, ajena] });
+    expect(q.ok).toBe(true);
+    const d = JSON.parse(readFileSync(f, "utf8")) as { preferencias: unknown; mcpServers: Record<string, unknown> };
+    expect(d).toEqual(antes);
+    expect(readFileSync(join(ajena, "claude_desktop_config.json"), "utf8")).toBe(otra);
+  });
 });

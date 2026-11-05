@@ -3,7 +3,8 @@
  * Deja Concreta FEM 3D listo para trabajar con un agente fuera de este repositorio (en la carpeta de
  * una obra, donde por A-e tienen que estar los planos y los proyectos de clientes):
  *
- *   bun run instalar             la skill `fem` en las del usuario y la orden `fem` en el PATH
+ *   bun run instalar             la skill `fem` en las del usuario, la orden `fem` en el PATH y el
+ *                                servidor MCP en Claude Desktop (si está instalado)
  *   bun run instalar --quitar    quita lo que puso (sólo lo suyo)
  *
  * - **La skill** va como enlace (junction en Windows, que no necesita permisos de administrador) a
@@ -12,9 +13,18 @@
  *   PowerShell) que ejecutan `cli/fem.ts` de este repo con bun. Llevan una marca (`MARCA`) para
  *   reconocerlos al reinstalar o quitarlos: un `fem` ajeno no se toca.
  *
- * Opciones para las pruebas y para otros sitios: `--skills <carpeta>` y `--bin <carpeta>`.
+ * - **El servidor MCP** (`cli/mcp.ts`, `docs/fem3d/agente.md` §13.3), para usarlo sin terminal: la
+ *   entrada `concreta-fem` de `mcpServers` en `claude_desktop_config.json`, con bun y la ruta del
+ *   servidor de este repo. En Windows, Claude Desktop puede estar en `%APPDATA%\Claude` o, el de la
+ *   Tienda, en `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude`: se escribe en las
+ *   que existen. El resto del fichero no se toca (se deja su copia `.bak` antes de cambiarlo), una
+ *   entrada `concreta-fem` que no lanza un `cli/mcp.ts` no se pisa, y un fichero que no es JSON, tampoco.
+ *   Hay que reiniciar Claude Desktop para que la lea.
+ *
+ * Opciones para las pruebas y para otros sitios: `--skills <carpeta>`, `--bin <carpeta>` y
+ * `--claude-desktop <carpeta>` (repetible; `--sin-mcp` no lo registra).
  */
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 
@@ -31,6 +41,86 @@ export interface OpcionesInstalar {
   /** El PATH con el que comprobar que `bin` está en él. */
   path?: string;
   windows?: boolean;
+  /** Carpetas de configuración de Claude Desktop donde registrar el servidor MCP (vacía: ninguna). */
+  claudeDesktop?: readonly string[];
+  /** El ejecutable de bun para el servidor MCP (por defecto, el que ejecuta esto). */
+  bun?: string;
+}
+
+export const NOMBRE_MCP = "concreta-fem";
+const CONFIG_DESKTOP = "claude_desktop_config.json";
+
+/** Las carpetas de configuración de Claude Desktop que hay en este equipo. */
+export function carpetasClaudeDesktop(): string[] {
+  const r: string[] = [];
+  const casa = homedir();
+  if (process.platform === "win32") {
+    const roaming = process.env.APPDATA ?? join(casa, "AppData", "Roaming");
+    const local = process.env.LOCALAPPDATA ?? join(casa, "AppData", "Local");
+    if (existsSync(join(roaming, "Claude"))) r.push(join(roaming, "Claude"));
+    try {
+      for (const p of readdirSync(join(local, "Packages"))) {
+        const d = join(local, "Packages", p, "LocalCache", "Roaming", "Claude");
+        if (/^Claude_/i.test(p) && existsSync(d)) r.push(d);
+      }
+    } catch {
+      // sin Packages
+    }
+  } else if (process.platform === "darwin") {
+    const d = join(casa, "Library", "Application Support", "Claude");
+    if (existsSync(d)) r.push(d);
+  } else {
+    const d = join(process.env.XDG_CONFIG_HOME ?? join(casa, ".config"), "Claude");
+    if (existsSync(d)) r.push(d);
+  }
+  return r;
+}
+
+const esNuestroMcp = (e: unknown): boolean => {
+  const args = (e as { args?: unknown } | null)?.args;
+  return Array.isArray(args) && args.some((a) => typeof a === "string" && /[\\/]cli[\\/]mcp\.ts$/.test(a));
+};
+
+/** La entrada del servidor MCP en la configuración de Claude Desktop de `carpeta`. */
+function registrarMcp(carpeta: string, entrada: { command: string; args: string[] }, quitar: boolean, r: Informe): void {
+  const f = join(carpeta, CONFIG_DESKTOP);
+  let config: Record<string, unknown> = {};
+  if (existsSync(f)) {
+    try {
+      const x = JSON.parse(readFileSync(f, "utf8") || "{}") as unknown;
+      if (!x || typeof x !== "object" || Array.isArray(x)) throw new Error("no es un objeto");
+      config = x as Record<string, unknown>;
+    } catch (e) {
+      r.errores.push(`${f} no es un JSON válido (${e instanceof Error ? e.message : String(e)}): no se toca. Arréglelo y vuelva a instalar.`);
+      return;
+    }
+  } else if (quitar) return;
+  const servidores = (config.mcpServers && typeof config.mcpServers === "object" ? config.mcpServers : {}) as Record<string, unknown>;
+  const hay = servidores[NOMBRE_MCP];
+  if (quitar) {
+    if (hay === undefined) return;
+    if (!esNuestroMcp(hay)) {
+      r.avisos.push(`La entrada ${NOMBRE_MCP} de ${f} no es la de Concreta FEM: no se toca.`);
+      return;
+    }
+    const { [NOMBRE_MCP]: _, ...otros } = servidores;
+    copyFileSync(f, `${f}.bak`);
+    writeFileSync(f, `${JSON.stringify({ ...config, mcpServers: otros }, null, 2)}\n`);
+    r.hecho.push(`Servidor MCP quitado de ${f}`);
+    return;
+  }
+  if (hay !== undefined && !esNuestroMcp(hay)) {
+    r.errores.push(`Ya hay una entrada ${NOMBRE_MCP} en ${f} que no lanza Concreta FEM: no se pisa.`);
+    return;
+  }
+  if (JSON.stringify(hay) === JSON.stringify(entrada)) {
+    r.hecho.push(`El servidor MCP ya estaba en ${f}`);
+    return;
+  }
+  if (existsSync(f)) copyFileSync(f, `${f}.bak`);
+  mkdirSync(carpeta, { recursive: true });
+  writeFileSync(f, `${JSON.stringify({ ...config, mcpServers: { ...servidores, [NOMBRE_MCP]: entrada } }, null, 2)}\n`);
+  r.hecho.push(`${hay === undefined ? "Servidor MCP registrado" : "Servidor MCP actualizado"} en ${f} (reinicie Claude Desktop)`);
 }
 
 export interface Informe {
@@ -125,6 +215,10 @@ export function instalar(o: OpcionesInstalar): Informe {
     r.hecho.push(`${hay === null ? "Orden escrita" : "Orden actualizada"}: ${f}`);
   }
 
+  // ─── El servidor MCP ───
+  const entrada = { command: o.bun ?? process.execPath, args: [join(o.repo, "cli", "mcp.ts")] };
+  for (const c of o.claudeDesktop ?? []) registrarMcp(c, entrada, !!o.quitar, r);
+
   if (!o.quitar) {
     const path = (o.path ?? process.env.PATH ?? "").split(delimiter).filter(Boolean);
     const norm = (x: string) => resolve(x).toLowerCase().replace(/[\\/]+$/, "");
@@ -142,11 +236,13 @@ if (import.meta.main) {
     const i = args.indexOf(n);
     return i >= 0 ? args[i + 1] : undefined;
   };
+  const desktop = args.flatMap((x, i) => (x === "--claude-desktop" && args[i + 1] ? [args[i + 1]!] : []));
   const r = instalar({
     repo: resolve(import.meta.dirname, ".."),
     skills: valor("--skills") ?? join(homedir(), ".claude", "skills"),
     bin: valor("--bin") ?? join(homedir(), ".local", "bin"),
     quitar: args.includes("--quitar"),
+    claudeDesktop: args.includes("--sin-mcp") ? [] : desktop.length ? desktop : carpetasClaudeDesktop(),
   });
   for (const x of r.hecho) console.log(x);
   for (const x of r.avisos) console.log(`Aviso: ${x}`);
