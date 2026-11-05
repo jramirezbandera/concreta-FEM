@@ -16,8 +16,9 @@
  * - **El servidor MCP** (`cli/mcp.ts`, `docs/fem3d/agente.md` §13.3), para usarlo sin terminal: la
  *   entrada `concreta-fem` de `mcpServers` en `claude_desktop_config.json`, con bun y la ruta del
  *   servidor de este repo. En Windows, Claude Desktop puede estar en `%APPDATA%\Claude` o, el de la
- *   Tienda, en `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude`: se escribe en las
- *   que existen. El resto del fichero no se toca (se deja su copia `.bak` antes de cambiarlo), una
+ *   Tienda, en `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude` o, con los datos fuera
+ *   del paquete, en `%LOCALAPPDATA%\Claude-Data\claude_*`: se escribe en las que existen. Claude
+ *   Desktop reescribe ese fichero con sus preferencias: hay que cerrarlo antes. El resto del fichero no se toca (se deja su copia `.bak` antes de cambiarlo), una
  *   entrada `concreta-fem` que no lanza un `cli/mcp.ts` no se pisa, y un fichero que no es JSON, tampoco.
  *   Hay que reiniciar Claude Desktop para que la lea.
  *
@@ -65,6 +66,15 @@ export function carpetasClaudeDesktop(): string[] {
       }
     } catch {
       // sin Packages
+    }
+    // El de la Tienda con los datos fuera del paquete (la opción de las versiones de 2026)
+    try {
+      for (const p of readdirSync(join(local, "Claude-Data"))) {
+        const d = join(local, "Claude-Data", p);
+        if (/^claude_/i.test(p) && existsSync(join(d, CONFIG_DESKTOP))) r.push(d);
+      }
+    } catch {
+      // sin Claude-Data
     }
   } else if (process.platform === "darwin") {
     const d = join(casa, "Library", "Application Support", "Claude");
