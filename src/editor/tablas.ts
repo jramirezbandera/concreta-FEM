@@ -19,6 +19,7 @@ import { cotasPlantas } from "../compilador/cotas.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
 import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, pesoReticular, pesoUnidireccional, viguetaPesable, type Bovedilla, type Caseton, type DesglosePeso } from "../compilador/pesoForjado.ts";
 import { describirCaso } from "./casos.ts";
+import { conCambiosCota, moverCota, type CambioCota } from "./plantas.ts";
 import { describirMaterial, describirSeccion } from "./gestores.ts";
 import { Lector, LONGITUD_MAXIMA, leerNumero, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
@@ -32,8 +33,13 @@ export interface Columna {
   unidad?: string;
   /** Qué va en la celda y en qué formato. */
   ayuda?: string;
-  /** Sólo se ve: sale del modelo (la cota de una planta). */
+  /** Sólo se ve: sale del modelo. */
   calculada?: boolean;
+  /**
+   * Sale del modelo, pero se puede escribir: cambia otros campos (la cota de una planta mueve su
+   * forjado, `moverCota`). Al pegar no cuenta, como una calculada.
+   */
+  derivada?: boolean;
   /**
    * Los valores que admite (una lista cerrada o los ids de otra colección), para elegirlos en un
    * desplegable; la celda se sigue pudiendo escribir y pegar. En una columna opcional, la primera
@@ -199,7 +205,13 @@ const plantas: DefTabla = {
     nombre,
     { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sótano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
     { clave: "altura", titulo: "altura", unidad: "m", ayuda: "la del tramo de debajo: de su forjado al de la planta de debajo, como en un alzado; vacía en la más baja. En una fila nueva, que va abajo del todo, la del tramo que la une a la de encima" },
-    { clave: "cota", titulo: "cota", unidad: "m", calculada: true },
+    {
+      clave: "cota",
+      titulo: "cota",
+      unidad: "m",
+      derivada: true,
+      ayuda: "la de la cara superior de su forjado. Escribirla mueve sólo ese forjado: cambian las alturas de sus tramos de debajo y de encima, y las demás plantas se quedan donde están. Con 0, esa planta pasa a ser la ±0,00 y las de debajo, sótanos. La ±0,00 (la más baja que no es sótano) sólo puede bajar: pasa a sótano y la ±0,00 es la de encima (la cimentación a −4,30 bajo la planta baja)",
+    },
     { clave: "diafragma", titulo: "diafragma", ayuda: "rígido: el forjado no se deforma en su plano y los nudos se mueven juntos en horizontal (lo normal en un forjado de hormigón continuo). Ninguno: lo ata en su plano la propia losa (semirrígido) o, sin losa, sólo las vigas; para plantas sin forjado continuo, con huecos grandes o muy alargadas, o si se quieren los axiles de las vigas, la membrana de la losa o diagonales en el plano. Vacío: rígido salvo en la más baja, donde arrancan los pilares", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
   ],
   fila(o, ctx) {
@@ -208,24 +220,29 @@ const plantas: DefTabla = {
     const cota = i >= 0 ? cotasPlantas(ctx.modelo.plantas)[i] : null;
     // UI-15: la altura de su tramo de debajo, que el modelo guarda en la planta de debajo
     const altura = i < 0 ? p.altura : (ctx.modelo.plantas[i + 1]?.altura ?? null);
-    return { id: p.id, nombre: s(p.nombre), tipo: s(p.tipo), altura: n(altura), cota: n(cota ?? null), diafragma: s(p.diafragma) };
+    return { id: p.id, nombre: s(p.nombre), tipo: s(p.tipo), altura: n(altura), cota: n(cota === null || cota === undefined ? null : Math.round(cota * 1e9) / 1e9), diafragma: s(p.diafragma) };
   },
   objeto(f, ctx, base) {
     const L = new Lector(f);
     // La suya («hasta la de encima») no está en su fila: la de una planta que ya hay se queda (la
     // cambia la fila de la de encima, `ademas`); una nueva va abajo del todo y su celda es esa
     const ya = ctx.modelo.plantas.find((x) => x.id === (base?.id ?? (f.id ?? "").trim())) ?? (base as unknown as Planta | undefined);
-    return resultado(L, {
+    const o = {
       ...base,
       id: L.texto("id") ?? "",
       nombre: L.texto("nombre"),
       tipo: L.opcion("tipo", ["planta", "sotano", "cubierta"] as const),
       altura: ya ? ya.altura : (L.numero("altura", { mayorQue: 0 }) ?? null),
       diafragma: L.opcion("diafragma", ["rigido", "ninguno"] as const),
-    });
+    };
+    // La cota escrita cambia su altura y su tipo (los de las demás, en `ademas`)
+    const cambios = cambiosCota(f, ctx, base ? ya : undefined, L);
+    return resultado(L, cambios ? { ...conCambiosCota({ ...o, id: ya!.id }, cambios), id: o.id } : o);
   },
   ademas(f, ctx, base) {
     if (!base) return { ok: true, cambios: [] };
+    const cota = cambiosCota(f, ctx, ctx.modelo.plantas.find((x) => x.id === base.id), new Lector(f));
+    if (cota) return { ok: true, cambios: cota.filter((c) => c.id !== base.id) };
     // Sólo si la celda se escribió: sin ella (pegar unas columnas), la altura no se toca
     if (f.altura === undefined) return { ok: true, cambios: [] };
     const ps = ctx.modelo.plantas;
@@ -241,6 +258,31 @@ const plantas: DefTabla = {
   },
   plantas: () => null,
 };
+
+/**
+ * Lo que cambia la cota escrita en la fila de la planta `ya` (`moverCota`), o null si no cambia (o
+ * no vale: el error queda en `L`). Con la altura cambiada también, no se sabe cuál manda: error.
+ */
+function cambiosCota(f: Fila, ctx: Contexto, ya: Planta | undefined, L: Lector): CambioCota[] | null {
+  if (!ya || f.cota === undefined) return null;
+  const ps = ctx.modelo.plantas;
+  const i = ps.findIndex((x) => x.id === ya.id);
+  const v = i < 0 ? undefined : L.numero("cota");
+  if (v === undefined) return null;
+  const r = moverCota(ps, ya.id, v);
+  if (!r.ok) {
+    L.errores.push({ columna: "cota", mensaje: r.mensaje });
+    return null;
+  }
+  if (!r.cambios.length) return null;
+  const abajo = ps[i + 1];
+  const a = f.altura === undefined || f.altura.trim() === "" ? null : leerNumero(f.altura);
+  if (typeof a === "number" && abajo && abajo.altura !== null && Math.abs(a - abajo.altura) > 1e-9) {
+    L.errores.push({ columna: "cota", mensaje: "cambie la altura o la cota, no las dos a la vez" });
+    return null;
+  }
+  return r.cambios;
+}
 
 // ─── Materiales ─────────────────────────────────────────────────────────────────────────────────
 

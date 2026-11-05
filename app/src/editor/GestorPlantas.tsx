@@ -6,7 +6,11 @@
  * los datos de la elegida (su formulario, el del inspector).
  *
  * Con un proyecto que empieza (`pedido.inicio`, al crearlo, con su planta sobre la cimentación), lo
- * primero es cuántas plantas tiene y de qué altura (`plantasEdificio`): sin plantas no se dibuja nada.
+ * primero es cuántas plantas tiene, de qué altura y dónde va la ±0,00 (`plantasEdificio`): sin plantas
+ * no se dibuja nada.
+ *
+ * La cota de una planta se escribe en sus datos (`moverCota`): mueve sólo su forjado, y 0 la hace la
+ * ±0,00. Debajo de la ficha se dice cuál es la ±0,00 y por qué.
  *
  * Los datos de una planta van al modelo con «Aplicar», como en los demás gestores (`auditoria-ui.md`,
  * D-19), y no se tiran sin preguntar.
@@ -44,6 +48,7 @@ const AYUDA = {
   plantas: "Cuántas plantas tiene el edificio sobre la cimentación, contando la cubierta. Cada planta es un forjado: sus pilares, vigas, forjados y cargas se dibujan en ella.",
   primera: "De la cimentación a la cara superior del primer forjado. La cota de una planta es la cara superior de su forjado.",
   demas: "De cara superior a cara superior de forjado, igual en todas. Con una sola planta no se usa.",
+  cero: "La cota ±0,00. En la primera planta: la cimentación queda por debajo, a la cota negativa de la primera altura (es un sótano). En la cimentación: todas las cotas son positivas. Sólo cambian las cotas que se ven, no el cálculo; se puede cambiar después escribiendo 0 en la cota de otra planta.",
   cuantas: `De 1 a ${MAX_PLANTAS_NUEVAS}, todas con la misma altura y el mismo tipo.`,
   altura: "De forjado a forjado (cara superior a cara superior): la de cada planta nueva hasta la de encima.",
   tipo: "Planta, sótano o cubierta. Un sótano cambia el origen de las cotas: la ±0,00 queda en la planta más baja que no es sótano. Una cubierta no tiene que llevar la sobrecarga de las demás plantas (no se avisa si le falta).",
@@ -67,6 +72,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
   const [alturaBaja, setAlturaBaja] = useState(String(plantas[1]?.altura ?? 3).replace(".", ","));
   const [prefijo, setPrefijo] = useState("N");
   const [tipo, setTipo] = useState<TipoPlanta | "">("");
+  const [cero, setCero] = useState<"primera" | "cimentacion">(plantas[1]?.tipo === "sotano" ? "primera" : "cimentacion");
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [borrar, setBorrar] = useState<string | null>(null);
@@ -74,7 +80,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
   const de = actual?.id ?? "";
   const r =
     modo === "inicio"
-      ? plantasEdificio(m, { n: leer(n), alturaBaja: leer(alturaBaja), altura: leer(altura), prefijo })
+      ? plantasEdificio(m, { n: leer(n), alturaBaja: leer(alturaBaja), altura: leer(altura), prefijo, cero })
       : insertarPlantas(m, { n: leer(n), altura: leer(altura), donde, de, prefijo, ...(tipo ? { tipo } : {}) });
   const nuevas = new Set(r.ok && modo !== "datos" ? r.ids : []);
   const vista = r.ok && modo !== "datos" ? r.plantas : plantas;
@@ -259,6 +265,18 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                     </span>
                   </label>
                 </div>
+                <div className="gp-fila">
+                  <span className="gp-etiqueta">
+                    La ±0,00, en <Ayuda texto={AYUDA.cero} />
+                  </span>
+                  <Grupo rol="radiogroup" etiqueta="Dónde va la cota ±0,00" className="seg gp-seg">
+                    {(["primera", "cimentacion"] as const).map((c) => (
+                      <button key={c} type="button" role="radio" aria-checked={cero === c} data-on={cero === c} onClick={() => setCero(c)}>
+                        {c === "primera" ? "la primera planta" : "la cimentación"}
+                      </button>
+                    ))}
+                  </Grupo>
+                </div>
               </section>
               <Nombres prefijo={prefijo} setPrefijo={setPrefijo} r={r} />
               <button type="button" className="gp-enlace" onClick={() => setModo("anadir")}>
@@ -330,6 +348,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
           {modo === "datos" && actual && (
             <>
               <FormularioObjeto id={actual.id} tabla="plantas" diferido={{ control: ficha, alCambiar }} />
+              <p className="ges-usos">{textoCero(plantas, actual.id)}</p>
               <p className="ges-usos">{usos.length ? `La usan ${textoUsos(usos)}.` : "No la usa ningún objeto."}</p>
             </>
           )}
@@ -354,6 +373,16 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
       )}
     </>
   );
+}
+
+/** Cuál es la ±0,00 y cómo se cambia, dicho desde la planta `id`. */
+function textoCero(plantas: readonly Planta[], id: string): string {
+  let o = plantas.length - 1;
+  while (o > 0 && plantas[o]!.tipo === "sotano") o--;
+  const cero = plantas[o]?.id;
+  if (!cero) return "";
+  if (cero === id) return `${id} es la ±0,00: la planta más baja que no es sótano. Las cotas se miden desde ella; para que la ±0,00 sea otra, escriba 0 en su cota.`;
+  return `La ±0,00 es ${cero} (la planta más baja que no es sótano). La cota de ${id} mueve sólo su forjado; con 0, ${id} pasa a ser la ±0,00.`;
 }
 
 /** El prefijo de los ids y, debajo, las plantas que salen con su cota (o por qué no salen). */
@@ -429,7 +458,7 @@ function Alzado({ plantas, nuevas, elegida, onElegir }: { plantas: readonly Plan
           const nueva = nuevas.has(p.id);
           const sel = p.id === elegida;
           const arriba = i > 0 ? ys[i - 1]! : null;
-          const sub = nueva ? "nueva" : p.nombre ? p.nombre : p.tipo && p.tipo !== "planta" ? (p.tipo === "sotano" ? "sótano" : p.tipo) : i === ultima ? "cimentación" : null;
+          const sub = nueva ? "nueva" : p.nombre ? p.nombre : i === ultima ? "cimentación" : p.tipo && p.tipo !== "planta" ? (p.tipo === "sotano" ? "sótano" : p.tipo) : null;
           return (
             <g
               key={p.id}

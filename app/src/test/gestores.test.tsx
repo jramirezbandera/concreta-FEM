@@ -428,6 +428,39 @@ describe("GE3: plantas", () => {
     expect(idsTabla("plantas")).toEqual(["N1", "Cim"]);
   }, 60_000);
 
+  it("la ±0,00 en la primera planta deja la cimentación a −4,30; la cota de una planta se escribe en sus datos", async () => {
+    await proyectoNuevo("ge3-cota", true);
+    const dlg = screen.getByRole("dialog", { name: "Plantas" });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Número de plantas sobre la cimentación" }), { target: { value: "2" } });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }), { target: { value: "4,3" } });
+    fireEvent.click(within(dlg).getByRole("radio", { name: "la primera planta" }));
+    const filas = () => [...within(dlg).getByRole("table", { name: "Cómo quedan las plantas" }).querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
+    expect(filas()).toEqual([
+      ["N2 · nueva", "", "—", "+3,00"],
+      ["N1", "", "3,00", "0,00"],
+      ["Cim", "", "4,30", "−4,30"],
+    ]);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Crear las plantas" }));
+    // En los datos, cuál es la ±0,00
+    expect(within(dlg).getByText(/^N1 es la ±0,00/)).toBeTruthy();
+    // La cubierta, a +3,20: mueve sólo su forjado, con «Aplicar»
+    fireEvent.click(within(dlg).getByRole("button", { name: "Elegir N2" }));
+    const cota = within(dlg).getByRole("textbox", { name: /^cota/ });
+    fireEvent.change(cota, { target: { value: "3,2" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: /^Aplicar/ }));
+    expect(filas()).toEqual([
+      ["N2", "", "—", "+3,20"],
+      ["N1", "", "3,20", "0,00"],
+      ["Cim", "", "4,30", "−4,30"],
+    ]);
+    // 0 en la cimentación: es la ±0,00 otra vez (deja de ser sótano)
+    fireEvent.click(within(dlg).getByRole("button", { name: "Elegir Cim" }));
+    fireEvent.change(within(dlg).getByRole("textbox", { name: /^cota/ }), { target: { value: "0" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: /^Aplicar/ }));
+    expect(filas().map((f) => f[3])).toEqual(["+7,50", "+4,30", "0,00"]);
+    expect(within(dlg).getByText(/^Cim es la ±0,00/)).toBeTruthy();
+  }, 60_000);
+
   it("dos plantas de 3,20 m encima de N1, viendo antes las cotas; un paso de deshacer", async () => {
     await proyectoNuevo("ge3-barra");
     fireEvent.click(within(barra()).getByRole("button", { name: "Plantas" }));

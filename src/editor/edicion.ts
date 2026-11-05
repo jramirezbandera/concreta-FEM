@@ -127,7 +127,8 @@ export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde 
     const pegada: Record<string, string> = {};
     celdasFila.forEach((v, j) => {
       const c = columnas[j];
-      if (c && !def.columnas.find((x) => x.clave === c)?.calculada) pegada[c] = v;
+      const col = def.columnas.find((x) => x.clave === c);
+      if (c && !col?.calculada && !col?.derivada) pegada[c] = v;
     });
     // La fila de la tabla que se cambia: la de su posición o la de su id
     let baseId: string | undefined;
