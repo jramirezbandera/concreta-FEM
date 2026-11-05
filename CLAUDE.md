@@ -47,7 +47,7 @@
    - Unlicense (dominio público), admitida el 2026-10-04 sólo para robust-predicates, que delaunator y constrainautor importan;
    - SIL OFL 1.1, admitida el 2026-10-11 sólo para fuentes (Geist y Geist Mono del visor, V-b);
    - no usar ni copiar código de OpenSees, xara, stabileo (AGPL), CHOLMOD Supernodal (GPL) ni Triangle (H54);
-   - lo que se porte de PyNite o de hekatan-struct-lineal (MIT) se cita en `NOTICE`.
+   - lo que se porte de PyNite, de hekatan-struct-lineal o de ACadSharp (MIT; el lector de DWG, fase DW) se cita en `NOTICE`. Mientras se porta ACadSharp, no se lee el código fuente de LibreDWG (GPL): sólo se usa su ejecutable, como oráculo.
 7. **No se usa para calcular de verdad** hasta que pase la batería de validación y un periodo «en sombra»: los mismos proyectos reales calculados también con SAP2000 o CYPE, para comparar.
 
 ## Flujo de trabajo
@@ -590,7 +590,7 @@
   - **la barra, en el orden de meter un edificio:** Plantas, Materiales, Secciones | Plantilla DXF, Ejes | Pilar, Muro, Viga | Forjado, Hueco, Ábacos | Apoyo, Apoyo lineal | editar; en Cargas, Casos junto al caso activo;
   - **capas del DXF a la vista:** la plantilla recién importada se abre con sus capas arriba, «Todas» y «Ninguna»;
   - **gestor de plantas (GE3) rehecho:** alzado esquemático con lo nuevo en azul antes de añadirlo, «Añadir» o «Datos de X», y una obra nueva lo abre con su primer paso (cuántas plantas sobre la cimentación, la primera y las demás: `plantasEdificio`);
-  - **DWG:** sin decidir. LibreDWG es GPL y el SDK de la ODA, de pago: por ahora, DXF.
+  - **DWG:** sin decidir. LibreDWG es GPL y el SDK de la ODA, de pago: por ahora, DXF (decidido el 2026-11-05: fase DW, abajo).
   - **enganches:** a igual tipo, el modelo gana a la plantilla DXF aunque esté más lejos; «Modelo» y «Plantilla DXF» apagan cada fuente (F3, la plantilla), también al editar;
   - **«Con zunchos»** (decisión del usuario) en Forjado (maciza y reticular) y en Hueco de una losa, por defecto: en el mismo paso, las vigas de «Vigas de borde» (0,30 × el canto) en los lados libres; en un hueco, sólo en los suyos (`proponerVigasBorde(…, anillos)`). Da byte a byte lo de dibujar sin ella y aplicar la orden (`dibujo2.test.ts`). «Vigas de borde» sale de la barra y queda en la paleta (Ctrl+K), para lo importado o del agente. Los bancos de V2c y V2c4 la desmarcan (sus referencias no tienen zunchos);
   - **Modelo y Cargas, separados** (`interfaz.md` §18): en Cargas, Propiedades de una pieza da sus cargas por caso con su resultante y el peso propio, y deja añadirle una en el caso activo con la plantilla de su herramienta (`src/editor/cargasPieza.ts`, byte a byte como un clic con ella); sin nada, el caso activo en la planta. Mover, Copiar, Girar, Simetría, Supr, los pinzamientos y «A plantas» (nueva en Cargas) sólo cogen cargas, y en un clic la carga gana a la pieza de la misma forma. Fuera «Tabla»; la escala, en la cabecera del alzado y del 3D;
@@ -692,6 +692,16 @@
   - **una viga por vano** (dibujó una viga de nueve tramos y no sabía cómo se calculaba ni cómo corregir un punto): la herramienta Viga corta por defecto en cada pilar, en los pinchados y en los que la línea atraviesa por su punto fijo (`porVanos`, casilla en la plantilla; con `false`, una sola viga como antes). Un extremo entero dentro de la huella de su pilar (dibujado hasta la cara de fuera del de borde) va con el vano de al lado: si no, `viga/sin-tramo-flexible`. Para el cálculo da lo mismo: la retícula con núcleo de A2 partida así tiene las mismas reacciones totales y el mismo peso, y cada apoyo a ≤ 1,1e-5 de su Fz. El vértice de una viga arrastrado con Elegir lleva el de las vigas que acaban en ese punto (no en un pilar; con Ctrl, solo), y la ayuda de Mover dice cómo se mueve un vértice solo. Los bancos de V2c y V2c4 desmarcan la casilla (sus referencias son de varios vanos);
   - **la cota de cada planta se escribe** (no veía qué ponía la cimentación a −4,30; `moverCota` en `src/editor/plantas.ts`). Las cotas siguen sin guardarse: en la tabla Plantas y en los datos del gestor, la cota (columna `derivada`, que al pegar no cuenta) mueve sólo ese forjado (cambian las alturas de sus dos tramos), 0 hace de una planta la ±0,00 (las de debajo, sótanos) y la ±0,00 sólo baja (pasa a sótano bajo la de encima). Al empezar una obra, «La ±0,00, en la primera planta / la cimentación» (por defecto, la cimentación, como antes), y los datos de una planta dicen cuál es la ±0,00. Pruebas: `src/editor/cotaPlantas.test.ts` y `gestores.test.tsx`;
   - **propuestos, sin hacer:** los tramos de pilar (`tramos`, hormigón y acero) en Propiedades y el panel de capas del DXF más grande.
+- **2026-11-05: plan de la fase DW** (la plantilla desde un DWG; `docs/fem3d/dwg.md`), a petición del usuario («trabajar en DXF en lugar de DWG es un latazo»).
+  - **Lo que cambia la conclusión del 2026-10-28:** ACadSharp (C#, MIT) lee DWG hasta AC1032 y cubre todas las entidades que lee `aplanar.ts`.
+  - **Propuesta:** `src/dwg/` (puro) da el mismo `Dxf` que `src/dxf/lector.ts`, con las entidades traducidas a sus códigos de grupo, así que lo de detrás no cambia.
+  - **Oráculo principal:** las muestras de ACadSharp, el mismo dibujo guardado por AutoCAD en cada versión con su DXF al lado. Además, los DWG del usuario con su DXF, y ODA File Converter y LibreDWG (sólo los ejecutables), en local.
+  - **Decidido por el usuario:**
+    - DW-a: portar de ACadSharp, fijado en `d9f3de8`, citado en `NOTICE`;
+    - DW-b: AC1014, AC1015, AC1018, AC1024, AC1027 y AC1032; AC1021 al final (DW5);
+    - DW-c: los oráculos de §4.
+  - **Propuestas:** DW-d (las muestras no se versionan; se descargan con su sha256, también en el CI) y DW-e («Plantilla DXF o DWG»).
+  - **Tramos:** DW1 (bits, secciones R13–R2000, objetos básicos) → DW2 (el resto de entidades y los bloques) → DW3 (2004+, LZ77) → DW4 (la app) → DW5 (2007).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
