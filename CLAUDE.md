@@ -722,5 +722,9 @@
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1, BN2 y BN3 hechas, falta su puerta de uso** (`barras.md`), de planta a planta y con `dz` previsto; después, lo de `barras.md` §7 (`dz`, el objeto `cruz`) y los desniveles de paño;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
+  - **pedido por el usuario el 2026-11-05, sin plan:** viento y sismo como en CYPECAD. Hoy son casos con las cargas metidas a mano (el sismo, como fuerzas estáticas equivalentes con signo; `investigacion/03-resultados.md`).
+    - Viento: generarlo desde los datos del edificio (CTE DB SE-AE), por planta y dirección.
+    - Sismo: el análisis modal espectral de la NCSE-02, que necesita el modal de E7, y la concomitancia de las combinaciones (SRSS o CQC, y 100/30).
+    - Las tablas de norma van en el programa, con su propia validación (`modelado.md`);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
