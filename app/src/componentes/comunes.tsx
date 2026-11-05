@@ -196,7 +196,11 @@ export function agruparDiagnosticos(ds: readonly Diagnostico[]): GrupoDiagnostic
   return lista.sort((a, b) => Number(b.causa) - Number(a.causa) || RANGO[a.d.severidad] - RANGO[b.d.severidad]);
 }
 
-export function ListaDiagnosticos({ ds, onObjeto, max = 200 }: { ds: readonly Diagnostico[]; onObjeto?: (id: string) => void; max?: number }) {
+/**
+ * `acciones`: por código, lo que se puede hacer con el aviso desde la lista (p. ej., «Pasar a cargas
+ * muertas» con `sensatez/cargas-en-peso-propio`), debajo de su mensaje.
+ */
+export function ListaDiagnosticos({ ds, onObjeto, max = 200, acciones }: { ds: readonly Diagnostico[]; onObjeto?: (id: string) => void; max?: number; acciones?: Readonly<Record<string, ReactNode>> }) {
   const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(() => new Set());
   if (!ds.length) return <p className="nota">Sin errores ni avisos.</p>;
   const grupos = agruparDiagnosticos(ds);
@@ -220,6 +224,7 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200 }: { ds: readonly Di
               </span>
             </div>
             <p className="mt-1 text-text-secondary">{textoApp(g.d.mensaje)}</p>
+            {acciones?.[g.d.codigo]}
             {n > 1 && (
               <>
                 <button type="button" className="enlace text-[12px]" aria-expanded={abierto} onClick={() => setAbiertos((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set([...s, k])))}>

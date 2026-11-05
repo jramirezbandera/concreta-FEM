@@ -80,6 +80,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "carga-pieza": { stroke: "#ea580c", sw: 3.5 },
   "carga-banda-lineal": { fill: "#dc2626", stroke: "#dc2626", sw: 1.2, opacity: 0.14 },
   "carga-banda-pieza": { fill: "#ea580c", stroke: "#c2410c", sw: 1.2, opacity: 0.14 },
+  "peso-propio": { fill: "#6b7280", stroke: "#6b7280", sw: 1, dash: "6 4", opacity: 0.1 },
+  "peso-propio-linea": { stroke: "#6b7280", sw: 2.5, dash: "6 4" },
   atenuado: { fill: "#f3f4f6", stroke: "#c4c8ce", sw: 0.8 },
   "atenuado-linea": { stroke: "#c4c8ce", sw: 1 },
   "diagnostico-error": { fill: "#dc2626", stroke: "#7f1d1d", sw: 1 },

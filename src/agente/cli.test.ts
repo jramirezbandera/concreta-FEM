@@ -229,7 +229,7 @@ describe("A3: revisar", () => {
     // Sólo el borde sin viga: la retícula no lleva zunchos
     expect(j.avisos).toBe(1);
     expect(j.comprobaciones.find((c) => c.codigo === "sensatez/borde-sin-viga")?.estado).toBe("avisos");
-    expect(j.comprobaciones.length).toBe(23); // M-26: «Objetos lejos del resto»; MA5: «Pilares y vértices alineados»
+    expect(j.comprobaciones.length).toBe(24); // 2026-11-05: «Caso del peso propio, sólo con el peso propio»; M-26: «Objetos lejos del resto»; MA5: «Pilares y vértices alineados»
     expect(j.comprobaciones.find((c) => c.codigo === "sensatez/casi-alineados")?.estado).toBe("bien");
     const md = readFileSync(join(ruta, "..", ".fem", j.huella, "informe.md"), "utf8");
     expect(md).toContain(j.huella);

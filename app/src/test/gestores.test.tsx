@@ -313,15 +313,15 @@ function orden(nombre: string) {
 }
 
 describe("GE2: casos de carga", () => {
-  it("los casos típicos de una vez: reutiliza G y Q, crea el viento, y es un paso de deshacer", async () => {
+  it("los casos típicos de una vez: reutiliza G, CM y Q, crea el viento, y es un paso de deshacer", async () => {
     await proyectoNuevo("ge2-juego");
     orden("Casos típicos");
     const dlg = screen.getByRole("dialog", { name: "Casos de carga" });
-    expect(within(dlg).getByLabelText("Lo que se va a hacer").textContent).toBe("Se crean W+X, W-X, W+Y, W-Y. Ya están: G, Q.");
+    expect(within(dlg).getByLabelText("Lo que se va a hacer").textContent).toBe("Se crean W+X, W-X, W+Y, W-Y. Ya están: G, CM, Q.");
     // Los típicos que ya están lo dicen
     expect(within(within(dlg).getByRole("group", { name: "Casos típicos: uso" })).getByRole("button", { name: /^Q.*ya está: Q/ })).toBeTruthy();
     fireEvent.click(within(dlg).getByRole("button", { name: "Crear los casos" }));
-    expect(within(dlg).getByRole("status").textContent).toBe("Creados W+X, W-X, W+Y, W-Y; ya estaban G, Q.");
+    expect(within(dlg).getByRole("status").textContent).toBe("Creados W+X, W-X, W+Y, W-Y; ya estaban G, CM, Q.");
     expect(deshacer().getAttribute("title")).toMatch(/Casos típicos: W\+X, W-X, W\+Y, W-Y/);
     // La ficha de un caso es su formulario
     fireEvent.click(within(within(dlg).getByRole("navigation", { name: "Lista de casos" })).getByRole("button", { name: /^W-Y/ }));
@@ -340,9 +340,9 @@ describe("GE2: casos de carga", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Casos de carga" })).toBeNull();
     elegirTabla("casos");
-    expect(idsTabla("casos")).toEqual(["G", "Q", "W+X", "W-X", "W+Y", "W-Y"]);
+    expect(idsTabla("casos")).toEqual(["G", "CM", "Q", "W+X", "W-X", "W+Y", "W-Y"]);
     fireEvent.click(deshacer());
-    expect(idsTabla("casos")).toEqual(["G", "Q"]);
+    expect(idsTabla("casos")).toEqual(["G", "CM", "Q"]);
   }, 60_000);
 
   it("la ficha de un caso se aplica con «Aplicar», como Secciones, y no se tira sin preguntar (D-19)", async () => {
@@ -390,7 +390,7 @@ describe("GE2: casos de carga", () => {
     expect(screen.queryByRole("dialog", { name: "Casos de carga" })).toBeNull();
     expect(screen.getByText(/EX se crea con ella/)).toBeTruthy();
     elegirTabla("casos");
-    expect(idsTabla("casos")).toEqual(["G", "Q"]);
+    expect(idsTabla("casos")).toEqual(["G", "CM", "Q"]);
   }, 60_000);
 });
 

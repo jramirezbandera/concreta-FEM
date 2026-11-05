@@ -52,6 +52,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "apoyo-lineal": { stroke: "#2dd4bf", sw: 3.5 },
   atenuado: { fill: "#1a1d23", stroke: "#3a404a", sw: 0.8 },
   "atenuado-linea": { stroke: "#3a404a", sw: 1 },
+  "peso-propio": { fill: "#9ca3af", stroke: "#9ca3af", sw: 1, dash: "6 4", opacity: 0.1 },
+  "peso-propio-linea": { stroke: "#9ca3af", sw: 2.5, dash: "6 4" },
   malla: { fill: "#12151a", stroke: "#5b6575", sw: 0.6 },
   "malla-abaco": { fill: "#1c2a1f", stroke: "#5b6575", sw: 0.6 },
   "malla-rigida": { fill: "#4b5563", stroke: "#9ca3af", sw: 0.6 },

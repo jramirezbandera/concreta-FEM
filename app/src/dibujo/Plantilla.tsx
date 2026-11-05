@@ -18,6 +18,7 @@ import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramien
 import { ANCHO_ZUNCHO, COARTADOS, HUECO_MURO, pesoPlantillaForjado, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
 import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, type Bovedilla, type Caseton } from "../../../src/compilador/pesoForjado.ts";
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
+import { casoCargasMuertas } from "../../../src/editor/casos.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { TEXTO_BOVEDILLA, TEXTO_CASETON, TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
 import { LONGITUD_MAXIMA } from "../../../src/editor/celdas.ts";
@@ -385,7 +386,7 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
         </Seccion>
       )}
 
-      {CARGA_HERR.has(h) && <PlantillaCargaPanel h={h as NombreCargaH} t={t.cargas ?? {}} poner={(c) => setPlantillas({ ...t, cargas: { ...t.cargas, ...c } })} />}
+      {CARGA_HERR.has(h) && <PlantillaCargaPanel h={h as NombreCargaH} t={t.cargas ?? {}} modelo={m} poner={(c) => setPlantillas({ ...t, cargas: { ...t.cargas, ...c } })} />}
 
     </div>
   );
@@ -867,13 +868,22 @@ const CARGA_HERR: ReadonlySet<string> = new Set(["puntual", "lineal", "superfici
 type NombreCargaH = "puntual" | "lineal" | "superficie" | "barra" | "empuje";
 
 /** La plantilla de una carga: el caso activo (el de la barra) y sus valores, que nunca tienen uno por defecto. */
-function PlantillaCargaPanel({ h, t, poner }: { h: NombreCargaH; t: PlantillaCargas; poner: (c: PlantillaCargas) => void }) {
+function PlantillaCargaPanel({ h, t, modelo: m, poner }: { h: NombreCargaH; t: PlantillaCargas; modelo: ModeloFisico | null; poner: (c: PlantillaCargas) => void }) {
   const [momento, setMomento] = useState(false);
   const conM = momento || !!t.puntual?.M;
+  // El caso del peso propio es del programa: lo dibujado en él se mezcla con lo que calcula
+  const casoPP = m?.casos.find((c) => c.id === t.caso)?.pesoPropio ? t.caso : null;
+  const cm = casoPP && m ? casoCargasMuertas(m) : null;
   return (
     <Seccion titulo="Plantilla" valor={t.caso ? `caso ${t.caso}` : "sin caso"}>
       <div className="py-1">
         {!t.caso && <p className="nota text-state-fail">Elija el caso activo en la barra (o cree uno con Casos).</p>}
+        {casoPP && (
+          <p className="nota text-state-warn" data-aviso-peso-propio>
+            {casoPP} es el caso del peso propio, que calcula el programa: lo que dibuje aquí se mezcla con él.{" "}
+            {cm && !cm.crear.length ? `Elija ${cm.id} en «Caso activo».` : "Cree un caso de cargas muertas (Casos, «Cargas muertas») y elíjalo en «Caso activo»."}
+          </p>
+        )}
         {h === "puntual" && (
           <>
             <CampoCarga etiqueta="F" unidad="kN" valor={t.puntual?.F} onCambio={(F) => poner({ puntual: { ...t.puntual, F } })} ayuda="La fuerza en el punto: p. ej., la reacción de un apeo." />

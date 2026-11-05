@@ -405,6 +405,21 @@ function cargas(f: ModeloFisico): Registro[] {
     if (!f.casos.some((c) => c.pesoPropio)) sinPP.aviso("Ningún caso lleva `pesoPropio`: las piezas no pesan en el cálculo.", f.casos.map((c) => c.id));
   }
 
+  // El caso del peso propio es del programa: lo que mete el usuario, aparte (en cargas muertas), para
+  // que se distinga en el dibujo y en los resultados por caso. Con la misma acción, las combinaciones no cambian.
+  const mezcla = new Registro("sensatez/cargas-en-peso-propio", "Caso del peso propio, sólo con el peso propio", "una carga del usuario en el caso que lleva el peso propio");
+  const casoPP = f.casos.find((c) => c.pesoPropio);
+  if (casoPP) {
+    mezcla.aplica();
+    const ids = (f.cargas ?? []).filter((c) => c.caso === casoPP.id).map((c) => c.id);
+    if (ids.length)
+      mezcla.aviso(
+        `El caso ${casoPP.id} lleva el peso propio, que calcula el programa, y además ${ids.length === 1 ? "una carga" : `${ids.length} cargas`} del usuario (${ids.slice(0, 6).join(", ")}${ids.length > 6 ? "…" : ""}): no se distingue lo uno de lo otro. Páselas a un caso de cargas muertas con la misma acción; las combinaciones dan lo mismo.`,
+        [casoPP.id, ...ids],
+        { caso: casoPP.id, cargas: ids },
+      );
+  }
+
   const vacio = new Registro("sensatez/caso-vacio", "Casos vacíos", "un caso sin cargas ni peso propio");
   const usados = new Set((f.cargas ?? []).map((c) => c.caso));
   for (const c of f.casos) {
@@ -433,7 +448,7 @@ function cargas(f: ModeloFisico): Registro[] {
     arriba.aplica();
     if (vs.some((v) => v > 0)) arriba.aviso(`La carga ${c.id} del caso ${c.caso} va hacia arriba (componente vertical ${num(Math.max(...vs))} > 0; Z es hacia arriba): ¿falta el signo?`, [c.id, c.caso]);
   }
-  return [sinPP, vacio, dup, arriba];
+  return [sinPP, mezcla, vacio, dup, arriba];
 }
 
 /**

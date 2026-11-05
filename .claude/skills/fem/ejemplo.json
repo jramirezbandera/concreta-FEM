@@ -30,16 +30,17 @@
       { "id": "L-P2", "planta": "P2", "contorno": [[0, 0], [6, 0], [6, 5], [0, 5]], "espesor": 0.2, "material": "HA-25" }
     ],
     "casos": [
-      { "id": "G", "pesoPropio": true, "accion": { "tipo": "G" } },
+      { "id": "G", "nombre": "Peso propio", "pesoPropio": true, "accion": { "tipo": "G" } },
+      { "id": "CM", "nombre": "Cargas muertas", "accion": { "tipo": "G" } },
       { "id": "Q", "accion": { "tipo": "Q", "psi": "uso-A" } },
       { "id": "VX", "accion": { "tipo": "W", "direccion": "X", "signo": 1, "psi": "viento" } }
     ],
     "cargas": [
-      { "tipo": "superficie", "id": "CM-P1", "caso": "G", "planta": "P1", "losa": "L-P1", "q": [0, 0, -2] },
-      { "tipo": "superficie", "id": "CM-P2", "caso": "G", "planta": "P2", "losa": "L-P2", "q": [0, 0, -1.5] },
+      { "tipo": "superficie", "id": "CM-P1", "caso": "CM", "planta": "P1", "losa": "L-P1", "q": [0, 0, -2] },
+      { "tipo": "superficie", "id": "CM-P2", "caso": "CM", "planta": "P2", "losa": "L-P2", "q": [0, 0, -1.5] },
       { "tipo": "superficie", "id": "SU-P1", "caso": "Q", "planta": "P1", "losa": "L-P1", "q": [0, 0, -2] },
       { "tipo": "superficie", "id": "SU-P2", "caso": "Q", "planta": "P2", "losa": "L-P2", "q": [0, 0, -1] },
-      { "tipo": "lineal", "id": "FACH-P1", "caso": "G", "planta": "P1", "puntos": [[0, 0], [6, 0]], "q": [0, 0, -7] },
+      { "tipo": "lineal", "id": "FACH-P1", "caso": "CM", "planta": "P1", "puntos": [[0, 0], [6, 0]], "q": [0, 0, -7] },
       { "tipo": "puntual", "id": "VX-P1", "caso": "VX", "planta": "P1", "x": 0, "y": 0, "F": [10, 0, 0] },
       { "tipo": "puntual", "id": "VX-P2", "caso": "VX", "planta": "P2", "x": 0, "y": 0, "F": [5, 0, 0] }
     ]

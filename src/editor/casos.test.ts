@@ -10,7 +10,7 @@ import type { Proyecto } from "../agente/proyecto.ts";
 import { generarCombinaciones, type CasoCarga } from "../combinaciones/generador.ts";
 import { psiDe } from "../combinaciones/psi.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
-import { CASOS_TIPICOS, casosDelJuego, casoTipico, crearCasos, describirCaso, JUEGO_DEFECTO, psiCaso } from "./casos.ts";
+import { CASOS_TIPICOS, cargasEnPesoPropio, casosDelJuego, casoTipico, crearCasos, describirCaso, JUEGO_DEFECTO, psiCaso, separarPesoPropio } from "./casos.ts";
 import { comoUna } from "./gestores.ts";
 import { aplicar, type Operacion } from "./operaciones.ts";
 import { insertarPlantas, plantasEdificio } from "./plantas.ts";
@@ -34,14 +34,14 @@ describe("GE2: casos típicos", () => {
     }
   });
 
-  it("el juego por defecto reutiliza G y Q de la plantilla y crea el viento en cuatro direcciones", () => {
+  it("el juego por defecto reutiliza G, CM y Q de la plantilla y crea el viento en cuatro direcciones", () => {
     const p = proyectoNuevo();
     const c = crearCasos(p.modelo, casosDelJuego(JUEGO_DEFECTO).map((t) => t.caso));
     expect(c.ok).toBe(true);
     if (!c.ok) return;
-    expect(c.reutilizados).toEqual(["G", "Q"]);
+    expect(c.reutilizados).toEqual(["G", "CM", "Q"]);
     expect(c.nuevos).toEqual(["W+X", "W-X", "W+Y", "W-Y"]);
-    expect(c.ids).toEqual(["G", "Q", "W+X", "W-X", "W+Y", "W-Y"]);
+    expect(c.ids).toEqual(["G", "CM", "Q", "W+X", "W-X", "W+Y", "W-Y"]);
     const q = aplicado(p, c.operaciones);
     expect(referenciasRotas(q.modelo)).toEqual([]);
     // Un segundo juego igual no crea nada
@@ -55,11 +55,11 @@ describe("GE2: casos típicos", () => {
     });
     const elu = generarCombinaciones(casos, { situaciones: ["ELU-PT"] });
     expect(elu.length).toBeGreaterThan(0);
-    for (const k of elu) expect([2, 3, 4, 5].filter((i) => k.factores[i] !== 0).length).toBeLessThanOrEqual(1);
-    expect(elu.some((k) => k.factores[2] !== 0)).toBe(true);
+    for (const k of elu) expect([3, 4, 5, 6].filter((i) => k.factores[i] !== 0).length).toBeLessThanOrEqual(1);
+    expect(elu.some((k) => k.factores[3] !== 0)).toBe(true);
   });
 
-  it("con todo: cargas muertas, nieve de altura y sismo; ids libres si el propuesto está cogido", () => {
+  it("con todo: cargas muertas (la de la plantilla), nieve de altura y sismo; ids libres si el propuesto está cogido", () => {
     let p = proyectoNuevo();
     // Un pilar «EX» ocupa el id del sismo X: los ids son únicos en todo el modelo
     p = aplicado(p, [
@@ -69,7 +69,8 @@ describe("GE2: casos típicos", () => {
     const j = { ...JUEGO_DEFECTO, cargasMuertas: true, uso: "C" as const, nieve: "mas-de-1000" as const, viento: false, sismo: true };
     const c = crearCasos(p.modelo, casosDelJuego(j).map((t) => t.caso));
     if (!c.ok) throw new Error(c.mensaje);
-    expect(c.nuevos).toEqual(["CM", "QC", "S", "EX-2", "EY"]);
+    expect(c.nuevos).toEqual(["QC", "S", "EX-2", "EY"]);
+    expect(c.reutilizados).toEqual(["G", "CM"]);
     const q = aplicado(p, c.operaciones);
     expect(q.modelo.casos!.find((x) => x.id === "S")!.accion).toEqual({ tipo: "S", psi: "nieve-mas-de-1000", duracion: "media" });
     expect(q.modelo.casos!.find((x) => x.id === "EX-2")!.accion).toEqual({ tipo: "E", direccion: "X" });
@@ -174,5 +175,77 @@ describe("la tabla Casos: lo que pide cada acción", () => {
       const f = def.fila(t.caso as never, ctx);
       for (const c of def.columnas) if (f[c.clave]) expect(def.aplica!(c.clave, f), `${t.clave}: ${c.clave}`).toBe(true);
     }
+  });
+});
+
+describe("el caso del peso propio, sólo del programa (2026-11-05)", () => {
+  const conCargas = (casos: Proyecto["modelo"]["casos"]): Proyecto => {
+    const p = proyectoNuevo();
+    return {
+      ...p,
+      modelo: {
+        ...p.modelo,
+        casos,
+        losas: [{ id: "L1", planta: "N1", contorno: [[0, 0], [4, 0], [4, 4], [0, 4]], espesor: 0.25, material: "HA-30" }],
+        cargas: [
+          { tipo: "superficie", id: "G-1", caso: "G", planta: "N1", losa: "L1", q: [0, 0, -1.5] },
+          { tipo: "superficie", id: "TAB", caso: "G", planta: "N1", losa: "L1", q: [0, 0, -1] },
+          { tipo: "superficie", id: "Q-1", caso: "Q", planta: "N1", losa: "L1", q: [0, 0, -2] },
+        ],
+      },
+    };
+  };
+
+  it("crea CM con la acción del peso propio, detrás de él, y le pasa las cargas (los ids del dibujo, renombrados)", () => {
+    const p = conCargas([
+      { id: "G", nombre: "Peso propio", pesoPropio: true, accion: { tipo: "G", duracion: "permanente" } },
+      { id: "Q", accion: { tipo: "Q", psi: "uso-A" } },
+    ]);
+    expect(cargasEnPesoPropio(p.modelo)).toEqual(["G-1", "TAB"]);
+    const r = separarPesoPropio(p.modelo);
+    if (!r.ok) throw new Error(r.mensaje);
+    expect(r).toMatchObject({ destino: "CM", nuevo: true, cargas: ["G-1", "TAB"] });
+    const q = aplicado(p, r.operacion);
+    expect(q.modelo.casos.map((c) => c.id)).toEqual(["G", "CM", "Q"]);
+    expect(q.modelo.casos[1]).toEqual({ id: "CM", nombre: "Cargas muertas", accion: { tipo: "G", duracion: "permanente" } });
+    expect(q.modelo.cargas!.map((c) => [c.id, c.caso])).toEqual([["CM-1", "CM"], ["TAB", "CM"], ["Q-1", "Q"]]);
+    expect(cargasEnPesoPropio(q.modelo)).toEqual([]);
+    expect(referenciasRotas(q.modelo)).toEqual([]);
+    expect(separarPesoPropio(q.modelo).ok).toBe(false);
+  });
+
+  it("usa el caso de cargas muertas que ya está, aunque otro tenga la misma acción antes", () => {
+    const p = conCargas([
+      { id: "G", pesoPropio: true, accion: { tipo: "G" } },
+      { id: "ET", nombre: "Empuje del terreno", accion: { tipo: "G" } },
+      { id: "PERM", nombre: "Cargas muertas", accion: { tipo: "G" } },
+      { id: "Q", accion: { tipo: "Q", psi: "uso-A" } },
+    ]);
+    const r = separarPesoPropio(p.modelo);
+    if (!r.ok) throw new Error(r.mensaje);
+    expect(r).toMatchObject({ destino: "PERM", nuevo: false });
+    expect(aplicado(p, r.operacion).modelo.cargas!.filter((c) => c.caso === "PERM").map((c) => c.id)).toEqual(["PERM-1", "TAB"]);
+  });
+
+  it("sin acción en el del peso propio, CM tampoco la lleva; las combinaciones son las mismas por caso permanente", () => {
+    const p = conCargas([
+      { id: "G", pesoPropio: true },
+      { id: "Q", accion: { tipo: "Q", psi: "uso-A" } },
+    ]);
+    const r = separarPesoPropio(p.modelo);
+    if (!r.ok) throw new Error(r.mensaje);
+    expect(aplicado(p, r.operacion).modelo.casos[1]).toEqual({ id: "CM", nombre: "Cargas muertas" });
+    // Con acción: G y CM llevan siempre el mismo factor (el CTE toma las permanentes globalmente, 4.2.2)
+    const casos: CasoCarga[] = [
+      { id: "G", tipo: "G" },
+      { id: "CM", tipo: "G" },
+      { id: "Q", tipo: "Q", psi: psiDe("uso-A") },
+    ];
+    for (const c of generarCombinaciones(casos)) expect(c.factores[1], c.etiqueta).toBe(c.factores[0]);
+  });
+
+  it("el proyecto nuevo y las «Hipótesis típicas» separan el peso propio de las cargas muertas", () => {
+    expect(proyectoNuevo().modelo.casos.map((c) => [c.id, !!c.pesoPropio])).toEqual([["G", true], ["CM", false], ["Q", false]]);
+    expect(casosDelJuego(JUEGO_DEFECTO).map((t) => t.clave).slice(0, 2)).toEqual(["G", "CM"]);
   });
 });

@@ -213,6 +213,9 @@ try {
   log("## Cargas de G en el 3D (sólido)");
   await pagina(`__i2.boton("Cargas", document.querySelector("nav")).click()`);
   await quietos();
+  // Desde el 2026-11-05 el caso activo por defecto es el primero sin el peso propio: aquí, G
+  await pagina(elegirEn('select[aria-label="Caso activo"]', "G"));
+  await quietos();
   await pagina(`__i2.boton("3D").click()`);
   await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).cargas > 0, 120000);`);
   await quietos();

@@ -64,6 +64,9 @@ export type Estilo =
   | "carga-pieza"
   | "carga-banda-lineal"
   | "carga-banda-pieza"
+  /** El peso propio que calcula el programa, en el caso que lo lleva (forjados y vigas). */
+  | "peso-propio"
+  | "peso-propio-linea"
   | "atenuado"
   | "atenuado-linea"
   | "diagnostico-error"

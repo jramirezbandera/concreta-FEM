@@ -192,11 +192,13 @@ describe("la herramienta activa (V2c-1)", () => {
     expect(screen.getByRole("button", { name: "uz" }).getAttribute("aria-pressed")).toBe("false");
     fireEvent.keyDown(window, { key: "Escape" });
 
-    // En Cargas, las herramientas van al caso activo; sin valor no hay carga por defecto
+    // En Cargas, las herramientas van al caso activo (por defecto, el primero que no es el del peso
+    // propio: CM); sin valor no hay carga por defecto
     fireEvent.click(screen.getByRole("button", { name: "Cargas" }));
     fireEvent.click(await screen.findByRole("button", { name: "Puntual" }));
     const puntual = screen.getByRole("region", { name: "Dibujar · Carga puntual" });
-    expect(puntual.textContent).toMatch(/caso G/);
+    expect(puntual.textContent).toMatch(/caso CM/);
+    expect(puntual.querySelector("[data-aviso-peso-propio]")).toBeNull();
     expect((screen.getByRole("textbox", { name: "F" }) as HTMLInputElement).value).toBe("");
     // Un número hacia abajo (la gravedad, por defecto); con «x, y, z», sus componentes (z < 0)
     expect(screen.getByRole("radio", { name: "↓ Gravedad" }).getAttribute("aria-checked")).toBe("true");
@@ -211,6 +213,9 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.click(screen.getByRole("radio", { name: "↓ Gravedad" }));
     fireEvent.change(screen.getByRole("textbox", { name: "F" }), { target: { value: "12,5" } });
     fireEvent.keyDown(screen.getByRole("textbox", { name: "F" }), { key: "Enter" });
+    // En el del peso propio, la plantilla avisa de que lo dibujado se mezcla con él
+    fireEvent.change(screen.getByRole("combobox", { name: "Caso activo" }), { target: { value: "G" } });
+    await waitFor(() => expect(screen.getByRole("region", { name: "Dibujar · Carga puntual" }).querySelector("[data-aviso-peso-propio]")!.textContent).toMatch(/Elija CM/));
     fireEvent.change(screen.getByRole("combobox", { name: "Caso activo" }), { target: { value: "Q" } });
     await waitFor(() => expect(screen.getByRole("region", { name: "Dibujar · Carga puntual" }).textContent).toMatch(/caso Q/));
   }, 60_000);

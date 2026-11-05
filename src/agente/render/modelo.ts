@@ -18,6 +18,7 @@ import { puntoEnPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, t
 import type { CargaFisica, Losa, ModeloFisico, Muro, PanoUnidireccional, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
 import { espesorLosaEn, huellasInglete, huellasVigas, tramosDe } from "../../visor/solido.ts";
+import { areaSeccion, gammaMaterial, ppDePano, ppLosa } from "../sensatez.ts";
 
 export { espesorLosaEn };
 import { capaEjes } from "./ejes.ts";
@@ -612,6 +613,8 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
   const panos = new Map((f.panos ?? []).map((p) => [p.id, p]));
   const pilares = new Map(pl.pilares().map((x) => [x.p.id, x]));
   const muros = new Map(pl.muros().map((x) => [x.m.id, x]));
+  // El peso propio, que calcula el programa: debajo de las cargas del usuario y sin objeto (no se elige ni se edita)
+  if (c?.pesoPropio) for (const x of pesoPropioPlanta(pl)) poner(x);
   let n = 0;
   for (const g of porId((f.cargas ?? []).filter((x) => x.caso === caso))) {
     const antes = P.length;
@@ -701,10 +704,11 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
   entrada("carga-lineal", "Carga lineal (kN/m)");
   entrada("carga-puntual", "Carga puntual (kN): círculo con punto si va hacia abajo, con aspa si va hacia arriba, flecha si es horizontal. Su momento (kN·m): Mz, un arco en su sentido (antihorario, positivo); (Mx, My), una flecha de doble punta (regla de la mano derecha)");
   entrada("carga-pieza", "Carga en una viga, un pilar que llega a la planta o un muro (kN/m o kN/m²)");
+  entrada("peso-propio", "Peso propio de los forjados (kN/m²) y de las vigas (kN/m), calculado por el programa: se cambia en Modelo (el pp del forjado, su sección o su material)");
   if (!c) notas.push(`El caso «${caso}» no existe.`);
-  else if (c.pesoPropio) notas.push("Este caso lleva además el peso propio de la estructura, que calcula el programa y no se dibuja.");
+  else if (c.pesoPropio) notas.push("Este caso lleva el peso propio de la estructura, que calcula el programa: en gris, el de los forjados y las vigas (el de pilares y muros también cuenta, sin dibujar). Las cargas del usuario van mejor en un caso de cargas muertas.");
   notas.push(NOTA_VALOR_CARGA);
-  if (!n) notas.push("El caso no tiene cargas en esta planta.");
+  if (!n) notas.push(c?.pesoPropio ? "Sin cargas del usuario en esta planta: sólo el peso propio." : "El caso no tiene cargas en esta planta.");
   return {
     titulo: titulo(d.nombre),
     cabecera: [cabeceraPlanta(pl), `Vista: cargas del caso ${caso}${c?.nombre ? ` (${c.nombre})` : ""}${c?.accion ? `, acción ${c.accion.tipo}` : ""}`, `Huella ${d.huella.slice(0, 12)}`],
@@ -714,6 +718,48 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
     extremos: [],
     caja: cajaPlanta(fondo.primitivas.length ? fondo.primitivas : P),
   };
+}
+
+/**
+ * El peso propio de la planta como lo calcula el programa, para la vista de cargas del caso que lo
+ * lleva: cada forjado con su pp (en un reticular, el de la zona aligerada y el de los ábacos) y cada
+ * viga con γ·A, sin lo que el compilador descuenta por los solapes (C2-g). Sin objeto: no se elige.
+ */
+function pesoPropioPlanta(pl: PlantaFisica): Primitiva[] {
+  // Con los ábacos de `abacosPilares` ya puestos (MA2)
+  const f = pl.f;
+  const P: Primitiva[] = [];
+  const material = (id: string) => f.materiales.find((m) => m.id === id);
+  const rot = (p: Vec2, t: string, extra: Partial<Extract<Primitiva, { tipo: "texto" }>> = {}) =>
+    P.push({ tipo: "texto", p, texto: t, tamano: 11, prioridad: 30, fondo: true, clase: "dato", ...extra });
+  const forjado = (x: Losa | PanoUnidireccional, texto: string | null) => {
+    const anillos = [x.contorno as Vec2[], ...((x.huecos ?? []) as Vec2[][])];
+    P.push({ tipo: "poligono", anillos, estilo: "peso-propio" });
+    // Debajo del rótulo de una carga que esté en el mismo sitio
+    if (texto) rot(puntoInterior(anillos), texto, { ancla: "medio", dy: 18 });
+  };
+  for (const l of porId(pl.enPlanta(f.losas))) {
+    const m = material(l.material);
+    if (!m) continue;
+    const { pp, ppAbaco } = ppLosa(l, m);
+    const abacos = l.reticular?.abacos ?? [];
+    forjado(l, `pp ${valorCarga([0, 0, -pp], "kN/m²")}${abacos.length && ppAbaco !== pp ? ` (ábacos ${rotulo(ppAbaco)})` : ""}`);
+  }
+  for (const x of porId(pl.enPlanta(f.panos))) {
+    const pp = ppDePano(f, x);
+    forjado(x, pp === undefined ? null : `pp ${valorCarga([0, 0, -pp], "kN/m²")}`);
+  }
+  for (const v of porId(pl.enPlanta(f.vigas))) {
+    const s = f.secciones.find((y) => y.id === v.seccion);
+    const m = s && material(s.material);
+    if (!s || !m) continue;
+    const q = areaSeccion(s) * gammaMaterial(m);
+    if (!(q > 0)) continue;
+    P.push({ tipo: "linea", puntos: v.puntos as Vec2[], estilo: "peso-propio-linea" });
+    const { p, d: dir } = puntoEnPolilinea(v.puntos, longitud(v.puntos) / 2);
+    rot(p, `pp ${valorCarga([0, 0, -q], "kN/m")}`, { giro: giroTexto(dir), ancla: "medio", dy: 12 });
+  }
+  return P;
 }
 
 // ─── Vista «diagnosticos» ───────────────────────────────────────────────────────────────────────

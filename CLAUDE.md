@@ -808,6 +808,11 @@
   - **Corregido de paso:** `pesoLosa` de la sensatez daba el pp escrito de un reticular también a los ábacos (MA3).
   - **Validación:** `pesoForjado.test.ts` (los seis casos de la tabla con las fórmulas escritas aparte, los criterios de aceptación, el relleno en el compilador, los límites, la huella, la tabla) y `app/src/test/formulario.test.tsx`.
   - **Diferencia con la revisión, sin cambiar:** sólo hay retícula cuadrada (un intereje y un nervio), como la rigidez.
+- **2026-11-05: el caso del peso propio, sólo del programa** (decisión del usuario: no se distinguía lo que pone el programa de lo que mete él; `interfaz.md` §18.1).
+  - **Por qué no cambia el cálculo:** las permanentes van «globalmente» (CTE 4.2.2), así que `G` (peso propio) + `CM` con la misma acción dan las mismas combinaciones, a la precisión de máquina; sólo se separan los resultados por caso.
+  - **Aviso, no error:** `sensatez/cargas-en-peso-propio` (fuera del criterio de A3) y «Pasar a cargas muertas» (`separarPesoPropio`, `src/editor/casos.ts`, un paso de deshacer), en Diagnósticos, en la ficha de la pieza y en el resumen del caso.
+  - **El dibujo:** en Cargas, con el caso del peso propio activo, la planta pinta en gris el pp de forjados y vigas, sin objeto; la ficha de una pieza lo da en su bloque, aparte de las cargas.
+  - **Por defecto:** caso activo, el primero sin peso propio; aviso en la plantilla de las cargas; el proyecto nuevo y las «Hipótesis típicas» traen `CM`. La vivienda y el ejemplo de la skill, con sus cargas en `CM`; la skill lo pide al agente.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

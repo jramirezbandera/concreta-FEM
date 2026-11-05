@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import type { CargaFisica, ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { componentes, valorCarga, valorCargaVariable } from "../../../src/agente/render/modelo.ts";
 import { cargaEnPieza, cargasPieza, resumenCaso, type CargasPieza as Datos, type TipoPieza } from "../../../src/editor/cargasPieza.ts";
+import { cargasEnPesoPropio, casoCargasMuertas } from "../../../src/editor/casos.ts";
 import type { Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import type { Vec3 } from "../../../src/motor/modelo.ts";
@@ -21,6 +22,7 @@ import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { CampoCarga, NumeroCampo, Segmentado } from "../dibujo/Plantilla.tsx";
 import { cota, fmt } from "../fmt.ts";
+import { PasarACargasMuertas } from "./PesoPropio.tsx";
 
 const ICONO: Record<TipoPieza, typeof IcForjado> = { losa: IcForjado, pano: IcForjado, viga: IcViga, pilar: IcPilar, muro: IcMuro };
 const NOMBRE: Record<TipoPieza, string> = { losa: "Forjado", pano: "Forjado", viga: "Viga", pilar: "Pilar", muro: "Muro" };
@@ -83,25 +85,31 @@ export function PropiedadesCargas({ id, caso, plantillas: t, setPlantillas, edit
         </button>
       </Cabecera>
       <Anadir d={d} caso={caso} t={t} setPlantillas={setPlantillas} editar={editar} />
+      {/* El peso propio, aparte de lo que mete el usuario: lo calcula el programa y se cambia en Modelo */}
+      {d.pesoPropio && (
+        <Seccion titulo="Peso propio · lo calcula el programa" valor={d.pesoPropio.caso ? `en ${d.pesoPropio.caso}` : "sin caso"}>
+          <table className="tb" data-peso-propio>
+            <tbody>
+              <tr title="Se cambia en Modelo: el pp del forjado, o su sección y su material">
+                <td className="txt" style={{ textAlign: "left", color: "var(--color-text-secondary)" }}>
+                  {fmt(d.pesoPropio.unidad, 2)} {d.pesoPropio.queUnidad}
+                  {d.pesoPropio.total === undefined ? " (sin los solapes)" : ""}
+                </td>
+                <td>{d.pesoPropio.total === undefined ? "—" : `${resultante([0, 0, -d.pesoPropio.total])} kN`}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="nota">{d.pesoPropio.caso ? "No es una carga suya: sale de la geometría y del material. Para cambiarlo, el lápiz (Modelo)." : "Ningún caso lleva el peso propio (Casos): no cuenta en el cálculo."}</p>
+        </Seccion>
+      )}
       {d.casos.map((c) => {
-        const pp = d.pesoPropio && d.pesoPropio.caso === c.caso ? d.pesoPropio : null;
-        const total = pp?.total !== undefined ? [c.F[0], c.F[1], c.F[2] - pp.total] : c.F;
-        const vacio = !c.cargas.length && !pp;
+        const conPP = d.pesoPropio?.caso === c.caso;
+        const vacio = !c.cargas.length;
         return (
-          <Seccion key={c.caso} titulo={`${c.caso === caso ? "● " : ""}${c.caso}${nombreCaso(c.caso) ? ` · ${nombreCaso(c.caso)}` : ""}`} valor={vacio ? "sin cargas" : `${resultante(total)} kN`}>
+          <Seccion key={c.caso} titulo={`${c.caso === caso ? "● " : ""}${c.caso}${nombreCaso(c.caso) ? ` · ${nombreCaso(c.caso)}` : ""}`} valor={vacio ? (conPP ? "sólo el peso propio" : "sin cargas") : `${resultante(c.F)} kN${conPP ? " + peso propio" : ""}`}>
             {!vacio && (
               <table className="tb">
                 <tbody>
-                  {pp && (
-                    <tr title="El peso propio de la pieza: se edita en Modelo (el pp del forjado o su sección y material)">
-                      <td className="txt">pp</td>
-                      <td className="txt" style={{ textAlign: "left", color: "var(--color-text-secondary)" }}>
-                        Peso propio · {fmt(pp.unidad, 2)} {pp.queUnidad}
-                        {pp.total === undefined ? " (sin los solapes)" : ""}
-                      </td>
-                      <td>{pp.total === undefined ? "—" : fmt(pp.total, 1)}</td>
-                    </tr>
-                  )}
                   {c.cargas.map((x) => (
                     <tr key={x.carga.id}>
                       <td className="txt">
@@ -118,12 +126,17 @@ export function PropiedadesCargas({ id, caso, plantillas: t, setPlantillas, edit
                 </tbody>
               </table>
             )}
+            {conPP && !vacio && (
+              <>
+                <p className="nota text-state-warn">Están en el caso del peso propio y se mezclan con lo que calcula el programa: mejor en uno de cargas muertas.</p>
+                <PasarACargasMuertas />
+              </>
+            )}
           </Seccion>
         );
       })}
       <p className="nota">
         kN hacia abajo (H: la horizontal). Es lo dibujado: con la unión por las caras, lo que cae en el ancho de una viga lo lleva la viga.
-        {d.pesoPropio && !d.pesoPropio.caso ? " Ningún caso lleva el peso propio (Casos)." : ""}
       </p>
     </>
   );
@@ -234,7 +247,7 @@ function Anadir({ d, caso, t, setPlantillas, editar }: { d: Datos; caso: string;
 }
 
 /** Sin nada elegido: el caso activo en la planta, por tipo, y lo que recibe cada planta. */
-export function ResumenCaso({ caso }: { caso: string }) {
+export function ResumenCaso({ caso, setCaso }: { caso: string; setCaso?: (c: string) => void }) {
   const { proyecto, planta } = useVisor();
   const e = proyecto.estado!;
   const m = proyecto.edicion?.proyecto.modelo;
@@ -242,6 +255,8 @@ export function ResumenCaso({ caso }: { caso: string }) {
   const filas = useMemo(() => (m && planta && caso ? resumenCaso(m, caso, planta) : null), [m, planta, caso]);
   const r = e.resumen?.plantas.find((p) => p.id === planta) ?? null;
   const total = filas?.reduce((s, x) => [s[0]! + x.F[0], s[1]! + x.F[1], s[2]! + x.F[2]], [0, 0, 0]);
+  // El caso de cargas muertas que ya está, para ir a él desde el del peso propio
+  const casoCM = useMemo(() => (m && c?.pesoPropio ? (casoCargasMuertas(m)?.crear.length === 0 ? casoCargasMuertas(m)!.id : null) : null), [m, c?.pesoPropio]);
   return (
     <>
       <Cabecera icono={IcCasos} tipo="Caso activo · nada elegido" titulo={caso || "—"} mono detalle={c ? [c.nombre, c.accion ?? "sin acción", c.pesoPropio ? "con peso propio" : null].filter(Boolean).join(" · ") : undefined} />
@@ -271,7 +286,22 @@ export function ResumenCaso({ caso }: { caso: string }) {
           ) : (
             <p className="nota">Dibuje las cargas con las herramientas de la barra o elija un forjado, una viga, un pilar o un muro para añadirle una.</p>
           )}
-          {c?.pesoPropio && <p className="nota">Sin el peso propio, que el compilador pone en este caso: está en «Lo que recibe cada planta».</p>}
+          {c?.pesoPropio && filas.length > 0 && <p className="nota text-state-warn">Son del usuario, en el caso del peso propio: se mezclan con lo que calcula el programa.</p>}
+        </Seccion>
+      )}
+      {c?.pesoPropio && (
+        <Seccion titulo="El caso del peso propio" valor="lo calcula el programa">
+          <p className="nota">
+            El peso de forjados, vigas, pilares y muros sale de la geometría y del material: en la planta, en gris (se cambia en Modelo). Las cargas que meta usted (solados, tabiquería, petos…) van mejor en un caso de cargas muertas, con la misma acción: así se distingue lo suyo de lo del programa, también en los resultados por caso, y las combinaciones dan lo mismo.
+          </p>
+          <PasarACargasMuertas alHacer={setCaso} />
+          {casoCM && casoCM !== caso && !(m && cargasEnPesoPropio(m).length) && setCaso && (
+            <div className="px-3.5 pt-1">
+              <button type="button" className="btn" onClick={() => setCaso(casoCM)}>
+                Ir a {casoCM}
+              </button>
+            </div>
+          )}
         </Seccion>
       )}
       {r && (

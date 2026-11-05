@@ -549,7 +549,7 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
     "Cada carga, como está en el modelo: el cálculo une a ε_snap sus zonas y polilíneas a lo que tienen cerca (C2-b).",
     ...(horizontales ? ["Las componentes horizontales de las cargas de superficie no se dibujan (van en el rótulo)."] : []),
     ...(paralelos.length ? ["El empuje de un muro paralelo al plano es normal a él: sólo se rotula."] : []),
-    ...(!c ? [`El caso «${caso}» no existe.`] : c.pesoPropio ? ["Este caso lleva además el peso propio de la estructura, que calcula el programa y no se dibuja."] : []),
+    ...(!c ? [`El caso «${caso}» no existe.`] : c.pesoPropio ? ["Este caso lleva el peso propio de la estructura, que calcula el programa: aquí no se dibuja; en planta, en gris."] : []),
     ...(vistas.size ? [] : ["El caso no tiene cargas en este plano."]),
     ...geo.notas,
     ...base.notas,

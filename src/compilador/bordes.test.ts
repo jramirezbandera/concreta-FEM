@@ -77,8 +77,8 @@ describe("MA4: la carga de borde de losa", () => {
       ...f,
       cargas: [
         ...(f.cargas ?? []).filter((c) => !c.id.startsWith("PETO")),
-        borde({ id: "PETO-CUB", losa: "L-CUB", excepto: [[[4.26, 1.87], [4.26, 15.67]]] }),
-        borde({ id: "PETO-CUB-S", losa: "L-CUB-S" }),
+        borde({ id: "PETO-CUB", caso: "CM", losa: "L-CUB", excepto: [[[4.26, 1.87], [4.26, 15.67]]] }),
+        borde({ id: "PETO-CUB-S", caso: "CM", losa: "L-CUB-S" }),
       ],
     };
     const [a, b] = [valido(compilar(f)).modelo, valido(compilar(g)).modelo];
@@ -146,13 +146,14 @@ describe("MA4: la carga de borde de losa", () => {
     const g: ModeloFisico = {
       ...f,
       losas: f.losas!.map((l, i) => ({ ...l, reticular: i === 0 ? { ...l.reticular!, abacos: undefined, abacosPilares: { lado: 2 } } : { ...l.reticular!, abacos: [...l.reticular!.abacos!, [[4, 14], [5, 14], [5, 15], [4, 15]]] } })),
-      cargas: [...(f.cargas ?? []).filter((c) => !c.id.startsWith("PETO")), borde({ id: "PETO-CUB-S", losa: "L-CUB-S" })],
+      cargas: [...(f.cargas ?? []).filter((c) => !c.id.startsWith("PETO")), borde({ id: "PETO-CUB-S", caso: "CM", losa: "L-CUB-S" })],
     };
     delete (g.losas![0]!.reticular as { abacos?: unknown }).abacos;
     const c = valido(compilar(g));
     expect(c.diagnosticos.some((d) => d.codigo === "reticular/abacos-unidos")).toBe(true);
     const q = new Consultas(g, c, casosValidos(calcular(c.modelo)));
-    expect(q.nc).toBe(3);
+    // G (peso propio), CM, Q y N
+    expect(q.nc).toBe(4);
   });
 
   it("sin cargas de borde, el mismo objeto", () => {

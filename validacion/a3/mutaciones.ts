@@ -209,9 +209,10 @@ const clave = (d: { codigo: string; ids?: string[] }) => `${d.codigo}|${[...(d.i
 /** Los avisos de la revisión mutada que la base no da, por código. */
 /**
  * Avisos que no cuentan en el criterio de A3, que se fijó sin ellos: el borde sin viga
- * (2026-10-15) es verdadero en los modelos de referencia, que no llevan zunchos.
+ * (2026-10-15) es verdadero en los modelos de referencia, que no llevan zunchos; y las cargas en el
+ * caso del peso propio (2026-11-05), que es cómo los llevan casi todos (es de orden, no de cálculo).
  */
-export const FUERA_DEL_CRITERIO: ReadonlySet<string> = new Set(["sensatez/borde-sin-viga"]);
+export const FUERA_DEL_CRITERIO: ReadonlySet<string> = new Set(["sensatez/borde-sin-viga", "sensatez/cargas-en-peso-propio"]);
 
 export function nuevos(base: Revision, mutada: Revision): Map<string, string[]> {
   const ya = new Set(base.avisos.map(clave));

@@ -15,6 +15,7 @@ import { psiDe, type CategoriaUso, type PsiNombrado } from "../combinaciones/psi
 import { idMaterialLibre } from "./gestores.ts";
 import type { Operacion } from "./operaciones.ts";
 import type { Objeto } from "./referencias.ts";
+import { idCarga } from "./tablas.ts";
 
 /** Un caso típico: el caso que se crea (con su id propuesto) y cómo se presenta. */
 export interface CasoTipico {
@@ -69,8 +70,11 @@ export interface JuegoCasos {
   sismo: boolean;
 }
 
-/** El ejemplo de §3.4: G + Q de uso A + viento en las cuatro direcciones. */
-export const JUEGO_DEFECTO: JuegoCasos = { permanentes: true, cargasMuertas: false, uso: "A", nieve: null, viento: true, sismo: false };
+/**
+ * El ejemplo de §3.4: G + Q de uso A + viento en las cuatro direcciones, y las cargas muertas en CM:
+ * el caso del peso propio es del programa (2026-11-05), así que lo que mete el usuario va aparte.
+ */
+export const JUEGO_DEFECTO: JuegoCasos = { permanentes: true, cargasMuertas: true, uso: "A", nieve: null, viento: true, sismo: false };
 
 /** Los típicos de un juego, en orden. */
 export function casosDelJuego(j: JuegoCasos): CasoTipico[] {
@@ -126,6 +130,78 @@ export function crearCasos(m: ModeloFisico, casos: readonly CasoFisico[]): Creac
     nuevos.push(id);
   }
   return { ok: true, ids, operaciones, nuevos, reutilizados };
+}
+
+// ─── El caso del peso propio, sólo del programa ─────────────────────────────────────────────────
+
+/** El caso que lleva el peso propio (como mucho uno). */
+export const casoPesoPropio = (m: ModeloFisico): CasoFisico | undefined => (m.casos ?? []).find((c) => c.pesoPropio);
+
+/** Las cargas del usuario en el caso del peso propio: se mezclan con lo que calcula el programa (aviso `sensatez/cargas-en-peso-propio`). */
+export function cargasEnPesoPropio(m: ModeloFisico): string[] {
+  const pp = casoPesoPropio(m);
+  return pp ? (m.cargas ?? []).filter((c) => c.caso === pp.id).map((c) => c.id) : [];
+}
+
+/**
+ * El caso de cargas muertas al que van las del usuario que no son del peso propio: uno sin
+ * `pesoPropio` con la misma acción que el del peso propio (las mismas combinaciones: el CTE toma las
+ * permanentes «globalmente», 4.2.2), o el típico CM con esa acción, que se crea. `crear` es la
+ * operación que lo crea, si hace falta.
+ */
+export function casoCargasMuertas(m: ModeloFisico): { id: string; crear: Operacion[] } | null {
+  const pp = casoPesoPropio(m);
+  if (!pp) return null;
+  const tipico = casoTipico("CM")!.caso;
+  // De los que tienen su acción, el que se llama de cargas muertas (en el muestrario, CM antes que ET)
+  const mismaAccion = (m.casos ?? []).filter((x) => !x.pesoPropio && clave(x.accion) === clave(pp.accion));
+  const ya = mismaAccion.find((x) => x.id === tipico.id || /muert/i.test(x.nombre ?? ""));
+  if (ya) return { id: ya.id, crear: [] };
+  const c = crearCasos(m, [{ ...tipico, ...(pp.accion ? { accion: { ...pp.accion } } : { accion: undefined }) }]);
+  if (!c.ok) return null;
+  // Sin acción, el caso no lleva el campo (como el del peso propio)
+  const crear = c.operaciones.map((o) => (o.op === "crear" && !pp.accion ? { ...o, objeto: Object.fromEntries(Object.entries(o.objeto).filter(([k]) => k !== "accion")) as Objeto } : o));
+  return { id: c.ids[0]!, crear };
+}
+
+/**
+ * «Pasar a Cargas muertas»: las cargas del usuario que están en el caso del peso propio, a su caso de
+ * cargas muertas (`casoCargasMuertas`), creándolo si no está; un paso de deshacer. Con la misma
+ * acción, las combinaciones dan lo mismo (a la precisión de máquina: se suman los dos casos en vez
+ * de uno); los resultados por caso se separan en lo del programa y lo del usuario.
+ */
+export function separarPesoPropio(m: ModeloFisico): { ok: true; operacion: Operacion; etiqueta: string; destino: string; cargas: string[]; nuevo: boolean } | { ok: false; mensaje: string } {
+  const pp = casoPesoPropio(m);
+  if (!pp) return { ok: false, mensaje: "Ningún caso lleva el peso propio." };
+  const ids = new Set(cargasEnPesoPropio(m));
+  if (!ids.size) return { ok: false, mensaje: `El caso ${pp.id} sólo lleva el peso propio: no hay nada que pasar.` };
+  const cm = casoCargasMuertas(m);
+  if (!cm) return { ok: false, mensaje: "No se ha podido crear el caso de cargas muertas." };
+  // Los ids que puso el dibujo por su caso («G-3», UI-2) pasan a los del destino («CM-1»); los demás se quedan
+  const automatico = new RegExp(`^${pp.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-\\d+$`);
+  const ocupados = new Set<string>();
+  const cambios: Operacion[] = (m.cargas ?? [])
+    .filter((c) => ids.has(c.id))
+    .map((c) => {
+      const id = automatico.test(c.id) ? idCarga(m, cm.id, ocupados) : c.id;
+      ocupados.add(id);
+      return { op: "cambiar", coleccion: "cargas", id: c.id, objeto: { ...c, id, caso: cm.id } as unknown as Objeto };
+    });
+  // Detrás del caso del peso propio, como en las «Hipótesis típicas»
+  const crear = cm.crear.map((o): Operacion => {
+    if (o.op !== "crear") return o;
+    const i = m.casos.findIndex((c) => c.id === pp.id);
+    return { ...o, antesDe: m.casos[i + 1]?.id ?? null };
+  });
+  const n = ids.size;
+  return {
+    ok: true,
+    operacion: { op: "lote", operaciones: [...crear, ...cambios] },
+    etiqueta: `${n} carga${n === 1 ? "" : "s"} de ${pp.id} a ${cm.id}`,
+    destino: cm.id,
+    cargas: [...ids],
+    nuevo: crear.length > 0,
+  };
 }
 
 const coma = (x: number) => String(x).replace(".", ",");

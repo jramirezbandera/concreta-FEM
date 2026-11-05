@@ -35,6 +35,7 @@ import { Chip, Desplegable, Disposicion, GrupoPlegable, Herramienta, Hueco, Camp
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
+import { PasarACargasMuertas } from "../pantallas/PesoPropio.tsx";
 import { useVisor } from "../contexto.ts";
 import { DialogoAbacos, DialogoAlinear, DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { FormularioVarios, tablaDe } from "../editor/Formulario.tsx";
@@ -106,7 +107,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const foto = useSyncExternalStore(ctrl.suscribir, ctrl.instantanea);
   const [plantillasDibujo, setPlantillasDibujo] = useState<Plantillas>({ pilar: {}, viga: {} });
   const modeloEd = ed?.proyecto.modelo ?? null;
-  const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
+  // Por defecto, el primero que no es el del peso propio (que es del programa: lo del usuario va aparte)
+  const casoValido = e.casos.some((c) => c.id === caso) ? caso! : ((e.casos.find((c) => !c.pesoPropio) ?? e.casos[0])?.id ?? "");
   // Las cargas que se dibujan van al caso activo
   const casoDibujo = cargas ? casoValido : undefined;
   // V2c-4: las plantillas DXF, leídas en su worker; su índice por planta va al controlador
@@ -572,7 +574,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
             Lo que se comprueba del modelo al compilarlo y al calcularlo. Un clic en un id lo elige.{e.compilando ? " Compilando: de momento, sólo lo que no necesita la compilación." : ""}
             {avisos > 0 && ` Avisos: ${desglose}; las comprobaciones de sensatez que necesitan los resultados, en Revisión.`}
           </p>
-          <ListaDiagnosticos ds={diagnosticos} onObjeto={setSeleccion} />
+          <ListaDiagnosticos ds={diagnosticos} onObjeto={setSeleccion} acciones={ed ? { "sensatez/cargas-en-peso-propio": <PasarACargasMuertas compacto alHacer={setCaso} /> } : undefined} />
         </>
       ),
     },
@@ -639,7 +641,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
                 <Inspector id={seleccion} />
               </>
             ) : cargas ? (
-              <ResumenCaso caso={casoValido} />
+              <ResumenCaso caso={casoValido} setCaso={setCaso} />
             ) : (
               <ResumenPlanta />
             ),
