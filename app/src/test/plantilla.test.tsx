@@ -80,7 +80,7 @@ describe("la plantilla DXF (V2c-4)", () => {
       { escala: 1000, insunits: 4 },
     );
     const f = new File([bytes as Uint8Array<ArrayBuffer>], "Planta baja.dxf");
-    fireEvent.change(screen.getByLabelText("Fichero DXF de la plantilla"), { target: { files: [f] } });
+    fireEvent.change(screen.getByLabelText("Fichero DXF o DWG de la plantilla"), { target: { files: [f] } });
     const nav = await waitFor(() => screen.getByRole("heading", { name: /Plantillas DXF/ }).closest("section")!, { timeout: 10_000 });
     await waitFor(() => expect(within(nav).getByText("2/2 capas")).toBeTruthy(), { timeout: 10_000 });
     expect(screen.getByRole("button", { name: "Deshacer" }).getAttribute("title")).toMatch(/Plantilla DXF «Planta baja»/);
@@ -138,6 +138,6 @@ describe("la plantilla DXF (V2c-4)", () => {
     expect((within(nav).getByRole("button", { name: "En todas" }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(within(nav).getByRole("button", { name: "Quitar la plantilla Planta baja" }));
-    await waitFor(() => expect(within(nav).getByText(/Un plano DXF en gris detrás de la planta/)).toBeTruthy());
+    await waitFor(() => expect(within(nav).getByText(/Un plano DXF o DWG en gris detrás de la planta/)).toBeTruthy());
   }, 60_000);
 });

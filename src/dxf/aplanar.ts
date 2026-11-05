@@ -21,6 +21,7 @@
  * Puro: sin IO, sin React ni DOM.
  */
 import { leerDxf, num, nums, texto, tiene, type Bloque, type Dxf, type Entidad } from "./lector.ts";
+import { esDwg, leerDwg } from "../dwg/lector.ts";
 
 export type TipoPuntoDxf = "extremo" | "vertice" | "centro" | "medio";
 export const TIPOS_PUNTO_DXF: readonly TipoPuntoDxf[] = ["extremo", "vertice", "centro", "medio"];
@@ -698,5 +699,5 @@ export function aplanarDxf(dxf: Dxf): DibujoDxf {
   };
 }
 
-/** Lee y aplana un DXF. Lanza `ErrorDxf` si no se puede leer. */
-export const dibujoDxf = (bytes: Uint8Array): DibujoDxf => aplanarDxf(leerDxf(bytes));
+/** Lee y aplana un DXF o un DWG (por su firma, fase DW). Lanza `ErrorDxf` si no se puede leer. */
+export const dibujoDxf = (bytes: Uint8Array): DibujoDxf => aplanarDxf(esDwg(bytes) ? leerDwg(bytes) : leerDxf(bytes));

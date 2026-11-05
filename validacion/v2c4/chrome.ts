@@ -241,7 +241,7 @@ const num = (x: number) => String(x).replace(".", ",");
 /** Elige un fichero en el campo de «Plantilla DXF», como el diálogo del navegador. */
 async function elegirDxf(ruta: string): Promise<void> {
   const doc = (await cdp("DOM.getDocument", { depth: 0 })) as { root: { nodeId: number } };
-  const n = (await cdp("DOM.querySelector", { nodeId: doc.root.nodeId, selector: 'input[aria-label="Fichero DXF de la plantilla"]' })) as { nodeId: number };
+  const n = (await cdp("DOM.querySelector", { nodeId: doc.root.nodeId, selector: 'input[aria-label="Fichero DXF o DWG de la plantilla"]' })) as { nodeId: number };
   await cdp("DOM.setFileInputFiles", { nodeId: n.nodeId, files: [ruta] });
 }
 

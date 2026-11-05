@@ -1,0 +1,21 @@
+## Criterios 5 y 6: la plantilla desde un DWG, leída en el worker
+BIEN  la muestra de AutoCAD de 2018: el proyecto de partida tiene la huella de Node
+BIEN  la muestra de AutoCAD de 2018: la vista dibuja los 1756 segmentos de Node (1756); su fila: «Plantillas DXF o DWG 1 sample_AC1032 8/11 capas Capas Todas Ninguna 0 129 Layer1 12 Layer_»
+BIEN  la muestra de AutoCAD de 2018: el fichero queda en el navegador con el sha256 de Node (0e8faaca949c9429…)
+BIEN  la muestra de AutoCAD de 2018: con la plantilla, la huella del proyecto no cambia
+BIEN  la muestra de AutoCAD de 2018: leerlo (1057 KB) y dibujarlo, en 333 ms, con 0 tareas largas (> 50 ms) 
+BIEN  la muestra de AutoCAD de 2000: el proyecto de partida tiene la huella de Node
+BIEN  la muestra de AutoCAD de 2000: la vista dibuja los 1763 segmentos de Node (1763); su fila: «Plantillas DXF o DWG 1 sample_AC1015 10/13 capas Capas Todas Ninguna 0 128 Layer1 12 Layer»
+BIEN  la muestra de AutoCAD de 2000: el fichero queda en el navegador con el sha256 de Node (8ffbdc713f5838cb…)
+BIEN  la muestra de AutoCAD de 2000: con la plantilla, la huella del proyecto no cambia
+BIEN  la muestra de AutoCAD de 2000: leerlo (1267 KB) y dibujarlo, en 265 ms, con 0 tareas largas (> 50 ms) 
+BIEN  el DWG de la vivienda (2018): el proyecto de partida tiene la huella de Node
+BIEN  el DWG de la vivienda (2018): la vista dibuja los 15449 segmentos de Node (15449); su fila: «Plantillas DXF o DWG 1 modelo 3/4 capas Capas Todas Ninguna 0 18 00 0 PLANTA BAJA 1592 00 »
+BIEN  el DWG de la vivienda (2018): el fichero queda en el navegador con el sha256 de Node (00366e4ad0cc3a3c…)
+BIEN  el DWG de la vivienda (2018): con la plantilla, la huella del proyecto no cambia
+BIEN  el DWG de la vivienda (2018): leerlo (144 KB) y dibujarlo, en 301 ms, con 0 tareas largas (> 50 ms) 
+
+## Un DWG 2007 (DW5)
+BIEN  dice cómo guardarlo: «Todavía no se leen los DWG 2007 (AC1021): guárdalo como DWG 2010 o 2018, o como DXF.»
+
+Todo bien

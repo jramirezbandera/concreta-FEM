@@ -1,6 +1,6 @@
 # DW: la plantilla desde un DWG (plan)
 
-> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, propuestas (DW-d, puesta en DW1 como se proponía). **DW1 hecho el 2026-11-05** (§9); **DW2 y DW3, el mismo día** (§10 y §11).
+> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, puestas como se proponían (DW1 y DW4). DW2-4 y DW3-5, decididas por el usuario el 2026-11-05 (§12.3). **DW1 hecho el 2026-11-05** (§9); **DW2, DW3 y DW4, el mismo día** (§10, §11 y §12). Falta DW5 (2007).
 >
 > **Origen:** el usuario: «lo de tener que trabajar en DXF en lugar de DWG es un latazo». El 2026-10-28 se dejó el DWG sin decidir porque LibreDWG es GPL y el SDK de la ODA es de pago. Al mirarlo otra vez, apareció ACadSharp (MIT), que lee DWG, y se puede portar con la regla 6.
 
@@ -53,8 +53,8 @@ Un lector de DWG que dé **el mismo `Dxf`**: las entidades, traducidas a sus có
 - **DW-a (decidida, 2026-11-05):** portar de ACadSharp (MIT) y usar la especificación de la ODA para entenderlo, no escribir el lector desde cero con la especificación.
 - **DW-b (decidida, 2026-11-05):** AC1014 y AC1015 (R14 y 2000: sin compresión y con el mismo lector de objetos), AC1018 (2004), y AC1024, AC1027 y AC1032 (2010, 2013 y 2018, el mismo camino en ACadSharp). AC1021 (2007) va al final (DW5). Antes de R13, nada.
 - **DW-c (decidida, 2026-11-05):** los oráculos de §4. ODA File Converter, sólo si hace falta para un DWG del usuario sin su DXF.
-- **DW-d (propuesta):** las muestras de ACadSharp no se versionan (son ~1 MB por DWG y ~2,6 MB por DXF, unos 25 MB en total). `validacion/dwg/muestras.ts` las descarga del commit fijado, comprueba su sha256 y las deja en `validacion/dwg/.muestras/` (ignorada por git). El CI las descarga igual. Sin ellas, la prueba falla con el mensaje de cómo traerlas, no se salta.
-- **DW-e (propuesta):** el botón y la sección pasan a «Plantilla DXF o DWG». El tipo `PlantillaDxf` y el almacén `dxf` de IndexedDB se quedan con su nombre.
+- **DW-d (propuesta; puesta así en DW1):** las muestras de ACadSharp no se versionan (son ~1 MB por DWG y ~2,6 MB por DXF, unos 25 MB en total). `validacion/dwg/muestras.ts` las descarga del commit fijado, comprueba su sha256 y las deja en `validacion/dwg/.muestras/` (ignorada por git). El CI las descarga igual. Sin ellas, la prueba falla con el mensaje de cómo traerlas, no se salta.
+- **DW-e (propuesta; puesta así en DW4):** el botón y la sección pasan a «Plantilla DXF o DWG». El tipo `PlantillaDxf` y el almacén `dxf` de IndexedDB se quedan con su nombre.
 
 ## 7. Tramos
 
@@ -188,4 +188,33 @@ Tiempo, como información: las muestras de 1,1 MB, en 11–24 ms; la vivienda, 1
 
 - **DW4:** el DWG en la app (los selectores, el texto de DW-e y la lectura en el worker) y los criterios 5 y 6 en Chrome. `NavPlantillas.tsx` lo estaba tocando otra sesión: hay que mirarlo antes.
 - **DW5:** la 2007 (AC1021), con su Reed-Solomon y su LZ77.
-- **Para el usuario:** si se rehacen los puntos de control de las splines por ajuste (DW3-5) y el gancho de los `LEADER` (DW2-4). Los dos son raros en planos de estructura.
+- **Decidido por el usuario el 2026-11-05** (§12.3): las splines por ajuste, con tramos rectos (DW3-5), y los `LEADER`, sin el gancho (DW2-4).
+
+## 12. DW4 hecho (2026-11-05)
+
+El DWG en la app: «Plantilla DXF o DWG» lee los dos. Pasan los criterios 5 y 6, y el 3 también en Chrome.
+
+### 12.1 Qué hay
+
+- **`dibujoDxf(bytes)`** (`src/dxf/aplanar.ts`) mira la firma: un DWG va a `leerDwg` y lo demás, a `leerDxf`. Lo que viene detrás (el worker de la app, `plantillas.ts`, la colocación, los enganches, el almacén por sha256, la búsqueda junto al proyecto) no cambia: `PlantillaDxf` guarda el nombre del fichero con su extensión. `leerDxf` sigue rechazando un DWG con su mensaje para quien lo llame directamente.
+- **La app (DW-e):** el botón de la barra de Modelo, «Plantilla DXF o DWG»; la sección del navegador, «Plantillas DXF o DWG»; los dos campos de fichero aceptan `.dxf,.dwg`; el nombre de la plantilla quita la extensión de los dos; el chip de una obra nueva, «Calcar un DXF o DWG»; el error del worker, «No se pudo leer el plano». El tipo `PlantillaDxf`, el almacén `dxf` de IndexedDB y la fuente de enganche «Plantilla DXF» se quedan con su nombre.
+- **Pruebas:** `dwg.test.ts` («dibujoDxf lee también un DWG»), `app/src/test/plantilla.test.tsx` con los textos nuevos, y el banco `validacion/dwg/chrome.ts` (`out_chrome.txt`). El de V2c-4, con el campo nuevo, sale igual («Todo bien»).
+
+### 12.2 Criterios
+
+| Criterio | Resultado |
+|---|---|
+| 5. Sin tareas largas | **Pasa:** en Chrome, leer en el worker y dibujar la muestra de 2018 (1 MB), la de 2000 (1,3 MB) y la vivienda: 0 tareas largas (> 50 ms) en la página; ~0,3 s cada una. |
+| 6. Chrome frente a Node | **Pasa:** la vista dibuja exactamente los segmentos que coloca Node (1 756, 1 763 y 15 449), el fichero queda en el navegador con el sha256 de Node y la huella del proyecto no cambia. Un DWG 2007 dice cómo guardarlo. |
+| 3. En Chrome | **Pasa** con el DWG de la vivienda (si está en local; es del cliente). |
+| 7. Licencias | **Pasa:** `NOTICE` cita ACadSharp con su commit y sus ficheros; `src/dwg/` no tiene nada de LibreDWG. |
+
+### 12.3 Decisiones del usuario (2026-11-05)
+
+- **DW3-5:** las `SPLINE` hechas por ajuste de 2013+ se quedan con tramos rectos entre sus puntos de ajuste. Rehacer los puntos de control de AutoCAD necesitaría su algoritmo.
+- **DW2-4:** los `LEADER`, sin el gancho que AutoCAD añade al exportar. Es un tramito de anotación, de unos 2,5 mm de papel, y rehacerlo pediría los estilos de cota, sus sobrescrituras y la regla de AutoCAD, con el riesgo de ponerlo donde no va. Se puede retomar si un plano lo pide.
+
+### 12.4 Lo que queda
+
+- **DW5:** la 2007 (AC1021), con su Reed-Solomon y su LZ77 propio. Es rara: hasta entonces, se pide guardarla como 2010 o 2018.
+- **El agente:** `src/agente/importarDxf.ts` (de otra sesión) llama a `leerDxf`; si se quiere que lea también un DWG, que pase por `esDwg`/`leerDwg` como `dibujoDxf`.

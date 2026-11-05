@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { muestra } from "../../validacion/dwg/muestras.ts";
-import { aplanarDxf } from "../dxf/aplanar.ts";
+import { aplanarDxf, dibujoDxf } from "../dxf/aplanar.ts";
 import { type Dxf, type Entidad, ErrorDxf, leerDxf, texto } from "../dxf/lector.ts";
 import { compararDwgConDxf } from "./comparar.ts";
 import { esDwg, leerDwg } from "./lector.ts";
@@ -89,6 +89,17 @@ for (const v of CON_DXF)
       expect(dwg.version).toBe(v);
     });
   });
+
+describe("dibujoDxf lee también un DWG (DW4)", () => {
+  it("por su firma: lo mismo que leerDwg y aplanar, y un DXF sigue yendo a su lector", () => {
+    const dwg = muestra("sample_AC1032.dwg");
+    const firma = (d: ReturnType<typeof dibujoDxf>) => JSON.stringify(d, (_, x) => (ArrayBuffer.isView(x) ? Array.from(x as Float64Array) : x));
+    expect(firma(dibujoDxf(dwg))).toBe(firma(aplanarDxf(leerDwg(dwg))));
+    expect(dibujoDxf(dwg).version).toBe("AC1032");
+    expect(dibujoDxf(muestra("sample_AC1032_ascii.dxf")).version).toBe("AC1032");
+    expect(() => dibujoDxf(muestra("sample_AC1021.dwg"))).toThrow(/Todavía no se leen los DWG 2007/);
+  });
+});
 
 describe("los anónimos (DW2-2)", () => {
   it("en 2000, el de un bloque dinámico, por su posición en la tabla, no por el nombre de su BLOCK", () => {

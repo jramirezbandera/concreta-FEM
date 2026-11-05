@@ -48,9 +48,9 @@ export function NavPlantillas({ pl, herramienta, error }: Props) {
   if (!ed) return null;
   const cambiar = (t: PlantillaDxf, nueva: PlantillaDxf, etiqueta: string) => ed.editar({ op: "plantillas", plantillas: lista.map((x) => (x.nombre === t.nombre ? nueva : x)) }, etiqueta);
   return (
-    <Seccion titulo="Plantillas DXF" valor={lista.length || undefined}>
+    <Seccion titulo="Plantillas DXF o DWG" valor={lista.length || undefined}>
       {/* M-23: vacía, lo justo */}
-      {!lista.length && <p className="nota">Ninguna. Un plano DXF en gris detrás de la planta, para calcar: «Plantilla DXF» en la barra.</p>}
+      {!lista.length && <p className="nota">Ninguna. Un plano DXF o DWG en gris detrás de la planta, para calcar: «Plantilla DXF o DWG» en la barra.</p>}
       {error && <p className="nota text-state-fail">{error}</p>}
       {lista.map((t) => (
         <Ficha key={t.nombre} t={t} abierta={abierta === t.nombre} alternar={() => setAbierta(abierta === t.nombre ? null : t.nombre)} pl={pl} cambiar={(n, e) => cambiar(t, n, e)} quitar={() => ed.editar({ op: "plantillas", plantillas: lista.filter((x) => x.nombre !== t.nombre) }, `Quitar la plantilla «${t.nombre}»`)} herramienta={(h) => herramienta(h, t.nombre)} />
@@ -133,7 +133,7 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
             <button type="button" className="ib-chip ib-texto" aria-label={`Elegir el fichero de la plantilla ${t.nombre}`} title="Elegir el fichero DXF (el mismo, si falta, u otra versión del plano)" onClick={() => fichero.current?.click()}>
               Elegir…
             </button>
-            <input ref={fichero} type="file" accept=".dxf" hidden tabIndex={-1} aria-hidden="true" onChange={(x) => {
+            <input ref={fichero} type="file" accept=".dxf,.dwg" hidden tabIndex={-1} aria-hidden="true" onChange={(x) => {
               const f = x.target.files?.[0];
               x.target.value = "";
               if (f) void elegirFichero(f);

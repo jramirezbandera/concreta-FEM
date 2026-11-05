@@ -22,6 +22,6 @@ ambito.onmessage = (e) => {
     const arrays = [d.grupos, d.lineas, d.grupoLineas, d.curvas, d.grupoCurvas, d.puntos, d.tipoPuntos, d.grupoPuntos];
     ambito.postMessage({ id, ok: true, dibujo: d }, arrays.map((a) => a.buffer));
   } catch (x) {
-    ambito.postMessage({ id, ok: false, mensaje: x instanceof ErrorDxf ? x.message : `No se pudo leer el DXF: ${x instanceof Error ? x.message : String(x)}` });
+    ambito.postMessage({ id, ok: false, mensaje: x instanceof ErrorDxf ? x.message : `No se pudo leer el plano: ${x instanceof Error ? x.message : String(x)}` });
   }
 };

@@ -151,7 +151,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     try {
       const { dibujo, sha256 } = await importarDxf(f, origen);
       const lista = ed.proyecto.plantillas ?? [];
-      const t = nuevaPlantilla(dibujo, { nombre: nombreLibre(lista, f.name.replace(/\.dxf$/i, "")), fichero: f.name, sha256, planta: planta ?? ed.proyecto.modelo.plantas[0]?.id ?? "" });
+      const t = nuevaPlantilla(dibujo, { nombre: nombreLibre(lista, f.name.replace(/\.(dxf|dwg)$/i, "")), fichero: f.name, sha256, planta: planta ?? ed.proyecto.modelo.plantas[0]?.id ?? "" });
       const a = ed.editar({ op: "plantillas", plantillas: [...lista, t] }, `Plantilla DXF «${t.nombre}»`);
       if (!a.ok) setErrorDxf(a.errores.map((x) => x.mensaje).join(" "));
       else if (!dibujo.extension) setErrorDxf(`${f.name} no tiene nada que dibujar en el espacio modelo.`);
@@ -434,8 +434,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él" />
           <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él" />
           <Separador />
-          <Herramienta icono={IcPlantillaDxf} nombre="Plantilla DXF" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
-          <input ref={ficheroDxf} type="file" accept=".dxf" hidden aria-label="Fichero DXF de la plantilla" onChange={(x) => {
+          <Herramienta icono={IcPlantillaDxf} nombre="Plantilla DXF o DWG" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF o DWG del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
+          <input ref={ficheroDxf} type="file" accept=".dxf,.dwg" hidden aria-label="Fichero DXF o DWG de la plantilla" onChange={(x) => {
             const f = x.target.files?.[0];
             x.target.value = "";
             if (f) void importarPlantilla(f);
@@ -543,7 +543,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
                   Pilares
                 </button>
                 <button type="button" className="chip" data-acento onClick={() => ficheroDxf.current?.click()}>
-                  Calcar un DXF
+                  Calcar un DXF o DWG
                 </button>
               </>
             )}
