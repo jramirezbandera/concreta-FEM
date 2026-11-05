@@ -202,3 +202,12 @@ Para la puerta: sin ella, un agente tiene que escribir a mano cada zuncho (16 en
 - **MA3:** el 4,6 del muestrario como peso de su zona aligerada; y que la regla valga para todos los casetones, no sólo los perdidos.
 - **MA2 y MA4:** los campos propios (`abacosPilares`, `tipo: "borde"`) en lugar de las variantes de §2.2 y §2.4.
 - **`fem vigas-borde`**, que no estaba en el plan.
+
+## 9. La puerta de la fase (criterio 1): el plan, fijado antes de lanzarla (2026-11-05)
+
+- **El encargo** (`validacion/ma/puerta/encargo.md`) y **las respuestas** (`respuestas.md`), en git antes de lanzar los agentes. Las respuestas están reconstruidas de lo que dijo el usuario el 2026-10-15 y de lo que quedó en el ejemplo (la conversación no se guardó): no son sus palabras.
+- **Tres subagentes**, cada uno en su carpeta con una copia del DXF real (fuera del repositorio), con sólo la skill y la orden `fem`. Reglas: sin código propio (el proyecto sólo lo cambian órdenes `fem` y sus ediciones directas del fichero), nada del repositorio fuera de la skill y una ronda de preguntas. A su ronda se le contesta con `respuestas.md` entero, una vez.
+- **La comparación** (`validacion/ma/puerta/comparar.ts`, frente a `ejemplos/vivienda`): pilares a ≤ 1 cm con su sección y sus plantas; por cubierta, una losa con los datos del reticular y los mismos ábacos (los que usa el cálculo) a ≤ 1 cm; las cargas por planta y caso del resumen (con el peso propio) a ≤ 0,5 %. Además se registra, de cada agente, las rondas, las órdenes, si escribió código y lo que supuso.
+- **Lo que ya se sabe que puede separarse del ejemplo, y no es un fallo del agente:**
+  - el ejemplo es de antes de TB: sus losas van a ejes de los zunchos, con la banda hasta el borde real como cargas de viga (`TIRA-*`); un agente con la skill de hoy las lleva hasta el borde real. Las áreas no se comparan; las cargas por planta, sí (la banda pesa lo mismo de las dos maneras si el agente pone los mismos pesos);
+  - «Alinear» lleva la fila de x = 0 a −0,02 m (la mayoría del dibujo, §7), y el agente de 2026-10-15 la llevó a 0 a mano: tres pilares a 2 cm del ejemplo.
