@@ -5,7 +5,8 @@
  *
  * Portado de ACadSharp (`IO/DwgReader.cs` y `IO/DWG/`; MIT, commit d9f3de8, citado en `NOTICE`).
  * Tramos DW1 y DW2: R13–R2000 (AC1012, AC1014, AC1015), con las capas, los bloques y las entidades
- * que dibuja `aplanar.ts` (las demás, sólo con su tipo, para que se cuenten como no leídas).
+ * que dibuja `aplanar.ts` (las demás, sólo con su tipo, para que se cuenten como no leídas). DW3:
+ * 2004, 2010, 2013 y 2018 (secciones2004.ts). DW5: 2007 (secciones2007.ts).
  *
  * - Lo que el fichero dice mal (tamaños, posiciones, handles) es un `ErrorDxf`. Un objeto que no se
  *   puede leer se salta y queda en `fallos`, como en ACadSharp: el resto del dibujo sirve.
@@ -21,6 +22,7 @@ import { type CabeceraDwg, type Flujos, hacerFlujos, leerCabecera } from "./cabe
 import { soloTipo, type Traducida, traducir } from "./entidades.ts";
 import { abrir, type CabeceraBloque, cabeceraBloque, capa, type CapaDwg, control, entidad, esEntidadFija, leerClases, leerMapa, nombreBloque, TIPO } from "./objetos.ts";
 import { leerSecciones2004 } from "./secciones2004.ts";
+import { leerSecciones2007 } from "./secciones2007.ts";
 import { type Version, version } from "./version.ts";
 
 /** Lo que da `leerDwg`, además del `Dxf`. */
@@ -169,7 +171,7 @@ export function leerDwg(bytes: Uint8Array): Dwg {
   let deSeccion: (num: number, nombre: string, descripcion: string) => Bits;
   let objetos: Uint8Array;
   if (v.r2004) {
-    const s = leerSecciones2004(bytes);
+    const s = v.r2007 && !v.r2010 ? leerSecciones2007(bytes) : leerSecciones2004(bytes);
     pagina = s.pagina;
     mantenimiento = s.mantenimiento;
     deSeccion = (_num, nombre, descripcion) => {

@@ -1,6 +1,6 @@
-# DW: la plantilla desde un DWG (plan)
+# DW: la plantilla desde un DWG
 
-> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, puestas como se proponían (DW1 y DW4). DW2-4 y DW3-5, decididas por el usuario el 2026-11-05 (§12.3). **DW1 hecho el 2026-11-05** (§9); **DW2, DW3 y DW4, el mismo día** (§10, §11 y §12). Falta DW5 (2007).
+> **Fecha:** 2026-11-05. **Estado:** DW-a, DW-b y DW-c decididas por el usuario el 2026-11-05 (§6); DW-d y DW-e, puestas como se proponían (DW1 y DW4). DW2-4 y DW3-5, decididas por el usuario el 2026-11-05 (§12.3). **DW1 hecho el 2026-11-05** (§9); **DW2, DW3 y DW4, el mismo día** (§10, §11 y §12), y **DW5 (2007) también** (§13): se leen todas las versiones de R14 a 2018.
 >
 > **Origen:** el usuario: «lo de tener que trabajar en DXF en lugar de DWG es un latazo». El 2026-10-28 se dejó el DWG sin decidir porque LibreDWG es GPL y el SDK de la ODA es de pago. Al mirarlo otra vez, apareció ACadSharp (MIT), que lee DWG, y se puede portar con la regla 6.
 
@@ -216,5 +216,51 @@ El DWG en la app: «Plantilla DXF o DWG» lee los dos. Pasan los criterios 5 y 6
 
 ### 12.4 Lo que queda
 
-- **DW5:** la 2007 (AC1021), con su Reed-Solomon y su LZ77 propio. Es rara: hasta entonces, se pide guardarla como 2010 o 2018.
-- **El agente:** `src/agente/importarDxf.ts` (de otra sesión) llama a `leerDxf`; si se quiere que lea también un DWG, que pase por `esDwg`/`leerDwg` como `dibujoDxf`.
+- **DW5:** la 2007 (AC1021). Hecho el mismo día (§13).
+- **El agente:** `fem importar-dxf` leía sólo DXF. Hecho con DW5 (§13).
+
+## 13. DW5 hecho (2026-11-05)
+
+La 2007 (AC1021), a petición del usuario («vamos con esto»), y `fem importar-dxf` con un DWG.
+
+### 13.1 Qué hay
+
+- **`src/dwg/secciones2007.ts`** (puro), portado de ACadSharp (`readFileHeaderAC21`, `getPageBuffer`, `getSectionBuffer21`, `reedSolomonDecoding` y `DwgLZ77AC21Decompressor`). Da lo mismo que `leerSecciones2004` (las secciones por su nombre), así que lo de detrás no cambia. Es un formato que no vuelve en 2010:
+  - la cabecera del fichero (0x80) son tres palabras de Reed-Solomon (255, 239) entrelazadas; dentro, la clave, dos CRC-64 y los metadatos comprimidos (0x110 bytes, con su CRC-64);
+  - el mapa de páginas y el de secciones, con sus datos repetidos varias veces y en Reed-Solomon (255, 239) entrelazado; las posiciones, desde 0x480;
+  - las páginas de datos, en Reed-Solomon (255, 251), entrelazado (codificación 4) o con la paridad detrás (1), con su CRC-64 y su suma;
+  - el LZ77 de 2007, distinto del de 2004: los literales se copian en trozos de 32 bytes y el resto con los bytes en otro orden. Las 31 permutaciones salen de las funciones de copia de ACadSharp con un script (no se copiaron a mano).
+- **`objetos.ts`:** en 2007, las cadenas de cada objeto van delante de los handles, con su bandera en el último bit de los datos (`updateHandleReader` de ACadSharp). La cabecera y las clases ya lo hacían desde DW3.
+- **`entidades.ts`:** las cotas dan también su tipo y banderas (70), su texto (1), su medida (42, desde 2000) y, en las lineales, alineadas y de coordenadas, sus puntos (13, 14 y 10) y giros (52 y 50). `aplanar.ts` no los usa; los lee `fem importar-dxf` para comprobar las cotas.
+- **`fem importar-dxf`** (`cli/ordenes.ts`): lee DXF o DWG por la firma, como `dibujoDxf`. `importarDxf.ts` no cambia.
+
+### 13.2 Comprobado al leer (ACadSharp no lo hace)
+
+ACadSharp sólo desentrelaza el Reed-Solomon, sin mirar la paridad, y no comprueba ningún CRC. Aquí, con lo que escribe su escritor (`ReedSolomon.cs`, `CRC.cs`, `DwgChecksumCalculatorAC21.cs`, `DwgCheckDataAC21.cs`), se comprueba todo lo que se sabe comprobar, y el fichero de AutoCAD lo cumple entero:
+
+- la paridad de cada palabra de Reed-Solomon (cabecera, mapas y páginas de datos; de la codificación 1, todas menos la última, que va rellena con bytes que no se guardan);
+- el CRC-64 de la clave de la cabecera, el de sus datos comprimidos y el de sus metadatos (en 0x108, con ese campo a 0);
+- el CRC-64 (reflejado) de los datos comprimidos de cada página y la suma de lo descomprimido.
+
+Los CRC-64 son dos polinomios conocidos: el normal, el del ECMA-182 (0x42F0E1EBA9EA3693), y el reflejado, el de Jones (0x95AC9329AC4BC9B5); las tablas se generan en vez de copiarlas. No se comprueban los CRC del mapa de páginas y del de secciones: llevan una semilla cifrada que no se sabe descifrar (el escritor de ACadSharp escribe 0). A esos dos los cubre su Reed-Solomon.
+
+### 13.3 Criterios
+
+| Criterio | Resultado |
+|---|---|
+| 1. Frente al DXF de AutoCAD | **Pasa:** la muestra de 2007 dibuja lo mismo que su DXF; 334 entidades por handle a < 1e-11, los 27 bloques, `$INSUNITS`, `$EXTMIN` y `$EXTMAX`, y ningún objeto en `fallos`. Las cotas (tipo, puntos, medida y texto) son las del DXF en las seis versiones con DXF. |
+| 2. Frente a la de 2000 | **Pasa:** lo que está en las dos, bit a bit; faltan sólo los anónimos regenerados (en 2007, como en 2004: el del bloque dinámico cambia de nombre desde 2010). |
+| 4. Robustez | **Pasa:** 2 000 ficheros con 1 a 4 bytes cambiados: 1 992 lo dicen y 8 dan el mismo dibujo (bytes de relleno); ninguno distinto sin aviso ni otra excepción (`validacion/dwg/out_danados.txt`). |
+| 5 y 6. En Chrome | **Pasa:** la vista dibuja los 1 763 segmentos de Node, el fichero queda en el navegador con su sha256, la huella no cambia y no hay tareas largas (~0,3 s; `out_chrome.txt`). |
+| `fem importar-dxf` | **Pasa:** en las muestras, el informe del DWG es el de su DXF (salvo un segmento por capa, el gancho del `LEADER`, DW2-4); en la vivienda, 23 pilares, las mismas losas y ejes y 16 de 18 cotas que cuadran, como con su DXF. |
+
+Leer la muestra de 2007 (1 MB) cuesta ~41 ms en Bun, frente a ~10–13 ms la de 2010 o 2018: es la paridad y los CRC-64 de todo el fichero. Sólo como información.
+
+### 13.4 Hallazgos
+
+- **DW5-1:** ACadSharp no comprueba nada en la 2007; con lo que su escritor calcula, el fichero de AutoCAD pasa todas las comprobaciones de §13.2 a la primera, así que el escritor reproduce bien lo de AutoCAD.
+- **DW5-2:** las cotas del DWG sólo daban lo común (su bloque, 11 y 12), porque `aplanar.ts` dibuja la cota por su bloque. `fem importar-dxf` comprueba las cotas por sus puntos (13 y 14): con un DWG decía «0 cotas». Ahora salen los puntos, el tipo, la medida y el texto, contrastados con el DXF de AutoCAD. R14 no guarda la medida (42).
+
+### 13.5 Lo que queda
+
+Nada de la fase DW. Antes de R13 no se lee (DW-b), y `fem importar-dxf` conserva su nombre aunque lea también DWG.

@@ -7,12 +7,11 @@
  * Con el andamiaje del de V2c-4 (`validacion/v2c4/chrome.ts`): compila la app, la sirve con el
  * manejador del servidor local y la maneja con Chrome headless por el protocolo de depuración.
  *
- * - 6: en la retícula con núcleo de A2, «Plantilla DXF o DWG» con la muestra de AutoCAD de 2018 y con
- *   la de 2000, leídas en el worker: la vista dibuja los segmentos que coloca Node, el fichero queda
+ * - 6: en la retícula con núcleo de A2, «Plantilla DXF o DWG» con las muestras de AutoCAD de 2018, de
+ *   2000 y de 2007 (DW5), leídas en el worker: la vista dibuja los segmentos que coloca Node, el fichero queda
  *   en el navegador con el sha256 de Node y la huella del proyecto no cambia. Si están (fuera de git),
  *   también el DWG de la vivienda (criterio 3 en Chrome).
  * - 5: importarlas no da tareas largas (> 50 ms) en el hilo de la página.
- * - Un DWG 2007 (DW5) dice cómo guardarlo.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -68,6 +67,7 @@ muestra("sample_AC1032.dwg"); // comprueba que estén, con su sha256
 const casos: Caso[] = [
   caso("la muestra de AutoCAD de 2018", join(CARPETA_MUESTRAS, "sample_AC1032.dwg"), muestra("sample_AC1032.dwg")),
   caso("la muestra de AutoCAD de 2000", join(CARPETA_MUESTRAS, "sample_AC1015.dwg"), muestra("sample_AC1015.dwg")),
+  caso("la muestra de AutoCAD de 2007", join(CARPETA_MUESTRAS, "sample_AC1021.dwg"), muestra("sample_AC1021.dwg")),
 ];
 if (existsSync(VIVIENDA)) casos.push(caso("el DWG de la vivienda (2018)", VIVIENDA, new Uint8Array(readFileSync(VIVIENDA))));
 
@@ -189,12 +189,6 @@ try {
     comprobar(!largas.some((x) => x.ms > 50), `${c.nombre}: leerlo (${(c.bytes.length / 1024).toFixed(0)} KB) y dibujarlo, en ${t} ms, con ${largas.length} tareas largas (> 50 ms) ${largas.length ? `(${largas.map((x) => x.ms.toFixed(0)).join(", ")} ms)` : ""}`);
   }
   if (!existsSync(VIVIENDA)) log("(el DWG de la vivienda no está: es del cliente y no está en git)");
-
-  log("\n## Un DWG 2007 (DW5)");
-  await abrir("nucleo");
-  await elegir(join(CARPETA_MUESTRAS, "sample_AC1021.dwg"));
-  const aviso = await pagina<string>(`return await __c.esperar(() => { const t = document.body.innerText; const m = /Todavía no se leen los DWG 2007[^\\n]*/.exec(t); return m ? m[0] : null; }, 30000);`);
-  comprobar(/guárdalo como DWG 2010 o 2018/.test(aviso), `dice cómo guardarlo: «${aviso.slice(0, 100)}»`);
 } catch (e) {
   comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {

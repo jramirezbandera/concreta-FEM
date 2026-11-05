@@ -22,7 +22,7 @@ Trabajas sobre **un único fichero `proyecto.json`**: es la única fuente de ver
 
 ## Antes de escribir el fichero: los datos del encargo
 
-Reúne **todo lo que falta en una sola ronda de preguntas**, con tu propuesta en cada punto que la admite, para que el ingeniero conteste «sí» o corrija. No empieces a escribir el fichero con medio encargo ni preguntes en tres rondas lo que podías preguntar en una. Si tienes el plano en DXF, pásalo antes por `fem importar-dxf` (abajo): lo que el dibujo ya dice no se pregunta.
+Reúne **todo lo que falta en una sola ronda de preguntas**, con tu propuesta en cada punto que la admite, para que el ingeniero conteste «sí» o corrija. No empieces a escribir el fichero con medio encargo ni preguntes en tres rondas lo que podías preguntar en una. Si tienes el plano en DXF o DWG, pásalo antes por `fem importar-dxf` (abajo): lo que el dibujo ya dice no se pregunta.
 
 - **Siempre:**
   - las plantas, con su cota (la de la cara superior de cada forjado) y la de la cimentación;
@@ -50,7 +50,7 @@ Lo que no te den y tenga valor por defecto en el fichero, déjalo por defecto y 
 
 ### Desde un plano DXF
 
-`fem importar-dxf` lee el plano y propone el proyecto: plantas, pilares (rectángulos y círculos de su capa, con su sección y su giro), contornos de losa (con sus huecos) y ejes de replanteo con el nombre de su burbuja. No pone cargas ni más casos que el del peso propio.
+`fem importar-dxf` lee el plano (DXF o DWG, de R14 a 2018) y propone el proyecto: plantas, pilares (rectángulos y círculos de su capa, con su sección y su giro), contornos de losa (con sus huecos) y ejes de replanteo con el nombre de su burbuja. No pone cargas ni más casos que el del peso propio.
 
 ```bash
 fem importar-dxf plano.dxf                     # sin --salida: qué capas hay, qué ve en cada una y qué propone

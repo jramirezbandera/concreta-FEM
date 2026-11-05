@@ -23,6 +23,7 @@ import { FICHERO_APP, leerEstadoApp, seleccionApp } from "../src/agente/estadoAp
 import { huellaSinCompilar } from "../src/compilador/compilar.ts";
 import { aplanarDxf } from "../src/dxf/aplanar.ts";
 import { ErrorDxf, leerDxf } from "../src/dxf/lector.ts";
+import { esDwg, leerDwg } from "../src/dwg/lector.ts";
 import { serializar } from "../src/editor/serializar.ts";
 import { proponerAlinear, textoGrupo, TOLERANCIA_ALINEAR } from "../src/editor/alinear.ts";
 import { operacionVigasBorde, proponerVigasBorde } from "../src/editor/vigasBorde.ts";
@@ -97,7 +98,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
       --escala de los mapas (uz…v23, f11…f12): completa (por defecto), sin-picos o mín:máx:paso («-40:20:5», «::5»)
       --envolvente de los mapas con varias combinaciones: en cada nudo, la mayor o la menor (sin ella, la combinación de mayor |valor| de la planta)
   fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
-  fem importar-dxf <plano.dxf> [--salida proyecto.json] [--capa-pilares C] [--capa-losas C] [--capa-ejes C]
+  fem importar-dxf <plano.dxf|plano.dwg> [--salida proyecto.json] [--capa-pilares C] [--capa-losas C] [--capa-ejes C]
       [--planta id:cota]… [--planta-losas id] [--material HA-30] [--espesor 0.30] [--unidades m|cm|mm] [--nombre N]
       sin --salida, sólo dice lo que reconoce (y las capas); con ella, escribe el proyecto (nunca encima de otro)
   fem seleccion <proyecto.json>            lo que el ingeniero tiene elegido en la app (planta, espacio y objetos, tal como están en el fichero)
@@ -505,7 +506,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
 function importarDxfOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
   const orden = "importar-dxf";
   const ruta = a.posicionales[0];
-  if (!ruta) return mal("fem importar-dxf necesita la ruta del plano .dxf.");
+  if (!ruta) return mal("fem importar-dxf necesita la ruta del plano (.dxf o .dwg).");
   const abs = resolve(ruta);
   if (!existsSync(abs) || !statSync(abs).isFile()) return { codigo: CODIGO.uso, json: { orden, ok: false, diagnosticos: [{ codigo: "cli/no-existe", severidad: "error", mensaje: `No existe el fichero ${abs}.` }] } };
   const b = (n: string) => a.banderas.get(n);
@@ -535,9 +536,10 @@ function importarDxfOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
   const bytes = new Uint8Array(readFileSync(abs));
   let dxf: ReturnType<typeof leerDxf>;
   try {
-    dxf = leerDxf(bytes);
+    // Un DWG (R14 a 2018, fase DW) da el mismo Dxf que su DXF
+    dxf = esDwg(bytes) ? leerDwg(bytes) : leerDxf(bytes);
   } catch (e) {
-    if (e instanceof ErrorDxf) return { codigo: CODIGO.uso, json: { orden, ok: false, diagnosticos: [{ codigo: "dxf/no-se-lee", severidad: "error", mensaje: `No se puede leer ${basename(abs)} como DXF: ${e.message}` }] } };
+    if (e instanceof ErrorDxf) return { codigo: CODIGO.uso, json: { orden, ok: false, diagnosticos: [{ codigo: "dxf/no-se-lee", severidad: "error", mensaje: `No se puede leer ${basename(abs)} como ${esDwg(bytes) ? "DWG" : "DXF"}: ${e.message}` }] } };
     throw e;
   }
   const d = aplanarDxf(dxf);
@@ -553,7 +555,7 @@ function importarDxfOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
     ...(uno("material") ? { material: uno("material")! } : {}),
     ...(espesor ? { espesor } : {}),
     ...(ladoMaximo ? { ladoMaximo } : {}),
-    nombre: uno("nombre") ?? basename(salida ?? abs).replace(/\.(json|dxf)$/i, ""),
+    nombre: uno("nombre") ?? basename(salida ?? abs).replace(/\.(json|dxf|dwg)$/i, ""),
     ...(junto ? { plantilla: { fichero: basename(abs), sha256: sha256Bytes(bytes) } } : {}),
   };
   const r = importarDxf(dxf, d, o);

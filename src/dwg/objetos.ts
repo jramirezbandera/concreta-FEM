@@ -162,11 +162,14 @@ export function abrir(v: Version, buf: Uint8Array, offset: number, dec: TextDeco
   return { tipo, inicio, fin, d, f: hacerFlujos(v, d, t, h, dec), v, dec };
 }
 
-/** Hasta 2007: el RL con el tamaño de los datos en bits; el flujo de handles empieza ahí. */
+/**
+ * Hasta 2007: el RL con el tamaño de los datos en bits; el flujo de handles empieza ahí. En 2007, las
+ * cadenas van delante de los handles, con su bandera en el último bit de los datos.
+ */
 function flujos(a: Abierto): Flujos {
   const bits = a.d.RL();
   const h = a.d.en(a.inicio + bits, a.fin);
-  if (a.v.r2007) throw new Error("objetos de 2007 (AC1021): DW5");
+  if (a.v.r2007) return hacerFlujos(a.v, a.d, flujoCadenas(a.d.buf, a.inicio + bits - 1), h, a.dec);
   return hacerFlujos(a.v, a.d, a.d, h, a.dec);
 }
 

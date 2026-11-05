@@ -29,6 +29,17 @@ export interface Traducida {
 }
 
 /** El nombre de DXF de cada tipo fijo de entidad. */
+/** El tipo de cada cota en el código 70 del DXF (los 3 bits bajos). */
+const TIPO_COTA: Readonly<Record<number, number>> = {
+  [TIPO.DIMENSION_LINEAR]: 0,
+  [TIPO.DIMENSION_ALIGNED]: 1,
+  [TIPO.DIMENSION_ANG_2LN]: 2,
+  [TIPO.DIMENSION_DIAMETER]: 3,
+  [TIPO.DIMENSION_RADIUS]: 4,
+  [TIPO.DIMENSION_ANG_3PT]: 5,
+  [TIPO.DIMENSION_ORDINATE]: 6,
+};
+
 export const NOMBRE_DXF: Readonly<Record<number, string>> = {
   [TIPO.TEXT]: "TEXT",
   [TIPO.ATTRIB]: "ATTRIB",
@@ -479,13 +490,20 @@ export function traducir(v: Version, e: Entidad): Traducida {
     case TIPO.DIMENSION_ANG_2LN:
     case TIPO.DIMENSION_RADIUS:
     case TIPO.DIMENSION_DIAMETER: {
-      // Sólo lo común: el bloque anónimo ya lleva el dibujo de la cota
+      // El bloque anónimo ya lleva el dibujo de la cota. De lo demás, lo que lee `fem importar-dxf`:
+      // el tipo y las banderas (70), el texto (1), la medida (42) y, en las lineales y alineadas, sus
+      // puntos (13, 14 y 10) y giros (52 y 50). Hasta 2000 no se guarda la medida.
       if (v.r2010) d.RC();
       const normal = d.BD3();
       const medio = d.RD2();
       const z = d.BD();
-      d.RC(); // banderas
-      tv(); // texto del usuario
+      // Las banderas: el bit 0 es lo contrario del 128 del código 70 y el bit 1, su 32; en las de
+      // coordenadas, el 64 (según X) va en sus datos propios
+      const banderas = d.RC();
+      const i70 = r.codigos.length;
+      r.p(70, TIPO_COTA[e.tipo]! + (banderas & 2 ? 32 : 0) + (banderas & 1 ? 0 : 128));
+      const usuario = tv();
+      if (usuario) r.p(1, usuario);
       d.BD(); // giro del texto
       d.BD(); // dirección horizontal
       d.BD3(); // escala de la inserción
@@ -494,7 +512,7 @@ export function traducir(v: Version, e: Entidad): Traducida {
         d.BS();
         d.BS();
         d.BD();
-        d.BD();
+        r.p(42, d.BD());
       }
       if (v.r2007) {
         d.B();
@@ -505,6 +523,18 @@ export function traducir(v: Version, e: Entidad): Traducida {
       r.p(2, "");
       r.pt(11, [medio[0], medio[1], z]);
       r.pt(12, [p12[0], p12[1], z]);
+      if (e.tipo === TIPO.DIMENSION_LINEAR || e.tipo === TIPO.DIMENSION_ALIGNED) {
+        r.pt(13, d.BD3());
+        r.pt(14, d.BD3());
+        r.pt(10, d.BD3());
+        r.p(52, (d.BD() * 180) / Math.PI);
+        if (e.tipo === TIPO.DIMENSION_LINEAR) r.p(50, (d.BD() * 180) / Math.PI);
+      } else if (e.tipo === TIPO.DIMENSION_ORDINATE) {
+        r.pt(10, d.BD3());
+        r.pt(13, d.BD3());
+        r.pt(14, d.BD3());
+        if (d.RC() & 1) r.valores[i70] = String(Number(r.valores[i70]) + 64);
+      }
       r.extrusion(normal);
       h.H(); // DIMSTYLE
       r.bloque = h.H();

@@ -1,4 +1,4 @@
-DWG AC1032 (144 KB), leído en 16 ms (el mínimo de 3, en caliente).
+DWG AC1032 (144 KB), leído en 12 ms (el mínimo de 3, en caliente).
 $INSUNITS: DWG 4, DXF 4. Página de códigos: windows-1252.
 Objetos que no se pudieron leer: 0.
 Espacio modelo: 1665 entidades en el DWG y 1665 en el DXF; bloques: 22 y 21; capas: 5 y 5.

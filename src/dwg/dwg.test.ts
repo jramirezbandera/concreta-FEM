@@ -3,13 +3,16 @@
  * son el mismo dibujo guardado por AutoCAD en cada versión, con su DXF ASCII al lado; se traen con
  * `bun validacion/dwg/muestras.ts` (DW-d). Sin ellas, la prueba falla diciendo cómo traerlas.
  *
- * Tramos DW1 a DW3: R14, 2000, 2004, 2010, 2013 y 2018, con las capas, los bloques y todo lo que dibuja
- * `aplanar.ts`.
+ * Tramos DW1 a DW3 y DW5: R14, 2000, 2004, 2007, 2010, 2013 y 2018, con las capas, los bloques y todo
+ * lo que dibuja `aplanar.ts`.
  */
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { muestra } from "../../validacion/dwg/muestras.ts";
+import { CARPETA_MUESTRAS, muestra } from "../../validacion/dwg/muestras.ts";
+import { importarDxf } from "../agente/importarDxf.ts";
 import { aplanarDxf, dibujoDxf } from "../dxf/aplanar.ts";
-import { type Dxf, type Entidad, ErrorDxf, leerDxf, texto } from "../dxf/lector.ts";
+import { type Dxf, type Entidad, ErrorDxf, leerDxf, num, texto, tiene } from "../dxf/lector.ts";
 import { compararDwgConDxf } from "./comparar.ts";
 import { esDwg, leerDwg } from "./lector.ts";
 
@@ -42,8 +45,8 @@ const LEADER = ["512", "DW2-4: el gancho del LEADER no está en el DWG; AutoCAD 
 const SPLINE = ["434", "DW3-5: desde 2013, una SPLINE por ajuste sólo guarda el ajuste; los puntos de control del DXF los calcula AutoCAD"] as const;
 const conocidas = (v: string) => new Map<string, string>(Number(v.slice(2)) >= 1027 ? [LEADER, SPLINE] : [LEADER]);
 
-/** Las versiones con su DXF de AutoCAD al lado (la de R14 no lo tiene; la de 2007 es de DW5). */
-const CON_DXF = ["AC1015", "AC1018", "AC1024", "AC1027", "AC1032"];
+/** Las versiones con su DXF de AutoCAD al lado (la de R14 no lo tiene). */
+const CON_DXF = ["AC1015", "AC1018", "AC1021", "AC1024", "AC1027", "AC1032"];
 
 for (const v of CON_DXF)
   describe(`DWG ${v} frente al DXF de AutoCAD (criterio 1)`, () => {
@@ -66,6 +69,28 @@ for (const v of CON_DXF)
       expect(dwg.entidades.length).toBe(163);
       expect([...dwg.bloques.keys()].sort()).toEqual([...dxf.bloques.keys()].sort());
       expect(dwg.bloques.size).toBe(27);
+    });
+
+    it("las cotas: su tipo, sus puntos, su medida y su texto, los del DXF (lo que lee fem importar-dxf)", () => {
+      const a = todas(dwg);
+      const b = todas(dxf);
+      let n = 0;
+      for (const [k, x] of a) {
+        if (x.tipo !== "DIMENSION") continue;
+        const y = b.get(k);
+        if (!y) continue; // las de los bloques que AutoCAD regenera (DW2-5)
+        n++;
+        expect(num(x, 70), k).toBe(num(y, 70));
+        expect(texto(x, 1), k).toBe(texto(y, 1));
+        const codigos = [42, ...((num(y, 70) & 7) <= 1 ? [13, 23, 33, 14, 24, 34, 10, 20, 30, 52] : [])];
+        if ((num(y, 70) & 7) === 0) codigos.push(50);
+        for (const c of codigos) {
+          if (!tiene(y, c) && c === 52) continue; // AutoCAD no escribe el 52 si es 0
+          const [p, q] = [tiene(x, c) ? num(x, c) : 0, num(y, c)];
+          expect(Math.abs(p - q), `${k} ${c}: ${p} frente a ${q}`).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(q)));
+        }
+      }
+      expect(n).toBeGreaterThan(5);
     });
 
     it("lo no leído por aplanar, igual", () => {
@@ -97,7 +122,32 @@ describe("dibujoDxf lee también un DWG (DW4)", () => {
     expect(firma(dibujoDxf(dwg))).toBe(firma(aplanarDxf(leerDwg(dwg))));
     expect(dibujoDxf(dwg).version).toBe("AC1032");
     expect(dibujoDxf(muestra("sample_AC1032_ascii.dxf")).version).toBe("AC1032");
-    expect(() => dibujoDxf(muestra("sample_AC1021.dwg"))).toThrow(/Todavía no se leen los DWG 2007/);
+    expect(dibujoDxf(muestra("sample_AC1021.dwg")).version).toBe("AC1021");
+  });
+});
+
+describe("fem importar-dxf lee también un DWG (DW5)", () => {
+  /** El informe del importador sin el recuento de segmentos por capa (DW2-4: el gancho del LEADER no está en el DWG). */
+  const informe = (d: Dxf) => {
+    const r = importarDxf(d, aplanarDxf(d), {});
+    if (!r.informe) return r;
+    return { ...r, informe: { ...r.informe, capas: r.informe.capas?.map(({ segmentos: _, ...c }) => c) } };
+  };
+  for (const v of CON_DXF)
+    it(`${v}: lo mismo que con su DXF (pilares, losas, ejes, cotas y capas)`, () => {
+      const a = informe(leerDwg(muestra(`sample_${v}.dwg`)));
+      expect(a.informe?.cotas?.total).toBe(5);
+      expect(a).toEqual(informe(leerDxf(muestra(`sample_${v}_ascii.dxf`))));
+    });
+
+  it("la orden, con un DWG 2007", () => {
+    const raiz = join(import.meta.dirname, "..", "..");
+    const r = spawnSync("bun", [join(raiz, "cli", "fem.ts"), "importar-dxf", join(CARPETA_MUESTRAS, "sample_AC1021.dwg")], { encoding: "utf8" });
+    expect(r.status).toBe(0);
+    const j = JSON.parse(r.stdout) as { ok: boolean; pilares: { n: number }; cotas: { total: number } };
+    expect(j.ok).toBe(true);
+    expect(j.pilares.n).toBe(9);
+    expect(j.cotas.total).toBe(5);
   });
 });
 
@@ -113,7 +163,7 @@ describe("las versiones de 2004 en adelante frente al DWG 2000 (criterio 2)", ()
   const d15 = leerDwg(muestra("sample_AC1015.dwg"));
   /** La geometría: los pares sin textos ni nombres (1, 2, 3, 8), que AutoCAD cambia al guardar en otra versión (DW3-9). */
   const geometria = (e: Entidad) => e.codigos.map((c, i) => ([1, 2, 3, 8].includes(c) ? `${c}` : `${c}=${e.valores[i]}`)).join(" ");
-  for (const v of ["AC1018", "AC1024", "AC1027", "AC1032"])
+  for (const v of ["AC1018", "AC1021", "AC1024", "AC1027", "AC1032"])
     it(`${v}: lo que está en los dos, bit a bit; lo que no, en los anónimos regenerados`, () => {
       const a = todas(leerDwg(muestra(`sample_${v}.dwg`)));
       const b = todas(d15);
@@ -133,7 +183,7 @@ describe("las versiones de 2004 en adelante frente al DWG 2000 (criterio 2)", ()
       }
       expect(comunes).toBeGreaterThan(340);
       // Desde 2010, el anónimo del bloque dinámico se llama como éste también en el DXF de AutoCAD
-      expect([...faltan].sort()).toEqual(v === "AC1018" ? ["*U25"] : ["*U17", "*U25"]);
+      expect([...faltan].sort()).toEqual(Number(v.slice(2)) < 1024 ? ["*U25"] : ["*U17", "*U25"]);
     });
 });
 
@@ -141,8 +191,15 @@ describe("DWG R14 (AC1014) frente al DWG 2000 (criterio 2)", () => {
   const r14 = leerDwg(muestra("sample_AC1014.dwg"));
   const d15 = leerDwg(muestra("sample_AC1015.dwg"));
 
-  /** Los pares sin los nombres (capa y bloque), que R14 escribe en mayúsculas (DW1-2). */
-  const pares = (e: Entidad) => e.codigos.map((c, i) => (c === 8 || c === 2 ? `${c}` : `${c}=${e.valores[i]}`)).join(" ");
+  /**
+   * Los pares sin los nombres (capa y bloque), que R14 escribe en mayúsculas (DW1-2), ni la medida de
+   * las cotas (42), que R14 no guarda.
+   */
+  const pares = (e: Entidad) =>
+    e.codigos
+      .map((c, i) => (c === 8 || c === 2 ? `${c}` : e.tipo === "DIMENSION" && c === 42 ? "" : `${c}=${e.valores[i]}`))
+      .filter(Boolean)
+      .join(" ");
 
   it("lo que está en los dos, bit a bit; lo que no, sólo en los anónimos que AutoCAD regenera (DW2-5)", () => {
     expect(r14.fallos).toEqual([]);
@@ -176,12 +233,6 @@ describe("DWG R14 (AC1014) frente al DWG 2000 (criterio 2)", () => {
 });
 
 describe("lo que no se lee", () => {
-  it("la 2007 (DW5) dice cómo guardarlo", () => {
-    const b = muestra("sample_AC1021.dwg");
-    expect(esDwg(b)).toBe(true);
-    expect(() => leerDwg(b)).toThrow(/Todavía no se leen los DWG 2007/);
-  });
-
   it("antes de R13 y lo que no es un DWG", () => {
     const b = new TextEncoder().encode("AC1009" + "\0".repeat(100));
     expect(() => leerDwg(b)).toThrow(/antes de R13/);
@@ -190,9 +241,13 @@ describe("lo que no se lee", () => {
   });
 });
 
-describe("robustez en 2018 (criterio 4)", () => {
-  it("bytes cambiados al azar: o lo dice o sale lo mismo (sumas de las páginas, CRC32 de la cabecera, CRC de cada objeto)", () => {
-    const original = muestra("sample_AC1032.dwg");
+for (const [v, que] of [
+  ["AC1032", "sumas de las páginas, CRC32 de la cabecera, CRC de cada objeto"],
+  ["AC1021", "Reed-Solomon de la cabecera, los mapas y las páginas, sus CRC-64 y sumas, CRC de cada objeto"],
+] as const)
+describe(`robustez en ${v} (criterio 4)`, () => {
+  it(`bytes cambiados al azar: o lo dice o sale lo mismo (${que})`, () => {
+    const original = muestra(`sample_${v}.dwg`);
     const firma = (d: Dxf) => JSON.stringify([d.insunits, d.capas, d.entidades]);
     const bien = firma(leerDwg(original));
     let semilla = 99;

@@ -45,9 +45,16 @@ Portado a TypeScript (fase DW, el lector de DWG; sólo la lectura de lo que usa 
   src/dwg/secciones2004.ts ← src/ACadSharp/IO/DwgReader.cs (readFileHeaderAC18, readFileMetaData,
                           getSectionBuffer18, decryptDataSection), DwgLZ77AC18Decompressor.cs,
                           CRC32StreamHandler.cs y DwgCheckSumCalculator.cs
+  src/dwg/secciones2007.ts ← src/ACadSharp/IO/DwgReader.cs (readFileHeaderAC21, getPageBuffer,
+                          getSectionBuffer21, reedSolomonDecoding), DwgLZ77AC21Decompressor.cs
+                          (el orden de sus copias, sacado con un script); para comprobar lo leído,
+                          de su escritor: CRC.cs (CRC-64), DwgStreamWriters/ReedSolomon.cs,
+                          DwgChecksumCalculatorAC21.cs, DwgCheckDataAC21.cs y
+                          DwgFileHeaderWriterAC21.cs
   src/dwg/lector.ts    ←  src/ACadSharp/IO/DwgReader.cs (cabecera del fichero de R13–R2000);
                           la tabla de páginas de códigos de src/ACadSharp/CadUtils.cs
-Código propio: la comprobación de los CRC y las sumas de las páginas al leer, la traducción a pares de DXF, el orden de las
+Código propio: la comprobación de los CRC, las sumas de las páginas y, en 2007, la paridad de
+Reed-Solomon al leer, la traducción a pares de DXF, el orden de las
 listas y el nombre de los bloques anónimos por su posición en la tabla. Las muestras de AutoCAD
 de su carpeta samples/ se usan como oráculo
 (validacion/dwg/muestras.ts) y no se versionan.

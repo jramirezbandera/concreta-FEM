@@ -132,10 +132,10 @@ export const HERRAMIENTAS: Herramienta[] = [
   { name: "seleccion", description: "Lo que el ingeniero tiene elegido en la app (planta, espacio y objetos, tal como están en el fichero): para «esta viga» o «lo que tengo elegido».", inputSchema: obj({ proyecto: PROYECTO }, ["proyecto"]) },
   {
     name: "importar_dxf",
-    description: "Lee un plano DXF y propone el proyecto (plantas, pilares, contornos de losa, ejes). Sin «salida», sólo dice lo que ve y las capas; con ella, escribe el proyecto (nunca encima de otro).",
+    description: "Lee un plano DXF o DWG (de R14 a 2018) y propone el proyecto (plantas, pilares, contornos de losa, ejes). Sin «salida», sólo dice lo que ve y las capas; con ella, escribe el proyecto (nunca encima de otro).",
     inputSchema: obj(
       {
-        plano: ruta("Ruta absoluta del .dxf."),
+        plano: ruta("Ruta absoluta del .dxf o el .dwg."),
         salida: ruta("Ruta absoluta del proyecto.json que se escribe."),
         capa_pilares: { type: "array", items: { type: "string" } },
         capa_losas: { type: "array", items: { type: "string" } },

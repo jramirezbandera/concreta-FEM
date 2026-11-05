@@ -34,7 +34,7 @@ export const VERSIONES_DWG: Readonly<Record<string, string>> = {
 };
 
 /** Las que se leen ya (los tramos de DW: R13–R2000 en DW1 y DW2; 2004+ en DW3; 2007 en DW5). */
-export const VERSIONES_LEIDAS: readonly string[] = ["AC1012", "AC1014", "AC1015", "AC1018", "AC1024", "AC1027", "AC1032"];
+export const VERSIONES_LEIDAS: readonly string[] = ["AC1012", "AC1014", "AC1015", "AC1018", "AC1021", "AC1024", "AC1027", "AC1032"];
 
 export function version(nombre: string): Version {
   const n = /^AC1\d{3}$/.test(nombre) ? Number(nombre.slice(2)) : NaN;
