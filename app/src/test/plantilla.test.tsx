@@ -96,6 +96,23 @@ describe("la plantilla DXF (V2c-4)", () => {
     await waitFor(() => expect(within(nav).getByText("2/2 capas")).toBeTruthy());
     fireEvent.click(within(nav).getByRole("checkbox", { name: /COTAS/ }));
     await waitFor(() => expect(within(nav).getByText("1/2 capas")).toBeTruthy());
+
+    // Las capas en grande (prueba de uso del 2026-11-04): el filtro y «Ver éstas»/«Ocultar éstas» van sobre lo filtrado
+    fireEvent.click(within(nav).getByRole("button", { name: "Ampliar la lista de capas" }));
+    const grande = screen.getByRole("dialog", { name: "Capas de la plantilla «Planta baja»" });
+    expect(within(grande).getByText("1 de 2 se ven y enganchan")).toBeTruthy();
+    fireEvent.change(within(grande).getByRole("searchbox", { name: "Filtrar las capas por nombre" }), { target: { value: "mur" } });
+    expect(within(grande).queryByRole("checkbox", { name: /COTAS/ })).toBeNull();
+    fireEvent.click(within(grande).getByRole("button", { name: "Ocultar éstas" }));
+    await waitFor(() => expect(within(nav).getByText("0/2 capas")).toBeTruthy());
+    fireEvent.change(within(grande).getByRole("searchbox", { name: "Filtrar las capas por nombre" }), { target: { value: "" } });
+    fireEvent.click(within(grande).getByRole("button", { name: "Todas" }));
+    await waitFor(() => expect(within(nav).getByText("2/2 capas")).toBeTruthy());
+    // La X de la cabecera y el botón del pie se llaman igual
+    fireEvent.click(within(grande).getAllByRole("button", { name: "Cerrar" }).at(-1)!);
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /Capas de la plantilla/ })).toBeNull());
+    fireEvent.click(within(nav).getByRole("checkbox", { name: /COTAS/ }));
+    await waitFor(() => expect(within(nav).getByText("1/2 capas")).toBeTruthy());
     fireEvent.change(unidades, { target: { value: "m" } });
     await waitFor(() => expect((within(nav).getByRole("combobox", { name: "Unidades del DXF" }) as HTMLSelectElement).value).toBe("m"));
     // En m, el plano mediría 12 km: se avisa de que $INSUNITS dice mm

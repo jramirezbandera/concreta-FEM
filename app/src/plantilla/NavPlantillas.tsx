@@ -3,14 +3,19 @@
  * el estado de su fichero y, desplegada, sus unidades, el redondeo de lo enganchado, sus plantas, sus
  * capas (con cuántas entidades tiene cada una), su colocación (con Colocar y Girar en la planta) y
  * Quitar. Todo cambio es una operación `plantillas` del editor: se deshace y no cambia la huella.
+ *
+ * Las capas (2026-11-05, de la primera prueba de uso de un usuario externo: con un plano real, la
+ * lista era pequeña): con un filtro por nombre, «Todas» y «Ninguna» sobre lo filtrado, la lista alta
+ * y estirable, y «Ampliar…», que la abre a lo ancho en un diálogo, con los nombres enteros.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, Trash2 } from "lucide-react";
+import { ChevronRight, Maximize2, Trash2 } from "lucide-react";
 import type { PlantillaDxf } from "../../../src/agente/proyecto.ts";
 import { leerNumero, textoNumero } from "../../../src/editor/celdas.ts";
 import { insunitsDistintas, UNIDADES, type UnidadDxf } from "../../../src/editor/dibujo/plantilla.ts";
 import type { NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
 import { Seccion } from "../componentes/comunes.tsx";
+import { Dialogo } from "../editor/Dialogos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { importarDxf, type usePlantillasDxf } from "./plantillas.ts";
@@ -68,6 +73,7 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
     cambiar(n.length ? { ...resto, ocultas: [...n] } : resto, `Capas de la plantilla «${t.nombre}»`);
   };
   const [aviso, setAviso] = useState<string | null>(null);
+  const [ampliada, setAmpliada] = useState(false);
   const fichero = useRef<HTMLInputElement>(null);
 
   /** El fichero elegido otra vez: si es el mismo, se vuelve a leer; si no, la plantilla pasa a él. */
@@ -109,28 +115,15 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
         </button>
       </div>
       {abierta && (
-        <div className="px-3.5 pb-2 text-[12px]" style={{ display: "grid", gap: 6 }}>
+        // minmax(0, 1fr): un nombre de capa largo se recorta, no ensancha el navegador (los botones quedaban fuera)
+        <div className="px-3.5 pb-2 text-[12px]" style={{ display: "grid", gap: 6, gridTemplateColumns: "minmax(0, 1fr)" }}>
           {d && (
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-text-secondary">Capas (las que se ven y enganchan)</span>
-                <button type="button" className="ib-chip ib-texto ml-auto" disabled={!ocultas.size} onClick={() => ponerOcultas([])}>
-                  Todas
-                </button>
-                <button type="button" className="ib-chip ib-texto" disabled={visibles === 0} onClick={() => ponerOcultas(conEntidades.map((c) => c.nombre))}>
-                  Ninguna
-                </button>
-              </div>
-              <div style={{ maxHeight: 240, overflowY: "auto" }}>
-                {conEntidades.map((c) => (
-                  <label key={c.nombre} className="flex items-center gap-1.5">
-                    <input type="checkbox" checked={!ocultas.has(c.nombre)} onChange={(x) => ponerOcultas(x.target.checked ? [...ocultas].filter((y) => y !== c.nombre) : [...ocultas, c.nombre])} />
-                    <span className="truncate">{c.nombre}</span>
-                    <span className="ml-auto text-text-secondary">{fmt(c.entidades, 0)}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <ListaCapas capas={conEntidades} ocultas={ocultas} poner={ponerOcultas} ampliar={() => setAmpliada(true)} />
+          )}
+          {d && ampliada && (
+            <Dialogo titulo={`Capas de la plantilla «${t.nombre}»`} clase="dialogo-capas" onCerrar={() => setAmpliada(false)} pie={<button type="button" className="btn btn-p" onClick={() => setAmpliada(false)}>Cerrar</button>}>
+              <ListaCapas capas={conEntidades} ocultas={ocultas} poner={ponerOcultas} ancha />
+            </Dialogo>
           )}
           <Linea k="Fichero">
             <span className="mono truncate" title={`sha256 ${t.sha256}`}>
@@ -182,8 +175,8 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-text-secondary">Plantas (dónde se ve)</span>
-              <button type="button" className="ib-chip ib-texto ml-auto" disabled={plantas.every((p) => t.plantas.includes(p.id))} title="Verla en todas las plantas" onClick={() => cambiar({ ...t, plantas: plantas.map((p) => p.id) }, `Plantas de la plantilla «${t.nombre}»`)}>
+              <span className="min-w-0 truncate text-text-secondary" title="Las plantas donde se ve">Plantas (dónde se ve)</span>
+              <button type="button" className="ib-chip ib-texto ml-auto" style={{ whiteSpace: "nowrap" }} disabled={plantas.every((p) => t.plantas.includes(p.id))} title="Verla en todas las plantas" onClick={() => cambiar({ ...t, plantas: plantas.map((p) => p.id) }, `Plantas de la plantilla «${t.nombre}»`)}>
                 En todas
               </button>
             </div>
@@ -260,5 +253,53 @@ function CampoNumero({ etiqueta, valor, poner, leer }: { etiqueta: string; valor
         else if (x.key === "Escape") setTexto(null);
       }}
     />
+  );
+}
+
+/** Con más capas que éstas, el filtro por nombre. */
+const CAPAS_CON_FILTRO = 8;
+
+/** Las capas de una plantilla: marcadas, las que se ven y enganchan. `ancha`: en el diálogo, en columnas. */
+function ListaCapas({ capas, ocultas, poner, ampliar, ancha }: { capas: readonly { nombre: string; entidades: number }[]; ocultas: ReadonlySet<string>; poner: (ocultas: readonly string[]) => void; ampliar?: () => void; ancha?: boolean }) {
+  const [filtro, setFiltro] = useState("");
+  const f = filtro.trim().toLocaleLowerCase("es");
+  const vistas = f ? capas.filter((c) => c.nombre.toLocaleLowerCase("es").includes(f)) : capas;
+  const nombres = new Set(vistas.map((c) => c.nombre));
+  const visibles = capas.filter((c) => !ocultas.has(c.nombre)).length;
+  const filtradasVisibles = vistas.filter((c) => !ocultas.has(c.nombre)).length;
+  return (
+    <div className="min-w-0" data-testid={ancha ? "capas-ampliadas" : "capas"}>
+      <div className="flex flex-wrap items-center gap-x-0.5">
+        <span className={ancha ? "min-w-0 truncate text-text-secondary" : "shrink-0 text-text-secondary"} title="Las marcadas se ven y enganchan">{ancha ? `${visibles} de ${capas.length} se ven y enganchan` : "Capas"}</span>
+        <button type="button" className="ib-chip ib-texto ml-auto" disabled={filtradasVisibles === vistas.length} title={f ? "Ver las capas filtradas" : "Ver todas las capas"} onClick={() => poner([...ocultas].filter((x) => !nombres.has(x)))}>
+          {f ? "Ver éstas" : "Todas"}
+        </button>
+        <button type="button" className="ib-chip ib-texto" disabled={filtradasVisibles === 0} title={f ? "Ocultar las capas filtradas" : "Ocultar todas las capas"} onClick={() => poner([...new Set([...ocultas, ...nombres])])}>
+          {f ? "Ocultar éstas" : "Ninguna"}
+        </button>
+        {ampliar && (
+          <button type="button" className="ib-chip" aria-label="Ampliar la lista de capas" title="Ver las capas en grande" onClick={ampliar}>
+            <Maximize2 size={12} />
+          </button>
+        )}
+      </div>
+      {(ancha || capas.length > CAPAS_CON_FILTRO) && (
+        <input className="sel my-1 w-full" type="search" placeholder="Filtrar por nombre" aria-label="Filtrar las capas por nombre" value={filtro} autoFocus={ancha} onChange={(x) => setFiltro(x.target.value)} />
+      )}
+      <div
+        className={ancha ? "capas-columnas" : "capas-lista"}
+        // En el navegador, alta y estirable desde su borde de abajo
+        style={ancha ? undefined : { height: capas.length > 14 ? "min(360px, 45vh)" : undefined, maxHeight: "70vh", overflowY: "auto", resize: capas.length > 14 ? "vertical" : undefined }}
+      >
+        {vistas.map((c) => (
+          <label key={c.nombre} className="flex min-w-0 items-center gap-1.5" title={c.nombre}>
+            <input type="checkbox" checked={!ocultas.has(c.nombre)} onChange={(x) => poner(x.target.checked ? [...ocultas].filter((y) => y !== c.nombre) : [...ocultas, c.nombre])} />
+            <span className={ancha ? "min-w-0 break-all" : "truncate"}>{c.nombre}</span>
+            <span className="ml-auto pl-1 text-text-secondary tabular-nums">{fmt(c.entidades, 0)}</span>
+          </label>
+        ))}
+        {!vistas.length && <p className="nota">Ninguna capa tiene «{filtro.trim()}» en el nombre.</p>}
+      </div>
+    </div>
   );
 }

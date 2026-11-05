@@ -401,6 +401,17 @@ const secciones: DefTabla = {
 
 // ─── Pilares ────────────────────────────────────────────────────────────────────────────────────
 
+/** La celda de los tramos de un pilar, «N3: P30x30; N5: P25x25»: lo que se lee hasta el primero mal escrito. */
+export function leerTramos(texto: string): { tramos: { planta: string; seccion: string }[]; error?: string } {
+  const tramos: { planta: string; seccion: string }[] = [];
+  for (const x of texto.split(";").map((y) => y.trim()).filter(Boolean)) {
+    const m = /^([^:]+):\s*(.+)$/.exec(x);
+    if (!m) return { tramos, error: `«${x}» tiene que ser «planta: sección»` };
+    tramos.push({ planta: m[1]!.trim(), seccion: m[2]!.trim() });
+  }
+  return { tramos };
+}
+
 const pilares: DefTabla = {
   nombre: "pilares",
   titulo: "Pilares",
@@ -414,7 +425,7 @@ const pilares: DefTabla = {
     { clave: "desde", titulo: "desde", ayuda: "planta de la base", opciones: opcionesPlantas, referencia: "plantas" },
     { clave: "hasta", titulo: "hasta", ayuda: "planta de la cabeza", opciones: opcionesPlantas, referencia: "plantas" },
     { clave: "seccion", titulo: "sección", opciones: secciones_(), referencia: "secciones" },
-    { clave: "tramos", titulo: "tramos", ayuda: "sección de los tramos que cambian, por la planta de su cabeza: «N3: P30x30; N5: P25x25»" },
+    { clave: "tramos", titulo: "tramos", ayuda: "sección de los tramos que cambian, por la planta de su cabeza: «N3: P30x30; N5: P25x25». En Propiedades, uno por línea con un desplegable" },
     { clave: "giro", titulo: "giro", unidad: "°", ayuda: "del canto h desde +X; por defecto, 0" },
     {
       clave: "fijo",
@@ -449,15 +460,9 @@ const pilares: DefTabla = {
     const t = L.texto("tramos");
     let tramos: { planta: string; seccion: string }[] | undefined;
     if (t !== undefined) {
-      tramos = [];
-      for (const x of t.split(";").map((y) => y.trim()).filter(Boolean)) {
-        const m = /^([^:]+):\s*(.+)$/.exec(x);
-        if (!m) {
-          L.errores.push({ columna: "tramos", mensaje: `«${x}» tiene que ser «planta: sección»` });
-          break;
-        }
-        tramos.push({ planta: m[1]!.trim(), seccion: m[2]!.trim() });
-      }
+      const r = leerTramos(t);
+      tramos = r.tramos;
+      if (r.error) L.errores.push({ columna: "tramos", mensaje: r.error });
     }
     const lb = L.gdl("libBase");
     const lc = L.gdl("libCabeza");

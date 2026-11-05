@@ -16,7 +16,8 @@ import type { Seccion, Vec2 } from "../compilador/fisico.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Lector, leerNumero, textoClaves, type Fila } from "./celdas.ts";
 import type { Objeto } from "./referencias.ts";
-import { TIPOS_FORJADO, type Contexto, type DefTabla, type TipoForjado } from "./tablas.ts";
+import { cotasPlantas } from "../compilador/cotas.ts";
+import { leerTramos, TIPOS_FORJADO, type Contexto, type DefTabla, type TipoForjado } from "./tablas.ts";
 
 export interface EstadoCampo {
   obligatorio: boolean;
@@ -164,6 +165,69 @@ export function rigidezAligerado(f: Fila, ctx: Contexto, rigidez: "uniforme" | "
   if (!dados || !Object.keys(dados).length) return { modo: "calculada", calculados, usados: calculados, dados: {}, nu, rigidez };
   const usados = Object.fromEntries(MULTIPLICADORES.map(({ clave }) => [clave, dados[clave] ?? 1])) as Required<MultiplicadoresLamina>;
   return { modo: "dada", calculados, usados, dados, nu, rigidez };
+}
+
+// ─── Los tramos de un pilar ─────────────────────────────────────────────────────────────────────
+
+export interface TramoPilar {
+  /** La planta de su cabeza (la que nombra el tramo en `tramos`). */
+  cabeza: string;
+  /** La de su base. */
+  base: string;
+  /** m, de la cota de la base a la de la cabeza (null si una de las dos no tiene cota). */
+  altura: number | null;
+  /** La sección que lleva: la suya o la del pilar. */
+  seccion: string;
+  /** ¿Tiene una suya en `tramos`? (Una igual a la del pilar no cuenta: se quita al escribir.) */
+  propia: boolean;
+}
+
+export interface TramosPilar {
+  /** De la cabeza a la base, como las plantas del modelo. */
+  tramos: TramoPilar[];
+  /** Lo escrito en `tramos` que no es de ningún tramo del pilar (otra planta, o la de su base). */
+  fuera: { planta: string; seccion: string }[];
+}
+
+/**
+ * Los tramos de una fila de Pilares, uno por planta entre su arranque y su cabeza, con la sección de
+ * cada uno: la de `tramos` por la planta de su cabeza o, si no, la del pilar (`topologia.ts`). Null
+ * si el arranque o la cabeza no se leen, o si la celda de los tramos está mal escrita.
+ */
+export function tramosPilar(f: Fila, ctx: Contexto): TramosPilar | null {
+  const plantas = ctx.modelo.plantas;
+  const ids = plantas.map((p) => p.id);
+  const [a, b] = [ids.indexOf((f.hasta ?? "").trim()), ids.indexOf((f.desde ?? "").trim())];
+  if (a < 0 || b < 0 || !(a < b)) return null;
+  const leidos = leerTramos(f.tramos ?? "");
+  if (leidos.error) return null;
+  const general = (f.seccion ?? "").trim();
+  const cotas = cotasPlantas(plantas);
+  const tramos: TramoPilar[] = [];
+  for (let k = a; k < b; k++) {
+    const propia = leidos.tramos.find((t) => t.planta === ids[k]);
+    const [zc, zb] = [cotas[k], cotas[k + 1]];
+    tramos.push({
+      cabeza: ids[k]!,
+      base: ids[k + 1]!,
+      altura: zc === null || zc === undefined || zb === null || zb === undefined ? null : Number((zc - zb).toPrecision(12)),
+      seccion: propia?.seccion ?? general,
+      propia: !!propia && propia.seccion !== general,
+    });
+  }
+  const dentro = new Set(tramos.map((t) => t.cabeza));
+  return { tramos, fuera: leidos.tramos.filter((t) => !dentro.has(t.planta)) };
+}
+
+/**
+ * La celda `tramos` con las secciones de algunos tramos cambiadas (`cambios`, por la planta de su
+ * cabeza): sólo los que no llevan la del pilar, de la cabeza a la base. Lo de `fuera` se conserva
+ * salvo con `sinFuera`: quitarlo es una decisión del ingeniero, no un efecto de cambiar otro tramo.
+ */
+export function textoTramos(t: TramosPilar, general: string, cambios: Readonly<Record<string, string>>, sinFuera = false): string {
+  const g = general.trim();
+  const dentro = t.tramos.map((x) => ({ planta: x.cabeza, seccion: (cambios[x.cabeza] ?? x.seccion).trim() })).filter((x) => x.seccion && x.seccion !== g);
+  return [...dentro, ...(sinFuera ? [] : t.fuera)].map((x) => `${x.planta}: ${x.seccion}`).join("; ");
 }
 
 /** Los ocho con 3 cifras significativas, para empezar «la mía» desde los calculados. */

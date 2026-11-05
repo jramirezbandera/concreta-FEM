@@ -17,14 +17,14 @@ const leido = leerProyecto(readFileSync(join(RAIZ, "ejemplos", "muestrario", "pr
 if (!leido.valido) throw new Error("muestrario no válido");
 const proyecto = leido.proyecto;
 
-function montar(id: string) {
+function montar(id: string, tabla: "forjados" | "pilares" = "forjados") {
   const editar = vi.fn((_o: Operacion, _e: string) => ({ ok: true as const }));
   const visor = { proyecto: { edicion: { proyecto, editar } }, planta: null, setPlanta() {}, seleccion: id, setSeleccion() {}, elegidos: [id], setElegidos() {}, espacio: "modelo", modo: null, irA() {}, tablaPedida: null, pedirTabla() {} };
-  return render(
+  return Object.assign(render(
     <ContextoVisor.Provider value={visor as never}>
-      <FormularioObjeto id={id} tabla="forjados" />
+      <FormularioObjeto id={id} tabla={tabla} />
     </ContextoVisor.Provider>,
-  );
+  ), { editar });
 }
 
 const nombre = (el: HTMLElement) => el.closest("label")!.querySelector(".campo-nombre")!.textContent;
@@ -67,5 +67,40 @@ describe("Propiedades de un forjado", () => {
     fireEvent.click(cota);
     expect(document.activeElement).toBe(screen.getByLabelText("nervio"));
     expect(cota.getAttribute("data-activo")).toBe("true");
+  });
+});
+
+describe("Propiedades de un pilar: sus tramos (2026-11-05)", () => {
+  it("cada tramo con su sección; cambiar uno escribe la celda de los tramos en un paso", () => {
+    // P6 del muestrario: de CIM a CUB, P30x30 salvo el tramo de CIM a PB (P40x40)
+    const { container, editar } = montar("P6", "pilares");
+    expect([...container.querySelectorAll(".campo-grupo")].map((h) => h.textContent)).toEqual(["General", "Posición", "Plantas y sección", "Tramos", "Base y liberaciones"]);
+    // La celda no sale como campo: la lleva la lista
+    expect(screen.queryByLabelText("tramos")).toBeNull();
+    const filas = [...screen.getByTestId("tramos-pilar").querySelectorAll("tr")].map((tr) => tr.getAttribute("data-tramo"));
+    expect(filas).toEqual(["CUB", "PL1", "PB"]);
+    const abajo = screen.getByLabelText("Sección del tramo CIM–PB") as HTMLSelectElement;
+    expect(abajo.value).toBe("P40x40");
+    expect((screen.getByLabelText("Sección del tramo PL1–CUB") as HTMLSelectElement).value).toBe("");
+    // Hormigón y acero, por separado
+    expect([...abajo.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Hormigón"]);
+    fireEvent.change(screen.getByLabelText("Sección del tramo PL1–CUB"), { target: { value: "P40x40" } });
+    expect(editar).toHaveBeenCalledTimes(1);
+    const [op] = editar.mock.calls[0]!;
+    expect(op.op === "cambiar" && (op.objeto as { tramos?: unknown }).tramos).toEqual([
+      { planta: "CUB", seccion: "P40x40" },
+      { planta: "PB", seccion: "P40x40" },
+    ]);
+  });
+
+  it("«y los de encima» pone la del tramo en todos los de encima", () => {
+    const { editar } = montar("P6", "pilares");
+    fireEvent.click(screen.getByRole("button", { name: "P40x40 también en los tramos de encima de CIM–PB" }));
+    const [op] = editar.mock.calls[0]!;
+    expect(op.op === "cambiar" && (op.objeto as { tramos?: unknown }).tramos).toEqual([
+      { planta: "CUB", seccion: "P40x40" },
+      { planta: "PL1", seccion: "P40x40" },
+      { planta: "PB", seccion: "P40x40" },
+    ]);
   });
 });

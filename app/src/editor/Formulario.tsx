@@ -7,7 +7,8 @@
  * Lo que ayuda a meter los datos (de la prueba de uso del 2026-10-28): lo obligatorio va marcado
  * con «*» y, vacío, lo dice el campo; un campo opcional vacío enseña lo que vale (`estadoCampos`); la
  * ayuda de cada campo sale en un globo al pasar el ratón por su «?» (`Ayuda`); y un forjado lleva su
- * croquis (`CroquisForjado.tsx`), enlazado con sus campos.
+ * croquis (`CroquisForjado.tsx`), enlazado con sus campos. Un pilar, la lista de sus tramos con la
+ * sección de cada uno (`FichaPilar.tsx`).
  */
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ComponentType, type ReactNode } from "react";
 import { operacionFila } from "../../../src/editor/edicion.ts";
@@ -25,6 +26,7 @@ import { useVisor } from "../contexto.ts";
 import { PlantaForjado, SeccionForjado } from "./CroquisForjado.tsx";
 import { ValorCarga } from "./FichaCarga.tsx";
 import { PesoForjado, RigidezAligeradoPanel } from "./FichaForjado.tsx";
+import { TramosPilarPanel } from "./FichaPilar.tsx";
 import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
 
 /** El grupo que va plegado: lo que casi nunca hace falta (2026-10-28, cargas). */
@@ -38,6 +40,13 @@ const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly s
     ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion", "bovedilla"]],
     ["Material y peso", ["material", "pp"]],
     ["Rigidez del aligerado", ["multiplicadores"]],
+  ],
+  pilares: [
+    ["General", ["id", "nombre"]],
+    ["Posición", ["x", "y", "giro", "fijo"]],
+    ["Plantas y sección", ["desde", "hasta", "seccion"]],
+    ["Tramos", ["tramos"]],
+    ["Base y liberaciones", ["base", "libBase", "libCabeza"]],
   ],
   casos: [
     ["El caso", ["id", "nombre", "pesoPropio"]],
@@ -99,11 +108,12 @@ const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCro
     "Material y peso": PesoForjado,
     "Rigidez del aligerado": ({ rigidezReticular, ...p }) => <RigidezAligeradoPanel {...p} rigidez={rigidezReticular} />,
   },
+  pilares: { Tramos: TramosPilarPanel },
   cargas: { Valor: ValorCarga },
 };
 
 /** Los campos que no se enseñan como campo: los lleva el croquis de su grupo (los multiplicadores; el valor de una carga). */
-const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados: new Set(["multiplicadores"]), cargas: new Set(["q", "qb", "F", "M"]) };
+const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados: new Set(["multiplicadores"]), pilares: new Set(["tramos"]), cargas: new Set(["q", "qb", "F", "M"]) };
 
 /** El nombre del campo: «*» si es obligatorio y «?» si tiene ayuda (en un globo, al pasar el ratón). */
 function Etiqueta({ c, estado, conUnidad, titulo }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean; titulo?: string }) {
