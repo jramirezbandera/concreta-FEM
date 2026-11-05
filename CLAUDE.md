@@ -774,6 +774,21 @@
   - **Lo que queda:**
     - en la primera Revisión, el peso propio calculado recompila el modelo (~2 s; `pesoPropioCalculado`, sin las cargas y sin LV-d, para que el reparto por plantas sea el del esperado) y los diagramas de todas las vigas en las combinaciones de flecha, que hay que hacer;
     - f sigue fallando: el mapa de franjas de N7 en ~3,4–4,0 s frente a los 2 s del criterio. Su tiempo se aceptó el 2026-10-13 (C5-4) y el umbral se quedó corto al crecer la malla. Además, una tarea larga de 62–87 ms en el hilo principal al pintarlo, sin investigar.
+- **2026-11-05: el peso propio de los forjados, revisado** (revisión del usuario, `pesoForjado.ts`; decisiones del usuario: relleno por peso aparente o por piezas, excluyentes; procedencia con su fuente; el peso medio con ábacos sólo informativo):
+  - **Lo que ya cumplía:**
+    - las fórmulas son las de la revisión (reticular de retícula cuadrada y unidireccional con vigueta en T; 25+5 a 80/12 de casetón de hormigón, 4,3390625 kN/m²; recuperable, 2,984375);
+    - sin redondeo intermedio, el pp escrito manda, los ábacos se modelan macizos y las geometrías imposibles dan error.
+  - **Nuevo en el modelo físico:**
+    - `relleno` en el reticular y en el paño: `{ pesoAparente }` (kN/m³ de hueco) o `{ pesoPieza, piezasM2 }` (kg × piezas/m² × 9,80665/1000), nunca los dos, con su `procedencia`. Sustituye al estimado del casetón o la bovedilla; con casetón «perdido» basta con él, con «recuperable» no cabe;
+    - `ppProcedencia` en losas y paños: `{ origen: estimado | fabricante | usuario, fuente? }`. Fuera de la huella: no cambia el cálculo.
+  - **Lo que manda:** el pp escrito, luego el relleno dado y luego el estimado; nunca se suman (con pp y relleno, aviso `forjado/relleno-sin-efecto`).
+  - **Dónde se ve:**
+    - una hipótesis por cálculo dice, forjado a forjado, de dónde sale su pp;
+    - la tabla Forjados tiene las columnas «relleno» («6,5» o «12 kg × 6,25») y «procedencia» («fabricante: Ficha X, 2025»);
+    - la ficha dice qué manda, que lo estimado (7,5 / 6 / 3,2 / 0,2 kN/m³) es un peso específico aparente equivalente de predimensionamiento y no un peso certificado ni de norma, y, en un reticular con ábacos, el peso medio con la fracción de ábacos dibujada, sólo como dato.
+  - **Corregido de paso:** `pesoLosa` de la sensatez daba el pp escrito de un reticular también a los ábacos (MA3).
+  - **Validación:** `pesoForjado.test.ts` (los seis casos de la tabla con las fórmulas escritas aparte, los criterios de aceptación, el relleno en el compilador, los límites, la huella, la tabla) y `app/src/test/formulario.test.tsx`.
+  - **Diferencia con la revisión, sin cambiar:** sólo hay retícula cuadrada (un intereje y un nervio), como la rigidez.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

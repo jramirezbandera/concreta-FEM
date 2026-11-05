@@ -104,3 +104,25 @@ describe("Propiedades de un pilar: sus tramos (2026-11-05)", () => {
     ]);
   });
 });
+
+describe("Propiedades de un forjado: el peso propio (revisión del 2026-11-05)", () => {
+  it("dice qué manda, el peso medio con los ábacos sólo como dato, y el relleno y su procedencia se escriben", () => {
+    // L2 del muestrario: reticular con casetón «perdido», pp escrito de 4,6 y 12 ábacos
+    const { editar } = montar("L2");
+    const peso = screen.getByTestId("peso-forjado");
+    expect(peso.textContent).toMatch(/Manda el escrito, 4,6 kN\/m², en la zona aligerada/);
+    expect(screen.getByTestId("peso-medio").textContent).toMatch(/sólo como dato/);
+    const relleno = screen.getByLabelText("relleno") as HTMLInputElement;
+    expect(nombre(relleno)).toBe("relleno");
+    fireEvent.change(relleno, { target: { value: "12 kg × 6,25" } });
+    fireEvent.blur(relleno);
+    expect(editar).toHaveBeenCalledTimes(1);
+    const [op] = editar.mock.calls[0]!;
+    expect(op.op === "cambiar" && (op.objeto as { reticular?: { relleno?: unknown } }).reticular?.relleno).toEqual({ pesoPieza: 12, piezasM2: 6.25 });
+    const proc = screen.getByLabelText("procedencia") as HTMLInputElement;
+    fireEvent.change(proc, { target: { value: "fabricante: Ficha X, 2025" } });
+    fireEvent.blur(proc);
+    const [op2] = editar.mock.calls[1]!;
+    expect(op2.op === "cambiar" && (op2.objeto as { ppProcedencia?: unknown }).ppProcedencia).toEqual({ origen: "fabricante", fuente: "Ficha X, 2025" });
+  });
+});

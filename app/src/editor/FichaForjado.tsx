@@ -3,15 +3,20 @@
  * multiplicadores «no se entienden ni se sabe cómo cambiarlos» y el peso propio «se podría calcular»):
  *
  * - el peso propio: cómo sale el pp que se usa (el hormigón y el casetón o la bovedilla, con sus
- *   números) y, si hay uno escrito, que manda él y cómo volver al calculado;
+ *   números) y, si hay uno escrito, que manda él y cómo volver al calculado. Desde la revisión del
+ *   usuario del 2026-11-05: qué manda (el pp escrito, el relleno dado o el estimado) y su
+ *   procedencia, que lo estimado es un peso específico aparente equivalente de predimensionamiento,
+ *   y, en un reticular con ábacos, su peso medio, sólo como dato;
  * - la rigidez del aligerado de un reticular: «calculada» (los ocho multiplicadores que usa el cálculo,
  *   con su nombre) o «la mía» (los ocho, rellenos con los calculados para cambiar el que se quiera).
  *
  * Lo que escriben va por `escribir`, como un campo más (un paso de deshacer).
  */
-import { useEffect, useState } from "react";
-import { MULTIPLICADORES, rigidezAligerado, textoMultiplicadores, type RigidezAligerado } from "../../../src/editor/ficha.ts";
-import { desglosePesoFila, ppObligatorio, type Contexto } from "../../../src/editor/tablas.ts";
+import { useEffect, useMemo, useState } from "react";
+import { gammaMaterial } from "../../../src/agente/sensatez.ts";
+import { pesoMedioConMacizo } from "../../../src/compilador/pesoForjado.ts";
+import { fraccionAbacos, MULTIPLICADORES, rigidezAligerado, textoMultiplicadores, type RigidezAligerado } from "../../../src/editor/ficha.ts";
+import { desglosePesoFila, leerProcedencia, ppObligatorio, type Contexto } from "../../../src/editor/tablas.ts";
 import { leerNumero, type Fila } from "../../../src/editor/celdas.ts";
 import type { MultiplicadoresLamina } from "../../../src/elementos/lamina.ts";
 import { Grupo } from "../componentes/Grupo.tsx";
@@ -20,6 +25,8 @@ import { Grupo } from "../componentes/Grupo.tsx";
 const n = (v: number, d = 3) => String(Number(v.toFixed(d))).replace(".", ",");
 
 interface Props {
+  /** El forjado (para sus ábacos ya resueltos en el modelo). */
+  id?: string;
   fila: Fila;
   ctx: Contexto;
   /** Escribe un campo de la fila (como si se tecleara). */
@@ -30,21 +37,52 @@ interface Props {
 
 // ─── Peso propio ────────────────────────────────────────────────────────────────────────────────
 
-export function PesoForjado({ fila, ctx, escribir }: Props) {
+export function PesoForjado({ id, fila, ctx, escribir }: Props) {
   const tipo = (fila.tipo ?? "").trim().toLowerCase() || "maciza";
   const d = desglosePesoFila(fila, ctx);
   const texto = (fila.pp ?? "").trim();
   const escrito = texto ? Number(texto.replace(",", ".")) : undefined;
+  const conRelleno = !!(fila.relleno ?? "").trim();
+  const pr = (fila.procedencia ?? "").trim() ? leerProcedencia(fila.procedencia!) : undefined;
+  const procedencia = pr && typeof pr !== "string" ? `${pr.origen === "fabricante" ? "de fabricante" : pr.origen === "usuario" ? "del usuario" : "estimado"}${pr.fuente ? `: ${pr.fuente}` : ""}` : null;
+  // El peso medio con los ábacos, sólo como dato (con los del modelo, también los de los pilares)
+  const f = useMemo(() => (tipo === "reticular" && id ? fraccionAbacos(ctx.modelo, id) : null), [tipo, id, ctx.modelo]);
+  const mat = ctx.modelo.materiales.find((x) => x.id === (fila.material ?? "").trim());
+  const canto = Number((fila.espesor ?? "").replace(",", "."));
+  const conEscrito = escrito !== undefined && Number.isFinite(escrito);
+  const medio = (pp: number) =>
+    f !== null && mat && canto > 0 ? (
+      <p className="mt-1" data-testid="peso-medio">
+        Peso medio con los ábacos ({n(100 * f, 1)} % del área): {n(pesoMedioConMacizo(pp, gammaMaterial(mat) * canto, f), 2)} kN/m², sólo como dato. El cálculo pesa cada zona con lo suyo: repartir este medio contaría los ábacos dos veces.
+      </p>
+    ) : null;
+  // Sin cálculo posible (casetón «perdido», vigueta que no es una T) pero con el pp escrito: manda él
+  if (!d && conEscrito)
+    return (
+      <div className="nota" data-testid="peso-forjado">
+        <p>
+          Manda el escrito, {n(escrito!, 2)} kN/m²{procedencia ? ` (${procedencia})` : ""}
+          {tipo === "reticular" ? ", en la zona aligerada (los ábacos, γ·canto)" : ""}.
+        </p>
+        {medio(escrito!)}
+      </div>
+    );
   if (!d) {
     if (!ppObligatorio(fila, ctx)) return null;
     return (
       <p className="nota">
         {tipo === "reticular" ? "Con un casetón perdido de otro material" : "Con una vigueta que no es una T más estrecha que el intereje"} el peso propio no sale solo: escríbalo
-        {tipo === "unidireccional" ? ", con las bovedillas" : ""}.
+        {tipo === "unidireccional" ? ", con las bovedillas" : ", o dé el relleno de su ficha"}.
       </p>
     );
   }
-  const hueco = tipo === "reticular" ? "casetón" : "bovedilla";
+  const pieza = tipo === "reticular" ? "casetón" : "bovedilla";
+  const relleno =
+    d.metodo === "piezas"
+      ? `relleno dado por piezas, ${n(d.piezas!.pesoPieza)} kg × ${n(d.piezas!.piezasM2)} piezas/m² × g = ${n(d.relleno)} kN/m²`
+      : d.pesoHueco > 0
+        ? `${d.metodo === "aparente" ? "relleno dado" : `${pieza} estimado`}, ${n(d.pesoHueco)} kN/m³ aparente equivalente × ${n(d.hueco)} m³/m² de hueco`
+        : `el ${pieza} no pesa`;
   return (
     <div className="nota" data-testid="peso-forjado">
       {tipo === "maciza" ? (
@@ -52,20 +90,30 @@ export function PesoForjado({ fila, ctx, escribir }: Props) {
           Peso propio: γ·canto = {n(d.gamma)} × {n(d.hormigon)} = <b>{n(d.pp, 2)} kN/m²</b>.
         </p>
       ) : (
-        <p>
-          Peso propio{tipo === "reticular" ? " de lo aligerado" : ""}: hormigón {n(d.gamma)} kN/m³ × {n(d.hormigon)} m³/m²
-          {d.pesoHueco > 0 ? ` + ${hueco} ${n(d.pesoHueco)} kN/m³ × ${n(d.hueco)} m³/m²` : ` (el ${hueco} no pesa)`} = <b>{n(d.pp, 2)} kN/m²</b>
-          {tipo === "reticular" ? `; los ábacos, macizos: ${n(d.gamma)} × canto.` : "."}
-        </p>
+        <>
+          <p>
+            Peso propio{tipo === "reticular" ? " de lo aligerado" : ""}: hormigón {n(d.gamma)} kN/m³ × {n(d.hormigon)} m³/m² + {relleno} = <b>{n(d.pp, 2)} kN/m²</b>
+            {tipo === "reticular" ? `; los ábacos, macizos: ${n(d.gamma)} × canto.` : "."}
+          </p>
+          {d.metodo === "estimado" && d.pesoHueco > 0 && !conEscrito && (
+            <p className="mt-1" data-testid="peso-estimado">
+              El {n(d.pesoHueco)} kN/m³ es un peso específico aparente equivalente (kN por m³ del hueco entre nervios, no la densidad del material de la pieza), estimado para predimensionar: no es un peso certificado ni de norma. Con la ficha del fabricante, escriba su relleno.
+            </p>
+          )}
+          {d.metodo !== "estimado" && !conEscrito && procedencia && <p className="mt-1">El relleno es {procedencia}.</p>}
+        </>
       )}
-      {escrito !== undefined && Number.isFinite(escrito) && (
+      {conEscrito && (
         <p className="mt-1">
-          Manda el escrito, {n(escrito, 2)} kN/m²{tipo === "reticular" ? ", en la zona aligerada (los ábacos, γ·canto)" : ""}.{" "}
+          Manda el escrito, {n(escrito!, 2)} kN/m²{procedencia ? ` (${procedencia})` : ""}
+          {tipo === "reticular" ? ", en la zona aligerada (los ábacos, γ·canto)" : ""}
+          {conRelleno ? "; el relleno no se usa: no se suman" : ""}.{" "}
           <button type="button" className="text-accent hover:underline" onClick={() => escribir("pp", "")}>
             Usar el calculado
           </button>
         </p>
       )}
+      {medio(conEscrito ? escrito! : d.pp)}
     </div>
   );
 }

@@ -37,6 +37,7 @@ import { conPuntoFijo } from "./puntoFijo.ts";
 import { construirTopologia, cotaNudo, ejeTramo } from "./topologia.ts";
 import { construirPanos, type PanosU } from "./unidireccional.ts";
 import { ordenarPoligonos, validar, type Contexto } from "./validar.ts";
+import { pesoReticular, textoOrigenPp } from "./pesoForjado.ts";
 import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 import { puntoEnRegion } from "./poligonos.ts";
@@ -108,6 +109,17 @@ function fisicoCanonico(f: ModeloFisico): unknown {
   const r: Record<string, unknown> = { ...f };
   // Los ejes de replanteo son sólo del dibujo (I2): no cambian el modelo analítico
   delete r.ejes;
+  // La procedencia de un pp o de un relleno sólo se informa (2026-11-05): no cambia el cálculo
+  const sinProcedencia = (v: unknown): unknown => {
+    if (typeof v !== "object" || v === null) return v;
+    const o = { ...(v as Record<string, unknown>) };
+    delete o.ppProcedencia;
+    // La de un relleno: el objeto que tiene su peso
+    if ("pesoAparente" in o || "pesoPieza" in o) delete o.procedencia;
+    for (const k of ["relleno", "reticular"]) if (typeof o[k] === "object" && o[k] !== null) o[k] = sinProcedencia(o[k]);
+    return o;
+  };
+  for (const k of ["losas", "panos"]) if (Array.isArray(r[k])) r[k] = (r[k] as unknown[]).map(sinProcedencia);
   for (const k of ["materiales", "secciones", "vigas", "barras", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
   // Los ábacos de un reticular, por su vértice menor (C4): su orden no significa nada
   if (Array.isArray(r.losas))
@@ -604,6 +616,20 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     h.push(
       `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos (C4-i, MA3)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo lo que su ancho no pesa ya como forjado: en una maciza, su descuelgue (C2-g, H24); en un aligerado, también γ·t menos el pp en su ancho, que es macizo (AU-4).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,
     );
+    // De dónde sale el peso propio de cada forjado aligerado (revisión del usuario, 2026-11-05)
+    const origenes = [
+      ...ctx.losas.flatMap((l) => {
+        const r = l.losa.reticular;
+        if (!r) return [];
+        const d = pesoReticular({ h: l.losa.espesor, hf: r.capa, bw: r.nervio, s: r.intereje }, l.gamma, r.caseton, r.relleno);
+        return [`${l.losa.id}: ${textoOrigenPp({ pp: l.losa.pp, ppProcedencia: l.losa.ppProcedencia, tipo: "reticular", caseton: r.caseton ?? "hormigon" }, d)}`];
+      }),
+      ...ctx.panos.map((p) => `${p.pano.id}: ${p.origenPp}`),
+    ];
+    if (origenes.length)
+      h.push(
+        `Peso propio de los forjados aligerados (${origenes.join("; ")}). Lo escrito manda; si no, el relleno dado y, sin él, el estimado del casetón o la bovedilla, que es un peso específico aparente equivalente de predimensionamiento (kN por m³ del hueco entre nervios), no un peso certificado ni de norma. Nunca se suman dos.`,
+      );
     for (const l of ctx.losas) {
       const r = l.reticular;
       if (!r) continue;

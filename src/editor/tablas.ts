@@ -13,7 +13,7 @@
  *
  * Puro: sin IO.
  */
-import type { AbacosPilares, AccionCaso, ApoyoFisico, ExceptoBorde, ApoyoLineal, Barra, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Vec2, Viga } from "../compilador/fisico.ts";
+import type { AbacosPilares, AccionCaso, ApoyoFisico, ExceptoBorde, ApoyoLineal, Barra, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Procedencia, Relleno, Seccion, Vec2, Viga } from "../compilador/fisico.ts";
 import { gammaMaterial } from "../agente/sensatez.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
@@ -628,9 +628,50 @@ const DEL_RETICULAR = ["nervio", "capa", "caseton", "abacos", "abacosPilares", "
 /** Las columnas propias de cada tipo; las demás (id, planta, contorno, pp, dirección…) son de todos. */
 const PROPIAS: Readonly<Record<TipoForjado, readonly string[]>> = {
   maciza: ["espesor", "material"],
-  reticular: ["espesor", "material", "intereje", ...DEL_RETICULAR],
-  unidireccional: ["intereje", "seccion", "bovedilla"],
+  reticular: ["espesor", "material", "intereje", ...DEL_RETICULAR, "relleno"],
+  unidireccional: ["intereje", "seccion", "bovedilla", "relleno"],
 };
+
+/**
+ * El relleno de un aligerado escrito en la tabla (2026-11-05): «6,5» es un peso específico aparente
+ * equivalente (kN/m³ de hueco; admite la unidad detrás) y «12 kg × 6,25» es el peso de una pieza por
+ * las piezas por m² (admite «x» y «/m²»).
+ */
+export function leerRelleno(texto: string): { pesoAparente: number } | { pesoPieza: number; piezasM2: number } | string {
+  const t = texto.trim().replace(/\s+/g, " ");
+  const num = (x: string) => {
+    const v = leerNumero(x);
+    return typeof v === "number" ? v : null;
+  };
+  const piezas = /^([^kx×]+?)\s*kg\s*[x×*]\s*([^/]+?)\s*(?:\/\s*m[²2])?$/i.exec(t);
+  if (piezas) {
+    const [a, b] = [num(piezas[1]!), num(piezas[2]!)];
+    if (a === null || b === null || !(a > 0) || !(b > 0)) return "el peso de la pieza (kg) y las piezas por m² tienen que ser números > 0: «12 kg × 6,25»";
+    return { pesoPieza: a, piezasM2: b };
+  }
+  const aparente = /^(.+?)\s*(?:kn\s*\/\s*m[³3])?$/i.exec(t);
+  const v = aparente ? num(aparente[1]!) : null;
+  if (v === null || !(v >= 0)) return "un peso aparente en kN/m³ de hueco («6,5») o el peso de pieza por piezas/m² («12 kg × 6,25»)";
+  return { pesoAparente: v };
+}
+
+/** El relleno como se escribe en la tabla. */
+export function textoRelleno(r: Relleno | undefined): string {
+  if (!r) return "";
+  return r.pesoPieza !== undefined ? `${textoNumero(r.pesoPieza)} kg × ${textoNumero(r.piezasM2 ?? 0)}` : r.pesoAparente !== undefined ? textoNumero(r.pesoAparente) : "";
+}
+
+
+/** La procedencia escrita: «fabricante: Ficha X, 2025», «usuario» o «estimado». */
+export function leerProcedencia(texto: string): Procedencia | string {
+  const m = /^\s*(?:de(?:l)?\s+)?(estimado|fabricante|usuario)\s*(?::\s*(.*))?$/i.exec(texto);
+  if (!m) return "«fabricante», «usuario» o «estimado», y si quiere la fuente detrás de «:» («fabricante: Ficha X, 2025»)";
+  const origen = m[1]!.toLowerCase() as Procedencia["origen"];
+  const fuente = (m[2] ?? "").trim();
+  return fuente ? { origen, fuente } : { origen };
+}
+
+export const textoProcedenciaFila = (p: Procedencia | undefined): string => (p ? `${p.origen}${p.fuente ? `: ${p.fuente}` : ""}` : "");
 
 /** Lo que es cada casetón y cada bovedilla, en las opciones. */
 export const TEXTO_CASETON: Readonly<Record<Caseton, string>> = {
@@ -677,28 +718,39 @@ const viguetaFila = (f: Fila, ctx: Contexto): Seccion | undefined => ctx.modelo.
  */
 export function desglosePesoFila(f: Fila, ctx: Contexto): DesglosePeso | undefined {
   const tipo = tipoFila(f);
+  const rl = (f.relleno ?? "").trim() ? leerRelleno(f.relleno!) : undefined;
+  if (typeof rl === "string") return undefined;
+  const relleno = rl && conProcedenciaRelleno(rl, f);
   if (tipo === "unidireccional") {
     const v = viguetaFila(f, ctx);
     const mat = v && ctx.modelo.materiales.find((x) => x.id === v.material);
     const s = numeroDe(f, "intereje");
     const b = (f.bovedilla ?? "").trim().toLowerCase() || BOVEDILLA_POR_DEFECTO;
     if (!v || v.forma !== "T" || !mat || !s || !viguetaPesable(v, s) || !(BOVEDILLAS as readonly string[]).includes(b)) return undefined;
-    return pesoUnidireccional(v, s, gammaMaterial(mat), b as Bovedilla);
+    return pesoUnidireccional(v, s, gammaMaterial(mat), b as Bovedilla, relleno);
   }
   const mat = ctx.modelo.materiales.find((x) => x.id === (f.material ?? "").trim());
   const h = numeroDe(f, "espesor");
   if (!mat || !h || h <= 0) return undefined;
   const g = gammaMaterial(mat);
-  if (tipo === "maciza") return { hormigon: h, gamma: g, hueco: 0, pesoHueco: 0, pp: g * h };
+  if (tipo === "maciza") return { hormigon: h, gamma: g, hueco: 0, pesoHueco: 0, relleno: 0, metodo: "estimado", pp: g * h };
   const [s, bw, hf, c] = [numeroDe(f, "intereje"), numeroDe(f, "nervio"), numeroDe(f, "capa"), casetonFila(f)];
   if (tipo !== "reticular" || !s || !bw || !hf || !c || !(bw < s) || !(hf < h)) return undefined;
-  return pesoReticular({ h, hf, bw, s }, g, c);
+  if (c === "recuperable" && relleno) return undefined;
+  return pesoReticular({ h, hf, bw, s }, g, c, relleno);
+}
+
+/** El relleno de una fila con la procedencia escrita, si es suya (sin pp escrito). */
+function conProcedenciaRelleno(r: { pesoAparente: number } | { pesoPieza: number; piezasM2: number }, f: Fila): Relleno {
+  const p = (f.pp ?? "").trim() || !(f.procedencia ?? "").trim() ? undefined : leerProcedencia(f.procedencia!);
+  return p && typeof p !== "string" ? { ...r, procedencia: p } : r;
 }
 
 /** El pp es obligatorio: un reticular con casetón "perdido" de otro material, o un unidireccional con una vigueta que no es una T. */
 export function ppObligatorio(f: Fila, ctx: Contexto): boolean {
   const tipo = tipoFila(f);
-  if (tipo === "reticular") return casetonFila(f) === "perdido";
+  // Con un relleno dado, un casetón «perdido» ya pesa
+  if (tipo === "reticular") return casetonFila(f) === "perdido" && !(f.relleno ?? "").trim();
   if (tipo !== "unidireccional") return false;
   const v = viguetaFila(f, ctx);
   const s = numeroDe(f, "intereje");
@@ -710,7 +762,8 @@ function ppPorDefecto(f: Fila, ctx: Contexto): string | undefined {
   if (ppObligatorio(f, ctx)) return undefined;
   const tipo = tipoFila(f);
   const d = desglosePesoFila(f, ctx);
-  const que = tipo === "maciza" ? "γ·canto" : tipo === "reticular" ? (casetonFila(f) === "recuperable" ? "hormigón" : "hormigón + casetón") : "vigueta + bovedilla";
+  const conRelleno = !!(f.relleno ?? "").trim();
+  const que = tipo === "maciza" ? "γ·canto" : tipo === "reticular" ? (casetonFila(f) === "recuperable" ? "hormigón" : conRelleno ? "hormigón + relleno" : "hormigón + casetón") : conRelleno ? "vigueta + relleno" : "vigueta + bovedilla";
   return d ? `${textoNumero(Math.round(d.pp * 100) / 100)} = ${que}` : que;
 }
 
@@ -767,6 +820,18 @@ const forjados: DefTabla = {
     },
     { clave: "seccion", titulo: "vigueta", ayuda: "unidireccional: sección de una vigueta (la T bruta u otra). Con una T, el peso propio sale de ella y de la bovedilla", opciones: secciones_("ninguna: losa"), referencia: "secciones" },
     { clave: "bovedilla", titulo: "bovedilla", ayuda: "unidireccional: de qué es la bovedilla, para el peso propio. De hormigón (por defecto), cerámica o de poliestireno", opciones: opcionesBovedilla },
+    {
+      clave: "relleno",
+      titulo: "relleno",
+      ayuda:
+        "reticular y unidireccional: el peso del casetón o la bovedilla de su ficha, en lugar del estimado. «6,5» es un peso específico aparente equivalente, en kN por m³ del hueco entre nervios (no la densidad del material: la pieza tiene sus propios huecos); «12 kg × 6,25», el peso de una pieza por las piezas por m². Lo estimado (7,5, 6, 3,2 y 0,2 kN/m³) es de predimensionamiento, no un peso certificado ni de norma. Un pp escrito manda sobre él",
+      defecto: (f) => (tipoFila(f) === "maciza" ? undefined : "el estimado del tipo"),
+    },
+    {
+      clave: "procedencia",
+      titulo: "procedencia",
+      ayuda: "de dónde sale el pp escrito o, sin él, el relleno: «fabricante», «usuario» o «estimado», y si quiere la fuente detrás de «:» («fabricante: Ficha X, 2025»). Sólo se informa (en la ficha y en las hipótesis): no cambia el cálculo",
+    },
   ],
   fila(o, ctx) {
     const tipo = tipoForjado(o, ctx);
@@ -792,6 +857,8 @@ const forjados: DefTabla = {
         multiplicadores: "",
         seccion: p.seccion,
         bovedilla: s(p.bovedilla),
+        relleno: textoRelleno(p.relleno),
+        procedencia: textoProcedenciaFila(p.pp !== undefined ? p.ppProcedencia : p.relleno?.procedencia),
       };
     }
     const l = o as unknown as Losa;
@@ -816,12 +883,25 @@ const forjados: DefTabla = {
       multiplicadores: r?.multiplicadores ? textoClaves(r.multiplicadores as Record<string, number>, MULT) : "",
       seccion: "",
       bovedilla: "",
+      relleno: textoRelleno(r?.relleno),
+      procedencia: textoProcedenciaFila(l.pp !== undefined ? l.ppProcedencia : r?.relleno?.procedencia),
     };
   },
   objeto(f) {
     const L = new Lector(f);
     const tipo = tipoFila(f);
     const comun = { id: L.texto("id") ?? "", nombre: L.texto("nombre"), planta: L.texto("planta", { obligatorio: true }), contorno: L.puntos("contorno", { obligatorio: true, min: 3 }), huecos: L.poligonos("huecos") };
+    // El relleno y la procedencia (2026-11-05): la procedencia es la del pp escrito o, sin él, la del relleno
+    const tr = L.texto("relleno");
+    const rl = tr === undefined ? undefined : leerRelleno(tr);
+    if (typeof rl === "string") L.errores.push({ columna: "relleno", mensaje: rl });
+    const tp = L.texto("procedencia");
+    const pr = tp === undefined ? undefined : leerProcedencia(tp);
+    if (typeof pr === "string") L.errores.push({ columna: "procedencia", mensaje: pr });
+    const conPp = L.texto("pp") !== undefined;
+    if (pr && typeof pr !== "string" && !conPp && !rl) L.errores.push({ columna: "procedencia", mensaje: "es la del pp o la del relleno escritos: escriba uno de los dos" });
+    const ppProcedencia = conPp && typeof pr === "object" ? pr : undefined;
+    const relleno = rl && typeof rl === "object" ? (!conPp && typeof pr === "object" ? { ...rl, procedencia: pr } : rl) : undefined;
     if (tipo === "unidireccional") {
       L.vacias(["espesor", "material", ...DEL_RETICULAR], "a un unidireccional");
       const r = resultado(L, {
@@ -830,7 +910,9 @@ const forjados: DefTabla = {
         intereje: L.longitud("intereje", { obligatorio: true, max: LONGITUD_MAXIMA.intereje }),
         seccion: L.texto("seccion", { obligatorio: true }),
         pp: L.numero("pp", { min: 0 }),
+        ppProcedencia,
         bovedilla: L.opcion("bovedilla", BOVEDILLAS),
+        relleno,
       });
       return r.ok ? { ...r, coleccion: "panos" } : r;
     }
@@ -840,7 +922,7 @@ const forjados: DefTabla = {
     }
     L.vacias(["seccion", "bovedilla"], `a una losa ${tipo}`);
     let reticular: Losa["reticular"];
-    if (tipo === "maciza") L.vacias(["intereje", ...DEL_RETICULAR], "a una losa maciza");
+    if (tipo === "maciza") L.vacias(["intereje", ...DEL_RETICULAR, "relleno"], "a una losa maciza");
     else
       reticular = limpio({
         intereje: L.longitud("intereje", { obligatorio: true, max: LONGITUD_MAXIMA.intereje }),
@@ -850,12 +932,14 @@ const forjados: DefTabla = {
         abacos: L.poligonos("abacos"),
         abacosPilares: abacosPilaresFila(L, f),
         multiplicadores: L.claves("multiplicadores", MULT, { max: 100 }),
+        relleno,
       }) as Losa["reticular"];
     const r = resultado(L, {
       ...comun,
       espesor: L.longitud("espesor", { obligatorio: true, max: LONGITUD_MAXIMA.espesor }),
       material: L.texto("material", { obligatorio: true }),
       pp: L.numero("pp", { min: 0 }),
+      ppProcedencia,
       eje1: L.numero("direccion"),
       reticular,
     });

@@ -1034,6 +1034,10 @@
           "type": "number",
           "description": "Peso propio, kN/m² (H24). Por defecto, γ·espesor: el de una losa maciza."
         },
+        "ppProcedencia": {
+          "$ref": "#/$defs/Procedencia",
+          "description": "De dónde sale el `pp` escrito (fabricante, usuario o estimado): sólo se informa, no cambia el cálculo."
+        },
         "eje1": {
           "type": "number",
           "description": "Dirección del eje 1 de sus láminas en planta, en grados desde +X (E3-2). Por defecto, 0. Orienta también la retícula de la malla."
@@ -1549,6 +1553,10 @@
           "type": "number",
           "description": "Peso propio del forjado, kN/m² (H24), con las bovedillas. Sin él, con una vigueta en T, sale de\nla sección y de la `bovedilla` (`pesoForjado.ts`); con otra sección es obligatorio."
         },
+        "ppProcedencia": {
+          "$ref": "#/$defs/Procedencia",
+          "description": "De dónde sale el `pp` escrito: sólo se informa, no cambia el cálculo."
+        },
         "bovedilla": {
           "enum": [
             "ceramica",
@@ -1556,6 +1564,10 @@
             "poliestireno"
           ],
           "description": "Bovedilla, para el peso sin `pp`. Por defecto, \"hormigon\"."
+        },
+        "relleno": {
+          "$ref": "#/$defs/Relleno",
+          "description": "El relleno entre viguetas dado por el usuario: sustituye al estimado de la `bovedilla`. Un `pp` escrito manda."
         }
       },
       "required": [
@@ -1845,6 +1857,26 @@
       "additionalProperties": false,
       "description": "Plantilla de esquina (fase LV2, §8 de la cabecera de `rejilla.ts`): la graduada parte el elemento de\nla esquina en 3 hacia ella `niveles` veces en los cruces con pilar y `nivelesSinPilar` veces en los\ncruces sin pilar (el de un zuncho o una viga secundaria con otra viga); sin `nivelesSinPilar`, los\nmismos niveles en todos los cruces. La de tercios (sólo para medir, §6 de `refinamiento-vigas.md`)\nparte la celda en tercios, con uno o dos niveles."
     },
+    "Procedencia": {
+      "type": "object",
+      "properties": {
+        "origen": {
+          "enum": [
+            "estimado",
+            "fabricante",
+            "usuario"
+          ]
+        },
+        "fuente": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "origen"
+      ],
+      "additionalProperties": false,
+      "description": "De dónde sale un dato de peso: estimado (de predimensionamiento), de un fabricante o del usuario, con su fuente («Ficha X, 2025»)."
+    },
     "Psi": {
       "type": "object",
       "properties": {
@@ -1880,6 +1912,28 @@
       ],
       "description": "Punto fijo de un pilar (fase PF): el punto de su sección que está en (x, y) en\ntodas las plantas. Los lados, en los ejes de la sección girados con ella: «derecha» según el canto\nh y «superior» a 90° (con giro 0, +X y +Y). Lo explica `puntoFijo.ts`."
     },
+    "Relleno": {
+      "type": "object",
+      "properties": {
+        "pesoAparente": {
+          "type": "number",
+          "description": "Peso específico aparente equivalente, kN/m³ de hueco."
+        },
+        "pesoPieza": {
+          "type": "number",
+          "description": "Peso de una pieza, kg (con `piezasM2`)."
+        },
+        "piezasM2": {
+          "type": "number",
+          "description": "Piezas por m² de forjado (con `pesoPieza`)."
+        },
+        "procedencia": {
+          "$ref": "#/$defs/Procedencia"
+        }
+      },
+      "additionalProperties": false,
+      "description": "El relleno del hueco de un forjado aligerado (el casetón o la bovedilla) dado por el usuario, de\nuna de dos formas, nunca las dos (`pesoForjado.ts`):\n- `pesoAparente`: peso específico aparente equivalente, kN por m³ de hueco entre nervios o\n  viguetas (no la densidad del material de la pieza: la pieza tiene sus propios huecos);\n- `pesoPieza` (kg por pieza) y `piezasM2` (piezas por m² de forjado): el relleno pesa\n  pesoPieza·piezasM2·9,80665/1000 kN/m²."
+    },
     "Reticular": {
       "type": "object",
       "properties": {
@@ -1904,6 +1958,10 @@
             "recuperable"
           ],
           "description": "Casetón (C4-i, `pesoForjado.ts`). Sin `pp`, el peso sale de él: γ·volumen de hormigón más el peso\naparente del casetón en el hueco entre nervios, en la zona aligerada, y γ·h en los ábacos. Por\ndefecto, \"hormigon\" (perdido de hormigón, el más común en obra; desde el 2026-10-28). Los perdidos\n\"ceramica\" y \"poliestireno\", y \"recuperable\" (el hueco no pesa). \"perdido\" es un casetón perdido\nde otro material: el `pp` de la losa es obligatorio."
+        },
+        "relleno": {
+          "$ref": "#/$defs/Relleno",
+          "description": "El relleno del hueco entre nervios dado por el usuario (de la ficha de un fabricante, por\nejemplo): sustituye al estimado del `caseton` en el peso propio. Con \"perdido\" basta con él (no\nhace falta el `pp`); con \"recuperable\" no cabe (el hueco queda vacío). Un `pp` escrito manda."
         },
         "abacos": {
           "type": "array",

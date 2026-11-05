@@ -750,7 +750,8 @@ function zonaRigidaBarra(f: ModeloFisico, X: readonly number[], Y: readonly numb
  */
 export function pesoLosa(l: Losa, m: Material): number {
   const A = areaRegion(l);
-  if (l.pp !== undefined) return l.pp * A;
+  // En un reticular, el pp escrito es el de la zona aligerada y los ábacos pesan γ·canto (MA3)
+  if (l.pp !== undefined && !l.reticular) return l.pp * A;
   if (!l.reticular) return gammaMaterial(m) * l.espesor * A;
   const { pp, ppAbaco } = ppLosa(l, m);
   const Aab = (l.reticular.abacos ?? []).reduce((t, ab) => t + Math.abs(momentosInterseccion(regionDe(l), ab).A), 0);

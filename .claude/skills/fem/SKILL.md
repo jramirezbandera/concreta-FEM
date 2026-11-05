@@ -33,6 +33,7 @@ Reúne **todo lo que falta en una sola ronda de preguntas**, con tu propuesta en
   - macizo: el canto;
   - reticular: el canto (casetón + capa), el intereje, el nervio, el casetón (de hormigón, cerámica, poliestireno, perdido de otro material o recuperable) y, si lo dan, el peso del forjado del fabricante (es el de la zona aligerada); los ábacos (su tamaño, o propón el habitual alrededor de cada pilar y pregunta: van con `abacosPilares`);
   - unidireccional: la vigueta, el intereje, el canto, la bovedilla y su pp si lo dan.
+  - el peso: si dan el del sistema entero, va en `pp` con `ppProcedencia` (`{ "origen": "fabricante", "fuente": "…" }`); si sólo el de la pieza de relleno, en `reticular.relleno` o en el `relleno` del paño, como `{ "pesoAparente": kN/m³ de hueco }` o `{ "pesoPieza": kg, "piezasM2": piezas/m² }` (nunca las dos), con su `procedencia`. Sin nada, sale del estimado del casetón o la bovedilla, que es de predimensionamiento: dilo en el resumen al ingeniero y no lo presentes como un peso certificado. Nunca pongas a la vez el `pp` y el `relleno` (manda el `pp`, avisa `forjado/relleno-sin-efecto`).
 - **Bordes:**
   - **todo borde de forjado lleva su zuncho** (de 20 a 40 cm; propón 30 con el canto del forjado), aunque el plano de arquitectura no lo dibuje;
   - los vuelos;

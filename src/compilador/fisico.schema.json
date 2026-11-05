@@ -832,6 +832,9 @@
         "pp": {
           "type": "number"
         },
+        "ppProcedencia": {
+          "$ref": "#/$defs/Procedencia"
+        },
         "eje1": {
           "type": "number"
         },
@@ -1291,12 +1294,18 @@
         "pp": {
           "type": "number"
         },
+        "ppProcedencia": {
+          "$ref": "#/$defs/Procedencia"
+        },
         "bovedilla": {
           "enum": [
             "ceramica",
             "hormigon",
             "poliestireno"
           ]
+        },
+        "relleno": {
+          "$ref": "#/$defs/Relleno"
         }
       },
       "required": [
@@ -1493,6 +1502,25 @@
       ],
       "additionalProperties": false
     },
+    "Procedencia": {
+      "type": "object",
+      "properties": {
+        "origen": {
+          "enum": [
+            "estimado",
+            "fabricante",
+            "usuario"
+          ]
+        },
+        "fuente": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "origen"
+      ],
+      "additionalProperties": false
+    },
     "Psi": {
       "type": "object",
       "properties": {
@@ -1526,6 +1554,24 @@
         "mitad-superior"
       ]
     },
+    "Relleno": {
+      "type": "object",
+      "properties": {
+        "pesoAparente": {
+          "type": "number"
+        },
+        "pesoPieza": {
+          "type": "number"
+        },
+        "piezasM2": {
+          "type": "number"
+        },
+        "procedencia": {
+          "$ref": "#/$defs/Procedencia"
+        }
+      },
+      "additionalProperties": false
+    },
     "Reticular": {
       "type": "object",
       "properties": {
@@ -1546,6 +1592,9 @@
             "poliestireno",
             "recuperable"
           ]
+        },
+        "relleno": {
+          "$ref": "#/$defs/Relleno"
         },
         "abacos": {
           "type": "array",

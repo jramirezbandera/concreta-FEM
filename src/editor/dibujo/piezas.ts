@@ -85,7 +85,7 @@ export function pesoPlantillaForjado(m: ModeloFisico, t: PlantillaForjado): Desg
   const h = t.espesor;
   if (!mat || !(h! > 0)) return undefined;
   const g = materialElastico(mat).peso;
-  if (tipo === "maciza") return { hormigon: h!, gamma: g, hueco: 0, pesoHueco: 0, pp: g * h! };
+  if (tipo === "maciza") return { hormigon: h!, gamma: g, hueco: 0, pesoHueco: 0, relleno: 0, metodo: "estimado", pp: g * h! };
   const [s, bw, hf] = [t.intereje, t.nervio, t.capa];
   if (!(s! > 0 && bw! > 0 && hf! > 0 && bw! < s! && hf! < h!)) return undefined;
   return pesoReticular({ h: h!, hf: hf!, bw: bw!, s: s! }, g, t.caseton);

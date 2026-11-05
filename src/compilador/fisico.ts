@@ -369,6 +369,8 @@ export interface Losa {
   material: string;
   /** Peso propio, kN/m² (H24). Por defecto, γ·espesor: el de una losa maciza. */
   pp?: number;
+  /** De dónde sale el `pp` escrito (fabricante, usuario o estimado): sólo se informa, no cambia el cálculo. */
+  ppProcedencia?: Procedencia;
   /** Dirección del eje 1 de sus láminas en planta, en grados desde +X (E3-2). Por defecto, 0. Orienta también la retícula de la malla. */
   eje1?: number;
   /**
@@ -402,6 +404,12 @@ export interface Reticular {
    * de otro material: el `pp` de la losa es obligatorio.
    */
   caseton?: "hormigon" | "ceramica" | "poliestireno" | "recuperable" | "perdido";
+  /**
+   * El relleno del hueco entre nervios dado por el usuario (de la ficha de un fabricante, por
+   * ejemplo): sustituye al estimado del `caseton` en el peso propio. Con "perdido" basta con él (no
+   * hace falta el `pp`); con "recuperable" no cabe (el hueco queda vacío). Un `pp` escrito manda.
+   */
+  relleno?: Relleno;
   /**
    * Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su
    * parte dentro. Los que se solapan o quedan a menos de h/2 (la mitad del tamaño de malla) se unen
@@ -451,8 +459,36 @@ export interface PanoUnidireccional {
    * la sección y de la `bovedilla` (`pesoForjado.ts`); con otra sección es obligatorio.
    */
   pp?: number;
+  /** De dónde sale el `pp` escrito: sólo se informa, no cambia el cálculo. */
+  ppProcedencia?: Procedencia;
   /** Bovedilla, para el peso sin `pp`. Por defecto, "hormigon". */
   bovedilla?: "hormigon" | "ceramica" | "poliestireno";
+  /** El relleno entre viguetas dado por el usuario: sustituye al estimado de la `bovedilla`. Un `pp` escrito manda. */
+  relleno?: Relleno;
+}
+
+/**
+ * El relleno del hueco de un forjado aligerado (el casetón o la bovedilla) dado por el usuario, de
+ * una de dos formas, nunca las dos (`pesoForjado.ts`):
+ * - `pesoAparente`: peso específico aparente equivalente, kN por m³ de hueco entre nervios o
+ *   viguetas (no la densidad del material de la pieza: la pieza tiene sus propios huecos);
+ * - `pesoPieza` (kg por pieza) y `piezasM2` (piezas por m² de forjado): el relleno pesa
+ *   pesoPieza·piezasM2·9,80665/1000 kN/m².
+ */
+export interface Relleno {
+  /** Peso específico aparente equivalente, kN/m³ de hueco. */
+  pesoAparente?: number;
+  /** Peso de una pieza, kg (con `piezasM2`). */
+  pesoPieza?: number;
+  /** Piezas por m² de forjado (con `pesoPieza`). */
+  piezasM2?: number;
+  procedencia?: Procedencia;
+}
+
+/** De dónde sale un dato de peso: estimado (de predimensionamiento), de un fabricante o del usuario, con su fuente («Ficha X, 2025»). */
+export interface Procedencia {
+  origen: "estimado" | "fabricante" | "usuario";
+  fuente?: string;
 }
 
 /** Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa o del eje de un muro (C3). */

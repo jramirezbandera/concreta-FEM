@@ -17,6 +17,9 @@ import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Lector, leerNumero, textoClaves, type Fila } from "./celdas.ts";
 import type { Objeto } from "./referencias.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { resolverAbacos } from "../compilador/abacos.ts";
+import { momentosInterseccion, momentosRegion } from "../compilador/poligonos.ts";
+import type { ModeloFisico } from "../compilador/fisico.ts";
 import { leerTramos, TIPOS_FORJADO, type Contexto, type DefTabla, type TipoForjado } from "./tablas.ts";
 
 export interface EstadoCampo {
@@ -236,4 +239,21 @@ export function textoMultiplicadores(m: MultiplicadoresLamina): string {
     Object.fromEntries(MULTIPLICADORES.flatMap(({ clave }) => (m[clave] === undefined ? [] : [[clave, Number(m[clave]!.toPrecision(3))]]))),
     MULTIPLICADORES.map((x) => x.clave),
   );
+}
+
+// ─── La fracción maciza de un reticular ─────────────────────────────────────────────────────────
+
+/**
+ * La fracción del área de un reticular que son ábacos (los dibujados y los de los pilares, MA2,
+ * resueltos como en el compilador), para el peso medio informativo de la ficha (`pesoMedioConMacizo`):
+ * null si no es un reticular del modelo o no tiene ábacos.
+ */
+export function fraccionAbacos(m: ModeloFisico, id: string): number | null {
+  const l = resolverAbacos(m).modelo.losas?.find((x) => x.id === id);
+  const ab = l?.reticular?.abacos ?? [];
+  if (!l || !ab.length) return null;
+  const region = { contorno: l.contorno, huecos: l.huecos ?? [] };
+  const A = Math.abs(momentosRegion(region).A);
+  if (!(A > 0)) return null;
+  return Math.min(1, ab.reduce((t, x) => t + Math.abs(momentosInterseccion(region, x).A), 0) / A);
 }

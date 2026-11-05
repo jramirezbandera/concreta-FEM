@@ -38,7 +38,7 @@ const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly s
     ["General", ["id", "nombre", "planta", "tipo"]],
     ["Geometría en planta", ["contorno", "huecos", "abacos", "direccion"]],
     ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion", "bovedilla"]],
-    ["Material y peso", ["material", "pp"]],
+    ["Material y peso", ["material", "pp", "relleno", "procedencia"]],
     ["Rigidez del aligerado", ["multiplicadores"]],
   ],
   pilares: [
