@@ -361,3 +361,18 @@ El usuario: «no tiene sentido que se firmen los resultados del programa […]; 
 - **Cambia el informe:** sin la sección «Firma», su sha256 cambia.
 - **Los `.revision.json` que ya existan** no se leen ni se borran. Abrir una carpeta los sigue saltando al buscar proyectos.
 - Lo de §7, §8 y §10 sobre la firma queda como historia.
+
+## 12. El agente fuera del repositorio (2026-11-05)
+
+La skill `fem` sólo estaba en `.claude/skills/` de este repo, y `fem` era `bun "<repo>/cli/fem.ts"`. Pero por A-e los proyectos y planos de clientes no viven en el repo, así que una sesión abierta en la carpeta de una obra no tenía ni la skill ni la orden.
+
+- **`bun run instalar`** (`cli/instalar.ts`):
+  - enlaza la skill en `~/.claude/skills/fem`, como junction en Windows (sin permisos de administrador). Es un enlace y no una copia: se actualiza con el repo;
+  - escribe los lanzadores `fem` (sh) y `fem.cmd` (cmd y PowerShell) en `~/.local/bin`, que ejecutan `cli/fem.ts` del repo;
+  - reinstalar no cambia nada, y un `fem` ajeno o una copia de la skill no se pisan;
+  - `--quitar` sólo quita lo suyo;
+  - avisa si `~/.local/bin` no está en el PATH.
+- **`fem visor <proyecto> [--nuevo]`:** abre la app sobre el proyecto desde cualquier carpeta (`app/visor.ts`). Es la única orden que no escribe JSON.
+- **La skill** dice que se trabaja en la carpeta de la obra, que `fem` sale de `bun run instalar` y que un proyecto guardado en el navegador no lo ve el agente (hay que exportarlo a la carpeta).
+- **Prueba:** `src/agente/instalar.test.ts`. Instala en carpetas temporales y lanza `fem esquema` desde una carpeta fuera del repo.
+- **Dentro del repo** la skill aparece dos veces (la del proyecto y la del usuario), con el mismo texto.

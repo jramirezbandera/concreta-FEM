@@ -89,6 +89,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
       --envolvente de los mapas con varias combinaciones: en cada nudo, la mayor o la menor (sin ella, la combinación de mayor |valor| de la planta)
   fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
   fem esquema
+  fem visor <proyecto.json> [--nuevo]      abre la app sobre el proyecto (no escribe JSON; Ctrl+C la cierra)
 
 Combinaciones de las consultas: --casos | --situacion ELU-PT[,ELS-C…] | --combinacion "1.35*G+1.5*Q" (repetible) | --caso G
 Otras: --planta P --tipo pilar|viga|vigueta --objeto id --losa id --armadura x-inf|x-sup|y-inf|y-sup (refuerzos, con la base del proyecto) --top N --todos --estaciones --exacto --cifras N

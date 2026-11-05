@@ -9,6 +9,7 @@ Motor de cálculo por elementos finitos 3D para edificios. Se desarrolla para in
   - todo ello en un Web Worker, con `ClienteMotor` (`src/worker/`) en el hilo principal.
 - **Unidades:** kN y m.
 - **Uso:** `bun install`, `bun run test:run` y `bun run nucleo:verificar` (el último necesita Rust; los tests, no).
+- **Con un agente (Claude Code), fuera del repo:** `bun run instalar` enlaza la skill `fem` en las del usuario (`~/.claude/skills/fem`, un enlace al repo, no una copia) y deja la orden `fem` en `~/.local/bin`. En la carpeta de una obra, `fem ayuda`, `fem visor proyecto.json` y una sesión de Claude Code con la skill. `bun run instalar --quitar` lo deshace.
 - **Documentos:**
   - [docs/fem3d/investigacion-id.md](docs/fem3d/investigacion-id.md): investigación de I+D con índice. Se lee primero el índice y luego sólo la sección que haga falta;
   - [docs/fem3d/diseno-tecnico.md](docs/fem3d/diseno-tecnico.md): diseño técnico v0.1;

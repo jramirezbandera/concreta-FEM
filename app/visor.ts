@@ -3,6 +3,7 @@
  *
  *   bun run visor <proyecto.json>            (desde la raíz del repo)
  *   bun run visor <nuevo.json> --nuevo       (crea el proyecto con la plantilla de V2a y lo abre)
+ *   fem visor <proyecto.json> [--nuevo]      (lo mismo, desde cualquier carpeta: `bun run instalar`)
  *
  * Levanta el servidor local del visor (sólo en 127.0.0.1), que sirve además la carpeta del proyecto
  * en `/proyecto/` (`servidor.ts`): se leen sus ficheros y se escribe sólo el proyecto abierto, desde

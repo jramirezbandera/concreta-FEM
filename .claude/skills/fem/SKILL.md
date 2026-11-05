@@ -32,7 +32,8 @@ fem render proyecto.json [--vista V] [--planta P]   # PNG y SVG de cada planta, 
 fem revisar proyecto.json                    # sensatez e informe de revisión (Markdown y HTML) de esta huella
 ```
 
-- `fem` es `bun "<repo>/cli/fem.ts"`; dentro del repo, también `bun run fem`.
+- `fem` es la orden que deja `bun run instalar` en el repo del motor (lanza su `cli/fem.ts` con bun). Si `fem` no existe, díselo al ingeniero; mientras, `bun "<repo>/cli/fem.ts"` o, dentro del repo, `bun run fem`.
+- **Trabajas en la carpeta de la obra**, con su `proyecto.json` y los `.fem/` que se generan, no dentro del repo del motor: los proyectos y planos de clientes no van en ese repo.
 - Cada orden escribe **un objeto JSON** con `orden`, `ok` y `diagnosticos`. Los diagnósticos repetidos se resumen en `omitidos`.
 - `calcular` puede añadir avisos del motor que `validar` no da (por ejemplo, `modelo/nudos-coincidentes`): léelos también.
 - **Códigos de salida:** 0 bien; 1 errores del modelo o del cálculo; 2 orden mal dada; 3 error interno.
@@ -91,9 +92,11 @@ Lo que no cuadre, pregúntalo o corrígelo en el fichero, como un diagnóstico.
 El ingeniero mete y revisa el modelo en la app: tablas por tipo de objeto, vistas de planta, alzado por eje y 3D (una, dos o cuatro a la vez), el cálculo y los resultados. Si quiere verla, dile que la abra él con:
 
 ```
-bun run visor proyecto.json            # escribe una URL local (127.0.0.1) que abre la app sobre ese fichero
-bun run visor nuevo.json --nuevo       # crea un proyecto con la plantilla y lo abre
+fem visor proyecto.json                # escribe una URL local (127.0.0.1) que abre la app sobre ese fichero
+fem visor nuevo.json --nuevo           # crea un proyecto con la plantilla y lo abre
 ```
+
+Si el ingeniero tiene el proyecto guardado en el navegador (en la app web, «Mis proyectos»), tú no lo ves: pídele que lo exporte a la carpeta de la obra y lo abra desde ahí con `fem visor`.
 
 La app vigila el fichero: cada vez que lo editas, se recarga sola (o usa lo que dejó `fem calcular` en `.fem/`). El ingeniero también puede editar y guardar el mismo `proyecto.json` desde ella, así que:
 

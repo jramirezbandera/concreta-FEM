@@ -13,6 +13,7 @@
     "fem": "bun cli/fem.ts",
     "esquema": "bun scripts/generar-esquema.ts",
     "visor": "bun app/visor.ts",
+    "instalar": "bun cli/instalar.ts",
     "visor:dev": "bun --cwd app run dev"
   },
   "devDependencies": {
