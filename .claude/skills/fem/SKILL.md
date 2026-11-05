@@ -20,6 +20,52 @@ Trabajas sobre **un único fichero `proyecto.json`**: es la única fuente de ver
 5. **Ningún resultado se da por bueno sin `fem revisar`.** Sus avisos de sensatez (`sensatez/…`) se corrigen si son un error del modelo o se explican al usuario si son legítimos. Nunca los silencies cambiando el modelo para que desaparezcan. Al acabar, dile al ingeniero dónde está el informe y qué avisos tiene: él lo revisa (no hay firma).
 6. **Un número nunca se lee de una imagen.** Las figuras de `fem render` sirven para ver el modelo y encontrar lo raro. El valor que cites sale del JSON de `render` (`extremos`) o de una consulta.
 
+## Antes de escribir el fichero: los datos del encargo
+
+Reúne **todo lo que falta en una sola ronda de preguntas**, con tu propuesta en cada punto que la admite, para que el ingeniero conteste «sí» o corrija. No empieces a escribir el fichero con medio encargo ni preguntes en tres rondas lo que podías preguntar en una. Si tienes el plano en DXF, pásalo antes por `fem importar-dxf` (abajo): lo que el dibujo ya dice no se pregunta.
+
+- **Siempre:**
+  - las plantas, con su cota (la de la cara superior de cada forjado) y la de la cimentación;
+  - el arranque de los pilares (empotrados, por defecto) y desde qué planta;
+  - el material (el hormigón, HA-xx; el acero de los perfiles);
+  - las secciones de los pilares, y si cambian en altura (y su punto fijo, si no es el centro).
+- **Por forjado:**
+  - macizo: el canto;
+  - reticular: el canto (casetón + capa), el intereje, el nervio, el casetón (de hormigón, cerámica, poliestireno, perdido de otro material o recuperable) y, si lo dan, el peso del forjado del fabricante; los ábacos (su tamaño, o propón el habitual alrededor de cada pilar y pregunta);
+  - unidireccional: la vigueta, el intereje, el canto, la bovedilla y su pp si lo dan.
+- **Bordes:**
+  - **todo borde de forjado lleva su zuncho** (de 20 a 40 cm; propón 30 con el canto del forjado), aunque el plano de arquitectura no lo dibuje;
+  - los vuelos;
+  - los petos, en **kN/m** (si te dan kN/m², pide la altura).
+- **Vigas:** las que no se ven en el plano (descolgadas o planas, su sección).
+- **Cargas:**
+  - las permanentes por zona (solado, tabiquería, instalaciones, cubierta);
+  - el uso con su **categoría** (para ψ);
+  - la nieve (su valor y la altitud, para ψ);
+  - si el viento y el sismo se dejan para después.
+- **Lo dudoso del dibujo:** las piezas que pueden no ser estructurales (un muro de fábrica, un pilar de la pérgola, un rectángulo sin cruz), cada una con tu lectura propuesta.
+
+Lo que no te den y tenga valor por defecto en el fichero, déjalo por defecto y dilo; lo que sea de norma, no lo pongas (regla 2).
+
+### Desde un plano DXF
+
+`fem importar-dxf` lee el plano y propone el proyecto: plantas, pilares (rectángulos y círculos de su capa, con su sección y su giro), contornos de losa (con sus huecos) y ejes de replanteo con el nombre de su burbuja. No pone cargas ni más casos que el del peso propio.
+
+```bash
+fem importar-dxf plano.dxf                     # sin --salida: qué capas hay, qué ve en cada una y qué propone
+fem importar-dxf plano.dxf --salida proyecto.json --capa-pilares "PILARES" --capa-losas "FORJADO" \
+    --capa-ejes "EJES" --planta Cim:0 --planta P1:3.40 --planta Cub:6.50 --planta-losas P1 --material HA-30 --espesor 0.30
+```
+
+- **Primero sin `--salida`:** mira `capas` (por capa, los pilares y contornos que vería y las líneas largas) y `propuesta`. Las capas que te proponga, confírmalas con el ingeniero en la ronda de preguntas si el nombre no lo deja claro.
+- **`supuestos`** es lo que puso sin dato (capas, plantas, material, espesor, unidades): pregúntalo todo, en la misma ronda.
+- **Unidades:** las del tamaño del dibujo (un DXF que dice mm y está en m se lee en m, con aviso); `--unidades` las fuerza.
+- **Pilares:** si unos rectángulos tienen cruz o aspa en el centro y otros no, sólo cuentan los que la tienen; los demás van a `noReconocidos` como trozos de muro. Lo que no reconoce (un polígono raro, un rectángulo sin cruz), pregúntalo con su caja. Todos van desde la planta más baja hasta la de las losas: ajusta `desde` y `hasta` con lo que te digan.
+- **Losas:** van hasta la línea de fuera del borde (con las líneas dobles de un peto o de una fachada, la de fuera); dos contornos que se tocan son dos losas. Todas en la planta de `--planta-losas`, macizas, con `--espesor`: pásalas a su planta y a su tipo de forjado (reticular, unidireccional) con lo que te digan. Con un DXF por planta, importa la primera y copia del resto sólo lo que haga falta.
+- **Cotas:** `cotas.noCuadran` lista las cotas del plano cuyos puntos no caen en nada reconocido. Si no cuadra ninguna, las unidades o las capas están mal.
+- Si el DXF está en la carpeta del proyecto, queda como plantilla de la planta de las losas: el ingeniero lo ve detrás del modelo en la app. Nunca escribe encima de un proyecto que ya existe.
+- Después, como siempre: `fem validar` y `fem render --vista modelo` para comparar con el plano. Las coordenadas salen al mm del dibujo: un descuadre de 1 o 2 cm entre pilares de una alineación es del dibujo; pregunta si se alinean.
+
 ## Flujo
 
 ```bash

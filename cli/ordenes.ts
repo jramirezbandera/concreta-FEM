@@ -18,6 +18,10 @@ import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados 
 import { revisar, type Revision } from "../src/agente/revision.ts";
 import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaArmado, vistaAxiles, vistaBandas, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Armadura, type Campo, type Envolvente, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
+import { importarDxf, type OpcionesImportar } from "../src/agente/importarDxf.ts";
+import { aplanarDxf } from "../src/dxf/aplanar.ts";
+import { ErrorDxf, leerDxf } from "../src/dxf/lector.ts";
+import { serializar } from "../src/editor/serializar.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
 import { Consultas } from "../src/compilador/consultas.ts";
@@ -51,7 +55,7 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "vista", "escala", "armadura", "envolvente"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "vista", "escala", "armadura", "envolvente", "salida", "capa-pilares", "capa-losas", "capa-ejes", "unidades", "planta-losas", "material", "espesor", "lado-maximo", "nombre"]);
 const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
@@ -88,6 +92,9 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
       --escala de los mapas (uz…v23, f11…f12): completa (por defecto), sin-picos o mín:máx:paso («-40:20:5», «::5»)
       --envolvente de los mapas con varias combinaciones: en cada nudo, la mayor o la menor (sin ella, la combinación de mayor |valor| de la planta)
   fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
+  fem importar-dxf <plano.dxf> [--salida proyecto.json] [--capa-pilares C] [--capa-losas C] [--capa-ejes C]
+      [--planta id:cota]… [--planta-losas id] [--material HA-30] [--espesor 0.30] [--unidades m|cm|mm] [--nombre N]
+      sin --salida, sólo dice lo que reconoce (y las capas); con ella, escribe el proyecto (nunca encima de otro)
   fem esquema
   fem visor <proyecto.json> [--nuevo]      abre la app sobre el proyecto (no escribe JSON; Ctrl+C la cierra)
 
@@ -457,9 +464,80 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
         },
       };
     }
+    case "importar-dxf":
+      return importarDxfOrden(a, mal);
     default:
       return mal(`orden desconocida «${orden}». ${AYUDA}`);
   }
+}
+
+/** `fem importar-dxf` (MA6, `docs/fem3d/modelado.md` §2.6). */
+function importarDxfOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
+  const orden = "importar-dxf";
+  const ruta = a.posicionales[0];
+  if (!ruta) return mal("fem importar-dxf necesita la ruta del plano .dxf.");
+  const abs = resolve(ruta);
+  if (!existsSync(abs) || !statSync(abs).isFile()) return { codigo: CODIGO.uso, json: { orden, ok: false, diagnosticos: [{ codigo: "cli/no-existe", severidad: "error", mensaje: `No existe el fichero ${abs}.` }] } };
+  const b = (n: string) => a.banderas.get(n);
+  const uno = (n: string) => b(n)?.[b(n)!.length - 1];
+  const capas = (n: string) => b(n)?.flatMap((x) => x.split(",")).map((x) => x.trim()).filter(Boolean);
+  const plantas: { id: string; cota: number }[] = [];
+  for (const x of (b("planta") ?? []).flatMap((y) => y.split(","))) {
+    const m = /^\s*([^:\s]+)\s*:\s*(-?\d+(?:[.,]\d+)?)\s*$/.exec(x);
+    if (!m) return mal(`--planta: «${x}» no es id:cota («N1:3.40»).`);
+    plantas.push({ id: m[1]!, cota: Number(m[2]!.replace(",", ".")) });
+  }
+  const numero = (n: string): number | undefined | null => {
+    const v = uno(n);
+    if (v === undefined) return undefined;
+    const x = Number(v.replace(",", "."));
+    return Number.isFinite(x) && x > 0 ? x : null;
+  };
+  const espesor = numero("espesor");
+  const ladoMaximo = numero("lado-maximo");
+  if (espesor === null) return mal("--espesor tiene que ser un número positivo, en m.");
+  if (ladoMaximo === null) return mal("--lado-maximo tiene que ser un número positivo, en m.");
+  const unidades = uno("unidades");
+  if (unidades !== undefined && !["m", "cm", "mm", "in", "ft"].includes(unidades)) return mal("--unidades: m, cm, mm, in o ft.");
+  const salida = uno("salida") ? resolve(uno("salida")!) : null;
+  if (salida && existsSync(salida)) return { codigo: CODIGO.uso, json: { orden, ok: false, diagnosticos: [{ codigo: "cli/ya-existe", severidad: "error", mensaje: `Ya existe ${salida}: importar-dxf no escribe encima de un proyecto. Elija otro nombre o bórrelo antes.` }] } };
+  if (salida && !existsSync(dirname(salida))) return { codigo: CODIGO.uso, json: { orden, ok: false, diagnosticos: [{ codigo: "cli/no-existe", severidad: "error", mensaje: `No existe la carpeta ${dirname(salida)}.` }] } };
+  const bytes = new Uint8Array(readFileSync(abs));
+  let dxf: ReturnType<typeof leerDxf>;
+  try {
+    dxf = leerDxf(bytes);
+  } catch (e) {
+    if (e instanceof ErrorDxf) return { codigo: CODIGO.uso, json: { orden, ok: false, diagnosticos: [{ codigo: "dxf/no-se-lee", severidad: "error", mensaje: `No se puede leer ${basename(abs)} como DXF: ${e.message}` }] } };
+    throw e;
+  }
+  const d = aplanarDxf(dxf);
+  // La plantilla, si el DXF está junto al proyecto (la app lo busca ahí)
+  const junto = salida !== null && dirname(salida) === dirname(abs);
+  const o: OpcionesImportar = {
+    ...(capas("capa-pilares") ? { capasPilares: capas("capa-pilares")! } : {}),
+    ...(capas("capa-losas") ? { capasLosas: capas("capa-losas")! } : {}),
+    ...(capas("capa-ejes") ? { capasEjes: capas("capa-ejes")! } : {}),
+    ...(unidades ? { unidades: unidades as OpcionesImportar["unidades"] & string } : {}),
+    ...(plantas.length ? { plantas } : {}),
+    ...(uno("planta-losas") ? { plantaLosas: uno("planta-losas")! } : {}),
+    ...(uno("material") ? { material: uno("material")! } : {}),
+    ...(espesor ? { espesor } : {}),
+    ...(ladoMaximo ? { ladoMaximo } : {}),
+    nombre: uno("nombre") ?? basename(salida ?? abs).replace(/\.(json|dxf)$/i, ""),
+    ...(junto ? { plantilla: { fichero: basename(abs), sha256: sha256Bytes(bytes) } } : {}),
+  };
+  const r = importarDxf(dxf, d, o);
+  if (!r.ok) return { codigo: CODIGO.errores, json: { orden, ok: false, ...(r.informe ? { capas: r.informe.capas, propuesta: r.informe.propuesta } : {}), diagnosticos: r.errores.map((m) => ({ codigo: "importar/dato", severidad: "error", mensaje: m })) } };
+  const { capas: listaCapas, ...informe } = r.informe;
+  if (salida && !junto) informe.avisos.push(`El DXF no está en la carpeta del proyecto: no va como plantilla. Para verlo detrás en la app, cópielo junto a ${basename(salida)} y añádalo desde «Plantilla DXF».`);
+  const c = compilar(r.proyecto.modelo, r.proyecto.opciones);
+  const json: Record<string, unknown> = { orden, ok: true, ...informe, capas: listaCapas.filter((x) => x.segmentos || x.textos) };
+  if (salida) {
+    writeFileSync(salida, serializar(r.proyecto), "utf8");
+    json.proyecto = rel(salida);
+  } else json.escrito = false;
+  Object.assign(json, { valido: c.valido, ...listaDiagnosticos(c.diagnosticos.filter((x) => x.severidad === "error")) });
+  return { codigo: CODIGO.bien, json };
 }
 
 /** Cifras significativas de la salida: null (todas) con --exacto. */

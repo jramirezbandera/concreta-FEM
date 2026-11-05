@@ -110,3 +110,19 @@ Carga `lineal` con `losa` y `borde` en lugar de `puntos`: a lo largo del contorn
 - Dibujar con el ratón en la app (V2c): `importar-dxf` cubre el caso de un plano ya hecho, no el de un modelo desde cero.
 - Generar viento y sismo desde la situación (CTE DB-SE-AE y NCSE): necesita las tablas de norma en el programa, con su propia validación.
 - Lo que la vivienda enseñó del cálculo, que no es del agente: los pilares de borde del encuentro de dos cubiertas sin cara de franja (`franja/pilar-sin-cara` en P4, P15 y P23) (resuelto en el compilador F3.3, `spr-abacos.md` §14) y la esquina de la sala de instalaciones (P1, casi sin carga). Se miran en la puerta de uso.
+
+## 6. MA1 y MA6, hechas (2026-11-05)
+
+A petición del usuario, MA1 y MA6 van antes que MA2–MA5 (y antes de la puerta de uso de F y AB, que cambia MA-g).
+
+- **MA1** (`.claude/skills/fem/SKILL.md`, «Antes de escribir el fichero»): la lista de datos del encargo de §2.1, para preguntarlo todo en una ronda con la propuesta de cada punto, y cómo usar `fem importar-dxf`.
+- **MA6** (`src/agente/importarDxf.ts`, orden `fem importar-dxf`). **MA-f, decidida por V2c4-a:** el lector propio de `src/dxf/`, con la colocación de la plantilla (las mismas unidades propuestas, la traslación si está lejos del origen y todo al mm). Lo que hace, en la cabecera del módulo:
+  - **sin `--salida`** sólo dice lo que ve: cada capa con los pilares, contornos y líneas largas que tendría, y las capas que propone (por lo que tienen y por su nombre); con `--salida`, escribe el proyecto (nunca encima de otro) y lo compila;
+  - **pilares:** los rectángulos del grafo de segmentos de su capa (cuatro esquinas unidas por cadenas rectas de aristas, de 0,15 m al lado máximo) que no caen dentro de otro, y los círculos sueltos. Así valen el pilar de cuatro `LINE`, el de su cruz y el que cruza un muro de la misma capa. Si alguno tiene un nudo en el centro (cruz o aspa), sólo cuentan los que lo tienen;
+  - **losas:** las caras del grafo; las «delgadas» (2·A/P ≤ 0,5 m: el hueco entre las dos líneas de un peto, un pilar en la capa) se unen a la losa vecina con la que comparten más borde, y las gruesas son losa o hueco alternando de fuera adentro;
+  - **ejes:** las líneas de ≥ 2 m de su capa, unidas las colineales, con el texto corto más cercano a un extremo;
+  - **cotas:** las `DIMENSION` lineales cuyos dos puntos no caen en algo reconocido se listan;
+  - `supuestos` dice lo que se puso sin dato (capas, plantas, material, espesor, unidades), para preguntarlo.
+- **Criterio 6:** `src/agente/importarDxf.test.ts`. Ida y vuelta con el muestrario (las dos plantas, en LWPOLYLINE, con sus huecos y sus ejes con burbuja) y la vivienda (en `LINE` sueltas, con las dos cubiertas que se tocan y los pilares con su cruz), y un DXF sintético como el de la vivienda (`$INSUNITS` en mm con el dibujo en m, contorno doble por el peto, aspas, un pilar circular y otro girado, un trozo de muro sin cruz, un triángulo y tres cotas). En mm da lo mismo que en m.
+- **Con el DXF real de la vivienda** (fuera del repo): los 23 pilares de 30 × 30 (a ≤ 2,4 cm de los del ejemplo, que el agente alineó a 2 cm), los dos contornos de cubierta (hasta su borde real, con los vuelos) y 16 de las 18 cotas cuadran, en 1,3 s. Las capas las propone solas («00 0 PLANTA BAJA» para los pilares, por sus cruces, y «00 1 PLANTA CUBIERTA» para las losas).
+- **Falta:** la puerta de la fase (criterio 1) y MA2–MA5.
