@@ -42,7 +42,7 @@ La firma no puede ser un SHA-256 del modelo: el mismo proyecto sale en V8 (Chrom
 
 ### 2.3 Lo que se encontró al compararla entre motores
 
-Dos cosas del modelo analítico no son iguales en Bun y en Node. Son equivalentes, pero rompían una firma exacta. Se vieron en la planta circular con pilares circulares de G (`edificioGeometria("circular", { circulares: true })`):
+Dos cosas del modelo analítico no eran iguales en Bun y en Node. Son equivalentes, pero rompían una firma exacta. Se vieron en la planta circular con pilares circulares de G (`edificioGeometria("circular", { circulares: true })`):
 
 - **FR-1:**
   - **Qué pasa:** cuatro barras llevan en Bun un offset de −4,4e-16 m (1 ulp) que en Node no existe.
@@ -50,8 +50,15 @@ Dos cosas del modelo analítico no son iguales en Bun y en Node. Son equivalente
 - **FR-2:**
   - **Qué pasa:** el compilador reparte las cargas de barra en 19 150 tramos en Bun y en 19 098 en Node, con algunas puntuales donde el otro pone distribuidas. La resultante es la misma, pero no la lista.
   - **En la firma:** las cargas entran sólo por la resultante de cada caso.
-  - **Consecuencia:** los resultados del mismo proyecto en Bun y en Chrome no son los mismos bits en ese modelo. La regla de C2 («la malla no depende del motor») sigue cumpliéndose: lo que cambia es el reparto de las cargas.
-  - **Pendiente técnico:** sin investigar.
+
+**Investigado el 2026-11-06: las dos venían de la entrada, no del compilador.** La prueba generaba el modelo físico en cada motor, y `edificioGeometria` calcula los vértices de la planta circular con senos y cosenos, que difieren en 1 ulp entre V8 y JavaScriptCore (COM-12). Con dos entradas distintas a 1 ulp:
+
+- un vértice de viga que en un motor cae justo en su nudo y en el otro a 1 ulp deja un offset de ruido (FR-1; los dos motores tienen cientos: 424 en Node y 486 en Bun, porque la geometría dibujada no se mueve y el hueco hasta el nudo es un offset);
+- el borde de una pieza de carga que cae 1 ulp a un lado u otro del borde de un trozo de barra da una rebanada de 4e-16 m más, que va como puntual de 1e-16 kN por la rama del «trozo de redondeo» de `aplicarLineal` (FR-2).
+
+**Con el mismo `proyecto.json`** (lo que pasa de verdad: la CLI guarda, el visor lee el mismo fichero), los dos motores dan los mismos nudos y las mismas cargas de los tres casos, byte a byte; sólo difieren las propiedades de sección a 1–2 ulp y el `vz` de 4 barras (COM-12). Así que los resultados de un proyecto en Bun y en Chrome se calculan sobre el mismo reparto de cargas, y la regla de C2 («la malla no depende del motor») se cumple también en las cargas.
+
+La prueba (`validacion/firma/firmas.ts`) genera ahora los físicos una vez, en Node, y Bun compila esos mismos por la entrada estándar; además de la firma, exige los nudos y las cargas idénticos (su sha256) en los cinco modelos. Las tolerancias de la firma (el offset nulo de FR-1, las cargas por su resultante) se quedan: no cuestan nada y cubren un proyecto que llegue con ruido de 1 ulp.
 
 ### 2.4 Coste
 
@@ -71,5 +78,5 @@ Dos cosas del modelo analítico no son iguales en Bun y en Node. Son equivalente
   - el ruido de 1e-12 en todos los números pasa;
   - no pasan un nudo movido 0,1 mm, una carga nodal más, una superficie ×1,001, un caso más ni una coacción cambiada;
   - unos resultados no se desempaquetan sobre otra malla, ni los guardados sin firma;
-  - Bun y Node firman igual cinco modelos (`validacion/firma/firmas.ts`, con plantas y pilares girados, pilares circulares y un reticular).
+  - Bun y Node firman igual cinco modelos (`validacion/firma/firmas.ts`, con plantas y pilares girados, pilares circulares y un reticular), compilados desde el mismo físico, y dan los mismos nudos y las mismas cargas byte a byte (§2.3).
 - **`src/agente/cli.test.ts`:** con los resultados de otra malla en `.fem/<huella>/` (huella, núcleo y sha256 válidos), `fem calcular` recalcula, y la vez siguiente reutiliza los suyos.

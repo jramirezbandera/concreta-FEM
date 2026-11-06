@@ -8,13 +8,13 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { firmas } from "../../validacion/firma/firmas.ts";
+import { fisicos, firmas, type FirmaDe } from "../../validacion/firma/firmas.ts";
 import { reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { calcular } from "../motor/calcular.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
-import { desempaquetarResultados, difiereFirma, empaquetarResultados, firmaModelo, type CabeceraResultados, type FirmaModelo } from "./resultados.ts";
+import { desempaquetarResultados, difiereFirma, empaquetarResultados, firmaModelo, type CabeceraResultados } from "./resultados.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const bun = (() => {
@@ -97,10 +97,16 @@ describe("firma del modelo analítico", () => {
     expect("motivo" in vieja && vieja.motivo).toMatch(/versión anterior/);
   });
 
-  it.skipIf(!bun)("Bun (JavaScriptCore) y Node (V8) firman igual el mismo modelo", () => {
-    const enBun = JSON.parse(execFileSync("bun", [join(RAIZ, "validacion", "firma", "firmas.ts")], { encoding: "utf8", maxBuffer: 1 << 26 })) as { nombre: string; firma: FirmaModelo }[];
-    const enNode = firmas();
+  it.skipIf(!bun)("Bun (JavaScriptCore) y Node (V8) firman igual el mismo modelo, con los nudos y las cargas idénticos", () => {
+    // El mismo físico en los dos (FR-2: generado en cada motor, los senos y cosenos daban otra entrada)
+    const fs = fisicos();
+    const enBun = JSON.parse(execFileSync("bun", [join(RAIZ, "validacion", "firma", "firmas.ts")], { input: JSON.stringify(fs), encoding: "utf8", maxBuffer: 1 << 26 })) as FirmaDe[];
+    const enNode = firmas(fs);
     expect(enBun.map((x) => x.nombre)).toEqual(enNode.map((x) => x.nombre));
-    enNode.forEach((a, i) => expect(difiereFirma(a.firma, enBun[i]!.firma), a.nombre).toBeNull());
+    enNode.forEach((a, i) => {
+      expect(difiereFirma(a.firma, enBun[i]!.firma), a.nombre).toBeNull();
+      expect(enBun[i]!.nudos, `${a.nombre}: nudos`).toBe(a.nudos);
+      expect(enBun[i]!.cargas, `${a.nombre}: cargas`).toBe(a.cargas);
+    });
   });
 });
