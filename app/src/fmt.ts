@@ -86,7 +86,7 @@ export function textoApp(t: string): string {
     .replace(/ a ε_snap/g, " a menos de la tolerancia de unión")
     .replace(/ε_snap/g, "la tolerancia de unión")
     .replace(/recuperad([oa]s?) por SPR/g, "suavizad$1")
-    .replace(/(\d)\.(\d)/g, "$1,$2");
+    .replace(/\d+(?:\.\d+)+/g, (n) => (n.split(".").length > 2 ? n : n.replace(".", ",")));
 }
 
 /** Un texto con números en punto decimal (las combinaciones, «0.8·G + 1.5·Q»), con coma (UI-44). */

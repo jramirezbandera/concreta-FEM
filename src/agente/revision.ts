@@ -10,7 +10,8 @@
 import type { ResultadoCompilacion } from "../compilador/compilar.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import { resumen, type Resumen } from "./consultas.ts";
+import { modos as consultaModos, resumen, sismo as consultaSismo, type ModosAgente, type Resumen, type SismoAgente } from "./consultas.ts";
+import { calcularViento, type VientoCalculado } from "../compilador/viento.ts";
 import { documentoInforme, html, markdown, type Bloque, type ReaccionBase } from "./informe.ts";
 import type { Proyecto } from "./proyecto.ts";
 import { sensatezModelo, type Comprobacion, type DesglosePesoPropio, type PesoCalculado } from "./sensatez.ts";
@@ -38,6 +39,8 @@ export interface RevisionPreparada {
   resultados: SensatezResultados;
   figuras: { titulo: string; svg: string }[];
   cimentacion: ReaccionBase[];
+  /** VS4: las acciones del programa (null sin ellas). */
+  programa: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null } | null;
   otros: Omit<DatosRevisar, "resumen">;
 }
 
@@ -55,7 +58,7 @@ export function prepararRevision(p: Proyecto, c: Extract<ResultadoCompilacion, {
   const { resumen: dado, ...otros } = datos;
   const res = dado ? { valido: true as const, valor: dado } : resumen(p, c);
   if (!res.valido) throw new Error("revisar: el resumen de un modelo compilado no puede fallar");
-  return { res: res.valor, resultados: sensatezResultados(q, res.valor, p.opciones), figuras: figurasInforme(p, c, q, res.valor), cimentacion: cimentacion(q), otros };
+  return { res: res.valor, resultados: sensatezResultados(q, res.valor, p.opciones), figuras: figurasInforme(p, c, q, res.valor), cimentacion: cimentacion(q), programa: programa(p, q), otros };
 }
 
 /**
@@ -67,7 +70,7 @@ export function prepararRevision(p: Proyecto, c: Extract<ResultadoCompilacion, {
 export function componerRevision(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: true }>, prep: RevisionPreparada, pesoCalculado?: PesoCalculado): Revision {
   const { res, resultados, figuras } = prep;
   const modelo = sensatezModelo(p.modelo, p.opciones, res, pesoCalculado);
-  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res, hipotesis: c.hipotesis, modelo, resultados, cimentacion: prep.cimentacion, figuras, ...prep.otros });
+  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res, hipotesis: c.hipotesis, modelo, resultados, cimentacion: prep.cimentacion, figuras, ...(prep.programa ? { programa: prep.programa } : {}), ...prep.otros });
   const comprobaciones = [...modelo.comprobaciones, ...resultados.comprobaciones];
   return {
     comprobaciones,
@@ -118,4 +121,14 @@ export function cimentacion(q: Consultas): ReaccionBase[] {
     if (x.valido && x.valor.nudos) r.push({ id, tipo, punto: x.valor.punto, R: x.valor.resultante });
   }
   return r;
+}
+
+/** VS4: lo que las acciones del programa dan en este cálculo, para el informe (null sin acciones). */
+function programa(p: Proyecto, q: Consultas): RevisionPreparada["programa"] {
+  const a = p.modelo.acciones;
+  if (!a?.viento && !a?.sismo) return null;
+  const viento = a.viento ? (calcularViento(p.modelo)?.viento ?? null) : null;
+  const m = a.sismo ? consultaModos(q, { top: 12 }) : null;
+  const s = a.sismo ? consultaSismo(q, { todos: true }) : null;
+  return { viento, modos: m?.valido ? m.valor : null, sismo: s?.valido ? s.valor : null };
 }

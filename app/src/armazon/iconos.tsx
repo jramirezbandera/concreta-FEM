@@ -204,6 +204,28 @@ export const IcDeformada = icono(
     <path d="M3 18h18" strokeDasharray="2 2" />
   </>,
 );
+/** VS4: el viento (dos rachas) y el sismo (un edificio que oscila sobre una onda). */
+export const IcViento = icono(
+  <>
+    <path d="M3 8h11a3 3 0 1 0-3-3" />
+    <path d="M3 13h15a3 3 0 1 1-3 3" />
+    <path d="M3 18h7" />
+  </>,
+);
+export const IcSismo = icono(
+  <>
+    <path d="M7 20V8l10-2v14" />
+    <path d="M7 12l10-2M7 16l10-2" />
+    <path d="M2 21l2-3 2 3 2-3 2 3M14 21l2-3 2 3 2-3 2 3" />
+  </>,
+);
+export const IcModal = icono(
+  <>
+    <path d="M12 21V3" strokeDasharray="2 2" />
+    <path d="M12 21c-6-4-6-8 0-12s6-8 0-12" />
+    <path d="M12 21c6-4 6-8 0-12s-6-8 0-12" />
+  </>,
+);
 export const IcReacciones = icono(
   <>
     <path d="M3 21h18" />

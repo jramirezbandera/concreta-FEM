@@ -22,6 +22,7 @@ import type { Cargas3D } from "./cargas3d.ts";
 import type { DatosArmado, DatosFranja } from "./franjas.ts";
 import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
+import type { DatosModal, DatosSismo, DatosViento } from "./programa.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
@@ -76,7 +77,12 @@ export type Pedido =
   /** `provisional`: sin el peso propio calculado, para enseñarla antes (luego se pide sin él). */
   | { tipo: "revision"; provisional?: boolean }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
-  | { tipo: "precalentar"; planta: string };
+  | { tipo: "precalentar"; planta: string }
+  /** VS4: las acciones del programa. El viento y el espectro no necesitan el cálculo; los modos y la forma de uno (1, el de mayor periodo), sí. */
+  | { tipo: "viento" }
+  | { tipo: "sismo" }
+  | { tipo: "modal" }
+  | { tipo: "modo"; modo: number };
 
 /** Lo que devuelve cada pedido cuando sale bien. */
 export interface Respuestas {
@@ -116,6 +122,10 @@ export interface Respuestas {
   "valor-armado": ValorArmado | null;
   revision: DatosRevision;
   precalentar: null;
+  viento: DatosViento;
+  sismo: DatosSismo;
+  modal: DatosModal;
+  modo: DatosDeformada;
 }
 
 export type TipoPedido = Pedido["tipo"];

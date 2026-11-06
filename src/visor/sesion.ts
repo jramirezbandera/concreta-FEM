@@ -46,6 +46,9 @@ import { isovalores3D, valorEnLamina, type Isovalores3D, type SuperficiesMapa } 
 import { pilares3D, type MagnitudPilares, type Pilares3D } from "./pilares3d.ts";
 import { reacciones3D, type Reacciones3D } from "./reacciones3d.ts";
 import { cargas3D, type Cargas3D } from "./cargas3d.ts";
+import type { ModeloFisico } from "../compilador/fisico.ts";
+import { casosPrograma, datosModal, datosSismo, datosViento, fisicoConPrograma, formaModo, type CasoVisor, type DatosModal, type DatosSismo, type DatosViento } from "./programa.ts";
+import type { DatosDeformada } from "./datos.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
 
@@ -217,7 +220,8 @@ export interface EstadoSesion {
   diagnosticos: Diagnostico[];
   hipotesis: string[];
   plantas: PlantaVisor[];
-  casos: { id: string; nombre?: string; accion?: string; pesoPropio?: boolean }[];
+  /** Los casos del fichero y, detrás, los del programa (VS4: el viento y el sismo de `acciones`, con `programa`). */
+  casos: CasoVisor[];
   resumen: Resumen | null;
   estadisticas: { nudos: number; barras: number; laminas: number; ecuaciones?: number } | null;
   /** Hay resultados válidos de esta huella. */
@@ -296,6 +300,9 @@ export class Sesion {
   private shaR: string | null = null;
   private qC: Consultas | null = null;
   private rrC: ResultadosRender | null = null;
+  /** VS4: el modelo físico con las cargas del programa, para dibujarlas (las del sismo, con resultados). */
+  private programaC: ModeloFisico | null = null;
+  private programaConQ = false;
   /** Escenas ya hechas, por su clave (las mismas que pide la interfaz al moverse). */
   private readonly escenas = new Map<string, Escena>();
 
@@ -407,7 +414,7 @@ export class Sesion {
       diagnosticos: this.diagnosticos,
       hipotesis: c.valido ? c.hipotesis : [],
       plantas: f.plantas.map((p, i) => ({ id: p.id, ...(p.nombre ? { nombre: p.nombre } : {}), cota: cotas[i] ?? null, altura: p.altura, avisos: cuenta.get(p.id)?.avisos ?? 0, errores: cuenta.get(p.id)?.errores ?? 0 })),
-      casos: f.casos.map((x) => ({ id: x.id, ...(x.nombre ? { nombre: x.nombre } : {}), ...(x.accion ? { accion: x.accion.tipo } : {}), ...(x.pesoPropio ? { pesoPropio: true } : {}) })),
+      casos: casosPrograma(f),
       resumen: this.res,
       estadisticas: c.valido ? { nudos: c.estadisticas.nudos, barras: c.estadisticas.barras, laminas: c.estadisticas.laminas, ...(this.cabecera ? { ecuaciones: this.cabecera.estadisticas.ecuaciones } : {}) } : null,
       calculado: this.calculado,
@@ -435,7 +442,7 @@ export class Sesion {
       diagnosticos,
       hipotesis: [],
       plantas: f.plantas.map((p, i) => ({ id: p.id, ...(p.nombre ? { nombre: p.nombre } : {}), cota: cotas[i] ?? null, altura: p.altura, avisos: cuenta.get(p.id)?.avisos ?? 0, errores: cuenta.get(p.id)?.errores ?? 0 })),
-      casos: f.casos.map((x) => ({ id: x.id, ...(x.nombre ? { nombre: x.nombre } : {}), ...(x.accion ? { accion: x.accion.tipo } : {}), ...(x.pesoPropio ? { pesoPropio: true } : {}) })),
+      casos: casosPrograma(f),
       resumen: null,
       estadisticas: null,
       calculado: false,
@@ -495,6 +502,18 @@ export class Sesion {
     return { ok: true, cabecera, bytes };
   }
 
+  /**
+   * Los resultados de un cálculo de esta sesión, empaquetados como `.fem/<huella>/` (los mismos bytes
+   * que dio `calcular`, con su sha256); null si no hay o si vinieron ya guardados. Se empaquetan al
+   * pedirlos: guardarlos costaba tanto como los resultados (VS4).
+   */
+  paquete(): { cabecera: CabeceraResultados; bytes: Uint8Array; sha256: string } | null {
+    if (!this.casosR || !this.cabecera || this.origenR !== "calculo" || !this.compilacion.valido || !this.shaR) return null;
+    const c = this.compilacion;
+    const { cabecera, bytes } = empaquetarResultados(c.huella, c.modelo, this.casosR, this.cabecera.estadisticas, this.cabecera.diagnosticos, this.modalR ?? undefined);
+    return { cabecera, bytes, sha256: this.shaR };
+  }
+
   private fijar(casos: ResultadoCaso[], cabecera: CabeceraResultados, origen: "calculo" | "guardados", sha: string, modal?: ResultadoModal): void {
     this.casosR = casos;
     this.modalR = modal ?? null;
@@ -503,7 +522,46 @@ export class Sesion {
     this.origenR = origen;
     this.qC = null;
     this.rrC = null;
+    this.programaC = null;
     this.escenas.clear();
+  }
+
+  /**
+   * El modelo físico que se dibuja en Cargas: el del proyecto con los casos y las cargas del programa
+   * (`fisicoConPrograma`). Sin resultados no lleva las del sismo; con ellos, sí (y se rehace una vez).
+   */
+  get fisicoCargas(): ModeloFisico {
+    const q = this.casosR && this.compilacion.valido ? this.q : null;
+    if (!this.programaC || (q !== null) !== this.programaConQ) {
+      this.programaC = fisicoConPrograma(this.proyecto.modelo, q);
+      this.programaConQ = q !== null;
+    }
+    return this.programaC;
+  }
+
+  // ─── Las acciones del programa (VS4) ──────────────────────────────────────────────────────────
+
+  /** El viento del programa, para su ficha (sin calcular). */
+  viento(): DatosViento {
+    return datosViento(this.proyecto.modelo);
+  }
+
+  /** El sismo del programa: el espectro de ahora y, con resultados, la consulta `sismo`. */
+  sismoDatos(): DatosSismo {
+    return datosSismo(this.proyecto.modelo, this.casosR && this.compilacion.valido ? this.q : null);
+  }
+
+  /** Las masas y los modos (con resultados). */
+  modal(): DatosModal {
+    return datosModal(this.proyecto.modelo, this.casosR && this.compilacion.valido ? this.q : null);
+  }
+
+  /** La forma del modo n (1, el de mayor periodo) como una deformada, o por qué no. */
+  modo(n: number): { valido: true; valor: DatosDeformada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const q = this.casosR && this.compilacion.valido ? this.q : null;
+    if (!q) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Los modos necesitan el cálculo." }] };
+    const r = formaModo(q, n);
+    return r ? { valido: true, valor: r } : { valido: false, diagnosticos: [{ codigo: "visor/modo", severidad: "error", mensaje: q.modal ? `No hay ningún modo ${n} (hay ${q.modal.modos.length}).` : "Los resultados no llevan el análisis modal." }] };
   }
 
   // ─── Combinaciones ────────────────────────────────────────────────────────────────────────────
@@ -586,10 +644,13 @@ export class Sesion {
       case "modelo":
         e = vistaModelo(f, planta, d);
         break;
-      case "cargas":
-        if (!f.casos.some((c) => c.id === v.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${v.caso} no existe.` }] };
-        e = vistaCargas(f, planta, v.caso, d);
+      case "cargas": {
+        // VS4: con los casos y las cargas del programa (el viento y, con resultados, el sismo)
+        const fp = this.fisicoCargas;
+        if (!fp.casos.some((c) => c.id === v.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${v.caso} no existe.` }] };
+        e = vistaCargas(fp, planta, v.caso, d);
         break;
+      }
       case "diagnosticos":
         e = vistaDiagnosticos(f, planta, this.diagnosticos, d);
         break;
@@ -660,8 +721,9 @@ export class Sesion {
       if (!conj.valido) return conj;
       e = vistaAlzadoReacciones(rr, plano, conj.valor, d, reacciones.escala, modo);
     } else if (cargas) {
-      if (!f.casos.some((c) => c.id === cargas.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${cargas.caso} no existe.` }] };
-      e = vistaAlzadoCargas(f, plano, cargas.caso, d, cargas.escala, base);
+      const fp = this.fisicoCargas;
+      if (!fp.casos.some((c) => c.id === cargas.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${cargas.caso} no existe.` }] };
+      e = vistaAlzadoCargas(fp, plano, cargas.caso, d, cargas.escala, base);
     } else e = vistaAlzado(f, plano, d, base);
     this.escenas.set(clave, e);
     return { valido: true, valor: e };
@@ -696,7 +758,7 @@ export class Sesion {
 
   /** Las cargas de un caso en el 3D (tras I4): sólo necesitan el modelo físico. */
   cargas3D(caso: string, escala?: number): { valido: true; valor: Cargas3D } | { valido: false; diagnosticos: Diagnostico[] } {
-    const f = this.proyecto.modelo;
+    const f = this.fisicoCargas;
     if (!f.casos.some((c) => c.id === caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${caso} no existe.` }] };
     return { valido: true, valor: cargas3D(f, this.origen3D, caso, escala) };
   }

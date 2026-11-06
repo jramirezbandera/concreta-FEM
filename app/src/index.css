@@ -1237,3 +1237,9 @@ select.sel { font-family: var(--font-sans); }
 .ges-cab { display: flex; flex-direction: column; gap: 1px; margin: 0 0 10px; }
 .ges-cab > span { font: 600 15px var(--font-mono); color: var(--color-text-primary); }
 .ges-cab > small { font: 12px var(--font-sans); color: var(--color-text-secondary); }
+
+/* VS4: la ficha «Viento y sismo» y su buscador de municipios */
+.dialogo.dialogo-ancho { width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+.lista-candidatos { margin: 4px 0 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto; border: 1px solid var(--color-border-main); border-radius: 6px; background: var(--color-bg-elevated, var(--color-bg-main)); }
+.lista-candidatos button { padding: 4px 8px; border: 0; border-radius: 4px; background: none; font: inherit; color: inherit; cursor: pointer; }
+.lista-candidatos button:hover, .lista-candidatos button[aria-selected="true"] { background: var(--color-bg-hover, rgba(0, 0, 0, 0.06)); }

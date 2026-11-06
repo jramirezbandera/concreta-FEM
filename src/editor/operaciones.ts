@@ -22,7 +22,7 @@
  */
 import { comprobarArmado, limpiarArmado, seguirLosas, type ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { comprobarProyecto, type PlantillaDxf, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
-import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
+import type { AccionesEdificio, ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { conValor, indiceIds, lista, referenciasDe, usos, type Coleccion, type Objeto, type Uso } from "./referencias.ts";
 import { renumerar, type Renumerable } from "./renumerar.ts";
@@ -52,6 +52,8 @@ export type Operacion =
   | { op: "armado"; armado: ArmadoProyecto | null }
   /** V2c-4: la lista de plantillas DXF, entera (no entra en la huella). Los nombres, no vacíos y sin repetir. */
   | { op: "plantillas"; plantillas: readonly PlantillaDxf[] }
+  /** VS4: las acciones del programa (viento y sismo), enteras; null o vacías, ninguna. Entran en la huella: lo que no vale lo dice el compilador. */
+  | { op: "acciones"; acciones: AccionesEdificio | null }
   /** Varias operaciones como una sola: o entran todas o ninguna (y se deshacen de una vez). */
   | { op: "lote"; operaciones: readonly Operacion[] };
 
@@ -345,6 +347,12 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
         vistos.add(n);
       }
       return { ok: true, modelo: m, proyecto: { ...datos, vistas: o.vistas.map((v) => ({ ...v, nombre: v.nombre.trim() })) } };
+    }
+    case "acciones": {
+      const { acciones: _a, ...resto } = m;
+      const a = o.acciones;
+      const vacias = !a || Object.values(a).every((x) => x === undefined);
+      return { ok: true, modelo: vacias ? resto : { ...resto, acciones: a } };
     }
     case "plantillas": {
       const vistos = new Set<string>();

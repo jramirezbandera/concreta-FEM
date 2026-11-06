@@ -27,8 +27,6 @@ const bien = <K extends keyof Respuestas>(_k: K, valor: Respuestas[K]): Contesta
 
 export class Atendedor {
   private sesion: Sesion | null = null;
-  /** Lo que calculó la sesión, empaquetado como `.fem/<huella>/`, hasta que se pide (`paquete`). */
-  private empaquetado: { cabecera: string; bytes: Uint8Array } | null = null;
   readonly motor: string;
   private readonly pesoAparte: PesoAparte | undefined;
   /** El peso propio calculado en otro hilo, por resultados (undefined si falló: se compila aquí). */
@@ -59,7 +57,6 @@ export class Atendedor {
   async atender(p: Pedido, alProgreso?: (fase: string, ms: number) => void): Promise<Contestacion> {
     if (p.tipo === "abrir") {
       const a = Sesion.abrir(p.texto, this.motor, { diferir: !!p.diferir });
-      this.empaquetado = null;
       if (!a.valido) {
         this.sesion = null;
         return { ok: false, diagnosticos: a.diagnosticos };
@@ -80,15 +77,14 @@ export class Atendedor {
       case "calcular": {
         const r = await s.calcular(alProgreso ? { alProgreso } : {});
         if (!r.ok) return { ok: false, diagnosticos: r.diagnosticos };
-        const e = s.estado();
-        // La cabecera, como la escribe la CLI (cli/ordenes.ts): con el núcleo y el sha256 de los bytes
-        this.empaquetado = { cabecera: JSON.stringify({ ...r.cabecera, motor: this.motor, sha256: e.sha256Resultados }), bytes: r.bytes };
-        return bien("calcular", e);
+        return bien("calcular", s.estado());
       }
       case "paquete": {
-        const x = this.empaquetado;
-        this.empaquetado = null;
-        return bien("paquete", x);
+        // VS4: se empaquetan al pedirlos (0,2–0,5 s en el edificio objetivo), no se guardan: con el sismo son
+        // 321 MiB, y abierto por URL o desde el disco nadie los pide. La cabecera, como la escribe la CLI
+        // (cli/ordenes.ts): con el núcleo y el sha256 de los bytes
+        const x = s.paquete();
+        return bien("paquete", x ? { cabecera: JSON.stringify({ ...x.cabecera, motor: this.motor, sha256: x.sha256 }), bytes: x.bytes } : null);
       }
       case "estado":
         return bien("estado", s.estado());
@@ -170,6 +166,15 @@ export class Atendedor {
       case "precalentar":
         if (s.proyecto.modelo.plantas.some((x) => x.id === p.planta)) s.rr?.valores(p.planta, "losas", "flexion");
         return bien("precalentar", null);
+      // VS4: las acciones del programa
+      case "viento":
+        return bien("viento", s.viento());
+      case "sismo":
+        return bien("sismo", s.sismoDatos());
+      case "modal":
+        return bien("modal", s.modal());
+      case "modo":
+        return de(s.modo(p.modo));
     }
   }
 }

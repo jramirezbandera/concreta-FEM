@@ -32,6 +32,8 @@ import { objetosVisibles } from "../../../src/editor/edicion.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
 import { Chip, Desplegable, Disposicion, GrupoPlegable, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
+import { FichaAcciones } from "../editor/FichaAcciones.tsx";
+import { IcSismo, IcViento } from "../armazon/iconos.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -102,7 +104,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     if (tablaElegido && (!cargas || tablaElegido === "cargas")) setTabla(tablaElegido);
   }, [tablaElegido, cargas]);
   const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
-  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | "alinear" | null>(null);
+  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | "alinear" | "viento" | "sismo" | null>(null);
 
   // V2c: la herramienta activa (Elegir por defecto), fuera de React; aquí, lo que cambia la barra y Propiedades
   const [ctrl] = useState(() => new ControladorDibujo());
@@ -414,16 +416,28 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     <>
       <Campo etiqueta="Caso activo" ancho={300}>
         <select className="sel w-full" value={casoValido} onChange={(x) => setCaso(x.target.value)} aria-label="Caso activo" title={textoCaso(e.casos.find((c) => c.id === casoValido))}>
-          {e.casos.map((c) => (
+          {/* VS4: los casos del programa (el viento y el sismo de las acciones), detrás, en su grupo */}
+          {e.casos.filter((c) => !c.programa).map((c) => (
             <option key={c.id} value={c.id}>
               {textoCaso(c)}
             </option>
           ))}
+          {e.casos.some((c) => c.programa) && (
+            <optgroup label="Del programa (viento y sismo)">
+              {e.casos.filter((c) => c.programa).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {textoCaso(c)}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </Campo>
       {ed && (
         <>
           <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, los casos típicos de una vez, y la tabla desde él" />
+          <Herramienta icono={IcViento} nombre="Viento" activa={e.casos.some((c) => c.programa === "viento")} onClick={() => setDialogo("viento")} title="El viento del programa (DB SE-AE): zona, aspereza y rasante; da 8 casos con una fuerza por planta" />
+          <Herramienta icono={IcSismo} nombre="Sismo" activa={e.casos.some((c) => c.programa === "sismo")} onClick={() => setDialogo("sismo")} title="El sismo del programa (NCSE-02): el municipio, el terreno y la ductilidad; masas, modos y el análisis por espectros de respuesta" />
           <Separador />
           <Herramienta icono={IcPuntual} nombre="Puntual" activa={foto.herramienta === "puntual"} onClick={() => elegirHerramienta("puntual")} title="Dibujar cargas puntuales en el caso activo: un clic donde va (F y M en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcLineal} nombre="Lineal" activa={foto.herramienta === "lineal"} onClick={() => elegirHerramienta("lineal")} title="Dibujar cargas lineales en el caso activo: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
@@ -673,6 +687,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {dialogo === "renumerar" && ed && <DialogoRenumerar onCerrar={() => setDialogo(null)} />}
       {dialogo === "abacos" && ed && <DialogoAbacos onCerrar={() => setDialogo(null)} />}
       {dialogo === "alinear" && ed && <DialogoAlinear onCerrar={cerrarDialogo} />}
+      {(dialogo === "viento" || dialogo === "sismo") && ed && <FichaAcciones pestana={dialogo} onCerrar={cerrarDialogo} />}
     </>
   );
 }

@@ -1,6 +1,6 @@
 /** Los modos de Resultados en la barra (lo que eran las pantallas de resultados de V1). */
 import { Herramienta } from "../armazon/Disposicion.tsx";
-import { IcBanda, IcDeformada, IcDiagramas, IcLosas, IcPilares, IcReacciones, type Icono } from "../armazon/iconos.tsx";
+import { IcBanda, IcDeformada, IcDiagramas, IcLosas, IcModal, IcPilares, IcReacciones, type Icono } from "../armazon/iconos.tsx";
 import { useVisor, type ModoResultados } from "../contexto.ts";
 
 const MODOS: { id: ModoResultados; nombre: string; icono: Icono; title: string }[] = [
@@ -10,6 +10,7 @@ const MODOS: { id: ModoResultados; nombre: string; icono: Icono; title: string }
   { id: "armado", nombre: "Armado", icono: IcBanda, title: "Franjas de armado de las losas: demanda de Wood–Armer por metro en X e Y, inferior y superior" },
   { id: "deformada", nombre: "Deformada", icono: IcDeformada, title: "Deformada en 3D y desplomes por planta" },
   { id: "reacciones", nombre: "Reacciones", icono: IcReacciones, title: "Reacciones en los apoyos: flechas en la planta y en 3D, y la tabla por casos" },
+  { id: "modal", nombre: "Modal", icono: IcModal, title: "Masas y modos de vibración (con el sismo en las acciones), la forma de cada modo en 3D y los cortantes de planta del sismo" },
 ];
 
 export function BarraModos() {

@@ -50,6 +50,7 @@ const MODOS: { id: ModoResultados; nombre: string; claves: string }[] = [
   { id: "pilares", nombre: "Pilares", claves: "axil N ternas cabeza pie cuadro" },
   { id: "armado", nombre: "Armado de losas", claves: "franjas Wood-Armer refuerzo armadura base" },
   { id: "deformada", nombre: "Deformada y desplomes", claves: "deriva desplome viento sismo" },
+  { id: "modal", nombre: "Modal: masas, modos y sismo", claves: "modos vibracion periodo masa sismo espectro cortante" },
   { id: "reacciones", nombre: "Reacciones", claves: "cimentacion apoyos cargas en cimentacion" },
 ];
 

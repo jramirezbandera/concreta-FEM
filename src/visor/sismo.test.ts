@@ -14,7 +14,7 @@ import type { AccionCaso, ModeloFisico } from "../compilador/fisico.ts";
 import { sha256 } from "../compilador/huella.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { datosLosas, datosPilares, datosViga, desplazamientos, valorEnPunto } from "./datos.ts";
-import { Sesion, type EleccionCombinaciones } from "./sesion.ts";
+import { Sesion, sha256Bytes, type EleccionCombinaciones } from "./sesion.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const WASM = readFileSync(join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm"));
@@ -122,5 +122,76 @@ describe("VS3 en el visor: un proyecto con el sismo del programa", () => {
     // Hoy la sesión valida el caso contra los del fichero o lo admite: en los dos casos, o un error o el caso lógico entero
     if (r.valido) expect(r.valor.factores[0]!.length).toBe(s.q!.nl);
     else expect(r.diagnosticos.length).toBeGreaterThan(0);
+  });
+});
+
+describe("VS4 en el visor: las acciones del programa a la vista", () => {
+  it("los casos del estado llevan detrás los del programa, con su familia; sin resultados, el viento y el espectro ya se dan", async () => {
+    const f = s.proyecto.modelo;
+    const sinCalcular = Sesion.abrir(JSON.stringify({ esquema: VERSION_ESQUEMA, modelo: { ...f, acciones: { viento: { zona: "A", aspereza: "IV" }, sismo: f.acciones!.sismo } } }), MOTOR);
+    if (!sinCalcular.valido) throw new Error("no abre");
+    const e = sinCalcular.sesion.estado();
+    const programa = e.casos.filter((c) => c.programa);
+    expect(programa.map((c) => c.id)).toEqual(["W+X+e", "W+X-e", "W-X+e", "W-X-e", "W+Y+e", "W+Y-e", "W-Y+e", "W-Y-e", "EX+e", "EX-e", "EY+e", "EY-e"]);
+    expect(programa.map((c) => c.programa)).toEqual([...Array<string>(8).fill("viento"), ...Array<string>(4).fill("sismo")]);
+    expect(e.casos.slice(0, f.casos.length).every((c) => !c.programa)).toBe(true);
+    // el viento, por plantas, y la planta de un caso del viento se dibuja con sus puntuales
+    const v = sinCalcular.sesion.viento();
+    expect(v.definido && v.viento !== null && v.viento.x.plantas.length > 0).toBe(true);
+    const esc = sinCalcular.sesion.escenaA4(f.plantas[0]!.id, { vista: "cargas", caso: "W+X+e" });
+    expect(esc.valido && esc.valor.primitivas.length > 0).toBe(true);
+    // el espectro, sin calcular: la curva y sin la consulta; el sismo sin resultados no tiene cargas que dibujar
+    const sd = sinCalcular.sesion.sismoDatos();
+    expect(sd.definido && sd.espectro !== null && sd.curva !== null && sd.resultado === null && sd.curva.T.length > 100).toBe(true);
+    expect(sd.curva!.elastico.some((a) => a === 2.5)).toBe(true);
+    expect(sinCalcular.sesion.escenaA4(f.plantas[0]!.id, { vista: "cargas", caso: "EX+e" }).valido).toBe(false);
+    expect(sinCalcular.sesion.modal().modal).toBeNull();
+  });
+
+  it("con resultados, las fuerzas equivalentes del sismo dibujadas dan el cortante en la base y el par de cada caso, y los modos salen", () => {
+    const q = s.q!;
+    const sismo = valido(q.sismo());
+    const fp = s.fisicoCargas;
+    for (const [caso, eje, exc] of [
+      ["EX+e", 0, 1],
+      ["EX-e", 0, -1],
+      ["EY+e", 1, 1],
+      ["EY-e", 1, -1],
+    ] as const) {
+      const cargas = (fp.cargas ?? []).filter((c) => c.caso === caso && c.tipo === "puntual");
+      expect(cargas.length).toBe(sismo.direcciones[eje].niveles.filter((n) => n.fuerza !== 0).length);
+      const F = cargas.reduce((t, c) => t + (c.tipo === "puntual" ? (c.F?.[eje] ?? 0) : 0), 0);
+      expect(Math.abs(F - sismo.direcciones[eje].basal) / sismo.direcciones[eje].basal).toBeLessThan(1e-12);
+      // el par respecto al centro de masas de cada planta: ±F·e, el del torsor de la excentricidad
+      const md = valido(q.modos());
+      for (const c of cargas) {
+        if (c.tipo !== "puntual") continue;
+        const pl = md.plantas.find((p) => p.planta === c.planta)!;
+        const nivel = sismo.direcciones[eje].niveles.find((n) => n.plantas.includes(c.planta))!;
+        const Mz = (c.x - pl.cm[0]) * (c.F?.[1] ?? 0) - (c.y - pl.cm[1]) * (c.F?.[0] ?? 0);
+        expect(Math.abs(Mz - (eje === 0 ? -1 : 1) * exc * nivel.par)).toBeLessThan(1e-9 * Math.max(1, Math.abs(nivel.par)));
+      }
+      expect(s.escenaA4(fp.plantas[0]!.id, { vista: "cargas", caso }).valido).toBe(true);
+      expect(s.cargas3D(caso).valido).toBe(true);
+    }
+    const m = s.modal();
+    expect(m.modal !== null && m.modal.modos.length === m.modal.numeroDeModos && m.modal.numeroDeModos === q.modal!.modos.length).toBe(true);
+    const forma = valido(s.modo(1));
+    expect(forma.u.length).toBe(q.modal!.modos[0]!.u.length / 2);
+    // la mayor traslación de los centros de masas, 1 m: la del maestro de alguna planta
+    let mayor = 0;
+    for (let i = 0; i < forma.u.length / 3; i++) mayor = Math.max(mayor, Math.abs(forma.u[3 * i]!), Math.abs(forma.u[3 * i + 1]!));
+    expect(mayor).toBeGreaterThan(0.99);
+    expect(s.modo(99).valido).toBe(false);
+    const sd = s.sismoDatos();
+    expect(sd.resultado !== null && sd.periodos.length === q.modal!.modos.length).toBe(true);
+  });
+
+  it("los resultados empaquetados se hacen al pedirlos y son los del cálculo (su sha256)", async () => {
+    const pk = s.paquete();
+    expect(pk).not.toBeNull();
+    expect(await sha256Bytes(pk!.bytes)).toBe(s.estado().sha256Resultados);
+    expect(pk!.sha256).toBe(s.estado().sha256Resultados);
+    expect(pk!.cabecera.modal?.modos.length).toBe(s.q!.modal!.modos.length);
   });
 });

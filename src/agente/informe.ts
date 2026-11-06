@@ -14,7 +14,8 @@
 import { resolverOpciones } from "../compilador/fisico.ts";
 import { sha256 } from "../compilador/huella.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { Resumen } from "./consultas.ts";
+import type { ModosAgente, Resumen, SismoAgente } from "./consultas.ts";
+import type { VientoCalculado } from "../compilador/viento.ts";
 import type { Proyecto } from "./proyecto.ts";
 import { num, separacion, type Comprobacion, type SensatezModelo } from "./sensatez.ts";
 import type { SensatezResultados } from "./sensatezResultados.ts";
@@ -57,10 +58,13 @@ export interface DatosInforme {
   resultados: SensatezResultados;
   /** Figuras del render (A4): la planta del modelo y la uz de las losas de cada planta. */
   figuras?: readonly { titulo: string; svg: string }[];
+  /** VS4: las acciones del programa, si las hay: el viento por plantas, las masas y los modos, y el sismo por espectros. */
+  programa?: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null };
 }
 
 const ESTADO: Record<Comprobacion["estado"], string> = { bien: "bien", avisos: "AVISOS", "no-aplica": "no aplica", pendiente: "pendiente" };
 const kN = (x: number) => num(x, 4);
+const pct = (x: number) => `${num(100 * x, 1)} %`;
 
 export function documentoInforme(d: DatosInforme): Bloque[] {
   const b: Bloque[] = [];
@@ -161,6 +165,61 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
       cabecera: ["Planta", ...ch.map((c) => `${c}: ΣFx, ΣFy (kN)`)],
       filas: r.plantas.map((p) => [p.id, ...ch.map((c) => (p.horizontales?.[c] ? `${kN(p.horizontales[c][0])}; ${kN(p.horizontales[c][1])}` : "—"))]),
     });
+  }
+
+  // ─── Viento y sismo del programa (VS4) ──────────────────────────────────────────────────────
+  const pg = d.programa;
+  if (pg && (pg.viento || pg.modos || pg.sismo)) {
+    titulo(2, "Viento y sismo del programa");
+    if (pg.viento) {
+      const v = pg.viento;
+      titulo(3, "Viento (DB SE-AE)");
+      parrafo(`qb = ${num(v.qb, 3)} kN/m² (${v.qbOrigen === "zona" ? `zona ${v.zona}` : v.qbOrigen === "dada" ? "escrita" : "simplificada"}), aspereza ${v.aspereza}, rasante a ${num(v.rasante)} m, altura ${num(v.altura)} m. Según X: esbeltez ${num(v.x.esbeltez)}, cp = ${num(v.x.cp)}, cs = ${num(v.x.cs)}, e = ${num(v.x.e)} m; según Y: ${num(v.y.esbeltez)}, ${num(v.y.cp)}, ${num(v.y.cs)}, ${num(v.y.e)} m. Casos ${v.casos.join(", ")}: una fuerza por planta en el centro de su banda, desplazada ±e.`);
+      b.push({
+        tipo: "tabla",
+        cabecera: ["Planta", "z (m)", "ce", "qe (kN/m²)", "Área X (m²)", "F según X (kN)", "Área Y (m²)", "F según Y (kN)"],
+        numericas: [1, 2, 3, 4, 5, 6, 7],
+        filas: v.x.plantas.map((p, i) => {
+          const py = v.y.plantas[i];
+          return [p.planta, num(p.z), num(p.ce, 3), num(p.qe, 3), `${num(p.area, 4)}${p.dada ? " (escrita)" : ""}`, kN(p.F), py ? num(py.area, 4) : "—", py ? kN(py.F) : "—"];
+        }),
+      });
+    }
+    if (pg.modos) {
+      const m = pg.modos;
+      titulo(3, "Masas y modos de vibración (NCSE-02)");
+      parrafo(`Masa que vibra: ${num(m.masas.plantas)} t (peso sísmico ${kN(m.peso)} kN); al terreno, ${num(m.masas.terreno)} t; repartida por su cota, ${num(m.masas.repartida)} t. ${m.numeroDeModos} modos (tres por planta con masa).`);
+      b.push({ tipo: "tabla", cabecera: ["Planta", "Cota (m)", "Masa (t)", "CM x (m)", "CM y (m)", "Radio de giro (m)"], numericas: [1, 2, 3, 4, 5], filas: m.plantas.map((p) => [p.planta, num(p.cota), num(p.masa), num(p.cm[0]), num(p.cm[1]), num(p.radioDeGiro)]) });
+      b.push({
+        tipo: "tabla",
+        cabecera: ["Modo", "T (s)", "f (Hz)", "Masa X", "Masa Y", "Giro", "Σ X", "Σ Y"],
+        numericas: [1, 2, 3, 4, 5, 6, 7],
+        filas: m.modos.map((x) => [String(x.modo), num(x.T, 3), num(x.f, 3), pct(x.masaEfectiva[0]), pct(x.masaEfectiva[1]), pct(x.masaEfectiva[2]), pct(x.acumulada[0]), pct(x.acumulada[1])]),
+      });
+      if (m.omitidos) parrafo(`… y ${m.omitidos} modos más, de menor periodo.`);
+    }
+    if (pg.sismo) {
+      const s = pg.sismo;
+      const em = s.emplazamiento;
+      titulo(3, "Sismo por espectros de respuesta (NCSE-02, art. 3.6.2)");
+      parrafo(`Emplazamiento: ab = ${num(em.ab, 3)} g, K = ${num(em.K, 2)}, importancia ${em.importancia} (ρ = ${num(em.rho, 2)}), terreno ${em.terreno} (C = ${num(em.C, 3)}, S = ${num(em.S, 4)}): ac = ${num(em.ac, 4)} g, TA = ${num(em.TA, 3)} s, TB = ${num(em.TB, 3)} s. Ω = ${num(s.omega)} % (ν = ${num(s.nu, 3)}); regla ${s.regla === "cqc" ? "cuadrática completa" : "del art. 3.6.2.4 (raíz de la suma de los cuadrados, modos a menos del 10 % en valor absoluto)"}; excentricidad accidental ${num(s.excentricidad, 3)} de la dimensión de la planta. Casos ${s.casos.join(", ")}, en las combinaciones de la situación sísmica.`);
+      b.push({
+        tipo: "tabla",
+        cabecera: ["Dirección", "μ", "β", "Modo dominante", "T (s)", "Masa del dominante", "Cortante en la base (kN)", "Entre el peso", "Desplazamiento máx. (mm, por μ)", "θ máx."],
+        numericas: [1, 2, 4, 5, 6, 7, 8, 9],
+        filas: s.direcciones.map((x) => [x.eje, num(x.mu), num(x.beta, 3), String(x.dominante.modo), num(x.dominante.T, 3), pct(x.dominante.masaEfectiva), kN(x.cortanteBasal), num(x.coeficienteSismico, 4), num(1000 * x.desplazamientoMaximo, 1), num(x.thetaMaxima, 3)]),
+      });
+      for (const x of s.direcciones) {
+        parrafo(`Según ${x.eje}, de arriba abajo (V: cortante combinado bajo la planta; F: su fuerza equivalente; par: el de la excentricidad; θ del art. 3.8${x.mesetaLarga ? "; α = 2,5 por encima de TB, art. 2.4" : ""}):`);
+        b.push({
+          tipo: "tabla",
+          cabecera: ["Planta", "Cota (m)", "Masa (t)", "V (kN)", "F (kN)", "e (m)", "Par (kN·m)", "u·μ (mm)", "Deriva·μ (mm)", "θ"],
+          numericas: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+          filas: x.plantas.map((p) => [p.plantas.join(" / "), num(p.cota), num(p.masa), kN(p.cortante), kN(p.fuerza), num(p.excentricidad), kN(p.par), num(1000 * p.desplazamiento, 1), num(1000 * p.deriva, 1), num(p.theta, 3)]),
+        });
+        if (x.simplificado.length) parrafo(`Para contrastar, el método simplificado (art. 3.7): ${x.simplificado.map((y) => `con ${y.periodo} (TF = ${num(y.TF, 3)} s, ${y.modos} ${y.modos === 1 ? "modo" : "modos"}), ${kN(y.cortanteBasal)} kN (el modal, ×${num(y.frente, 3)})`).join("; ")}.`);
+      }
+    }
   }
 
   // ─── Cargas en cimentación ─────────────────────────────────────────────────────────────────
