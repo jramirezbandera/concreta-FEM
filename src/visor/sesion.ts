@@ -37,7 +37,7 @@ import { ejesDe } from "../compilador/ejes.ts";
 import { traducirDiagnosticos } from "../compilador/mapeo.ts";
 import { calcular } from "../motor/calcular.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { ResultadoCaso } from "../motor/modelo.ts";
+import type { ResultadoCaso, ResultadoModal } from "../motor/modelo.ts";
 import { alambrico } from "./alambrico.ts";
 import { solido, type Solido } from "./solido.ts";
 import { diagramas3D, type Diagramas3D, type Esfuerzo3D, type PiezasDiagrama } from "./diagramas3d.ts";
@@ -289,6 +289,8 @@ export class Sesion {
   private res: Resumen | null = null;
   private huellaC: string | null = null;
   private casosR: ResultadoCaso[] | null = null;
+  /** VS2: el análisis modal de los resultados, si el proyecto lleva `acciones.sismo`. */
+  private modalR: ResultadoModal | null = null;
   private cabecera: CabeceraResultados | null = null;
   private origenR: "calculo" | "guardados" | null = null;
   private shaR: string | null = null;
@@ -355,7 +357,7 @@ export class Sesion {
 
   /** Las consultas de C5 sobre el cálculo (null sin resultados). */
   get q(): Consultas | null {
-    if (!this.qC && this.casosR && this.compilacion.valido) this.qC = new Consultas(this.proyecto.modelo, this.compilacion, this.casosR, this.proyecto.opciones);
+    if (!this.qC && this.casosR && this.compilacion.valido) this.qC = new Consultas(this.proyecto.modelo, this.compilacion, this.casosR, this.proyecto.opciones, this.modalR);
     return this.qC;
   }
 
@@ -472,8 +474,9 @@ export class Sesion {
     const d = desempaquetarResultados(cab, bytes, this.compilacion.modelo);
     if ("motivo" in d) return { ok: false, motivo: d.motivo };
     const casos = d.casos;
-    if (casos.map((x) => x.id).join("\n") !== this.proyecto.modelo.casos.map((x) => x.id).join("\n")) return { ok: false, motivo: "sus casos no son los del proyecto" };
-    this.fijar(casos, cab, "guardados", cab.sha256);
+    // Los del modelo compilado: con los casos del programa (el viento de VS1), que no están en el fichero
+    if (casos.map((x) => x.id).join("\n") !== this.compilacion.modelo.casos.map((x) => x.id).join("\n")) return { ok: false, motivo: "sus casos no son los del proyecto" };
+    this.fijar(casos, cab, "guardados", cab.sha256, d.modal);
     return { ok: true };
   }
 
@@ -487,13 +490,14 @@ export class Sesion {
     const r = calcular(c.modelo, opciones.alProgreso ? { alProgreso: opciones.alProgreso } : {});
     const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
     if (!r.valido) return { ok: false, diagnosticos: ordenSeveridad(diags) };
-    const { cabecera, bytes } = empaquetarResultados(c.huella, c.modelo, r.casos, r.estadisticas, diags);
-    this.fijar(r.casos, cabecera, "calculo", await sha256Bytes(bytes));
+    const { cabecera, bytes } = empaquetarResultados(c.huella, c.modelo, r.casos, r.estadisticas, diags, r.modal);
+    this.fijar(r.casos, cabecera, "calculo", await sha256Bytes(bytes), r.modal);
     return { ok: true, cabecera, bytes };
   }
 
-  private fijar(casos: ResultadoCaso[], cabecera: CabeceraResultados, origen: "calculo" | "guardados", sha: string): void {
+  private fijar(casos: ResultadoCaso[], cabecera: CabeceraResultados, origen: "calculo" | "guardados", sha: string, modal?: ResultadoModal): void {
     this.casosR = casos;
+    this.modalR = modal ?? null;
     this.shaR = sha;
     this.cabecera = cabecera;
     this.origenR = origen;

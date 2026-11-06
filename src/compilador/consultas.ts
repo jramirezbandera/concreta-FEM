@@ -31,7 +31,7 @@ import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { CamposLaminas } from "../motor/campos.ts";
 import { Cortes } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
-import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
+import type { ModeloAnalitico, ModoVibracion, ResultadoCaso, ResultadoModal, Vec3 } from "../motor/modelo.ts";
 import { alineacionesLosa, semiextension } from "./bandas.ts";
 import { EsfuerzosBandas, type EstacionResultado, type LineaReparto } from "./esfuerzosBandas.ts";
 import { EsfuerzosFranjas, type EnvolventeEstacionFranja, type ResultadoFranja } from "./esfuerzosFranjas.ts";
@@ -132,6 +132,27 @@ export interface PlantaConsulta {
   maestro: { punto: Vec3; u: Float64Array } | null;
 }
 
+/** Masa de una planta con diafragma rígido en el análisis modal (VS2). */
+export interface PlantaModal {
+  planta: string;
+  cota: number;
+  /** Masa, t; centro de masas, m; inercia de giro respecto a él, t·m². */
+  masa: number;
+  cm: [number, number];
+  J: number;
+  /** De la masa, la de los nudos que no son del diafragma y le llegan por su cota, t. */
+  repartida: number;
+}
+
+/** El análisis modal por plantas: `forma` y `fuerzas` de cada modo van de 3 en 3, en el orden de `plantas`. */
+export interface ModosConsulta {
+  g: number;
+  masas: ResultadoModal["masas"];
+  cm: [number, number];
+  plantas: PlantaModal[];
+  modos: readonly ModoVibracion[];
+}
+
 export interface Desplome {
   pilar: string;
   /** Desplazamiento horizontal de su nudo en la planta respecto al de la planta de abajo (m). */
@@ -187,6 +208,8 @@ export class Consultas {
   readonly modelo: ModeloAnalitico;
   readonly mapeo: Mapeo;
   readonly casos: readonly ResultadoCaso[];
+  /** VS2: el análisis modal del cálculo (sólo con `acciones.sismo` en el proyecto). */
+  readonly modal: ResultadoModal | null;
   private readonly ctx: Contexto;
   private readonly opciones: OpcionesCompilacion;
   private piezasC?: EsfuerzosPiezas;
@@ -202,9 +225,10 @@ export class Consultas {
 
   /**
    * @param fisico el modelo físico que se compiló (con sus bandas) y `opciones`, las de la compilación.
-   * @param compilado su modelo analítico y su mapeo; `casos`, los resultados de un cálculo válido.
+   * @param compilado su modelo analítico y su mapeo; `casos`, los resultados de un cálculo válido;
+   * `modal`, su análisis modal, si lo tiene.
    */
-  constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion = {}) {
+  constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion = {}, modal?: ResultadoModal | null) {
     // VS1: con los casos y las cargas del viento del programa, al final, como en la compilación: los
     // casos del modelo físico casan uno a uno con los resultados
     fisico = resolverViento(fisico).modelo;
@@ -212,6 +236,7 @@ export class Consultas {
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
     this.casos = casos;
+    this.modal = modal ?? null;
     this.opciones = opciones;
     const diag = new Diagnosticos();
     const ctx = validar(fisico, resolverOpciones(opciones), diag);
@@ -641,6 +666,25 @@ export class Consultas {
       maestro = { punto: [nd.x, nd.y, nd.z], u };
     }
     return { valido: true, valor: { cota: this.ctx.cotas[k]!, maestro }, diagnosticos: [] };
+  }
+
+  /**
+   * Masas y modos de vibración (VS2): la masa, el centro de masas y la inercia de giro de cada planta
+   * con diafragma rígido, y todos los modos, del periodo mayor al menor.
+   */
+  modos(): Respuesta<ModosConsulta> {
+    const md = this.modal;
+    if (!md) {
+      return this.no(
+        "consulta/sin-modal",
+        this.fisico.acciones?.sismo === undefined
+          ? 'El proyecto no tiene el sismo en sus acciones: los modos de vibración se calculan con "acciones": { "sismo": {} } en el modelo.'
+          : "Los resultados no llevan el análisis modal: hay que volver a calcular.",
+        [],
+      );
+    }
+    const plantas = md.diafragmas.map((df): PlantaModal => ({ planta: this.mapeo.restricciones[df.restriccion]!.planta, cota: df.z, masa: df.masa, cm: df.cm, J: df.J, repartida: df.repartida }));
+    return { valido: true, valor: { g: md.g, masas: md.masas, cm: md.cm, plantas, modos: md.modos }, diagnosticos: [] };
   }
 
   /**

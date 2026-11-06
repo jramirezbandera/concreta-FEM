@@ -34,7 +34,7 @@ import { Consultas } from "../src/compilador/consultas.ts";
 import { traducirDiagnosticos } from "../src/compilador/mapeo.ts";
 import { calcular } from "../src/motor/calcular.ts";
 import type { Diagnostico } from "../src/motor/diagnosticos.ts";
-import type { ResultadoCaso } from "../src/motor/modelo.ts";
+import type { ResultadoCaso, ResultadoModal } from "../src/motor/modelo.ts";
 import { iniciarNucleo } from "../src/nucleo/index.ts";
 import { svgAPng } from "./png.ts";
 
@@ -113,6 +113,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
 
 Combinaciones de las consultas: --casos | --situacion ELU-PT[,ELS-C…] | --combinacion "1.35*G+1.5*Q" (repetible) | --caso G
 Otras: --planta P --tipo pilar|viga|vigueta --objeto id --losa id --armadura x-inf|x-sup|y-inf|y-sup (refuerzos, con la base del proyecto) --top N --todos --estaciones --exacto --cifras N
+modos: masas por planta y modos de vibración (periodos, masa efectiva y forma); necesita "acciones": { "sismo": {} } en el modelo y no depende de las combinaciones
 Salida: un objeto JSON. Códigos: 0 bien, 1 errores del modelo o del cálculo, 2 orden mal dada, 3 error interno.`;
 
 // ─── Diagnósticos y números ─────────────────────────────────────────────────────────────────────
@@ -187,6 +188,8 @@ const rel = (ruta: string) => relative(process.cwd(), ruta).split(sep).join("/")
 interface Calculado {
   compilacion: Extract<ResultadoCompilacion, { valido: true }>;
   casos: ResultadoCaso[];
+  /** VS2: los modos, si el proyecto lleva `acciones.sismo`. */
+  modal?: ResultadoModal;
   cabecera: CabeceraResultados;
   reutilizados: boolean;
   tiempos: Record<string, number>;
@@ -207,7 +210,7 @@ async function calculado(orden: string, ruta: string, p: Proyecto, recalcular: b
       // Misma huella, mismo núcleo, los mismos bytes que se guardaron y el mismo modelo analítico (el
       // visor comprueba lo mismo, V1): si no, se recalcula
       const r = cabecera.huella === c.huella && cabecera.motor === huellaMotor() && cabecera.sha256 === sha256Bytes(bin) ? desempaquetarResultados(cabecera, bin, c.modelo) : null;
-      if (r && "casos" in r) return { compilacion: c, casos: r.casos, cabecera, reutilizados: true, tiempos: { compilar: tCompilar } };
+      if (r && "casos" in r) return { compilacion: c, casos: r.casos, ...(r.modal ? { modal: r.modal } : {}), cabecera, reutilizados: true, tiempos: { compilar: tCompilar } };
     } catch {
       // resultados rotos: se recalculan
     }
@@ -218,9 +221,9 @@ async function calculado(orden: string, ruta: string, p: Proyecto, recalcular: b
   const tCalcular = (performance.now() - t1) / 1000;
   const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
   if (!r.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos([...c.diagnosticos, ...diags]) } };
-  const { cabecera, bytes } = empaquetarResultados(c.huella, c.modelo, r.casos, r.estadisticas, diags);
+  const { cabecera, bytes } = empaquetarResultados(c.huella, c.modelo, r.casos, r.estadisticas, diags, r.modal);
   guardar(carpeta, { ...cabecera, motor: huellaMotor(), sha256: sha256Bytes(bytes) }, bytes);
-  return { compilacion: c, casos: r.casos, cabecera, reutilizados: false, tiempos: { compilar: tCompilar, calcular: tCalcular } };
+  return { compilacion: c, casos: r.casos, ...(r.modal ? { modal: r.modal } : {}), cabecera, reutilizados: false, tiempos: { compilar: tCompilar, calcular: tCalcular } };
 }
 
 function guardar(carpeta: string, cabecera: object, bytes: Uint8Array): void {
@@ -320,6 +323,8 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           resultados: relative(process.cwd(), carpetaResultados(l.ruta, r.compilacion.huella)).split(sep).join("/"),
           reutilizados: r.reutilizados,
           casos: r.cabecera.casos.map((c) => ({ id: c.id, equilibrio: c.equilibrio })),
+          // VS2: con el sismo en las acciones, los modos (el detalle, con `fem consultar modos`)
+          ...(r.modal ? { modos: { numero: r.modal.modos.length, T1: r.modal.modos[0]?.periodo ?? null, masa: r.modal.masas.diafragmas, equilibrio: Math.max(0, ...r.modal.modos.flatMap((m) => [m.equilibrio.fuerzas, m.equilibrio.momentos])) } } : {}),
           estadisticas: { nudos: est.nudos, ecuaciones: est.ecuaciones, barras: r.compilacion.estadisticas.barras, laminas: r.compilacion.estadisticas.laminas },
           segundos: r.tiempos,
           ...listaDiagnosticos([...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos]),
@@ -345,7 +350,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if (top !== undefined && !(Number.isInteger(Number(top)) && Number(top) > 0)) return mal("--top tiene que ser un entero positivo");
       const r = await calculado(orden, l.ruta, l.proyecto, a.banderas.has("recalcular"));
       if ("codigo" in r) return r;
-      const q = new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones);
+      const q = new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal);
       const opciones: OpcionesConsulta = {
         ...(a.banderas.get("planta") ? { planta: a.banderas.get("planta")![0]! } : {}),
         ...(a.banderas.get("tipo") ? { tipo: a.banderas.get("tipo")![0]! } : {}),

@@ -34,7 +34,7 @@ import { ARMADURAS, losasDe, refuerzosDe, type Armadura, type ZonaRefuerzo } fro
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
-export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "combinaciones"] as const;
+export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "modos", "combinaciones"] as const;
 export type NombreConsulta = (typeof CONSULTAS)[number];
 
 /** Elementos de una lista que se dan por defecto (los mayores); `todos` los da todos. */
@@ -790,6 +790,79 @@ export function refuerzos(q: Consultas, conjunto: ConjuntoCombinaciones, o: Pick
   return si({ combinaciones: conjunto.descripcion, armadura: a as Armadura, zonas, sinBase: r.valor.sinBase });
 }
 
+// ─── Masas y modos de vibración (VS2) ───────────────────────────────────────────────────────────
+
+export interface ModosAgente {
+  /** Aceleración de la gravedad con la que el peso de las cargas pasa a masa, m/s². */
+  g: number;
+  /**
+   * Masas, t: la de todas las cargas que cuentan (`total`), la que queda en las plantas con diafragma
+   * rígido y vibra (`plantas`), la que va al terreno (apoyos) y, de la de las plantas, la de los nudos
+   * que no son de ningún diafragma y se les asigna por su cota (`repartida`).
+   */
+  masas: { total: number; plantas: number; terreno: number; repartida: number };
+  /** Peso que vibra, kN: `masas.plantas`·g. */
+  peso: number;
+  /** Centro de masas de todas las plantas, m. */
+  centroDeMasas: [number, number];
+  /** De abajo arriba: masa (t), peso (kN), centro de masas (m), inercia de giro respecto a él (t·m²) y su radio de giro (m). */
+  plantas: { planta: string; cota: number; masa: number; peso: number; cm: [number, number]; J: number; radioDeGiro: number }[];
+  /** Modos del modelo (tres por planta con masa); se listan los de mayor periodo. */
+  numeroDeModos: number;
+  modos: {
+    modo: number;
+    /** Periodo, s, y frecuencia, Hz. */
+    T: number;
+    f: number;
+    /** Masa efectiva entre la total, en X, en Y y en el giro alrededor del centro de masas. */
+    masaEfectiva: [number, number, number];
+    /** La suma de las masas efectivas hasta este modo. */
+    acumulada: [number, number, number];
+    /** [ux, uy, rz] de cada planta en su centro de masas (en el orden de `plantas`), con la mayor traslación igual a 1 (m y rad/m). */
+    forma: [number, number, number][];
+  }[];
+  /** Modos que no se listan (los de menor periodo). */
+  omitidos?: number;
+}
+
+/** Masas por planta y modos de vibración (`fem consultar modos`): los `top` de mayor periodo, o todos. */
+export function modos(q: Consultas, o: Pick<OpcionesConsulta, "top" | "todos"> = {}): Respuesta<ModosAgente> {
+  const r = q.modos();
+  if (!r.valido) return r;
+  const md = r.valor;
+  const n = o.todos ? md.modos.length : Math.min(md.modos.length, o.top ?? TOP_POR_DEFECTO);
+  const acumulada: [number, number, number] = [0, 0, 0];
+  const lista: ModosAgente["modos"] = [];
+  md.modos.slice(0, n).forEach((m, i) => {
+    for (let d = 0; d < 3; d++) acumulada[d]! += m.masaEfectiva[d]!;
+    let [t, g] = [0, 0];
+    for (let k = 0; k < md.plantas.length; k++) {
+      t = Math.max(t, Math.abs(m.forma[3 * k]!), Math.abs(m.forma[3 * k + 1]!));
+      g = Math.max(g, Math.abs(m.forma[3 * k + 2]!));
+    }
+    // Un modo de giro puro (sin traslación de los centros de masas): con el mayor giro igual a 1
+    const escala = t > 1e-9 * g ? t : g || 1;
+    lista.push({
+      modo: i + 1,
+      T: m.periodo,
+      f: 1 / m.periodo,
+      masaEfectiva: [...m.masaEfectiva],
+      acumulada: [...acumulada],
+      forma: md.plantas.map((_, k) => [m.forma[3 * k]! / escala, m.forma[3 * k + 1]! / escala, m.forma[3 * k + 2]! / escala]),
+    });
+  });
+  return si({
+    g: md.g,
+    masas: { total: md.masas.total, plantas: md.masas.diafragmas, terreno: md.masas.terreno, repartida: md.masas.repartida },
+    peso: md.masas.diafragmas * md.g,
+    centroDeMasas: md.cm,
+    plantas: md.plantas.map((p) => ({ planta: p.planta, cota: p.cota, masa: p.masa, peso: p.masa * md.g, cm: p.cm, J: p.J, radioDeGiro: p.masa > 0 ? Math.sqrt(p.J / p.masa) : 0 })),
+    numeroDeModos: md.modos.length,
+    modos: lista,
+    ...(n < md.modos.length ? { omitidos: md.modos.length - n } : {}),
+  });
+}
+
 // ─── Entrada común ──────────────────────────────────────────────────────────────────────────────
 
 const PROPOSITO: Record<NombreConsulta, Proposito> = {
@@ -802,10 +875,13 @@ const PROPOSITO: Record<NombreConsulta, Proposito> = {
   franjas: "esfuerzos",
   franja: "esfuerzos",
   refuerzos: "esfuerzos",
+  // los modos no dependen de las combinaciones
+  modos: "lineal",
   combinaciones: "esfuerzos",
 };
 
 export function consultar(q: Consultas, consulta: NombreConsulta, o: OpcionesConsulta): Respuesta<unknown> {
+  if (consulta === "modos") return modos(q, o);
   const c = o.combinaciones(PROPOSITO[consulta]);
   if (!c.valido) return c;
   const conjunto = c.valor;
@@ -831,4 +907,5 @@ export function consultar(q: Consultas, consulta: NombreConsulta, o: OpcionesCon
     case "refuerzos":
       return refuerzos(q, conjunto, o);
   }
+  return no("consulta/no-existe", `La consulta «${consulta}» no existe.`);
 }

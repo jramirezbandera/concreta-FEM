@@ -134,6 +134,7 @@ export function renumerarModelo(m: ModeloAnalitico, nuevo: readonly number[]): M
     muelles: m.muelles?.map((mu) => ({ ...mu, nudos: mu.nudos.map(N) as never })).reverse(),
     apoyos: m.apoyos?.map((a) => ({ ...a, nudo: N(a.nudo) })).reverse(),
     restricciones: m.restricciones?.map((r) => ({ ...r, maestro: N(r.maestro), esclavos: r.esclavos.map(N).reverse() })).reverse(),
+    ...(m.modal ? { modal: { ...m.modal, ...(m.modal.nodales ? { nodales: m.modal.nodales.map((x) => ({ ...x, nudo: N(x.nudo) })) } : {}) } } : {}),
     casos: m.casos.map((c) => ({
       ...c,
       nodales: c.nodales?.map((n) => ({ ...n, nudo: N(n.nudo) })),

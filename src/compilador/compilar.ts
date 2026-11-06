@@ -22,6 +22,7 @@ import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, Mo
 import { avisarAbacosUnidos, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
 import { resolverBordes } from "./bordes.ts";
+import { calcularSismo, hipotesisSismo } from "./sismo.ts";
 import { hipotesisViento, resolverViento } from "./viento.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
@@ -197,6 +198,22 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const ctx = validar(viento.modelo, op, diag);
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
+  // VS2: las masas del sismo, de los casos (con los del viento); sus errores ya los ha dado `validar`
+  const sismo = calcularSismo(viento.modelo)?.masas ?? null;
+  if (sismo) {
+    // VS-h: una planta con forjado y sin diafragma rígido tiene masa que no va a ningún diafragma
+    const sueltas = ctx.plantas
+      .filter((p, k) => k !== ctx.plantaBaja && diafragmaDe(ctx, k) !== "rigido" && (ctx.losas.some((l) => l.losa.planta === p.id) || ctx.panos.some((x) => x.pano.planta === p.id) || ctx.vigas.some((v) => v.planta === p.id)))
+      .map((p) => p.id);
+    if (sueltas.length) {
+      diag.error(
+        "sismo/planta-sin-diafragma",
+        `${sueltas.length === 1 ? `La planta ${sueltas[0]} tiene` : `Las plantas ${sueltas.join(", ")} tienen`} forjado y no ${sueltas.length === 1 ? "tiene" : "tienen"} diafragma rígido: los modos del sismo se calculan con tres grados de libertad por planta, y su masa no iría a ninguna. Póngale el diafragma rígido o quite el sismo de las acciones.`,
+        sueltas,
+      );
+      return fallo();
+    }
+  }
   avisarApoyosBandas(ctx, diag);
   const topo = construirTopologia(ctx, diag);
   marca("topologia");
@@ -364,7 +381,16 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       .map(([, cl]) => cl);
     return { id: c.id, ...(nodales.length ? { nodales } : {}), ...(cc.barras.length ? { barras: cc.barras } : {}), ...(enLaminas.length ? { laminas: enLaminas } : {}) };
   });
-  const modelo: ModeloAnalitico = { nudos, barras, ...(laminas.length ? { laminas } : {}), apoyos, restricciones, casos };
+  const modelo: ModeloAnalitico = {
+    nudos,
+    barras,
+    ...(laminas.length ? { laminas } : {}),
+    apoyos,
+    restricciones,
+    casos,
+    // VS2: los casos que hacen de masa en el análisis modal, con su fracción
+    ...(sismo ? { modal: { masas: sismo.casos.filter((c) => c.fraccion > 0).map((c) => ({ caso: c.caso, fraccion: c.fraccion })) } } : {}),
+  };
 
   // Sin pérdidas: resultante física = analítica, por caso
   const sinPerdidas = { fuerzas: 0, momentos: 0 };
@@ -442,6 +468,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     hipotesis: [
       ...hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma.filter((id) => !delViento.has(id)), planas),
       ...(viento.calculo?.viento ? [hipotesisViento(viento.calculo.viento)] : []),
+      ...(sismo ? [hipotesisSismo(sismo)] : []),
     ],
     huella,
     estadisticas: {

@@ -43,5 +43,7 @@ export function transferibles(r: ResultadoCalculo): ArrayBuffer[] {
   for (const c of casos) {
     for (const a of [c.u, c.reacciones, c.esfuerzosBarras, c.esfuerzosLaminas]) buffers.add(a.buffer as ArrayBuffer);
   }
+  // VS2: los vectores de cada modo
+  if (r.valido && r.modal) for (const m of r.modal.modos) for (const a of [m.forma, m.fuerzas, m.u]) buffers.add(a.buffer as ArrayBuffer);
   return [...buffers];
 }

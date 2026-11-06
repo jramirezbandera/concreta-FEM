@@ -1,6 +1,6 @@
 # VS: viento y sismo generados desde la situación
 
-> **Fecha:** 2026-11-06. **Estado:** decidido el 2026-11-06 (§8); VS1, en curso.
+> **Fecha:** 2026-11-06. **Estado:** decidido el 2026-11-06 (§8); VS1 (§10) y VS2 (§11), hechos; sigue VS3.
 >
 > **Origen:** el usuario, el 2026-11-05: viento y sismo «como en CYPECAD». Hoy son casos con las cargas metidas a mano, y el sismo, como fuerzas estáticas equivalentes con signo (`investigacion/03-resultados.md`, RES-13).
 
@@ -313,3 +313,84 @@ Pasan los cuatro criterios de §5. Los casos del programa no se ven todavía en 
 - el viento en las plantas sin diafragma (`viento/planta-sin-diafragma`, error, VS-c);
 - la zona eólica por provincia y municipio;
 - en la app (VS4): la ficha «Viento», ver los casos del programa en los selectores de caso y dibujarlos. Hoy la app los usa en las combinaciones por defecto, pero el selector de casos lista sólo los del fichero.
+
+## 11. VS2 hecho (2026-11-06): las masas y los modos
+
+Pasan los seis criterios de §5; el 4, con las losas y los muros por otro camino que `eigen` (VS2-2). No se ven todavía en la app (VS4) y no hay casos del sismo: eso es VS3.
+
+**Ya en el repo:**
+- `src/motor/modal.ts` y `modelo.modal` (`DefinicionModal`: los casos que hacen de masa con su fracción, o masas puestas en nudos). Con él, `calcular` da además `ResultadoCalculo.modal`: las masas de cada diafragma y todos los modos. `src/pruebas/modal.ts` se queda sólo con la combinación espectral (pasa al motor con VS3).
+- `src/normas/ncse02.ts`: las fracciones del art. 3.2, con el texto de la norma.
+- `acciones.sismo` en el modelo físico (`fisico.ts`, en la huella y en los dos esquemas): `masas` (la fracción de un caso, escrita) y `nievePermanente`. Basta `"sismo": {}`.
+- `src/compilador/sismo.ts`: `calcularSismo(m)` (la fracción de cada caso, o por qué no se puede saber) e `hipotesisSismo`. El compilador deja las fracciones en `modelo.modal` y da el error `sismo/planta-sin-diafragma` (VS-h).
+- Los resultados guardados llevan el modal (`src/agente/resultados.ts`: los números en la cabecera y los vectores de cada modo en el bloque, tras los casos); unos resultados sin él no valen para un modelo que lo pide.
+- `Consultas.modos()` (la masa, el centro de masas y la inercia de giro de cada planta con su id, y los modos) y `fem consultar modos [--top N | --todos]`, también en el servidor MCP y en la skill.
+
+**La masa (§3.2), como quedó:**
+- En cada nudo, m = −Σ fracción·Fz/g, con Fz la componente vertical de las fuerzas nodales equivalentes del caso (el vector que ensambla el cálculo, antes de las restricciones) y g = 9,80665 m/s². Sólo tiene inercia horizontal.
+- **La fracción de cada caso,** por su acción: G (y el caso del peso propio), 1; Q, por el nombre de su ψ (uso-A, 0,5; uso-B, C y D, 0,6; uso-E, 0,6 y uso-G, 0, que no están en la norma); S, 0,5 si permanece más de 30 días (`nievePermanente`, o por su ψ: a más de 1 000 m, sí); W, T, E, A y N, 0. **Lo que no se puede saber es un error** (`sismo/caso-sin-fraccion`): un caso Q o S con ψ por sus valores, o un caso sin acción que no es el del peso propio. Se arregla con su fracción en `masas`.
+- **Adónde va la de cada nudo:**
+  - si es de un diafragma (su maestro, un esclavo, o un esclavo de un enlace rígido a la cota de su maestro: las huellas de los pilares y las caras de las vigas), a él, en su sitio;
+  - si no lo es y tiene ux y uy coartados, al terreno;
+  - si no lo es, se reparte por su cota entre el nivel de arriba y el de abajo. Los niveles son las cotas de los diafragmas y las de los apoyos horizontales que no son de un diafragma (el terreno). En su misma cota, todo al diafragma; con varios diafragmas en una cota, al de la caja en planta más cercana.
+- De cada diafragma salen m, el centro de masas y J respecto a él. El maestro no está en el centro de masas (el compilador lo pone en el centroide de los nudos), así que la masa en sus GDL es el bloque 3 × 3 entero, M = L·Lᵀ con L = [[√m, 0, 0], [0, √m, 0], [−dy·√m, dx·√m, √J]].
+- `masas` en el resultado dice cuánta hay en total, cuánta vibra (la de los diafragmas), cuánta va al terreno y cuánta es «repartida» (la de los nudos de fuera): lo aproximado queda a la vista.
+
+**Los modos (§3.3), como quedaron:**
+- Los GDL dinámicos son los libres de los maestros con masa. Cada uno lleva una carga unidad como un lado más del mismo `resolver` que los casos: una factorización, nc + 3n lados, y `memoriaRequerida` lo cuenta antes.
+- **No se invierte la flexibilidad.** Con y = Lᵀ·φ, el problema es (Lᵀ·F·L)·y = λ·y con λ = 1/ω², simétrico y definido positivo, por Jacobi cíclico. De cada (λ, y) salen las fuerzas de inercia del modo, f = ω²·M·φ = L·y/λ, y su forma, φ = F·f.
+- **Cada modo es la respuesta estática a sus fuerzas de inercia:** su forma completa (los 6 GDL de todos los nudos) es la combinación de las soluciones unitarias con f, y se comprueba con la regla de oro 2: f contra las reacciones que da, a 1e-9. Si un modo no la cumple, el cálculo no es válido (`modal/equilibrio`).
+- Salen todos los modos (tres por planta con masa), normalizados a la masa, con su periodo, su factor de participación y su masa efectiva en X, en Y y en el giro alrededor del centro de masas del edificio, y el signo con Γ ≥ 0 en la dirección de traslación con más masa.
+- Un GDL sin masa no es dinámico: una planta sin cargas, o el giro de un maestro con toda la masa en él (los ejemplos de CSI). Sigue estáticamente a los demás, y la condensación sigue siendo exacta. Un GDL de un maestro coartado no se mueve y su masa no cuenta.
+
+**Criterios:**
+1. **Σ m·g es el peso** de los casos con sus fracciones a 1e-12 (`sismo.test.ts`: el edificio de losas y la retícula con núcleo), y con sólo el peso propio, el peso esperado de A3, sin la malla, a 1e-9 (1e-3 con muros, como en A3-1; `modos.test.ts`).
+2. **SAP2000 1-022 y 1-024** con el código del motor (`validacion/e6/csi.ts`, `csi.test.ts`): los 7 y los 4 periodos y el espectro (SRSS, CQC, ABS y NRC 10 %), dentro del redondeo de lo publicado, como en E6.
+3. **Edificio de cortante de 3 plantas** (`modal.test.ts`): los 9 modos (en X, en Y y en giro) a 1e-10 de la solución cerrada de la cadena, con los dos solvers, y sus masas efectivas a 1e-10. Con el maestro fuera del centro de masas, lo mismo; con una planta sin masa, los de la cadena condensada.
+4. **OpenSeesPy 3.8** (`validacion/vs2/`, `oraculo-vs2.test.ts`, `out_opensees.txt`), sobre modelos compilados y con la masa de cada diafragma en su centro de masas:
+
+   | Modelo | Nudos | Cómo | Modos | Diferencia máxima | Media |
+   |---|---|---|---|---|---|
+   | Pórtico de 3 plantas, 3 × 2 vanos | 78 | `eigen` | 9 de 9 | 2,1e-14 | 3,2e-15 |
+   | Pórtico objetivo, 7 plantas, 9 × 7 vanos | 1 151 | `eigen` | 21 de 21 | 5,6e-13 | 5,9e-14 |
+   | Losas, 3 plantas, 3 × 2 vanos | 4 206 | flexibilidad + LAPACK | 9 de 9 | 0,51 % | 0,27 % |
+   | Retícula con núcleo de muros | 2 568 | flexibilidad + LAPACK | 3 de 3 | 0,40 % | 0,29 % |
+   | Losas, 7 plantas, 3 × 2 vanos (sólo en el informe) | 9 798 | flexibilidad + LAPACK | 21 de 21 | 0,53 % | 0,24 % |
+
+   Los pórticos son el edificio objetivo de C1 (sólo barras, sin áreas de cortante: E2-1), con `eigen` de OpenSees y todos sus modos. Con losas y muros, la flexibilidad estática de OpenSees en los centros de masas y los valores propios de LAPACK (VS2-2); sus láminas son ASDShellQ4, no la DKMQ24 del motor, y la diferencia es la de los elementos (E6: ≤ 0,5 %). El mismo pórtico por ese segundo camino da lo mismo que el motor a 6,5e-15.
+5. **Propiedades** (`modal.test.ts`): φᵀ·M·φ = I y φᵀ·K·φ = Ω² a 1e-10; cada modo es la respuesta estática, en un cálculo aparte sin modal, a las fuerzas de inercia ω²·m·u puestas en sus propios nudos con masa (no pasa por la masa de los diafragmas: comprueba de una vez el centro de masas, J, el acoplamiento con el maestro y los valores propios); masas ×4, periodos ×2; girar la planta, trasladarla y renumerar, los mismos periodos a 1e-10.
+6. **Coste** (`validacion/vs2/banco.ts`, `out_banco.txt`), en los edificios objetivo de 7 plantas:
+
+   | Edificio | Ecuaciones (sin y con) | Núcleo pedido, MiB (sin / con) | Pico en un núcleo nuevo, MiB | ¿Cabe en el móvil? | Cálculo, s (sin / con) | T₁, s |
+   |---|---|---|---|---|---|---|
+   | Losas | 149 814 | 155 / 203 | 182 / 237 | sí | 4,7 / 5,6 | 0,840 |
+   | Losas y muros | 221 349 | 263 / 334 | 306 / 388 | no, por ecuaciones (tampoco sin el modal) | 5,8 / 7,4 | 0,679 |
+   | Reticular | 199 962 | 213 / 277 | 249 / 323 | sí | 5,4 / 6,7 | 0,763 |
+   | Unidireccional | 19 845 | 16 / 23 | 23 / 30 | sí | 0,50 / 0,68 | 0,818 |
+
+   Son 21 GDL dinámicos en los cuatro (21 lados más sobre 4 casos). El tiempo, sólo como información (mínimo de tres pasadas, alternando): de 0,2 a 1,6 s más, de los que el modal propio (flexibilidad, Jacobi y la forma de los modos) son 0,04–0,7 s; el resto, las 21 soluciones. En los cuatro, la masa efectiva de todos los modos suma 1,000000 en X y en Y, y el peor equilibrio de un modo es 1,1e-12.
+
+   Las ecuaciones no cambian y los casos salen con los mismos bits (también en `sismo.test.ts`). Sin `acciones.sismo`, el modelo analítico es el de antes: las referencias congeladas no cambian.
+
+**En la vivienda** (`"sismo": {}` sobre el ejemplo): 214 t en sus dos diafragmas (CUB, 117 t a 3,40; CUB-S, 97 t a 4,30), 8,5 t al terreno y 8,5 t repartidas (los nudos de la pérgola y de los pilares que cruzan la cota de la cubierta baja); T₁ = 0,34 s, con el 54 % de la masa en X y el 24 % en Y.
+
+**Hallazgos:**
+- **VS2-1, un GDL sin masa no es dinámico.** El giro de un maestro con toda la masa en él (1-022, 1-024) gastaba una solución unitaria y dejaba un valor propio nulo. Ahora sólo son dinámicos los GDL con alguna fila de L no nula.
+- **VS2-2, `eigen` de OpenSees no sirve con cadenas de restricciones y masa en 3n GDL.** Con `Transformation` resuelve mal las cadenas (E1-1); con multiplicadores, K no es definida; con penalización, ARPACK no arma más vectores de Lanczos que GDL con masa («Could not build an Arnoldi factorization», tamaño 3 en la retícula con núcleo), y el solver denso no cabe (27 000 GDL). El criterio 4 con losas se hace con lo que sí es exacto: la flexibilidad de OpenSees en los GDL con masa y LAPACK.
+- **VS2-3, el último modo de cada dirección puede llevar mucha masa.** En el edificio de losas de 7 plantas, el 7.º modo en X (T = 0,049 s) tiene el 8,9 % de la masa, más que el 2.º (8,4 %): la primera planta, sobre pilares empotrados en la base, es mucho más rígida que las demás (losa plana) y vibra casi sola. **Para VS3:** truncar por número de modos dejaría masa fuera; si se trunca, por masa acumulada y con todos los de T > TA. Con todos los modos no hay nada que decidir.
+- **VS2-4, corregido:** el peso propio calculado de `fem revisar` recompila con sólo el caso del peso propio, y con `acciones.sismo.masas` (que nombra los otros casos) no compilaba: la comprobación se quedaba sin lo calculado. Ahora recompila sin las acciones del programa (con el viento, además, compilaba sus 8 casos sin falta).
+- **VS2-5, corregido (de VS1):** el visor rechazaba los resultados guardados de un proyecto con viento («sus casos no son los del proyecto»): comparaba con los casos del fichero, no con los del modelo compilado, que lleva los del programa.
+- **VS2-7, el refinamiento arrastraba a los casos.** El refinamiento iterativo del solver era global: si un lado pasaba de 1e-12, se refinaban todos. En el unidireccional de 7 plantas, una solución unitaria del modal lo pasaba, y los casos salían con un paso de refinamiento que sin el modal no tienen (a 1e-14 de los de antes: inocuo, pero no los mismos bits). Ahora el solver refina por grupos de lados (`grupos`): los casos, como siempre, y los del modal, aparte. Lo destapó el banco, no las pruebas.
+- **VS2-8, de paso:** el edificio objetivo con losas y muros tiene hoy 221 349 ecuaciones, por encima de las 200 000 del perfil móvil, con modal o sin él: la malla creció después de medirlo (`rejilla.md` daba 151 905, antes de LV y LV2).
+- **VS2-6, el tamaño de los modos.** La forma completa de cada modo son 6 números por nudo: en el edificio de losas de 7 plantas, 21 × 4,2 MB = 87 MB más en la memoria de JavaScript y en `.fem/`. VS3 los necesita (cada modo es un caso). Falta medirlo en un móvil (con E4-9).
+
+**Lo que decidí al hacerlo, para el usuario:**
+- **VS2-a:** `acciones.sismo` existe ya, sólo con las masas: `"sismo": {}` da las masas y los modos. VS3 añade en el mismo objeto el emplazamiento y el espectro; sin ellos seguirá dando sólo los modos.
+- **VS2-b:** un caso de uso o de nieve sin ψ por su nombre, o un caso sin acción, es un error que pide su fracción (no se toma 0 ni 1 en silencio). Los modelos de validación, sin acciones en sus casos, escriben sus fracciones.
+- **VS2-c:** en su misma cota, la masa de un nudo de fuera va entera al diafragma (los pilares que cruzan una cubierta, una pérgola); el terreno son los apoyos con ux o uy coartados que no son de un diafragma.
+- **VS2-d:** la forma completa de cada modo se guarda con los resultados (VS2-6).
+
+**Fuera de VS2:**
+- el espectro, los casos del sismo y su combinación (VS3); la app (VS4: el modo «Modal», la ficha «Sismo»);
+- las plantas con forjado y sin diafragma rígido (error, VS-h, hasta VS6);
+- la inercia vertical y la de giro de los nudos alrededor de ejes horizontales (§9: la componente vertical del sismo queda fuera de la fase).

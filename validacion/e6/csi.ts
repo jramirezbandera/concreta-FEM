@@ -17,16 +17,31 @@
  * Los modelos van en kN y m (D1): los datos de CSI (kip, in, ft) se convierten aquí y los
  * resultados se devuelven en las unidades del PDF para compararlos con su redondeo.
  *
- * Los periodos y el espectro no necesitan análisis modal (E7): las masas sólo están en GDL de los
- * diafragmas, y la rigidez condensada a esos GDL, que sale de soluciones estáticas, es exacta
- * (`src/pruebas/modal.ts`).
+ * Los periodos y los modos son los del motor (VS2, `src/motor/modal.ts`): las masas sólo están en
+ * los GDL de los maestros de los diafragmas, y la rigidez condensada a esos GDL, que sale de
+ * soluciones estáticas, es exacta. La combinación espectral sigue en `src/pruebas/modal.ts` (VS3).
  */
 import type { SeccionBarra } from "../../src/elementos/barra.ts";
 import { calcular } from "../../src/motor/calcular.ts";
-import type { Apoyo, ModeloAnalitico, ResultadoCaso, Vec3 } from "../../src/motor/modelo.ts";
+import type { Apoyo, ModeloAnalitico, ResultadoCaso, ResultadoModal, Vec3 } from "../../src/motor/modelo.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
 import { carga, Constructor, EMPOTRADO } from "../../src/pruebas/constructor.ts";
-import { combinar, flexibilidad, inversa, modos, participacion, type GdlMasa } from "../../src/pruebas/modal.ts";
+import { combinar } from "../../src/pruebas/modal.ts";
+
+/** Un GDL con masa: el de un maestro de diafragma. */
+export interface GdlMasa {
+  nudo: number;
+  gdl: 0 | 1;
+}
+
+/** Los modos del motor con la masa `mi` (t) en los nudos de `masas` (los maestros de los diafragmas). */
+export function modalCsi(modelo: ModeloAnalitico, masas: readonly GdlMasa[], mi: number): ResultadoModal {
+  const nudos = [...new Set(masas.map((g) => g.nudo))];
+  const r = calcular({ ...modelo, modal: { nodales: nudos.map((nudo) => ({ nudo, m: mi })) } });
+  casosValidos(r);
+  if (!r.valido || !r.modal) throw new Error("sin modal");
+  return r.modal;
+}
 
 // Unidades de CSI → kN, m
 export const IN = 0.0254;
@@ -284,19 +299,17 @@ export function resultados1022(): Publicado[] {
   // Esfuerzos del pilar 1 en el nudo 1 (i' = x = 0): N y My (= P y M3 de SAP2000, cabecera de modelo.ts)
   const N1 = lat!.esfuerzosBarras[12 * b1]! / KIP;
   const M1 = lat!.esfuerzosBarras[12 * b1 + 4]! / (KIP * IN);
-  // Periodos: rigidez condensada a las 7 masas (0,49 k·s²/in en X)
+  // Periodos: los 7 modos del motor con las 7 masas (0,49 k·s²/in en X; en Y el maestro está coartado)
   const mi = (0.49 * KIP) / IN;
-  const F = flexibilidad(modelo, masas);
-  const md = modos(inversa(F), masas.map(() => mi));
+  const md = modalCsi(modelo, masas, mi);
   const periodos = [1.2732, 0.4313, 0.242, 0.1602, 0.119, 0.0951, 0.0795];
-  // Espectro (5 %): por modo, fuerzas estáticas equivalentes M·φₙ·Γₙ·Sa(Tₙ), un caso por modo
-  const gamma = participacion(md, masas.map(() => mi), masas.map(() => 1));
-  const casos = md.modos.map((phi, n) => ({
+  // Espectro (5 %): por modo, fuerzas estáticas equivalentes M·φₙ·Γₙ·Sa(Tₙ) = (fuerzas de inercia/ω²)·Γₙ·Sa, un caso por modo
+  const casos = md.modos.map((modo, n) => ({
     id: `modo${n + 1}`,
-    nodales: masas.map((g, i) => carga(g.nudo, { fx: mi * phi[i]! * gamma[n]! * espectro1022(md.periodos[n]!) * G_CSI })),
+    nodales: md.diafragmas.map((df, d) => carga(df.maestro, { fx: (modo.fuerzas[3 * d]! / modo.omega2) * modo.participacion[0] * espectro1022(modo.periodo) * G_CSI })),
   }));
   const rm = casosValidos(calcular({ ...modelo, casos }));
-  const omega = md.omega2.map(Math.sqrt);
+  const omega = md.modos.map((modo) => Math.sqrt(modo.omega2));
   const ux = combinar(rm.map((c) => c.u[6 * nudo(22)]! / IN), omega, 0.05);
   const N = combinar(rm.map((c) => c.esfuerzosBarras[12 * b1]! / KIP), omega, 0.05);
   const M = combinar(rm.map((c) => c.esfuerzosBarras[12 * b1 + 4]! / (KIP * IN)), omega, 0.05);
@@ -308,7 +321,7 @@ export function resultados1022(): Publicado[] {
     { nombre: "1-022 LAT: Ux nudo 22 (in)", valor: 1.45076, decimales: 5, motor: lat!.u[6 * nudo(22)]! / IN, fuente },
     { nombre: "1-022 LAT: axil pilar 1 (kip)", valor: 69.99, decimales: 2, motor: N1, fuente },
     { nombre: "1-022 LAT: momento pilar 1 en el nudo 1 (k·in)", valor: 2324.68, decimales: 2, motor: M1, fuente },
-    ...periodos.map((T, n) => ({ nombre: `1-022 periodo del modo ${n + 1} (s)`, valor: T, decimales: 4, motor: md.periodos[n]!, fuente })),
+    ...periodos.map((T, n) => ({ nombre: `1-022 periodo del modo ${n + 1} (s)`, valor: T, decimales: 4, motor: md.modos[n]!.periodo, fuente })),
     { nombre: "1-022 SRSS: Ux nudo 22 (in)", valor: 5.436, decimales: 3, motor: ux.srss, ...fuenteEsp },
     { nombre: "1-022 SRSS: axil pilar 1 (kip)", valor: 261.7, decimales: 1, motor: N.srss, ...fuenteEsp },
     { nombre: "1-022 SRSS: momento pilar 1 (k·in)", valor: 9864, decimales: 0, motor: M.srss, ...fuenteEsp },
@@ -362,17 +375,15 @@ export function sap1024(J = 1e-6): { modelo: ModeloAnalitico; masas: GdlMasa[] }
 export function resultados1024(J?: number): Publicado[] {
   const { modelo, masas } = sap1024(J);
   const mi = 6.2112 * (KIP / FT);
-  const mm = masas.map(() => mi);
-  const md = modos(inversa(flexibilidad(modelo, masas)), mm);
-  const r = masas.map((g) => (g.gdl === 0 ? 1 : 0));
-  const gamma = participacion(md, mm, r);
-  // Espectro constante de 0,4g en X; flecha en X del CM de la cubierta (nudo 29: masa 2, componente X)
+  // La masa va en el maestro (el centro de masas), sin inercia de giro: 2 GDL dinámicos por planta
+  const md = modalCsi(modelo, masas, mi);
+  // Espectro constante de 0,4g en X; flecha en X del CM de la cubierta (nudo 29: el segundo diafragma, componente X)
   const sa = 0.4 * G_CSI;
-  const R = md.modos.map((phi, n) => (phi[2]! * gamma[n]! * sa) / md.omega2[n]! / FT);
-  const c = combinar(R, md.omega2.map(Math.sqrt), 0.04);
+  const R = md.modos.map((modo) => (modo.forma[3]! * modo.participacion[0] * sa) / modo.omega2 / FT);
+  const c = combinar(R, md.modos.map((modo) => Math.sqrt(modo.omega2)), 0.04);
   const fuente = "SAP2000 1-024, p. 3";
   return [
-    ...[0.2271, 0.2156, 0.0733, 0.072].map((T, n) => ({ nombre: `1-024 periodo del modo ${n + 1} (s)`, valor: T, decimales: 4, motor: md.periodos[n]!, fuente })),
+    ...[0.2271, 0.2156, 0.0733, 0.072].map((T, n) => ({ nombre: `1-024 periodo del modo ${n + 1} (s)`, valor: T, decimales: 4, motor: md.modos[n]!.periodo, fuente })),
     { nombre: "1-024 CQC: Ux nudo 29 (ft)", valor: 0.02014, decimales: 5, motor: c.cqc, fuente },
     { nombre: "1-024 SRSS: Ux nudo 29 (ft)", valor: 0.02012, decimales: 5, motor: c.srss, fuente },
     { nombre: "1-024 ABS: Ux nudo 29 (ft)", valor: 0.0205, decimales: 5, motor: c.abs, fuente },

@@ -6,9 +6,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { dentroDelRedondeo, resultados1022, resultados1024, sap1004, sap1018, sap1024, type Publicado } from "../../validacion/e6/csi.ts";
+import { dentroDelRedondeo, FT, KIP, modalCsi, resultados1022, resultados1024, sap1004, sap1018, sap1024, type Publicado } from "../../validacion/e6/csi.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
-import { flexibilidad } from "../pruebas/modal.ts";
+import { calcular } from "./calcular.ts";
 
 beforeAll(async () => {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
@@ -42,10 +42,24 @@ describe("criterio 1 de E6: ejemplos de barras de CSI", () => {
     comprobarPublicados(resultados1024());
   });
 
-  it("la flexibilidad condensada es simétrica (Betti) a ≤ 1e-12", () => {
+  it("1-024 con el modal del motor (VS2): 4 modos con toda la masa, cada uno en equilibrio, y la flexibilidad simétrica (Betti)", () => {
     const { modelo, masas } = sap1024();
-    const F = flexibilidad(modelo, masas);
-    const escala = Math.max(...F.flat().map(Math.abs));
-    for (let i = 0; i < F.length; i++) for (let j = 0; j < i; j++) expect(Math.abs(F[i]![j]! - F[j]![i]!) / escala).toBeLessThan(1e-12);
+    const mi = 6.2112 * (KIP / FT);
+    const md = modalCsi(modelo, masas, mi);
+    // la masa va en los maestros, sin inercia de giro: 2 GDL dinámicos por planta
+    expect(md.gdl).toBe(4);
+    expect(md.modos.length).toBe(4);
+    for (const df of md.diafragmas) {
+      expect(df.masa).toBe(mi);
+      expect(df.J).toBe(0);
+    }
+    for (const d of [0, 1]) expect(Math.abs(md.modos.reduce((s, m) => s + m.masaEfectiva[d]!, 0) - 1)).toBeLessThan(1e-12);
+    for (const m of md.modos) {
+      expect(m.equilibrio.fuerzas).toBeLessThan(1e-9);
+      expect(m.equilibrio.momentos).toBeLessThan(1e-9);
+    }
+    // Betti: el motor avisa si la flexibilidad condensada no es simétrica
+    const r = calcular({ ...modelo, modal: { nodales: [...new Set(masas.map((g) => g.nudo))].map((nudo) => ({ nudo, m: mi })) } });
+    expect(r.diagnosticos.filter((d) => d.codigo.startsWith("modal/"))).toEqual([]);
   });
 });

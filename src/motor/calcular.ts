@@ -13,6 +13,10 @@
  *    resultantes de las láminas en su centroide.
  * 8. Regla de oro 2: equilibrio ΣF/ΣM a 1e-9 (con la resultante real de las cargas de barra y de
  *    lámina) y resultados finitos en cada caso.
+ * 9. Con `modelo.modal` (VS2, `modal.ts`): las masas de cada diafragma salen de las cargas en la
+ *    fase 4; los GDL de sus maestros llevan una carga unidad cada uno, como lados de más del mismo
+ *    sistema (la misma factorización), y de esas soluciones salen los modos, cada uno con su
+ *    equilibrio.
  *
  * El motor es puro: sin IO, sin DOM. El solver "nucleo" necesita `iniciarNucleo()` antes.
  */
@@ -23,7 +27,8 @@ import { ensamblarRigidez, patronSistema } from "./ensamblado.ts";
 import { equilibrio, sumaResultantes } from "./equilibrio.ts";
 import { desplazamientosFisicos, fuerzasIndependientes, numerar, TipoGdl, type Numeracion } from "./gdl.ts";
 import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada } from "./laminas.ts";
-import { NOMBRES_GDL, type CasoCarga, type EstadisticasCalculo, type ModeloAnalitico, type ResultadoCalculo, type ResultadoCaso } from "./modelo.ts";
+import { definicionModal, modosCondensados, prepararModal, type PlanModal } from "./modal.ts";
+import { NOMBRES_GDL, type CasoCarga, type EstadisticasCalculo, type ModeloAnalitico, type ModoVibracion, type ResultadoCalculo, type ResultadoCaso, type ResultadoModal } from "./modelo.ts";
 import { ErrorSinMemoria } from "../nucleo/index.ts";
 import { ErrorLimiteMemoria, resolver, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
 
@@ -167,6 +172,8 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
       }
     }
   });
+  // VS2: los casos que hacen de masa, con su fracción
+  const defModal = modelo.modal ? definicionModal(modelo, diag) : null;
   if (diag.hayErrores) return fallo();
   // Cargas de barra: FER condensadas → fuerzas nodales equivalentes. El equilibrio usa su
   // resultante real, no las equivalentes, para que un error de las FER no se cancele.
@@ -181,8 +188,10 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   // Lados derechos: b = Tᵀ·f, con f = nodales + equivalentes de barras y de láminas
   const n = num.nEcuaciones;
   const nCoart = num.coartados.length;
-  const B = new Float64Array(n * nc);
+  let B = new Float64Array(n * nc);
   const bCoartados = new Float64Array(nCoart * nc);
+  /** VS2: masa de cada nudo, t: la componente vertical hacia abajo de las cargas de los casos que hacen de masa, entre g. */
+  const masa = defModal ? new Float64Array(nn) : null;
   casos.forEach((caso, k) => {
     const t = cargasNodales(caso, P);
     const porBarra = deBarras[k]!.porBarra;
@@ -196,6 +205,10 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         t[6 * i + c]! += eq[c]!;
         t[6 * j + c]! += eq[6 + c]!;
       }
+    }
+    if (masa && defModal!.fraccion[k] !== 0) {
+      const f = defModal!.fraccion[k]! / defModal!.g;
+      for (let v = 0; v < nn; v++) masa[v]! -= f * t[6 * v + 2]!;
     }
     const b = fuerzasIndependientes(num, t);
     for (let j = 0; j < n; j++) B[n * k + j] = b[num.gdlDeEcuacion[j]!]!;
@@ -212,6 +225,18 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     }
   });
   if (diag.hayErrores) return fallo();
+  // VS2: la masa, a los diafragmas, y una carga unidad en cada GDL dinámico (los lados nc … nc + nm − 1)
+  let plan: PlanModal | null = null;
+  if (masa) {
+    for (const m of modelo.modal!.nodales ?? []) masa[m.nudo]! += m.m;
+    plan = prepararModal(modelo, geo, num, masa, defModal!.g, diag);
+    if (!plan || diag.hayErrores) return fallo();
+    const conCasos = B;
+    B = new Float64Array(n * (nc + plan.gdl.length));
+    B.set(conCasos);
+    plan.gdl.forEach((p, j) => (B[n * (nc + j) + num.ecuacion[p]!] = 1));
+  }
+  const nm = plan ? plan.gdl.length : 0;
   marcar("cargas");
 
   // 5. Patrón y ensamblado
@@ -252,8 +277,10 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   try {
     sol =
       n > 0
-        ? resolver(ps.patron, K.valores, K.diagonal, B, nc, opciones.solver ?? "nucleo", {
+        ? resolver(ps.patron, K.valores, K.diagonal, B, nc + nm, opciones.solver ?? "nucleo", {
             limiteMemoria: opciones.limites?.memoriaNucleo,
+            // VS2: los lados del modal se refinan aparte, para que los casos salgan como sin él
+            ...(nm ? { grupos: [nc, nm] } : {}),
             alProgreso: alProgreso && ((fase, ms) => alProgreso(`solucion.${fase}`, ms)),
           })
         : null;
@@ -307,20 +334,22 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   const resultados: ResultadoCaso[] = [];
   let equilibrioRoto = false;
   const magnitud = new Float64Array(P);
-  for (let k = 0; k < nc; k++) {
-    const caso = casos[k]!;
-    const uI = impuestosDelCaso(caso, P); // û por GDL físico independiente
-    if (sol?.X) for (let j = 0; j < n; j++) uI[num.gdlDeEcuacion[j]!] = sol.X[n * k + j]!;
-    const u = desplazamientosFisicos(num, uI);
-    // Reacciones de los apoyos: R = (K'·û − Tᵀ·f) en los GDL coartados
-    // (`magnitud`: suma de |términos| de cada reacción, la escala de su redondeo)
+  /**
+   * Reacciones de los apoyos y de los muelles a tierra con los desplazamientos û (por GDL físico
+   * independiente) y u: R = (K'·û − Tᵀ·f) en los GDL coartados, con Tᵀ·f del caso k (nada con
+   * k < 0: un modo, que sólo carga GDL libres). Deja en `magnitud` la suma de |términos| de cada
+   * reacción, la escala de su redondeo.
+   */
+  const reaccionesDe = (uI: Float64Array, u: Float64Array, k: number): Float64Array => {
     const reacciones = new Float64Array(P);
     magnitud.fill(0);
-    for (let i = 0; i < nCoart; i++) {
-      const p = num.coartados[i]!;
-      const b = bCoartados[nCoart * k + i]!;
-      reacciones[p] = -b;
-      magnitud[p] = Math.abs(b);
+    if (k >= 0) {
+      for (let i = 0; i < nCoart; i++) {
+        const p = num.coartados[i]!;
+        const b = bCoartados[nCoart * k + i]!;
+        reacciones[p] = -b;
+        magnitud[p] = Math.abs(b);
+      }
     }
     for (const e of K.coartados) {
       const nq = e.gdl.length;
@@ -354,6 +383,14 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         magnitud[6 * v + a]! += m;
       }
     });
+    return reacciones;
+  };
+  for (let k = 0; k < nc; k++) {
+    const caso = casos[k]!;
+    const uI = impuestosDelCaso(caso, P); // û por GDL físico independiente
+    if (sol?.X) for (let j = 0; j < n; j++) uI[num.gdlDeEcuacion[j]!] = sol.X[n * k + j]!;
+    const u = desplazamientosFisicos(num, uI);
+    const reacciones = reaccionesDe(uI, u, k);
     const eq = equilibrio(geo, cargasNodales(caso, P), reacciones, magnitud, sumaResultantes(deBarras[k]!.resultante, deLaminas[k]!.resultante));
     // Esfuerzos de las barras en los extremos de su tramo flexible
     const esfuerzosBarras = new Float64Array(12 * (modelo.barras?.length ?? 0));
@@ -405,7 +442,78 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   if (diag.hayErrores) {
     return { valido: false, casosNoValidos: equilibrioRoto ? resultados : undefined, diagnosticos: diag.lista, estadisticas };
   }
-  return { valido: true, casos: resultados, diagnosticos: diag.lista, estadisticas };
+  if (!plan) return { valido: true, casos: resultados, diagnosticos: diag.lista, estadisticas };
+
+  // 9. Modos (VS2): la flexibilidad en los GDL dinámicos, el problema propio y la forma de cada modo
+  const X = sol?.X;
+  if (!X) {
+    diag.error("modal/sin-ecuaciones", "El análisis modal no se puede hacer: el modelo no tiene ecuaciones.");
+    return { valido: false, diagnosticos: diag.lista, estadisticas };
+  }
+  const F = new Float64Array(nm * nm);
+  const xy = new Float64Array(2 * nm);
+  for (let i = 0; i < nm; i++) {
+    const p = plan.gdl[i]!;
+    const e = num.ecuacion[p]!;
+    for (let j = 0; j < nm; j++) F[nm * i + j] = X[n * (nc + j) + e]!;
+    const v = Math.floor(p / 6);
+    xy[2 * i] = geo.xyz[3 * v]!;
+    xy[2 * i + 1] = geo.xyz[3 * v + 1]!;
+  }
+  const condensados = modosCondensados(plan, F, xy, diag);
+  if (!condensados || diag.hayErrores) return { valido: false, diagnosticos: diag.lista, estadisticas };
+  const modos: ModoVibracion[] = [];
+  const nDiaf = plan.diafragmas.length;
+  const uE = new Float64Array(n);
+  const uI = new Float64Array(P);
+  const fNodal = new Float64Array(P);
+  const rotos: number[] = [];
+  const elPlan = plan;
+  condensados.forEach((md, im) => {
+    // û = Σ fⱼ·xⱼ, con xⱼ la solución de la carga unidad en el GDL dinámico j
+    uE.fill(0);
+    fNodal.fill(0);
+    const fuerzas = new Float64Array(3 * nDiaf);
+    for (let j = 0; j < nm; j++) {
+      const fj = md.f[j]!;
+      fNodal[elPlan.gdl[j]!] = fj;
+      fuerzas[3 * elPlan.diafragma[j]! + elPlan.componente[j]!] = fj;
+      if (fj === 0) continue;
+      const o = n * (nc + j);
+      for (let e = 0; e < n; e++) uE[e]! += fj * X[o + e]!;
+    }
+    uI.fill(0);
+    for (let e = 0; e < n; e++) uI[num.gdlDeEcuacion[e]!] = uE[e]!;
+    const u = desplazamientosFisicos(num, uI);
+    const eq = equilibrio(geo, fNodal, reaccionesDe(uI, u, -1), magnitud);
+    if (!u.every(Number.isFinite) || !(eq.fuerzas <= TOL_EQUILIBRIO && eq.momentos <= TOL_EQUILIBRIO)) rotos.push(im + 1);
+    const forma = new Float64Array(3 * nDiaf);
+    elPlan.diafragmas.forEach((df, d) => {
+      const m = df.maestro;
+      const rz = u[6 * m + 5]!;
+      forma[3 * d] = u[6 * m]! - (df.cm[1] - geo.xyz[3 * m + 1]!) * rz;
+      forma[3 * d + 1] = u[6 * m + 1]! + (df.cm[0] - geo.xyz[3 * m]!) * rz;
+      forma[3 * d + 2] = rz;
+    });
+    modos.push({ omega2: md.omega2, periodo: (2 * Math.PI) / Math.sqrt(md.omega2), forma, fuerzas, participacion: md.participacion, masaEfectiva: md.masaEfectiva, u, equilibrio: eq });
+  });
+  if (rotos.length) {
+    diag.error(
+      "modal/equilibrio",
+      `${rotos.length === 1 ? `El modo ${rotos[0]} no cumple` : `Los modos ${listaIds(rotos.map(String))} no cumplen`} el equilibrio entre sus fuerzas de inercia y sus reacciones (tolerancia ${TOL_EQUILIBRIO}): el análisis modal no es válido.`,
+      undefined,
+      { modos: rotos },
+    );
+    return { valido: false, diagnosticos: diag.lista, estadisticas };
+  }
+  let residuo = 0;
+  for (let j = 0; j < nm; j++) residuo = Math.max(residuo, sol!.residuos[nc + j]!);
+  if (residuo > RESIDUO_OBJETIVO) {
+    diag.aviso("solver/residuo", `Las soluciones unitarias del análisis modal quedan con un error hacia atrás de ${residuo.toExponential(2)} tras el refinamiento (objetivo ${RESIDUO_OBJETIVO}).`, undefined, { residuo });
+  }
+  const modal: ResultadoModal = { g: plan.g, masas: plan.masas, cm: plan.cm, diafragmas: plan.diafragmas, modos, gdl: nm, residuo };
+  marcar("modal");
+  return { valido: true, casos: resultados, diagnosticos: diag.lista, estadisticas, modal };
 }
 
 /** Cargas nodales del caso (ya comprobadas), 6 por nudo, sumadas en el orden del caso. */

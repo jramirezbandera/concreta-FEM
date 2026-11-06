@@ -109,6 +109,9 @@
       "properties": {
         "viento": {
           "$ref": "#/$defs/VientoEdificio"
+        },
+        "sismo": {
+          "$ref": "#/$defs/SismoEdificio"
         }
       },
       "additionalProperties": false
@@ -1794,6 +1797,34 @@
           "additionalProperties": false
         }
       ]
+    },
+    "SismoEdificio": {
+      "type": "object",
+      "properties": {
+        "masas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "caso": {
+                "type": "string"
+              },
+              "fraccion": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "caso",
+              "fraccion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nievePermanente": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
     },
     "TipoAccion": {
       "enum": [

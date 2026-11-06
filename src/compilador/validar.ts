@@ -9,6 +9,7 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { ladosAbacos, resolverAbacos } from "./abacos.ts";
 import { problemaBorde, resolverBordes } from "./bordes.ts";
+import { calcularSismo } from "./sismo.ts";
 import { calcularViento, resolverViento } from "./viento.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type Barra, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
@@ -296,6 +297,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   }
   // VS1: si el viento sigue sin resolver, es que no se puede calcular; por qué
   if (fisico.acciones?.viento) for (const e of calcularViento(fisico)?.errores ?? []) diag.error(e.codigo, e.mensaje, e.ids);
+  // VS2: las fracciones de masa del sismo que no se pueden saber
+  if (fisico.acciones?.sismo !== undefined) for (const e of calcularSismo(fisico)?.errores ?? []) diag.error(e.codigo, e.mensaje, e.ids);
   if (!(num(op.epsGeom) && op.epsGeom > 0 && num(op.epsSnap) && op.epsSnap >= op.epsGeom && num(op.factorZonaRigida) && op.factorZonaRigida >= 0 && op.factorZonaRigida <= 1)) {
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
     return null;

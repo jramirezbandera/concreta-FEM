@@ -257,6 +257,27 @@ export interface CasoCarga {
   impuestos?: readonly DesplazamientoImpuesto[];
 }
 
+/** Aceleración de la gravedad normal, m/s²: la que convierte en masa (t) el peso (kN) de las cargas. */
+export const GRAVEDAD = 9.80665;
+
+/**
+ * Análisis modal (fase VS2, cabecera de `modal.ts`): de dónde sale la masa. Con él, el cálculo da
+ * además las masas de cada diafragma rígido y los modos de vibración (`ResultadoCalculo.modal`).
+ * Las masas van en t (kN·s²/m) y sólo tienen inercia horizontal (ux y uy de su nudo).
+ */
+export interface DefinicionModal {
+  /**
+   * Casos cuyas cargas hacen de masa, con la fracción que cuenta de cada uno: en cada nudo,
+   * m = −fracción·Fz/g, con Fz la componente vertical de las fuerzas nodales equivalentes del caso
+   * (las que ensambla el cálculo: el peso con su reparto).
+   */
+  masas?: readonly { caso: string; fraccion: number }[];
+  /** Masas puestas directamente en nudos, t. */
+  nodales?: readonly { nudo: number; m: number }[];
+  /** Aceleración de la gravedad, m/s². Por defecto, `GRAVEDAD`. */
+  g?: number;
+}
+
 export interface ModeloAnalitico {
   nudos: readonly NudoAnalitico[];
   barras?: readonly BarraAnalitica[];
@@ -265,6 +286,70 @@ export interface ModeloAnalitico {
   apoyos?: readonly Apoyo[];
   restricciones?: readonly Restriccion[];
   casos: readonly CasoCarga[];
+  /** VS2: si está, se calculan también las masas por diafragma y los modos de vibración. */
+  modal?: DefinicionModal;
+}
+
+/** Masa de un diafragma rígido (VS2): la de sus nudos y la que le llega de los de fuera. */
+export interface DiafragmaModal {
+  /** Índice en `restricciones` e id de la restricción. */
+  restriccion: number;
+  id: string;
+  /** Nudo maestro y su cota, m. */
+  maestro: number;
+  z: number;
+  /** Masa, t. */
+  masa: number;
+  /** Centro de masas, m (el punto del maestro si no tiene masa). */
+  cm: [number, number];
+  /** Inercia de giro respecto al eje vertical por el centro de masas, t·m². */
+  J: number;
+  /** De `masa`, la de los nudos que no son del diafragma y se le asignan por su cota, t. */
+  repartida: number;
+}
+
+/**
+ * Un modo de vibración, normalizado a la masa (φᵀ·M·φ = 1). Las direcciones son X, Y y el giro
+ * alrededor del eje vertical por el centro de masas de todos los diafragmas.
+ */
+export interface ModoVibracion {
+  /** ω², rad²/s², y periodo T = 2π/ω, s. */
+  omega2: number;
+  periodo: number;
+  /** [ux, uy, rz] de cada diafragma (en el orden de `diafragmas`) en su centro de masas: 3 por diafragma. */
+  forma: Float64Array;
+  /**
+   * Fuerzas de inercia ω²·M·φ sobre el maestro de cada diafragma, [Fx, Fy, Mz] (3 por diafragma, con
+   * Mz respecto al maestro): el modo es la respuesta estática a ellas.
+   */
+  fuerzas: Float64Array;
+  /** Factores de participación Γ = φᵀ·M·r en X, en Y y en el giro. */
+  participacion: [number, number, number];
+  /** Masa efectiva Γ² entre la masa total de cada dirección (suman 1 entre todos los modos). */
+  masaEfectiva: [number, number, number];
+  /** La forma completa: desplazamientos de todos los nudos, 6 por nudo. */
+  u: Float64Array;
+  /** Regla de oro 2 en el modo: sus fuerzas de inercia contra las reacciones que dan. */
+  equilibrio: { fuerzas: number; momentos: number };
+}
+
+export interface ResultadoModal {
+  g: number;
+  /**
+   * Masas, t: la de todas las cargas que hacen de masa (`total`), la que queda en los diafragmas
+   * (`diafragmas`, la que vibra), la que va al terreno (la de los nudos con apoyo horizontal y la
+   * parte de los nudos de fuera que les toca a los apoyos) y, de la de los diafragmas, la de los
+   * nudos que no son de ninguno y se les asigna por su cota (`repartida`).
+   */
+  masas: { total: number; diafragmas: number; terreno: number; repartida: number };
+  /** Centro de masas de todos los diafragmas, m: el eje del giro de `participacion`. */
+  cm: [number, number];
+  diafragmas: DiafragmaModal[];
+  /** Todos los modos del modelo condensado, del periodo mayor al menor. */
+  modos: ModoVibracion[];
+  /** GDL dinámicos (los de los maestros con masa) y el mayor error hacia atrás de sus soluciones unitarias. */
+  gdl: number;
+  residuo: number;
 }
 
 export interface ResultadoCaso {
@@ -331,5 +416,5 @@ export interface EstadisticasCalculo {
  * depurar, para que ningún consumidor los presente por descuido.
  */
 export type ResultadoCalculo =
-  | { valido: true; casos: ResultadoCaso[]; diagnosticos: Diagnostico[]; estadisticas: EstadisticasCalculo }
+  | { valido: true; casos: ResultadoCaso[]; diagnosticos: Diagnostico[]; estadisticas: EstadisticasCalculo; /** Sólo con `modelo.modal`. */ modal?: ResultadoModal }
   | { valido: false; casosNoValidos?: ResultadoCaso[]; diagnosticos: Diagnostico[]; estadisticas?: EstadisticasCalculo };

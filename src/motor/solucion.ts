@@ -68,6 +68,13 @@ export interface OpcionesResolver {
   limiteMemoria?: number;
   /** Se llama al terminar cada subfase, con su duración en ms. */
   alProgreso?: (fase: string, ms: number) => void;
+  /**
+   * Tamaños de los grupos de lados consecutivos que se refinan cada uno por su cuenta (suman `nrhs`).
+   * Por defecto, uno con todos. El refinamiento es por grupo entero: si un lado lo necesita, se
+   * refinan todos los de su grupo. Con los lados del análisis modal en un grupo aparte, los casos se
+   * refinan (o no) como sin él y salen con los mismos bits.
+   */
+  grupos?: readonly number[];
 }
 
 const MAX_PIVOTES_NULOS = 64;
@@ -245,8 +252,8 @@ export function resolver(
     let R: Float64Array | null = null;
     const y = new Float64Array(n);
     const ya = new Float64Array(n);
-    const calcularResiduos = () => {
-      for (let k = 0; k < nrhs; k++) {
+    const calcularResiduos = (desde = 0, hasta = nrhs) => {
+      for (let k = desde; k < hasta; k++) {
         const x = X.subarray(n * k, n * (k + 1));
         productoSimetrico(patron, valores, x, y);
         productoSimetricoAbsoluto(patron, valores, x, ya);
@@ -264,18 +271,26 @@ export function resolver(
     calcularResiduos();
     marcar("residuo");
     let pasos = 0;
-    while (pasos < 3 && residuos.some((r) => r > RESIDUO_SUFICIENTE)) {
-      const anterior = Math.max(...residuos);
-      if (!R) {
-        R = new Float64Array(n * nrhs);
-        calcularResiduos();
+    let a = 0;
+    for (const tam of opciones.grupos ?? [nrhs]) {
+      const b = a + tam;
+      const delGrupo = residuos.subarray(a, b);
+      let pasosGrupo = 0;
+      while (pasosGrupo < 3 && delGrupo.some((r) => r > RESIDUO_SUFICIENTE)) {
+        const anterior = Math.max(...delGrupo);
+        if (!R) {
+          R = new Float64Array(n * nrhs);
+          calcularResiduos();
+        }
+        const dX = factor.resolver(tam === nrhs ? R : R.subarray(n * a, n * b), tam);
+        for (let i = 0; i < dX.length; i++) X[n * a + i]! += dX[i]!;
+        pasosGrupo++;
+        calcularResiduos(a, b);
+        marcar("refinamiento");
+        if (Math.max(...delGrupo) > anterior / 2) break;
       }
-      const dX = factor.resolver(R, nrhs);
-      for (let i = 0; i < X.length; i++) X[i]! += dX[i]!;
-      pasos++;
-      calcularResiduos();
-      marcar("refinamiento");
-      if (Math.max(...residuos) > anterior / 2) break;
+      pasos = Math.max(pasos, pasosGrupo);
+      a = b;
     }
     const nnzL = factor.nnzL;
     factor.liberar();

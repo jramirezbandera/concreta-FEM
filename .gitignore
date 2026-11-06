@@ -60,3 +60,6 @@ validacion/sombra/*/.datos/
 
 # Validación DW: las muestras de ACadSharp (se traen con validacion/dwg/muestras.ts)
 validacion/dwg/.muestras/
+
+# VS2: los modelos del oráculo de los modos (validacion/vs2/modelos-oraculo.ts)
+validacion/vs2/opensees-modelos.json

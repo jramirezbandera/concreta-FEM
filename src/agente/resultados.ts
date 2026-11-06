@@ -11,11 +11,14 @@
  * la cabecera lleva también la firma del modelo analítico calculado (`firmaModelo`), y unos
  * resultados sólo se desempaquetan sobre un modelo con la misma firma.
  *
+ * Con el análisis modal (VS2), la cabecera lleva además las masas de los diafragmas y los números de
+ * cada modo, y el bloque, tras los casos, los vectores de cada modo (forma, fuerzas y u).
+ *
  * Puro: entra y sale texto y bytes; la CLI los escribe.
  */
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { EstadisticasCalculo, ModeloAnalitico, ResultadoCaso } from "../motor/modelo.ts";
+import type { EstadisticasCalculo, ModeloAnalitico, ModoVibracion, ResultadoCaso, ResultadoModal } from "../motor/modelo.ts";
 
 export const FORMATO_RESULTADOS = "concreta-fem/resultados@1";
 
@@ -175,17 +178,36 @@ export interface CabeceraResultados {
   estadisticas: EstadisticasCalculo;
   /** Diagnósticos del cálculo (avisos), ya con los ids físicos. */
   diagnosticos: Diagnostico[];
+  /** VS2: el análisis modal, si el modelo lo pide. Los vectores de cada modo van en el bloque, tras los casos. */
+  modal?: CabeceraModal;
 }
+
+/** El análisis modal sin los vectores de sus modos, que van en el bloque: de cada uno, forma, fuerzas y u, en este orden. */
+export type CabeceraModal = Omit<ResultadoModal, "modos"> & {
+  modos: Omit<ModoVibracion, "forma" | "fuerzas" | "u">[];
+  /** Longitud de `u` de cada modo (6 por nudo); `forma` y `fuerzas` son 3 por diafragma. */
+  longitudU: number;
+};
 
 const LITTLE_ENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 /** Empaqueta los resultados de `modelo` (el modelo analítico que se calculó). */
-export function empaquetarResultados(huella: string, modelo: ModeloAnalitico, casos: readonly ResultadoCaso[], estadisticas: EstadisticasCalculo, diagnosticos: Diagnostico[]): { cabecera: CabeceraResultados; bytes: Uint8Array } {
+export function empaquetarResultados(
+  huella: string,
+  modelo: ModeloAnalitico,
+  casos: readonly ResultadoCaso[],
+  estadisticas: EstadisticasCalculo,
+  diagnosticos: Diagnostico[],
+  modal?: ResultadoModal,
+): { cabecera: CabeceraResultados; bytes: Uint8Array } {
   if (!LITTLE_ENDIAN) throw new Error("Los resultados se guardan en little-endian y esta máquina no lo es");
   const c0 = casos[0];
   const longitudes = { u: c0?.u.length ?? 0, reacciones: c0?.reacciones.length ?? 0, esfuerzosBarras: c0?.esfuerzosBarras.length ?? 0, esfuerzosLaminas: c0?.esfuerzosLaminas.length ?? 0 };
   const porCaso = CAMPOS.reduce((s, k) => s + longitudes[k], 0);
-  const datos = new Float64Array(porCaso * casos.length);
+  const nd3 = 3 * (modal?.diafragmas.length ?? 0);
+  const longitudU = modal?.modos[0]?.u.length ?? 0;
+  const porModo = 2 * nd3 + longitudU;
+  const datos = new Float64Array(porCaso * casos.length + porModo * (modal?.modos.length ?? 0));
   casos.forEach((c, k) => {
     let o = k * porCaso;
     for (const campo of CAMPOS) {
@@ -194,8 +216,28 @@ export function empaquetarResultados(huella: string, modelo: ModeloAnalitico, ca
       o += longitudes[campo];
     }
   });
+  let cabeceraModal: CabeceraModal | undefined;
+  if (modal) {
+    modal.modos.forEach((m, i) => {
+      if (m.forma.length !== nd3 || m.fuerzas.length !== nd3 || m.u.length !== longitudU) throw new Error(`El modo ${i + 1} no tiene los vectores del tamaño de los demás`);
+      const o = porCaso * casos.length + i * porModo;
+      datos.set(m.forma, o);
+      datos.set(m.fuerzas, o + nd3);
+      datos.set(m.u, o + 2 * nd3);
+    });
+    cabeceraModal = { ...modal, modos: modal.modos.map(({ forma: _f, fuerzas: _q, u: _u, ...resto }) => resto), longitudU };
+  }
   return {
-    cabecera: { formato: FORMATO_RESULTADOS, huella, modelo: firmaModelo(modelo), casos: casos.map((c) => ({ id: c.id, equilibrio: c.equilibrio, residuo: c.residuo })), longitudes, estadisticas, diagnosticos },
+    cabecera: {
+      formato: FORMATO_RESULTADOS,
+      huella,
+      modelo: firmaModelo(modelo),
+      casos: casos.map((c) => ({ id: c.id, equilibrio: c.equilibrio, residuo: c.residuo })),
+      longitudes,
+      estadisticas,
+      diagnosticos,
+      ...(cabeceraModal ? { modal: cabeceraModal } : {}),
+    },
     bytes: new Uint8Array(datos.buffer),
   };
 }
@@ -203,19 +245,37 @@ export function empaquetarResultados(huella: string, modelo: ModeloAnalitico, ca
 /**
  * Los casos de unos resultados guardados, si son de `modelo` (el modelo analítico de la compilación
  * de ahora); si no, el motivo: la cabecera y los bytes no casan, o son de otro modelo analítico
- * aunque la huella sea la misma (o no llevan su firma: los guardó una versión anterior).
+ * aunque la huella sea la misma (o no llevan su firma: los guardó una versión anterior). Con ellos,
+ * el análisis modal, si el modelo lo pide (y si lo pide y no lo llevan, no valen).
  */
-export function desempaquetarResultados(cabecera: CabeceraResultados, bytes: Uint8Array, modelo: ModeloAnalitico): { casos: ResultadoCaso[] } | { motivo: string } {
+export function desempaquetarResultados(cabecera: CabeceraResultados, bytes: Uint8Array, modelo: ModeloAnalitico): { casos: ResultadoCaso[]; modal?: ResultadoModal } | { motivo: string } {
   if (cabecera.formato !== FORMATO_RESULTADOS || !LITTLE_ENDIAN) return { motivo: "no tienen el formato de esta versión" };
   const f = cabecera.modelo as Partial<FirmaModelo> | undefined;
   if (!f || typeof f.estructura !== "string" || typeof f.sumas !== "object" || f.sumas === null || !Array.isArray(f.cargas)) return { motivo: "no llevan la firma del modelo calculado (los guardó una versión anterior)" };
   const otro = difiereFirma(f as FirmaModelo, firmaModelo(modelo));
   if (otro) return { motivo: `son de otro modelo analítico: ${otro}` };
   const porCaso = CAMPOS.reduce((s, k) => s + cabecera.longitudes[k], 0);
-  if (bytes.byteLength !== 8 * porCaso * cabecera.casos.length) return { motivo: "resultados.bin no casa con su cabecera" };
+  const cm = cabecera.modal;
+  if (!!modelo.modal !== !!cm) return { motivo: cm ? "llevan un análisis modal que el modelo no pide" : "no llevan los modos de vibración que pide el modelo" };
+  if (cm && !(Array.isArray(cm.modos) && Array.isArray(cm.diafragmas) && Number.isInteger(cm.longitudU) && cm.longitudU >= 0)) return { motivo: "su análisis modal no tiene el formato de esta versión" };
+  const nd3 = 3 * (cm?.diafragmas.length ?? 0);
+  const porModo = cm ? 2 * nd3 + cm.longitudU : 0;
+  if (bytes.byteLength !== 8 * (porCaso * cabecera.casos.length + porModo * (cm?.modos.length ?? 0))) return { motivo: "resultados.bin no casa con su cabecera" };
   // Copia alineada: los bytes de un fichero no tienen por qué empezar en múltiplo de 8
   const datos = new Float64Array(bytes.slice().buffer);
+  let modal: ResultadoModal | undefined;
+  if (cm) {
+    const { longitudU, modos, ...resto } = cm;
+    modal = {
+      ...resto,
+      modos: modos.map((m, i) => {
+        const o = porCaso * cabecera.casos.length + i * porModo;
+        return { ...m, forma: datos.slice(o, o + nd3), fuerzas: datos.slice(o + nd3, o + 2 * nd3), u: datos.slice(o + 2 * nd3, o + porModo) };
+      }),
+    };
+  }
   return {
+    ...(modal ? { modal } : {}),
     casos: cabecera.casos.map((c, k) => {
       let o = k * porCaso;
       const r = {} as Record<(typeof CAMPOS)[number], Float64Array>;

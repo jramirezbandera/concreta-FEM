@@ -589,9 +589,40 @@ export interface ModeloFisico {
   acciones?: AccionesEdificio;
 }
 
-/** Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento. */
+/** Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento; VS2, las masas y los modos del sismo. */
 export interface AccionesEdificio {
   viento?: VientoEdificio;
+  sismo?: SismoEdificio;
+}
+
+/**
+ * Sismo de la NCSE-02 (fase VS). Con VS2, sus masas y sus modos de vibración: basta `"sismo": {}`
+ * para que el cálculo dé la masa, el centro de masas y la inercia de giro de cada planta con
+ * diafragma rígido, y los periodos y las formas de todos sus modos (`fem consultar modos`). El
+ * espectro y los casos del sismo llegan con VS3.
+ *
+ * La masa sale de las cargas (art. 3.2): de cada caso, la fracción que le toca de la componente
+ * vertical de sus cargas, entre g. Por defecto, la de su acción:
+ * - G (y el caso del peso propio), 1;
+ * - Q, por el nombre de su ψ: "uso-A", 0,5; "uso-B", "uso-C" y "uso-D", 0,6; "uso-E", 0,6 y
+ *   "uso-G", 0 (estas dos no están en la norma);
+ * - S, 0,5 si la nieve permanece más de 30 días al año (`nievePermanente`) y 0 si no;
+ * - W, T, E, A y N, 0.
+ *
+ * Un caso Q o S sin ψ por su nombre, o sin acción, necesita su fracción en `masas`. Todas las plantas
+ * con forjado, salvo la más baja, tienen que tener diafragma rígido.
+ */
+export interface SismoEdificio {
+  /**
+   * Fracción de la carga de un caso que cuenta como masa, de 0 a 1, en lugar de la de su acción
+   * (1 en un almacén o un archivo, o en un depósito de agua, por ejemplo).
+   */
+  masas?: readonly { caso: string; fraccion: number }[];
+  /**
+   * ¿Permanece la nieve más de 30 días al año? Si no se da, se toma que sí en los casos con el ψ
+   * "nieve-mas-de-1000" y que no en los de "nieve-hasta-1000".
+   */
+  nievePermanente?: boolean;
 }
 
 /**

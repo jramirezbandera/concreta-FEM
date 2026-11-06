@@ -786,7 +786,10 @@ export function pesoPropioCalculado(f: ModeloFisico, opciones: OpcionesCompilaci
   if (!caso) return null;
   // Sin la zona rígida de la base de los pilares (LV-d): el peso es el mismo, pero el de esa zona
   // iría al nudo de la planta de abajo, y el esperado cuenta el tramo entero en la de su cabeza
-  const c = compilar({ ...f, casos: [caso], cargas: [] }, { ...opciones, zonaRigidaBase: false });
+  // Sin las acciones del programa (VS): no cambian el peso ni la malla, y sus casos no están aquí (las
+  // masas del sismo nombran casos que se quitan)
+  const { acciones: _a, ...sinAcciones } = f;
+  const c = compilar({ ...sinAcciones, casos: [caso], cargas: [] }, { ...opciones, zonaRigidaBase: false });
   if (!c.valido) return null;
   const ids = f.plantas.map((p) => p.id);
   const r = new Map<string, number>();
