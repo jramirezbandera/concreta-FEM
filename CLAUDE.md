@@ -46,6 +46,7 @@
    - sólo MIT, BSD, Apache-2.0, MPL-2.0 o ISC (equivalente a MIT; admitida el 2026-10-04 para el mallador de C2: delaunator y constrainautor, H29);
    - Unlicense (dominio público), admitida el 2026-10-04 sólo para robust-predicates, que delaunator y constrainautor importan;
    - SIL OFL 1.1, admitida el 2026-10-11 sólo para fuentes (Geist y Geist Mono del visor, V-b);
+   - CC BY 4.0, admitida el 2026-11-06 sólo para los datos de peligrosidad sísmica del IGN (ab y K por municipio, copiados de Concreta con su manifiesto; VS-l), citada en `NOTICE`;
    - no usar ni copiar código de OpenSees, xara, stabileo (AGPL), CHOLMOD Supernodal (GPL) ni Triangle (H54);
    - lo que se porte de PyNite, de hekatan-struct-lineal o de ACadSharp (MIT; el lector de DWG, fase DW) se cita en `NOTICE`. Mientras se porta ACadSharp, no se lee el código fuente de LibreDWG (GPL): sólo se usa su ejecutable, como oráculo.
 7. **No se usa para calcular de verdad** hasta que pase la batería de validación y un periodo «en sombra»: los mismos proyectos reales calculados también con SAP2000 o CYPE, para comparar.
@@ -841,11 +842,12 @@
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1, BN2 y BN3 hechas, falta su puerta de uso** (`barras.md`), de planta a planta y con `dz` previsto; después, lo de `barras.md` §7 (`dz`, el objeto `cruz`) y los desniveles de paño;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
-  - **pedido por el usuario el 2026-11-05; plan del 2026-11-06, sin decidir** (`docs/fem3d/viento-sismo.md`): viento y sismo como en CYPECAD. Hoy son casos con las cargas metidas a mano (el sismo, como fuerzas estáticas equivalentes con signo; `investigacion/03-resultados.md`).
+  - **pedido por el usuario el 2026-11-05; plan del 2026-11-06, decidido el mismo día** (`docs/fem3d/viento-sismo.md`): viento y sismo como en CYPECAD. Hoy son casos con las cargas metidas a mano (el sismo, como fuerzas estáticas equivalentes con signo; `investigacion/03-resultados.md`).
     - **Viento (VS1):** el de `lib/acciones/viento.ts` de Concreta (CTE DB SE-AE, por planta y dirección), con el ancho de cada planta sacado del modelo; 8 casos del programa (4 direcciones × ±e).
     - **Masas y modos (VS2):** masas desde las cargas (G entero y las Q con la fracción de la NCSE-02 3.2), condensadas exactas a los 3 GDL de cada diafragma con 3n soluciones sobre la factorización del cálculo; todos los 3n modos.
     - **Espectral (VS3):** el espectro de la NCSE-02 (3.6.2.2, con la rama ascendente que el simplificado no tiene), cada modo como caso modal y la combinación en cada variable (3.6.2.4: SRSS con los modos a < 10 % sumados en valor absoluto), con el signo del modo dominante; excentricidad accidental como torsor estático.
     - **Después:** VS4 (la app y el agente), VS5 (en sombra con CYPECAD) y VS6 (plantas semirrígidas).
-    - **Pendiente del usuario:** VS-a…VS-n (§8), entre ellas admitir la CC BY 4.0 del IGN para la peligrosidad por municipio (VS-l);
+    - **Decididas VS-a…VS-n** (§8), como se proponían salvo: la nieve con la casilla «permanece más de 30 días» (1 000 m sólo por defecto, VS-d); la CC BY 4.0 admitida para los datos del IGN, con el Anejo 1 del BOE como oráculo (VS-l); VS1 primero y sola (VS-m); la planta `escalon`, con su propia banda (VS-n).
+    - **Para integrarse:** `acciones.viento` y `acciones.sismo` siguen los campos de `PubVientoNieve` y `PubSismo` de Concreta, cuyo sismo arranca con `metodo: "programa"`: el programa es este motor (§1);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

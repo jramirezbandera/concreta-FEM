@@ -1,6 +1,6 @@
 # VS: viento y sismo generados desde la situación
 
-> **Fecha:** 2026-11-06. **Estado:** propuesta, sin decidir (VS-a…VS-n en §8).
+> **Fecha:** 2026-11-06. **Estado:** decidido el 2026-11-06 (§8); VS1, en curso.
 >
 > **Origen:** el usuario, el 2026-11-05: viento y sismo «como en CYPECAD». Hoy son casos con las cargas metidas a mano, y el sismo, como fuerzas estáticas equivalentes con signo (`investigacion/03-resultados.md`, RES-13).
 
@@ -38,6 +38,11 @@
 
   Pruebas en `src/test/calc/ncse02Chain.test.ts` y `ncse02Applicability.test.ts`, con sus fixtures.
 - **Peligrosidad sísmica por municipio:** `src/features/seismic-ncse02/ncse02.hazard.json` (116 KB), con ab y K de cada municipio. Viene del IGN (CC BY 4.0), completado con el Anejo 1 del BOE, y su manifiesto lleva el sha256.
+- **Las publicaciones de los módulos** (`src/lib/pub`), visto el 2026-11-06 a indicación del usuario. Es lo que leerá el FEM al integrarse, en lugar de pedir los datos otra vez:
+  - `PubSismo` (`features/seismic-ncse02/state.ts`, v1): municipio e INE, ab, K, importancia, ρ, terreno, C, S, ac, TA, TB, sistema, μ, Ω, plantas y H, y `metodo`. **Su valor por defecto es `"programa"`:** Concreta da el emplazamiento y el espectro, y el cálculo lo hace un programa. Ese programa es este motor;
+  - `PubVientoNieve` (`features/viento-nieve/state.ts`, v1): provincia, municipio, altitud, zona, qb y su origen, aspereza, H, las dos direcciones y las fuerzas por planta.
+
+  Por eso `acciones.viento` y `acciones.sismo` (§3) llevan los mismos campos con los mismos nombres de concepto que esas publicaciones: integrarse será leer el sobre, no traducirlo. `sismoPub.ts` (cargas por planta) enseña cómo se lee un sobre y por qué se compara el emplazamiento (el «dato fantasma» del ejemplo de Granada).
 
 ## 2. Lo que dice la norma y manda en el diseño
 
@@ -181,7 +186,7 @@ Cuatro piezas, todas en código puro:
 | **VS5** | En sombra con el CYPECAD del usuario | VS4 |
 | **VS6** (opcional) | Plantas sin diafragma con masa: Lanczos con desplazamiento sobre la factorización | VS3 |
 
-VS1 y VS2 son independientes y pueden ir a la vez.
+VS1 y VS2 son independientes. Por VS-m, VS1 va primero y sola; VS2 sólo a la vez si la lleva otra sesión.
 
 ## 5. Criterios de paso y oráculos
 
@@ -227,36 +232,33 @@ VS1 y VS2 son independientes y pueden ir a la vez.
 - **Plantas semirrígidas** (`"ninguno"`) con masa: hasta VS6, error.
 - **La norma puede cambiar** (NCSR-23). Por eso el espectro y las fracciones de masa quedan en un módulo de norma aparte (`src/normas/ncse02.ts`), como en Concreta.
 
-## 8. Decisiones para el usuario
+## 8. Decisiones del usuario (2026-11-06)
 
-- **VS-a, la norma:** la NCSE-02 (propuesto), con el espectro en un módulo propio para poder añadir la NCSR-23 si se aprueba.
-- **VS-b, el ancho del viento:** por planta, calculado del modelo, con la opción de escribirlo (propuesto); o un rectángulo para todo el edificio, como Concreta.
+Las recomendaciones de Claude, aceptadas por el usuario. Lo que cambia frente a la propuesta está en VS-d, VS-l, VS-m y VS-n.
+
+- **VS-a, la norma:** la NCSE-02, con el espectro y las fracciones de masa en un módulo de norma aparte (`src/normas/ncse02.ts`) para poder añadir la NCSR-23 si se aprueba.
+- **VS-b, el ancho del viento:** por planta, calculado del modelo, con la opción de escribirlo.
 - **VS-c, dónde se aplica el viento:**
-  - con diafragma, una puntual en el centro de la banda ±e (propuesto);
-  - sin diafragma, una lineal por los bordes;
-  - y 8 casos (4 direcciones × ±e, propuesto) o 4 sin excentricidad.
-- **VS-d, las fracciones de masa por ψ:**
-  - uso-A, 0,5; uso-B, C y D, 0,6, como dice 3.2;
-  - **sin valor en la norma:** uso-E (vehículos ligeros, propuesto 0,6), uso-F (cubiertas transitables, propuesto 0,5 o la de su uso) y uso-G (cubiertas sólo de mantenimiento, propuesto 0);
-  - nieve: 0 hasta 1 000 m y 0,5 por encima (propuesto: la de 3.2 es «más de 30 días al año»);
-  - se pueden cambiar por caso.
-- **VS-e, cómo se combinan los modos:**
-  - en cada variable, como dice 3.6.2.4 y hacen los programas comerciales (propuesto);
-  - o fuerzas de planta combinadas y aplicadas como un caso estático (más barato, como 3.6.2.5 y el 3.7.4; con la torsión ambigua).
-- **VS-f, la regla:** SRSS con los modos a menos del 10 % sumados en valor absoluto, como la norma (propuesto por defecto), y la CQC como opción para comparar.
-- **VS-g, el signo:** el del modo de más masa en la dirección, uno para todas las variables (propuesto); o el del modo que más aporta a cada variable.
-- **VS-h, plantas sin diafragma con masa:** error hasta VS6 (propuesto).
-- **VS-i, la excentricidad accidental:** como torsor estático ±F_k·L/20 (propuesto) o moviendo el CM y rehaciendo los modos. VS3 mide cuánto difieren en el edificio objetivo.
-- **VS-j, el método simplificado:** sólo como comprobación de sensatez al lado del espectral (propuesto), no como método de cálculo. En un modelo 3D, su reparto por elementos con γₐ no tiene sentido.
-- **VS-k, segundo orden:** sólo el aviso con θ (propuesto). Amplificar va en otra fase.
-- **VS-l, los datos de peligrosidad:** hay tres opciones.
-  - Copiar el JSON de Concreta. Es del IGN con CC BY 4.0: son datos, no código, y es una licencia nueva para la regla 6, que habría que admitir con su cita en `NOTICE`.
-  - Sólo la lista del Anejo 1 del BOE: un texto legal, sin derechos de autor (art. 13 LPI), con ab y K de los municipios con ab ≥ 0,04 g.
-  - Sólo ab y K a mano.
-
-  Propuesto: el JSON de Concreta, si se admite la CC BY 4.0.
-- **VS-m, el orden:** VS1 y VS2 a la vez, y luego VS3 y VS4 (propuesto). VS1 sola ya quita trabajo a mano.
-- **VS-n, el viento en la vivienda:** la cubierta baja y la alta a cotas distintas ya se tratan con los anchos por planta (VS-b). Sin decidir: si la planta CUB-S (tipo `escalon`) recibe su banda o va con CUB.
+  - con diafragma, una puntual en el centro de la banda ±e; sin diafragma, una lineal por los bordes;
+  - 8 casos (4 direcciones × ±e). Sólo son lados más sobre la misma factorización, y el viento ya es una familia excluyente en las combinaciones.
+- **VS-d, las fracciones de masa:**
+  - uso-A, 0,5; uso-B, C y D, 0,6 (3.2);
+  - sin valor en la norma: uso-E 0,6, uso-F la de su uso y uso-G 0 (los ψ₂ del Eurocódigo 8);
+  - **nieve, cambiado:** la norma dice «más de 30 días al año», no una altitud. Va una casilla `nievePermanente` en `acciones.sismo`; si no se da, se toma por defecto que permanece por encima de 1 000 m (0,5) y que no por debajo (0), y la hipótesis lo dice;
+  - todas se pueden cambiar por caso.
+- **VS-e, la combinación de los modos:** en cada variable (3.6.2.4). Las fuerzas de planta como un caso estático dejan la torsión ambigua, y aquí manda la precisión.
+- **VS-f, la regla:** SRSS con los modos a menos del 10 % sumados en valor absoluto, por defecto; la CQC con Ω como opción. Cuál se queda por defecto lo decide VS5: si el CYPECAD del usuario usa la CQC, hay que poder comparar con lo mismo.
+- **VS-g, el signo:** el del modo de más masa en la dirección, uno para todas las variables, que es lo que mantiene la concomitancia. El ± lo da el generador.
+- **VS-h, plantas sin diafragma con masa:** error hasta VS6.
+- **VS-i, la excentricidad accidental:** torsor estático ±F_k·L/20; VS3 mide cuánto se separa de mover el CM.
+- **VS-j, el método simplificado:** sólo como comprobación de sensatez.
+- **VS-k, segundo orden:** sólo el aviso con θ.
+- **VS-l, los datos de peligrosidad, cambiado:**
+  - se admite la **CC BY 4.0 sólo para los datos de peligrosidad del IGN** (como la OFL sólo para las fuentes), con su cita en `NOTICE`, y se copia el JSON de Concreta con su manifiesto y su sha256: los mismos datos que Concreta, así que no hay dos fuentes al integrar;
+  - **la lista del Anejo 1 del BOE es el oráculo:** una prueba comprueba que cada municipio del Anejo 1 tiene en el JSON el mismo ab y el mismo K;
+  - ab y K a mano siempre se pueden escribir, por encima del municipio.
+- **VS-m, el orden, cambiado:** VS1 primero y sola (es pequeña y ya quita trabajo); VS2 es la parte arriesgada y va en su propio tramo, salvo que la lleve otra sesión.
+- **VS-n, la planta `escalon` (CUB-S de la vivienda):** su propia banda, con su ancho y su altura de fachada. Tiene su diafragma y su cota; con CUB, la fuerza entraría a la altura y en el diafragma equivocados. VS1 lo comprueba con un cálculo a mano de la vivienda.
 
 ## 9. Fuera de esta fase
 
