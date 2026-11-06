@@ -267,3 +267,49 @@ Las recomendaciones de Claude, aceptadas por el usuario. Lo que cambia frente a 
 - γc = 1,3 y γs = 1,0 en la situación sísmica (RES-13), también de los módulos.
 - Las presiones locales de viento por zonas y la nieve, que ya da Concreta para los elementos.
 - La amplificación por segundo orden, P-Δ (S1: fuera del MVP).
+
+## 10. VS1 hecho (2026-11-06): el viento
+
+Pasan los cuatro criterios de §5. Los casos del programa no se ven todavía en la app: eso es VS4.
+
+**Ya en el repo:**
+- `src/normas/cteViento.ts`: las tablas del DB SE-AE y las piezas de cálculo (ce por la fórmula D.2, la tabla 3.5 interpolada, las alturas tributarias), copiadas de Concreta (`tablasAE.ts`, `interp.ts`, `viento.ts`) con su cita.
+- `acciones.viento` en el modelo físico (`fisico.ts`, en la huella y en los dos esquemas): `zona`, `qb`, `aspereza`, `altitud`, `rasante` y `fachadas` (el área de la banda de una planta escrita, VS-b).
+- `src/compilador/viento.ts`:
+  - `calcularViento(m)`: las fuerzas por planta y dirección, o por qué no se pueden calcular;
+  - `resolverViento(m)`: los 8 casos (`W+X+e` … `W-Y-e`, familia `viento`, ψ de viento) y una puntual por planta y caso (`<caso>@<planta>`), al final de `casos` y `cargas`, y quita `acciones.viento` (idempotente);
+  - `hipotesisViento`: la hipótesis del cálculo, con qb, cp, cs, e y las fuerzas de cada planta.
+- **Dónde se resuelve:** en `fisicoResuelto` (lo usa `validar`), en `compilar` (con los avisos y la hipótesis) y en `Consultas`. Por eso `q.fisico.casos` casa uno a uno con los resultados, también en las combinaciones por defecto, la sensatez de los resultados y el render.
+
+**La banda de cada planta, la regla de la pila:**
+- en cada punto del ancho, las plantas que lo cubren (con sus losas y paños, o con sus vigas si no tienen ni lo uno ni lo otro) se reparten la altura como en Concreta: media planta por debajo y media por encima, desde la rasante;
+- A es la integral de esa altura en el ancho. Con todas las plantas del mismo ancho es la `h_trib · b` de Concreta;
+- con dos cubiertas a cotas distintas, cada una lleva su banda (VS-n);
+- el centro de la banda es su centroide en el ancho, y la recta de acción está a ±e de él.
+
+**Dónde se aplica:**
+- una puntual horizontal en el punto medio del trozo más largo de la recta de acción dentro de una losa de la planta. SP-5 la lleva al diafragma, exacta y sin sembrar el punto: **la malla no cambia**;
+- si la recta no pisa ninguna losa, en el punto de una losa más cercano, con su momento de transporte;
+- en una planta sin losas, en un pilar (en el borde de un paño, si los hay), con su momento.
+
+**Criterios:**
+1. **Concreta:** sus fuerzas en cinco edificios rectangulares, congeladas por `validacion/vs/oraculo-concreta.ts` en `src/compilador/__fixtures__/viento-concreta.json` (de una planta de 4 m a doce de 3,2; qb de la zona, simplificada y escrita), a ≤ 1e-12, con cp, cs, esbeltez, e, ce y la banda. Además, un caso a mano con la fórmula D.2.
+   - **El «≤ 1 %» con la tabla 3.4 no se puede cumplir:** la tabla es la fórmula redondeada a una décima (hasta 0,084, un 6 % con ce = 1,3). Se comprueba lo que dice la norma: sus 40 casillas, a ≤ 0,1 de la fórmula.
+2. **Equilibrio:** la reacción horizontal de cada caso es −ΣF a 1e-9 y su momento, el de las fuerzas en su recta ±e, en un bloque de 3 plantas y trasladado (`viento.test.ts`). En la vivienda, a ≤ 3,3e-13 en los 8 casos.
+3. **Sin `acciones`**, el mismo modelo analítico bit a bit (y con `acciones: {}`). Las referencias congeladas no cambian.
+4. **Metamórficas:** intercambiar X e Y intercambia las fuerzas bit a bit; trasladar el edificio no las cambia y mueve los centros.
+
+**En la vivienda** (`validacion/vs/vivienda.ts`, `out_vivienda.txt`; zona A y aspereza IV de prueba):
+- según X, CUB 17,45 kN y CUB-S 2,50; según Y, 12,58 y 12,18;
+- Σ A es la integral de z_alta − z_baja/2 en el ancho, calculada sin la pila, a 2e-16 (la identidad de la regla, que prueba también `viento.test.ts`).
+
+**Hallazgos:**
+- **VS1-1:** un pilar que atraviesa la cota de una planta sin losa alrededor (los de la cubierta alta, a la cota de la baja) no es de esa planta. Contarlo le daba fachada donde no la tiene, y su nudo no está en su diafragma (C2-f), así que tampoco vale para aplicar la carga. La huella de una planta es la de sus losas y paños.
+- **VS1-2:** las vigas que salen de una losa (la pérgola de la vivienda) no son fachada. Contándolas, la vivienda tenía un 12 % más de área según X.
+- **VS1-3:** el criterio de la tabla 3.4 estaba mal puesto (arriba).
+
+**Fuera de VS1:**
+- el rozamiento (3.3.2-3), la cubierta a dos aguas (D.6) y las direcciones que no son X e Y;
+- el viento en las plantas sin diafragma (`viento/planta-sin-diafragma`, error, VS-c);
+- la zona eólica por provincia y municipio;
+- en la app (VS4): la ficha «Viento», ver los casos del programa en los selectores de caso y dibujarlos. Hoy la app los usa en las combinaciones por defecto, pero el selector de casos lista sólo los del fichero.

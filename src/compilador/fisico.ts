@@ -582,6 +582,50 @@ export interface ModeloFisico {
   cargas?: readonly CargaFisica[];
   /** I2: ejes de replanteo, sólo para el dibujo. No entran en el cálculo ni en la huella. */
   ejes?: readonly EjeReplanteo[];
+  /**
+   * Fase VS: las acciones que el programa genera desde la situación del edificio. Sus casos y sus
+   * cargas no se escriben: el compilador los añade al final de `casos` y de `cargas`.
+   */
+  acciones?: AccionesEdificio;
+}
+
+/** Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento. */
+export interface AccionesEdificio {
+  viento?: VientoEdificio;
+}
+
+/**
+ * Viento del CTE DB SE-AE (art. 3.3, Anejo D) para el análisis global (VS1). Da 8 casos del
+ * programa, de la familia `viento`: según X e Y, en los dos sentidos y con la excentricidad del
+ * 5 % a un lado y al otro (`W+X+e`, `W+X-e`, `W-X+e`, `W-X-e` y los cuatro según Y).
+ *
+ * En cada sentido y cada planta sobre la rasante, F = (cp − cs) · qb · ce(z) · A, con z la cota de
+ * la planta sobre la rasante, cp y cs de la tabla 3.5 por la esbeltez del edificio en esa
+ * dirección y A el área de la fachada que le toca: en cada punto del ancho, la banda de media planta
+ * por debajo y por encima entre las plantas que hay en ese punto (las que lo cubren con sus losas y
+ * paños, o con sus vigas si no los tiene). Va como una puntual horizontal en la planta, en el centro de su
+ * banda desplazado ±e (con el diafragma rígido, exacta: SP-5).
+ */
+export interface VientoEdificio {
+  /** Zona eólica de la figura D.1: qb = 0,42 (A), 0,45 (B) o 0,52 (C) kN/m². */
+  zona: "A" | "B" | "C";
+  /** Presión dinámica, kN/m², en lugar de la de la zona (0,5 es el valor simplificado del art. 3.3.2-1). */
+  qb?: number;
+  /**
+   * Grado de aspereza del entorno (tabla 3.4): I, borde del mar o de un lago; II, terreno rural
+   * llano; III, zona rural accidentada; IV, zona urbana, industrial o forestal; V, centro de
+   * negocios de una gran ciudad.
+   */
+  aspereza: "I" | "II" | "III" | "IV" | "V";
+  /** Altitud del emplazamiento, m: el DB no es aplicable por encima de 2 000 m (art. 3.3.1-2). */
+  altitud?: number;
+  /** Cota de la rasante, m: la de la fachada a barlovento (art. 3.3.3-1). Por defecto, la ±0,00. */
+  rasante?: number;
+  /**
+   * Área de la fachada de la banda de una planta, m², en lugar de la que sale del modelo: para el
+   * viento según X (`x`, la fachada perpendicular a X) y según Y (`y`).
+   */
+  fachadas?: readonly { planta: string; x?: number; y?: number }[];
 }
 
 /**

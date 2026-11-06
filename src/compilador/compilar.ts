@@ -22,6 +22,7 @@ import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, Mo
 import { avisarAbacosUnidos, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
 import { resolverBordes } from "./bordes.ts";
+import { hipotesisViento, resolverViento } from "./viento.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
 import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PERDIDAS } from "./cargas.ts";
@@ -189,7 +190,11 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const abacos = resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom);
   avisarAbacosUnidos(abacos.porLosa, op.tamanoMalla / 2, diag);
   // MA4: las cargas de borde, en lineales por los tramos del borde que las llevan
-  const ctx = validar(resolverBordes(abacos.modelo, op.epsSnap).modelo, op, diag);
+  // VS1: el viento del programa, en sus casos y sus cargas (si no se puede, `validar` dice por qué)
+  const viento = resolverViento(resolverBordes(abacos.modelo, op.epsSnap).modelo);
+  for (const a of viento.calculo?.avisos ?? []) diag.aviso(a.codigo, a.mensaje, a.ids);
+  const delViento = new Set(viento.calculo?.viento ? (viento.modelo.cargas ?? []).filter((c) => viento.calculo!.viento!.casos.includes(c.caso)).map((c) => c.id) : []);
+  const ctx = validar(viento.modelo, op, diag);
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
   avisarApoyosBandas(ctx, diag);
@@ -433,7 +438,11 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     modelo,
     mapeo,
     diagnosticos: diag.lista,
-    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma, planas),
+    // VS1: las puntuales del viento van al diafragma como las de SP-5, pero se dicen en su hipótesis
+    hipotesis: [
+      ...hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma.filter((id) => !delViento.has(id)), planas),
+      ...(viento.calculo?.viento ? [hipotesisViento(viento.calculo.viento)] : []),
+    ],
     huella,
     estadisticas: {
       nudos: nudos.length,

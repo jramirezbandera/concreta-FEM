@@ -43,6 +43,7 @@ import type { Mapeo } from "./mapeo.ts";
 import { diafragmaDe } from "./piezas.ts";
 import { EsfuerzosPiezas } from "./resultados.ts";
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
+import { resolverViento } from "./viento.ts";
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
@@ -204,6 +205,9 @@ export class Consultas {
    * @param compilado su modelo analítico y su mapeo; `casos`, los resultados de un cálculo válido.
    */
   constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion = {}) {
+    // VS1: con los casos y las cargas del viento del programa, al final, como en la compilación: los
+    // casos del modelo físico casan uno a uno con los resultados
+    fisico = resolverViento(fisico).modelo;
     this.fisico = fisico;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;

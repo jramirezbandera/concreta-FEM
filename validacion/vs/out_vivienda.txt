@@ -1,0 +1,30 @@
+Vivienda: zona A, qb 0,420 kN/m², aspereza IV; altura 4,30 m sobre la rasante
+
+Según X: fondo 23,060 m, ancho 15,670 m, esbeltez 0,186, cp 0,700, cs -0,300, e ±0,784 m
+planta   z (m)    ce      A (m²)   centro (m)   F (kN)
+CUB       3,40  1,336    31,085      8,249    17,446
+CUB-S     4,30  1,336     4,446     10,730     2,495
+Σ F = 19,941 kN
+
+Según Y: fondo 15,670 m, ancho 23,060 m, esbeltez 0,274, cp 0,700, cs -0,310, e ±1,153 m
+planta   z (m)    ce      A (m²)   centro (m)   F (kN)
+CUB       3,40  1,336    22,202     -2,270    12,582
+CUB-S     4,30  1,336    21,500      9,260    12,184
+Σ F = 24,767 kN
+
+Según X: Σ A = 35,531000 m², ∫(z_alta − z_baja/2) = 35,531000 m², diferencia 2.0e-16
+
+Según Y: Σ A = 43,702000 m², ∫(z_alta − z_baja/2) = 43,702000 m², diferencia 0.0e+0
+
+caso      ΣF (kN)    −ΣR (kN)   rel.
+W+X+e       19,941     19,941  3.3e-13
+W+X-e       19,941     19,941  2.8e-13
+W-X+e      -19,941    -19,941  3.3e-13
+W-X-e      -19,941    -19,941  2.8e-13
+W+Y+e       24,767     24,767  1.6e-13
+W+Y-e       24,767     24,767  1.8e-14
+W-Y+e      -24,767    -24,767  1.6e-13
+W-Y-e      -24,767    -24,767  1.8e-14
+
+3420 nudos; la hipótesis:
+Viento del DB SE-AE generado por el programa (VS1): 8 casos de la familia «viento» (W+X+e, W+X-e, W-X+e, W-X-e, W+Y+e, W+Y-e, W-Y+e, W-Y-e). Zona A, qb = 0,42 kN/m², aspereza IV (zona urbana en general, industrial o forestal), rasante a la cota 0 m; según X, fondo 23,06 m y esbeltez 0,19: cp = 0,7 y cs = −0,3, e = ±0,78 m (el 5 % del ancho, 15,67 m); según Y, fondo 15,67 m y esbeltez 0,27: cp = 0,7 y cs = −0,31, e = ±1,15 m (el 5 % del ancho, 23,06 m). Cada planta sobre la rasante recibe F = (cp − cs)·qb·ce(z)·A, con ce de la fórmula D.2 a su cota y A la fachada de su banda: en cada punto del ancho, media planta por debajo y media por encima entre las plantas que hay en él; la banda entre la rasante y la mitad de la primera planta va a la cimentación y lo que hay por encima de la última (petos, casetones) no se cuenta. Va como una puntual horizontal en el centro de su banda desplazado ±e. Fuerzas según X / Y, kN: CUB 17,45 / 12,58; CUB-S 2,5 / 12,18. No entran el rozamiento (art. 3.3.2-3) ni la cubierta a dos aguas (Anejo D.6).

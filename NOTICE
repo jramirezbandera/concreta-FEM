@@ -137,6 +137,9 @@ Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
     src/components/pwa/PwaUpdatePrompt.tsx y pwaUpdate.ts (AL2)
   src/secciones/perfiles.ts (catálogo IPE, HEA, HEB e IPN de ArcelorMittal, fase GE)  ←
     src/data/steelProfiles.ts (commit 3e24851; sólo las columnas de PerfilCatalogo)
+  src/normas/cteViento.ts (tablas del DB SE-AE, ce de la fórmula D.2, tabla 3.5 y alturas
+    tributarias del viento, fase VS1)  ←  src/lib/acciones/tablasAE.ts, interp.ts y viento.ts
+    (commit aebd12d; sin el rozamiento, la cubierta a dos aguas ni los paramentos)
 Copyright (c) Javier Ramírez Bandera. El lienzo 2D que se copió para V1 (transform.ts,
 useCanvasView2D.ts y ZoomControls.tsx) se quitó en I2: la planta se dibuja con el motor de vistas
 propio (app/src/vistas/).

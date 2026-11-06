@@ -104,6 +104,15 @@
       ],
       "additionalProperties": false
     },
+    "AccionesEdificio": {
+      "type": "object",
+      "properties": {
+        "viento": {
+          "$ref": "#/$defs/VientoEdificio"
+        }
+      },
+      "additionalProperties": false
+    },
     "ApoyoFisico": {
       "type": "object",
       "properties": {
@@ -1023,6 +1032,9 @@
           "items": {
             "$ref": "#/$defs/EjeReplanteo"
           }
+        },
+        "acciones": {
+          "$ref": "#/$defs/AccionesEdificio"
         }
       },
       "required": [
@@ -1833,6 +1845,62 @@
       "items": false,
       "minItems": 3,
       "maxItems": 3
+    },
+    "VientoEdificio": {
+      "type": "object",
+      "properties": {
+        "zona": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "qb": {
+          "type": "number"
+        },
+        "aspereza": {
+          "enum": [
+            "I",
+            "II",
+            "III",
+            "IV",
+            "V"
+          ]
+        },
+        "altitud": {
+          "type": "number"
+        },
+        "rasante": {
+          "type": "number"
+        },
+        "fachadas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "planta": {
+                "type": "string"
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "planta"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "zona",
+        "aspereza"
+      ],
+      "additionalProperties": false
     },
     "Viga": {
       "type": "object",

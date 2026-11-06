@@ -9,6 +9,7 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { ladosAbacos, resolverAbacos } from "./abacos.ts";
 import { problemaBorde, resolverBordes } from "./bordes.ts";
+import { calcularViento, resolverViento } from "./viento.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type Barra, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
 import { BOVEDILLAS, CASETONES, desglosePano, pesoReticular, textoOrigenPp } from "./pesoForjado.ts";
@@ -280,7 +281,8 @@ const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
 
 /** El modelo con los ábacos de los pilares (MA2) y las cargas de borde (MA4) resueltos, como lo valida y compila el compilador. */
 export function fisicoResuelto(fisico: ModeloFisico, op: Pick<OpcionesResueltas, "tamanoMalla" | "epsGeom" | "epsSnap">): ModeloFisico {
-  return resolverBordes(resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom).modelo, op.epsSnap).modelo;
+  // VS1: los casos y las cargas del viento del programa, al final de las listas
+  return resolverViento(resolverBordes(resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom).modelo, op.epsSnap).modelo).modelo;
 }
 
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
@@ -292,6 +294,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("fisico/no-valido", "El modelo físico no es un objeto.");
     return null;
   }
+  // VS1: si el viento sigue sin resolver, es que no se puede calcular; por qué
+  if (fisico.acciones?.viento) for (const e of calcularViento(fisico)?.errores ?? []) diag.error(e.codigo, e.mensaje, e.ids);
   if (!(num(op.epsGeom) && op.epsGeom > 0 && num(op.epsSnap) && op.epsSnap >= op.epsGeom && num(op.factorZonaRigida) && op.factorZonaRigida >= 0 && op.factorZonaRigida <= 1)) {
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
     return null;

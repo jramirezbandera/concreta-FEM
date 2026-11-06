@@ -161,6 +161,16 @@
       "additionalProperties": false,
       "description": "La acción de un caso: los datos de `CasoCarga` con ψ por su nombre o por sus valores (A-2)."
     },
+    "AccionesEdificio": {
+      "type": "object",
+      "properties": {
+        "viento": {
+          "$ref": "#/$defs/VientoEdificio"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento."
+    },
     "ApoyoFisico": {
       "type": "object",
       "properties": {
@@ -1239,6 +1249,10 @@
             "$ref": "#/$defs/EjeReplanteo"
           },
           "description": "I2: ejes de replanteo, sólo para el dibujo. No entran en el cálculo ni en la huella."
+        },
+        "acciones": {
+          "$ref": "#/$defs/AccionesEdificio",
+          "description": "Fase VS: las acciones que el programa genera desde la situación del edificio. Sus casos y sus\ncargas no se escriben: el compilador los añade al final de `casos` y de `cargas`."
         }
       },
       "required": [
@@ -2209,6 +2223,69 @@
       "items": false,
       "minItems": 3,
       "maxItems": 3
+    },
+    "VientoEdificio": {
+      "type": "object",
+      "properties": {
+        "zona": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ],
+          "description": "Zona eólica de la figura D.1: qb = 0,42 (A), 0,45 (B) o 0,52 (C) kN/m²."
+        },
+        "qb": {
+          "type": "number",
+          "description": "Presión dinámica, kN/m², en lugar de la de la zona (0,5 es el valor simplificado del art. 3.3.2-1)."
+        },
+        "aspereza": {
+          "enum": [
+            "I",
+            "II",
+            "III",
+            "IV",
+            "V"
+          ],
+          "description": "Grado de aspereza del entorno (tabla 3.4): I, borde del mar o de un lago; II, terreno rural\nllano; III, zona rural accidentada; IV, zona urbana, industrial o forestal; V, centro de\nnegocios de una gran ciudad."
+        },
+        "altitud": {
+          "type": "number",
+          "description": "Altitud del emplazamiento, m: el DB no es aplicable por encima de 2 000 m (art. 3.3.1-2)."
+        },
+        "rasante": {
+          "type": "number",
+          "description": "Cota de la rasante, m: la de la fachada a barlovento (art. 3.3.3-1). Por defecto, la ±0,00."
+        },
+        "fachadas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "planta": {
+                "type": "string"
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "planta"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Área de la fachada de la banda de una planta, m², en lugar de la que sale del modelo: para el\nviento según X (`x`, la fachada perpendicular a X) y según Y (`y`)."
+        }
+      },
+      "required": [
+        "zona",
+        "aspereza"
+      ],
+      "additionalProperties": false,
+      "description": "Viento del CTE DB SE-AE (art. 3.3, Anejo D) para el análisis global (VS1). Da 8 casos del\nprograma, de la familia `viento`: según X e Y, en los dos sentidos y con la excentricidad del\n5 % a un lado y al otro (`W+X+e`, `W+X-e`, `W-X+e`, `W-X-e` y los cuatro según Y).\n\nEn cada sentido y cada planta sobre la rasante, F = (cp − cs) · qb · ce(z) · A, con z la cota de\nla planta sobre la rasante, cp y cs de la tabla 3.5 por la esbeltez del edificio en esa\ndirección y A el área de la fachada que le toca: en cada punto del ancho, la banda de media planta\npor debajo y por encima entre las plantas que hay en ese punto (las que lo cubren con sus losas y\npaños, o con sus vigas si no los tiene). Va como una puntual horizontal en la planta, en el centro de su\nbanda desplazado ±e (con el diafragma rígido, exacta: SP-5)."
     },
     "Viga": {
       "type": "object",
