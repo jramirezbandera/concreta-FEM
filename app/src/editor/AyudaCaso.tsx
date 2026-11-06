@@ -1,10 +1,10 @@
 /**
  * El panel de la derecha del gestor de casos: qué es la acción del caso, cómo entra en las
- * combinaciones, sus ψ con lo que es cada uno y los campos que pide; y, al pasar por un campo del
- * formulario o escribir en él, qué es ese campo y qué vale cada opción, con la del caso marcada.
+ * combinaciones, sus ψ con lo que es cada uno y los campos que pide; y, con el foco en un campo del
+ * formulario, qué es ese campo y qué vale cada opción, con la del caso marcada.
  * Los textos, de `explicaciones.ts`; los ψ, de `psiDe` (los mismos que el generador).
  */
-import { useCallback, useState, type FocusEvent, type MouseEvent } from "react";
+import { useCallback, useState, type FocusEvent } from "react";
 import type { CasoFisico, ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { psiDe } from "../../../src/combinaciones/psi.ts";
 import type { Objeto } from "../../../src/editor/referencias.ts";
@@ -24,12 +24,12 @@ export function LetraAccion({ tipo, texto, grande }: { tipo?: string; texto?: st
 }
 
 /**
- * El campo del formulario bajo el ratón o con el foco, por el `data-clave` de su input (la clave de
- * la columna). Se ponen los manejadores en el contenedor del formulario.
+ * El campo del formulario con el foco, por el `data-clave` de su input (la clave de la columna). Se
+ * ponen los manejadores en el contenedor del formulario. Sólo el foco, no el ratón: al pasar por
+ * varios campos, la ayuda aparecía y desaparecía sin parar (para eso está el «?» de cada campo).
  */
 export function useCampoActivo() {
   const [foco, setFoco] = useState<string | null>(null);
-  const [encima, setEncima] = useState<string | null>(null);
   const clave = (t: EventTarget | null): string | null => {
     const campo = (t as HTMLElement | null)?.closest?.(".campo");
     const clave = campo?.querySelector("[data-clave]")?.getAttribute("data-clave");
@@ -38,10 +38,8 @@ export function useCampoActivo() {
   const manejadores = {
     onFocus: useCallback((e: FocusEvent) => setFoco(clave(e.target)), []),
     onBlur: useCallback(() => setFoco(null), []),
-    onMouseOver: useCallback((e: MouseEvent) => setEncima(clave(e.target)), []),
-    onMouseLeave: useCallback(() => setEncima(null), []),
   };
-  return { activo: encima ?? foco, manejadores };
+  return { activo: foco, manejadores };
 }
 
 export function AyudaCaso({ caso, m, campo }: { caso: CasoFisico; m: ModeloFisico; campo: string | null }) {
@@ -115,7 +113,7 @@ export function AyudaCaso({ caso, m, campo }: { caso: CasoFisico; m: ModeloFisic
           </div>
         </section>
       )}
-      {!c && <p className="text-text-tertiary">Pase el ratón por un campo para ver qué es y qué vale cada opción.</p>}
+      {!c && <p className="text-text-tertiary">Al entrar en un campo, aquí sale qué es y qué vale cada opción.</p>}
     </div>
   );
 }
