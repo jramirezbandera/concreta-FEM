@@ -4,6 +4,7 @@
  *
  * Puro: el núcleo WASM ya iniciado por quien lo crea.
  */
+import type { OpcionesCompilacion, ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
 import { alambrico } from "./alambrico.ts";
@@ -12,6 +13,13 @@ import type { Pedido, Respuestas } from "./protocolo.ts";
 import { Sesion } from "./sesion.ts";
 
 export type Contestacion = { ok: true; valor: unknown } | { ok: false; diagnosticos: Diagnostico[] };
+
+/**
+ * El peso propio calculado de la revisión (`pesoPropioCalculado`, una compilación más) hecho en
+ * otro hilo: en la app, un worker anidado (`app/src/sesion/pesoPropio.worker.ts`). Sin él, como en
+ * los tests y en un móvil, la revisión final lo compila aquí.
+ */
+export type PesoAparte = (modelo: ModeloFisico, opciones: OpcionesCompilacion | undefined) => Promise<Map<string, number> | null>;
 
 const sin = (mensaje: string): Contestacion => ({ ok: false, diagnosticos: [{ codigo: "visor/sin-proyecto", severidad: "error", mensaje }] });
 const de = <T>(r: Resultado<T>): Contestacion => (r.valido ? { ok: true, valor: r.valor } : { ok: false, diagnosticos: r.diagnosticos });
@@ -22,9 +30,13 @@ export class Atendedor {
   /** Lo que calculó la sesión, empaquetado como `.fem/<huella>/`, hasta que se pide (`paquete`). */
   private empaquetado: { cabecera: string; bytes: Uint8Array } | null = null;
   readonly motor: string;
+  private readonly pesoAparte: PesoAparte | undefined;
+  /** El peso propio calculado en otro hilo, por resultados (undefined si falló: se compila aquí). */
+  private pesos = new WeakMap<object, Promise<Map<string, number> | null | undefined>>();
 
-  constructor(motor: string) {
+  constructor(motor: string, o: { pesoAparte?: PesoAparte } = {}) {
     this.motor = motor;
+    this.pesoAparte = o.pesoAparte;
   }
 
   get huella(): string | null {
@@ -140,8 +152,21 @@ export class Atendedor {
         return de(s.valorLamina(p));
       case "reacciones-casos":
         return de(reaccionesPorCaso(s));
-      case "revision":
+      case "revision": {
+        // Con la provisional se lanza el peso propio calculado en otro hilo, y la final lo espera:
+        // mientras se prepara la provisional (~4 s en el edificio objetivo) se compila al lado (~2 s),
+        // y la cola de este worker no se para por él
+        const q = s.q;
+        if (p.provisional && q && this.pesoAparte && !this.pesos.has(q) && s.proyecto.modelo.casos.some((c) => c.pesoPropio))
+          this.pesos.set(q, this.pesoAparte(s.proyecto.modelo, s.proyecto.opciones).catch(() => undefined));
+        const aparte = !p.provisional && q ? this.pesos.get(q) : undefined;
+        if (aparte) {
+          const pesoCalculado = await aparte;
+          if (q) this.pesos.delete(q);
+          if (pesoCalculado !== undefined) return de(datosRevision(s, { pesoCalculado }));
+        }
         return de(datosRevision(s, { provisional: !!p.provisional }));
+      }
       case "precalentar":
         if (s.proyecto.modelo.plantas.some((x) => x.id === p.planta)) s.rr?.valores(p.planta, "losas", "flexion");
         return bien("precalentar", null);

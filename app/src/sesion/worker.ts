@@ -4,7 +4,9 @@
  * asíncrono (los resultados guardados) no deja que otro vea la sesión a medias.
  */
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
-import { Atendedor, transferibles } from "../../../src/visor/atender.ts";
+import { Atendedor, transferibles, type PesoAparte } from "../../../src/visor/atender.ts";
+import { infoNavegador, type NavegadorParcial } from "../../../src/worker/limites.ts";
+import type { PedidoPeso, RespuestaPeso } from "./pesoPropio.worker.ts";
 import type { MensajeAlWorker, MensajeDelWorker } from "../../../src/visor/protocolo.ts";
 import { sha256Bytes } from "../../../src/visor/sesion.ts";
 
@@ -15,6 +17,40 @@ interface AmbitoWorker {
 
 const ambito = globalThis as unknown as AmbitoWorker;
 let atendedor: Atendedor | null = null;
+
+/**
+ * El peso propio calculado de la Revisión en un worker anidado (`pesoPropio.worker.ts`), salvo en un
+ * móvil: dos compilaciones a la vez doblan el pico de memoria, y allí se hace detrás, como antes.
+ *
+ * El worker anidado se crea antes de que haga falta y queda cargado: en Chrome se carga a través
+ * de este hilo, y si se creara al pedir la revisión no empezaría hasta que acabase la provisional,
+ * que lo bloquea unos segundos (medido: la final llegaba más tarde que compilándolo aquí). Cada uno
+ * contesta una vez y se cierra (la memoria de la compilación se va con él); en ese momento se crea
+ * el siguiente.
+ */
+function pesoAparte(): PesoAparte | undefined {
+  if (typeof Worker === "undefined" || infoNavegador(navigator as unknown as NavegadorParcial).movil) return undefined;
+  const crear = () => new Worker(new URL("./pesoPropio.worker.ts", import.meta.url), { type: "module" });
+  let listo = crear();
+  return (modelo, opciones) =>
+    new Promise((resolver, rechazar) => {
+      const w = listo;
+      const fin = () => {
+        w.terminate();
+        listo = crear();
+      };
+      w.onmessage = (e: MessageEvent<RespuestaPeso>) => {
+        fin();
+        if (e.data.ok) resolver(e.data.peso);
+        else rechazar(new Error(e.data.mensaje));
+      };
+      w.onerror = (e) => {
+        fin();
+        rechazar(new Error(e.message));
+      };
+      w.postMessage({ modelo, opciones } satisfies PedidoPeso);
+    });
+}
 let cola: Promise<void> = Promise.resolve();
 
 /**
@@ -29,7 +65,8 @@ async function procesar(m: MensajeAlWorker): Promise<void> {
     try {
       const motor = await sha256Bytes(new Uint8Array(m.wasm));
       await iniciarNucleo(m.wasm);
-      atendedor = new Atendedor(motor);
+      const aparte = pesoAparte();
+      atendedor = new Atendedor(motor, aparte ? { pesoAparte: aparte } : {});
       ambito.postMessage({ tipo: "listo", motor, ms: performance.now() - t0 });
     } catch (e) {
       ambito.postMessage({ tipo: "fallo", mensaje: `No se pudo cargar el núcleo de cálculo: ${String(e)}` });

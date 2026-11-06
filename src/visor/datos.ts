@@ -17,7 +17,7 @@ import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../ag
 import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { componerRevision, prepararRevision, type RevisionPreparada } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
-import { areaSeccion, UMBRALES, type Comprobacion } from "../agente/sensatez.ts";
+import { areaSeccion, UMBRALES, type Comprobacion, type PesoCalculado } from "../agente/sensatez.ts";
 import { puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { proponerEjes } from "../compilador/ejes.ts";
@@ -712,11 +712,14 @@ export interface DatosRevision {
  * `provisional`: sin el peso propio calculado, que es una compilación más (~2 s en el edificio
  * objetivo): la pantalla enseña el informe antes y pide después la final, que reutiliza lo
  * preparado de los resultados. Si la final ya está, se da ésa.
+ *
+ * `pesoCalculado`: el peso propio calculado ya hecho fuera (`pesoPropioCalculado` en el worker
+ * anidado de la app, con el mismo modelo y las mismas opciones: los mismos bits), para la final.
  */
 const REVISIONES = new WeakMap<object, DatosRevision>();
 const PREPARADAS = new WeakMap<object, RevisionPreparada>();
 
-export function datosRevision(s: Sesion, o: { provisional?: boolean } = {}): Resultado<DatosRevision> {
+export function datosRevision(s: Sesion, o: { provisional?: boolean; pesoCalculado?: Exclude<PesoCalculado, "pendiente"> } = {}): Resultado<DatosRevision> {
   const q = s.q;
   const c = s.compilado;
   const cab = s.cabeceraResultados;
@@ -733,7 +736,7 @@ export function datosRevision(s: Sesion, o: { provisional?: boolean } = {}): Res
     });
     PREPARADAS.set(q, prep);
   }
-  const rev = componerRevision(s.proyecto, c, prep, o.provisional ? "pendiente" : undefined);
+  const rev = componerRevision(s.proyecto, c, prep, o.provisional ? "pendiente" : o.pesoCalculado);
   const valor: DatosRevision = {
     documento: rev.documento,
     comprobaciones: rev.comprobaciones.map((x) => ({ codigo: x.codigo, titulo: x.titulo, estado: x.estado, ...(x.peor ? { peor: x.peor } : {}) })),
