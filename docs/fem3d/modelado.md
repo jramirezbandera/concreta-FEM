@@ -258,3 +258,15 @@ Para la puerta: sin ella, un agente tiene que escribir a mano cada zuncho (16 en
 - **Alinear:** «la mayoría» frente a «el número redondo» (§7) sigue abierto: es lo que pone a 2 cm la fila de x = 0.
 
 **Para el usuario:** decidir si el criterio 1 se da por cumplido con estas dos diferencias explicadas o se repite tras añadir la pregunta del escalón a MA1.
+
+## 11. Decisiones del usuario y lo hecho con ellas (2026-11-06)
+
+- **El criterio 1 se da por cumplido** con las dos diferencias de §10.2 explicadas (la fila de x = 0 por «Alinear» y hasta dónde llega la cubierta baja): lo que mide del agente pasa con los tres, y repetir la puerta con unas respuestas reconstruidas no añadiría nada. Antes de cerrarla, lo de §10.4:
+  - **MA1:** la lista de la skill pregunta en un escalón de cubierta hasta dónde llega la baja bajo la alta (la cara de los pilares del encuentro, que se propone; su eje; o por debajo de la alta).
+  - **`fem vigas-borde` en el encuentro** (`src/editor/vigasBorde.ts`): los pilares que tocan el borde por fuera con su cara (a ≤ ε_snap; la losa dibujada hasta ellos) cuentan ya para el eje del zuncho, que va por el suyo, fuera de la losa (retranqueo negativo; la losa llega a la cara de la viga, LV). Antes se ignoraban y el zuncho iba enrasado por dentro (x = 3,96, con dos escalones). En los tres proyectos de la puerta, sin sus zunchos de la cubierta baja, la orden da ahora los que los agentes corrigieron a mano (por x = 4,26, con P4, P12, P15, P19 y P23). Los pilares que cruzan el borde (no sólo lo tocan) siguen como antes. Pruebas en `vigasBorde.test.ts`.
+  - **El error de un lado más corto que su retranqueo** dice qué lado es (sus extremos y su largo) y que se quite del contorno o se ensanche.
+- **MA2 y MA4:** los campos propios (`abacosPilares`, `tipo: "borde"`), como están.
+- **`fem vigas-borde` se queda.**
+- **El muestrario** (L2): sin el `pp` de 4,6 y con `caseton: "hormigon"`; su peso sale calculado (4,34 kN/m² en la zona aligerada; los ábacos, γ·canto). El 4,6 pedía un casetón de ≈ 9 kN/m³ de hueco (≈ 105 kg), más que el estimado, y no venía de ninguna ficha. Las pruebas del camino «casetón perdido con pp escrito» (`ficha.test.ts`, `formulario.test.tsx`) montan esa variante del L2 ellas mismas.
+- **De paso, en el sólido** (`src/visor/solido.ts`): la cara inferior de los casetones se dibujaba sólo con `"perdido"`, que dejó de ser el casetón por defecto el 2026-10-28; ahora, con todos los que se quedan en obra (todos menos el recuperable).
+- **Sigue abierto de §8.6:** que la regla de MA3 (el `pp` escrito es el de la zona aligerada) valga para todos los casetones y no sólo el perdido.

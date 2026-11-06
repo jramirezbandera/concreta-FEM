@@ -6,7 +6,9 @@
  *
  * - El eje del zuncho va por el eje de los pilares del lado (los que llegan a la planta y cuya huella
  *   pisa la banda de un zuncho enrasado); sin pilares, enrasado por fuera (b/2 hacia dentro del
- *   borde dibujado). Un lado libre sólo en parte sigue la recta de lo que ya lo ata.
+ *   borde dibujado). Un lado libre sólo en parte sigue la recta de lo que ya lo ata. Los pilares que
+ *   tocan el borde por fuera con su cara (la losa dibujada hasta ellos: la cubierta baja de un
+ *   escalón, puerta de MA §10.4) también cuentan: el eje va por el suyo, fuera de la losa.
  * - La losa no se toca (fase TB, 2026-10-28, a petición del usuario: el borde dibujado es donde se
  *   hormigona). El compilador lleva a la viga lo que cae en su ancho (LV) y la tira entre su cara de
  *   fuera y el borde, de hasta b (`tirasBorde`), con sus cargas; antes la orden retranqueaba la losa
@@ -140,7 +142,12 @@ export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h
         const ds = p.huella.map((q) => (q[0] - t.A[0]) * ni[0] + (q[1] - t.A[1]) * ni[1]);
         const dc = (p.c[0] - t.A[0]) * ni[0] + (p.c[1] - t.A[1]) * ni[1];
         if (Math.max(...ss) <= -b || Math.min(...ss) >= t.L + b) continue;
-        if (dc < -eps || Math.min(...ds) >= b - 1e-9 || Math.max(...ds) <= 0) continue;
+        if (Math.min(...ds) >= b - 1e-9) continue;
+        // Por fuera, sólo los que tocan el borde con su cara (a ≤ eps): la losa dibujada hasta la cara
+        // de los pilares, como la cubierta baja de un escalón bajo la alta (puerta de MA, §10.4). Su
+        // zuncho va por su eje, fuera de la losa, y la losa llega a su cara (LV)
+        const fuera = dc < -eps || Math.max(...ds) <= 0;
+        if (fuera && !(Math.abs(Math.max(...ds)) <= eps && Math.min(...ds) < -eps)) continue;
         en.push({ id: p.id, d: dc });
       }
       if (en.length) {
@@ -148,7 +155,8 @@ export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h
         const d = ds.reduce((s, x) => s + x, 0) / ds.length;
         if (Math.max(...ds) - Math.min(...ds) > eps)
           avisos.push(`Los pilares ${en.map((x) => x.id).join(", ")} del lado de (${r6(t.A[0])}, ${r6(t.A[1])}) a (${r6(t.B[0])}, ${r6(t.B[1])}) no están alineados (de ${r6(Math.min(...ds))} a ${r6(Math.max(...ds))} m del borde): el eje va a la media, ${r6(d)} m.`);
-        delta[i] = Math.max(0, d);
+        // Por dentro, al eje (nunca fuera de la losa por un pilar que la pisa); por fuera, a su eje
+        delta[i] = d < -eps ? d : Math.max(0, d);
         regla[i] = "pilares";
         suyos[i] = en.map((x) => x.id).sort();
       } else {
@@ -215,7 +223,16 @@ export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h
       }
     }
     const defecto = defectoPoligono(nuevo, 1e-6);
-    if (defecto || Math.sign(areaConSigno(nuevo)) !== Math.sign(areaConSigno(an))) return { error: `Los ejes de las vigas de borde de ${ia === 0 ? "el contorno" : `el hueco ${ia}`} de ${losaId} no forman un polígono (${defecto ?? "se da la vuelta"}): algún lado es más corto que la distancia de su borde al eje.` };
+    if (defecto || Math.sign(areaConSigno(nuevo)) !== Math.sign(areaConSigno(an))) {
+      // Los lados que se dan la vuelta al retranquearlos (puerta de MA, §10.4: el error no decía cuál)
+      const vuelta = ts.flatMap((t, i) => {
+        const [a, z] = [ini[i], fin[i]];
+        if (!a || !z || (z[0] - a[0]) * t.u[0] + (z[1] - a[1]) * t.u[1] >= -1e-9) return [];
+        return [`de (${r6(t.A[0])}, ${r6(t.A[1])}) a (${r6(t.B[0])}, ${r6(t.B[1])}), de ${r6(t.L)} m`];
+      });
+      const cuales = vuelta.length ? `: ${vuelta.length > 1 ? "los lados" : "el lado"} ${vuelta.join("; ")}, más corto${vuelta.length > 1 ? "s" : ""} que la distancia de su borde al eje (quítalo del contorno o ensánchalo)` : ": algún lado es más corto que la distancia de su borde al eje";
+      return { error: `Los ejes de las vigas de borde de ${ia === 0 ? "el contorno" : `el hueco ${ia}`} de ${losaId} no forman un polígono (${defecto ?? "se da la vuelta"})${cuales}.` };
+    }
     nuevos.push(nuevo);
     // Las vigas: los lados libres en parte, por sus trozos libres; los libres enteros seguidos y en la
     // misma recta, una sola (un lado que se queda en nada va con la de antes)

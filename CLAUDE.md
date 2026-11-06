@@ -815,6 +815,10 @@
   - **Aviso, no error:** `sensatez/cargas-en-peso-propio` (fuera del criterio de A3) y «Pasar a cargas muertas» (`separarPesoPropio`, `src/editor/casos.ts`, un paso de deshacer), en Diagnósticos, en la ficha de la pieza y en el resumen del caso.
   - **El dibujo:** en Cargas, con el caso del peso propio activo, la planta pinta en gris el pp de forjados y vigas, sin objeto; la ficha de una pieza lo da en su bloque, aparte de las cargas.
   - **Por defecto:** caso activo, el primero sin peso propio; aviso en la plantilla de las cargas; el proyecto nuevo y las «Hipótesis típicas» traen `CM`. La vivienda y el ejemplo de la skill, con sus cargas en `CM`; la skill lo pide al agente.
+- **2026-11-06: decisiones pendientes cerradas** (recomendaciones de Claude aceptadas por el usuario):
+  - **MA** (`modelado.md` §11): el criterio 1 se da por cumplido; MA2 y MA4 con sus campos propios; `fem vigas-borde` se queda. Hecho con ello: la pregunta del escalón en la lista de la skill (MA1); la orden cuenta los pilares que tocan el borde por fuera con su cara y pone el zuncho por su eje, fuera de la losa (en la puerta, lo que los agentes corrigieron a mano); su error dice qué lado es más corto que su retranqueo. Sigue abierto si MA3 vale para todos los casetones.
+  - **Pesos aparentes** (7,5 / 6 / 3,2 / 0,2 kN/m³): aceptados como estimados de predimensionamiento; el del casetón de hormigón, por contrastar con un catálogo. **El muestrario**, sin el `pp` de 4,6 y con casetón de hormigón (sale 4,34). De paso, el sólido dibuja la cara inferior de todos los casetones que se quedan en obra, no sólo de los «perdido».
+  - **PF-a…PF-e** confirmadas (PF-b, a falta de la sombra); **BN3-a…BN3-e** confirmadas; **`dimensionBarra`**, de 0,01 a 1 m (antes 3: un Ø20 en cm no avisaba); **`agente.md` §13**, confirmado.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

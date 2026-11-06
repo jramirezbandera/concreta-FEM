@@ -16,6 +16,8 @@ const RAIZ = join(__dirname, "..", "..", "..");
 const leido = leerProyecto(readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8"));
 if (!leido.valido) throw new Error("muestrario no válido");
 const proyecto = leido.proyecto;
+// L2, con el casetón perdido de otro material y su pp escrito (el muestrario lo tuvo así hasta el 2026-11-06)
+proyecto.modelo.losas = proyecto.modelo.losas!.map((l) => (l.id === "L2" ? { ...l, pp: 4.6, reticular: { ...l.reticular!, caseton: "perdido" as const } } : l));
 
 function montar(id: string, tabla: "forjados" | "pilares" = "forjados") {
   const editar = vi.fn((_o: Operacion, _e: string) => ({ ok: true as const }));

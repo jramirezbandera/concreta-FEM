@@ -83,8 +83,8 @@ Losa plana de 25 cm, 2 × 2 vanos de 5 m y tres plantas. Los pilares son de 40 �
 - **PF-1, la astilla.** El 30 × 30 en el eje del 40 deja 5 cm de losa entre su cara y el borde. La malla se refina en esa astilla y pasa de 1 327 nudos a 2 993. Es una razón más para dar el punto fijo, y no el eje, cuando la fachada es plana.
 - **PF-2, COM-12.** Con un punto fijo y un giro que no es múltiplo de 90°, el eje sale del seno y el coseno: puede diferir en un ulp entre motores de JavaScript. La numeración canónica (`CUANTO_ORDEN`) lo absorbe, como la huella girada.
 - **PF-3, de paso en el sólido.** En la planta de su base, el macizo de un pilar en un reticular tomaba la sección por defecto del pilar, no la del tramo de encima. Se ha corregido; ninguna prueba cambia.
+- **Confirmadas por el usuario el 2026-11-06:** PF-a…PF-e como están. PF-b, a falta de cerrarla con la comparación en sombra.
 - **Pendiente del usuario:**
-  - confirmar PF-a…PF-e;
   - **la comparación en sombra:** un modelo de CYPECAD con un pilar de fachada que cambia de sección con la cara fija (mejor, uno de esquina y uno girado), con su listado de esfuerzos por tramo. Así se cierran PF-b y la manera en que CYPE lleva la excentricidad (sólo la memoria dice que la considera).
 - **Fuera de esta fase:**
   - el giro por tramo: el `giro` es del pilar entero, como en CYPECAD;

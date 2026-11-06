@@ -7,8 +7,8 @@
  * - Losa: su región (contorno menos huecos) de c − e a c. Un reticular, maciza menos sus casetones:
  *   una retícula a su intereje, centrada en la losa y recortada por sus bordes, sus ábacos y las
  *   huellas de pilares, vigas y muros (su sitio es ilustrativo: el cálculo usa multiplicadores, D3).
- *   No lleva un zuncho que no esté en el modelo: un borde sin viga se ve abierto. Con casetón
- *   perdido (por defecto), su cara inferior aparte (`casetones`), que no cuenta en el volumen.
+ *   No lleva un zuncho que no esté en el modelo: un borde sin viga se ve abierto. Con un casetón
+ *   que se queda en obra (todos menos el recuperable), su cara inferior aparte (`casetones`), que no cuenta en el volumen.
  * - Paño: sus viguetas, las del compilador (C4-a), con su sección y la cara superior en c, y macizo
  *   del canto de la vigueta lo que no cae en la banda de un intereje de ninguna (junto a una viga
  *   o un muro paralelos, donde el compilador no pone vigueta, o el sobrante del ancho). Sin
@@ -906,8 +906,9 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       const cols = descomponer(region, [celdas, ...macizos.map((m) => [m])], d);
       const hueco = (fr: Franja) => fr.capas[0]! && !fr.capas.some((x, i) => i > 0 && x);
       prismas(cols, d, (fr) => (hueco(fr) ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
-      // Casetón perdido: su cara inferior, enrasada con la de los nervios
-      if ((ret.caseton ?? "perdido") === "perdido")
+      // Casetón que se queda en obra (todos menos el recuperable; el de hormigón por defecto desde el
+      // 2026-10-28): su cara inferior, enrasada con la de los nervios
+      if ((ret.caseton ?? "hormigon") !== "recuperable")
         for (const col of cols)
           for (const fr of col.franjas) {
             if (!fr.enP || !hueco(fr)) continue;

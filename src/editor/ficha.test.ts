@@ -11,6 +11,8 @@ import { DEF_TABLAS, TABLAS, contexto, objetosTabla } from "./tablas.ts";
 
 const { proyecto } = leerEjemplo("muestrario");
 const m = proyecto.modelo;
+// L2, con el casetón perdido de otro material y su pp escrito (el muestrario lo tuvo así hasta el 2026-11-06)
+m.losas = m.losas!.map((l) => (l.id === "L2" ? { ...l, pp: 4.6, reticular: { ...l.reticular!, caseton: "perdido" as const } } : l));
 const ctx = contexto(m);
 const forjados = DEF_TABLAS.forjados;
 const fila = (id: string) => forjados.fila(objetosTabla(m, "forjados").find((o) => o.id === id)!, ctx);

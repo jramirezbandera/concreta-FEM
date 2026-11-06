@@ -300,7 +300,7 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
       const conViga = (f.vigas ?? []).some((v) => v.planta === l.planta);
       if (!conViga) expect(alBorde, `${l.id}: borde macizo sin viga`).toBe(true);
       // Casetón perdido: su cara inferior cubre los huecos, en la cara inferior de la losa y mirando abajo
-      const perdido = (ret.caseton ?? "perdido") === "perdido";
+      const perdido = (ret.caseton ?? "hormigon") !== "recuperable";
       const cs = p.casetones ?? [];
       expect(cs.length > 0, l.id).toBe(perdido);
       if (perdido) {

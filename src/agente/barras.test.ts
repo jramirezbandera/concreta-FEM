@@ -20,7 +20,7 @@ import { casosValidos } from "../pruebas/comparar.ts";
 import { conjuntoCombinaciones } from "./combinaciones.ts";
 import { pieza, resumen } from "./consultas.ts";
 import { VERSION_ESQUEMA } from "./proyecto.ts";
-import { pesoPropioCalculado, pesoPropioEsperado, Plantas } from "./sensatez.ts";
+import { pesoPropioCalculado, pesoPropioEsperado, Plantas, sensatezPrevia } from "./sensatez.ts";
 import { sensatezResultados } from "./sensatezResultados.ts";
 import { bajadaTributaria } from "./tributaria.ts";
 
@@ -107,5 +107,21 @@ describe("BN2: barra/compresion y la consulta de una barra", () => {
     expect(v.extremos["N+"]!.comb).toBe("W");
     expect(v.extremos["N+"]!.v).toBeCloseTo(3.706, 3);
     expect(v.extremos["N-"]!.v).toBeLessThan(0);
+  });
+});
+
+describe("el umbral de las secciones de barras (`dimensionBarra`, de 0,01 a 1 m)", () => {
+  const aviso = (D: number) => {
+    const f = porticoArriostrado();
+    const ids = new Set(f.barras!.map((b) => b.seccion));
+    f.secciones = f.secciones.map((s) => (ids.has(s.id) ? { id: s.id, material: s.material, forma: "circular" as const, D } : s));
+    return sensatezPrevia(f).find((c) => c.codigo === "sensatez/seccion")!.avisos.length > 0;
+  };
+  it("un redondo de Ø10 a Ø60 no avisa; uno en cm (Ø20 como «2») o en mm, sí", () => {
+    expect(aviso(0.01)).toBe(false);
+    expect(aviso(0.02)).toBe(false);
+    expect(aviso(0.6)).toBe(false);
+    expect(aviso(2)).toBe(true);
+    expect(aviso(0.008)).toBe(true);
   });
 });

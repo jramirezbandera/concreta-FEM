@@ -379,7 +379,7 @@ La skill `fem` sólo estaba en `.claude/skills/` de este repo, y `fem` era `bun 
 
 ## 13. La app y el agente, juntos (2026-11-05)
 
-A petición del usuario, para trabajar con el agente sobre lo que se tiene abierto en la app. Las decisiones de esta sección las tomó Claude; quedan para confirmar.
+A petición del usuario, para trabajar con el agente sobre lo que se tiene abierto en la app. Las decisiones de esta sección las tomó Claude; **confirmadas por el usuario el 2026-11-06** (el MCP, escrito a mano mientras funcione: si una versión de Claude Desktop cambia el protocolo, se pasa al SDK, que es MIT).
 
 ### 13.1 Pasar un proyecto del navegador a una carpeta
 

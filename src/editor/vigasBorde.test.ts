@@ -126,9 +126,39 @@ describe("Vigas de borde en una losa hecha a mano", () => {
     (m.losas![0] as Losa & { contorno: unknown; huecos?: unknown }).contorno = [[0, 0], [8, 0], [8, 6], [4.1, 6], [4.1, 6.5], [3.9, 6.5], [3.9, 6], [0, 6]];
     delete (m.losas![0] as { huecos?: unknown }).huecos;
     const r = proponerVigasBorde(m, "L", 0.3, 0.3);
-    expect("error" in r && r.error).toContain("algún lado es más corto que la distancia de su borde al eje");
+    // Dice cuál: el de arriba de la pestaña, de 0,2 m, entre dos retranqueos de 0,15
+    expect("error" in r && r.error).toContain("el lado de (4.1, 6.5) a (3.9, 6.5), de 0.2 m, más corto que la distancia de su borde al eje");
     expect(proponerVigasBorde(m, "L", 30, 30)).toEqual({ error: "Una viga de borde de 30 × 30 m no es razonable: las medidas van en metros." });
     expect(proponerVigasBorde(m, "X", 0.3, 0.3)).toEqual({ error: "No hay ninguna losa «X»." });
+  });
+
+  it("la losa dibujada hasta la cara de unos pilares (el escalón bajo otra cubierta): el zuncho, por su eje, fuera de la losa", () => {
+    // Puerta de MA (§10.4): el lado este acaba en la cara de dos pilares de 30 × 30 con el eje en x = 8,15
+    const m = modelo();
+    delete (m.losas![0] as { huecos?: unknown }).huecos;
+    // (sin el P2 de la esquina, que pisa la banda por dentro: con los dos, el eje iría a la media, con aviso)
+    m.pilares = m.pilares!.filter((p) => p.id !== "P2");
+    m.pilares.push({ id: "P3", x: 8.15, y: 1, desde: "N0", hasta: "N1", seccion: "P30" }, { id: "P4", x: 8.15, y: 5, desde: "N0", hasta: "N1", seccion: "P30" });
+    const r2 = propuesta(m, "L", 0.25, 0.25);
+    const e2 = r2.vigas.find((x) => x.pilares.includes("P3"))!;
+    expect(e2.regla).toBe("pilares");
+    expect(e2.pilares).toEqual(["P3", "P4"]);
+    expect(e2.retranqueo).toBeCloseTo(-0.15, 12);
+    expect(e2.puntos.map((q) => q[0])).toEqual([8.15, 8.15]);
+    expect(r2.avisos).toEqual([]);
+    const a = aplicar({ esquema: "concreta-fem/proyecto@1", modelo: m } as Proyecto, operacionVigasBorde(m, r2)!);
+    if (!a.ok) throw new Error(a.errores.map((e) => e.mensaje).join(" "));
+    expect(bordesSinViga(a.proyecto.modelo, new Plantas(a.proyecto.modelo), 0.05)).toEqual([]);
+    const c = compilar(a.proyecto.modelo);
+    expect(c.valido, c.diagnosticos.filter((d) => d.severidad === "error").map((d) => d.mensaje).join(" ")).toBe(true);
+  });
+
+  it("un pilar lejos del borde por fuera no cuenta", () => {
+    const m = modelo();
+    delete (m.losas![0] as { huecos?: unknown }).huecos;
+    m.pilares!.push({ id: "P3", x: 8.3, y: 3, desde: "N0", hasta: "N1", seccion: "P30" });
+    const este = propuesta(m, "L", 0.25, 0.25).vigas.find((x) => x.puntos.every((q) => q[0] > 7));
+    expect(este?.pilares ?? []).not.toContain("P3");
   });
 });
 

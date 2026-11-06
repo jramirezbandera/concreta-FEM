@@ -46,6 +46,9 @@ export const BOVEDILLA_POR_DEFECTO: Bovedilla = "hormigon";
 /**
  * Peso específico aparente equivalente del casetón, kN por m³ de hueco entre nervios ("perdido" no lo
  * tiene). Estimaciones de predimensionamiento, no de norma: se cambian con el `relleno` de la losa.
+ * Aceptadas por el usuario el 2026-11-06 como tales (por pieza: el casetón de hormigón de un hueco de
+ * 68 × 68 × 25 cm, ≈ 88 kg; una bovedilla de 60 × 25 × 20, ≈ 18 kg de hormigón y ≈ 10 de cerámica; el
+ * poliestireno, ≈ 20 kg/m³), con el casetón de hormigón por contrastar con un catálogo.
  */
 export const PESO_CASETON: Readonly<Record<Exclude<Caseton, "perdido">, number>> = { hormigon: 7.5, ceramica: 3.2, poliestireno: 0.2, recuperable: 0 };
 

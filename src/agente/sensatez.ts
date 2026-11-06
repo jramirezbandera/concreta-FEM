@@ -44,8 +44,8 @@ export const UMBRALES = {
   dimension: [0.1, 3],
   /** bw y hf de una T, m. */
   dimensionFina: [0.03, 3],
-  /** b, h o D de una sección que sólo usan barras entre dos niveles (fase BN: redondos y perfiles de arriostramiento), m. */
-  dimensionBarra: [0.01, 3],
+  /** b, h o D de una sección que sólo usan barras entre dos niveles (fase BN: redondos y perfiles de arriostramiento), m. Hasta 1 m (decisión del usuario, 2026-11-06): con 3 m, un Ø20 escrito en cm («2») no se avisaba. */
+  dimensionBarra: [0.01, 1],
   /** fck, MPa. */
   fck: [12, 100],
   /** E de un material general, kN/m². */

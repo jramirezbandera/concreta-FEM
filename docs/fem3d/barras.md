@@ -201,7 +201,7 @@ Pasan los criterios; falta la puerta de uso.
 - **Peso propio esperado de A3:** las barras, γ·A por la longitud real en la planta del extremo alto, salvo la zona rígida del extremo bajo (CB-f, la que el compilador lleva a esa planta). Coincide con el del cálculo planta a planta a precisión de máquina. La columna «Barras» del informe sólo sale con barras.
 - **Bajada tributaria:** el peso y las cargas verticales de cada barra, a sus dos extremos como una biapoyada.
 - **`barra/compresion`** (sólo si hay alguna «sólo tracción»): N < 0 en alguna combinación de esfuerzos (sin acciones, cada caso). En el pórtico arriostrado, X1 con 1,4·(G + Q): −4,17 kN.
-- **Umbral nuevo, `dimensionBarra`** de 0,01 a 3 m: el mínimo de las secciones que sólo usan barras. Con el de 0,1 m, un redondo de 3 cm salía como «¿está en cm?». Los umbrales de A3 los fijó el usuario: éste es nuevo, por confirmar.
+- **Umbral nuevo, `dimensionBarra`** de 0,01 a 1 m: el de las secciones que sólo usan barras. Con el mínimo de 0,1 m, un redondo de 3 cm salía como «¿está en cm?». **Decidido por el usuario el 2026-11-06:** el máximo, 1 m y no 3 (con 3, un Ø20 escrito en cm, «2», no avisaba; ningún perfil ni tornapuntas de arriostramiento llega a 1 m). Prueba en `src/agente/barras.test.ts`.
 - **La skill `fem`:** las barras, sus ejes, sus uniones, la diagonal articulada, «sólo tracción» y el diafragma.
 
 **Banco de Chrome** (`validacion/bn/chrome.ts`, `out_chrome.txt`), con el pórtico arriostrado en la app compilada:
@@ -251,7 +251,7 @@ Pasa el criterio; falta la puerta de uso (con la de BN2).
 
 Las pruebas de dibujo de antes (`src/editor`, 386, y las de la app) pasan sin cambios.
 
-**Decisiones tomadas al hacerlo (para revisar en la puerta de uso):**
+**Decisiones tomadas al hacerlo** (confirmadas por el usuario el 2026-11-06; se revisan sólo si la puerta de uso dice que cuestan):
 
 - **BN3-a:** un clic fuera de las líneas de nivel en un alzado es un error, no un extremo a otra altura (hasta que haya `dz`).
 - **BN3-b:** en planta, la planta del fin por defecto es la de la vista del segundo clic (con una sola vista, una barra en el plano de la planta); para una diagonal entre plantas desde una sola vista, se elige en la plantilla.

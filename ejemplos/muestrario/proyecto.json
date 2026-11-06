@@ -290,12 +290,11 @@
         ],
         "espesor": 0.3,
         "material": "HA-30",
-        "pp": 4.6,
         "reticular": {
           "intereje": 0.8,
           "nervio": 0.12,
           "capa": 0.05,
-          "caseton": "perdido",
+          "caseton": "hormigon",
           "abacos": [
             [[-1.2, 9.8], [1.2, 9.8], [1.2, 12.2], [-1.2, 12.2]],
             [[4.8, 9.8], [7.2, 9.8], [7.2, 12.2], [4.8, 12.2]],
