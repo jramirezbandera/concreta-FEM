@@ -145,6 +145,16 @@ Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
     fundamental aproximado, el número de modos y los cortantes de planta)  ←
     src/lib/codes/seismic/ncse02.ts (commit aebd12d; sin el reparto por elementos, la torsión del
     art. 3.7.5 ni las puertas de aplicabilidad; el coeficiente αᵢ del art. 3.6.2.2 es propio)
+  src/normas/peligrosidad.ts (la tabla de peligrosidad sísmica por municipio, fase VS4: los tipos,
+    la búsqueda en cuatro niveles, el plegado de la consulta y los textos)  ←
+    src/features/seismic-ncse02/hazard.ts (commit f6afb7d; síncrono, sin la carga perezosa ni el
+    enlace con el municipio de la obra)
+  src/normas/provincias.ts (las 52 provincias con la zona eólica de su capital, figura D.1 del
+    DB SE-AE, y el aviso de la parte de la provincia que cae en otra zona, fase VS4)  ←
+    src/lib/acciones/provincias.ts (commit f6afb7d; sin la zona de clima invernal, la capital de
+    la tabla 3.8 ni el reconocimiento de la capital por su nombre, que son de la nieve)
+  src/normas/datos/ncse02.hazard.json y ncse02.hazard.manifest.json (los datos, abajo)  ←
+    src/features/seismic-ncse02/ (commit f6afb7d), byte a byte
 Copyright (c) Javier Ramírez Bandera. El lienzo 2D que se copió para V1 (transform.ts,
 useCanvasView2D.ts y ZoomControls.tsx) se quitó en I2: la planta se dibuja con el motor de vistas
 propio (app/src/vistas/).
@@ -162,3 +172,31 @@ Dependencias del visor (app/package.json), por bun:
   lucide-react 1.55.0 — https://github.com/lucide-icons/lucide — Licencia ISC
   vite-plugin-pwa 1.3.0 — https://github.com/vite-pwa/vite-plugin-pwa — Licencia MIT (AL2)
   Workbox 7 (workbox-build, workbox-window y el código que lleva sw.js) — https://github.com/GoogleChrome/workbox — Licencia MIT (AL2)
+
+--------------------------------------------------------------------------------
+Datos de peligrosidad sísmica (fase VS4): aceleración sísmica básica ab y coeficiente de
+contribución K por municipio (Anejo 1 de la NCSE-02).
+
+© Instituto Geográfico Nacional (IGN) — https://www.ign.es
+Licencia CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/deed.es), admitida el 2026-11-06 sólo
+para estos datos (decisión VS-l, docs/fem3d/viento-sismo.md §8).
+
+  src/normas/datos/ncse02.hazard.json           los datos (2 635 municipios, en columnas)
+  src/normas/datos/ncse02.hazard.manifest.json  su manifiesto: origen, fecha, recuentos y sha256
+
+Origen: la capa «HazardArea2002.NCSE-02» del servicio WMS de geofísica del IGN
+(https://www.ign.es/wms-inspire/geofisica), cosechada en Concreta el 2026-08-27 con su
+scripts/harvest-ign-hazard.mjs y copiada de allí con su manifiesto, sin modificar (los mismos bytes:
+el manifiesto lleva el sha256 del JSON, y src/normas/peligrosidad.test.ts lo comprueba).
+
+Cambios sobre la capa del IGN, hechos en Concreta y descritos en el manifiesto y, fila a fila, en el
+campo «procedencia» de los datos: de sus 8 191 registros se conservan los 2 610 de los municipios del
+Anejo 1 (ab ≥ 0,04 g), en columnas y con claves de búsqueda; y se suplementan con el texto del Anejo 1
+(BOE núm. 244, de 11 de octubre de 2002, Real Decreto 997/2002) y con el registro de municipios del
+INE: 6 municipios que el anejo lista y a los que la capa no da aceleración, 19 municipios creados
+después de 2002, que heredan los valores de su municipio de origen, y 1 valor de K corregido contra el
+texto del anejo.
+
+El texto del Anejo 1 (la edición de la NCSE-02 del Ministerio de Fomento, que no se versiona) es el
+oráculo: src/normas/__fixtures__/ncse02-anejo1.json es su lista de municipios con su ab y su K, leída
+con validacion/vs4/anejo1.py, y la prueba la compara con los datos, municipio a municipio.

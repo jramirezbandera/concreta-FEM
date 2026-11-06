@@ -32,6 +32,8 @@ import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
 import { Consultas } from "../src/compilador/consultas.ts";
 import { traducirDiagnosticos } from "../src/compilador/mapeo.ts";
+import { tieneEspectro } from "../src/compilador/sismo.ts";
+import { emplazamiento, LIMITE_EMPLAZAMIENTO } from "../src/agente/emplazamiento.ts";
 import { calcular } from "../src/motor/calcular.ts";
 import type { Diagnostico } from "../src/motor/diagnosticos.ts";
 import type { ResultadoCaso, ResultadoModal } from "../src/motor/modelo.ts";
@@ -108,13 +110,16 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem vigas-borde <proyecto.json> [--losa L]… [--ancho 0.30] [--canto <el de la losa>] [--escribir]
       los zunchos de los bordes libres de cada losa, como «Vigas de borde» del editor (por el eje de los pilares del lado o enrasados por fuera);
       sólo propone: con --escribir, los pone y reescribe el proyecto (deja el de antes en <proyecto>.json.bak)
+  fem emplazamiento <municipio | código INE> [--top N]
+      el municipio de la obra para el sismo y el viento: su código INE («ine» de acciones.sismo), ab y K del Anejo 1 de la NCSE-02
+      y la zona eólica de la capital de su provincia, con el aviso si la provincia tiene más de una; no lleva proyecto
   fem esquema
   fem visor <proyecto.json> [--nuevo]      abre la app sobre el proyecto (no escribe JSON; Ctrl+C la cierra)
 
 Combinaciones de las consultas: --casos | --situacion ELU-PT[,ELS-C…] | --combinacion "1.35*G+1.5*Q" (repetible) | --caso G
 Otras: --planta P --tipo pilar|viga|vigueta --objeto id --losa id --armadura x-inf|x-sup|y-inf|y-sup (refuerzos, con la base del proyecto) --top N --todos --estaciones --exacto --cifras N
 modos: masas por planta y modos de vibración (periodos, masa efectiva y forma); necesita "acciones": { "sismo": {} } en el modelo y no depende de las combinaciones
-sismo: el sismo del programa por espectros de respuesta (NCSE-02): emplazamiento y espectro y, según X y según Y, cortante en la base, cortantes y fuerzas de planta, desplazamientos, θ de segundo orden y el contraste con el método simplificado; necesita "ab", "K", "terreno" y "mu" en "acciones": { "sismo": {…} }; sus casos EX+e, EX-e, EY+e y EY-e entran en las combinaciones sísmicas (--situacion ELU-SIS) y en --caso
+sismo: el sismo del programa por espectros de respuesta (NCSE-02): emplazamiento y espectro y, según X y según Y, cortante en la base, cortantes y fuerzas de planta, desplazamientos, θ de segundo orden y el contraste con el método simplificado; necesita "ine" (el municipio, de fem emplazamiento) o "ab" y "K", y "terreno" y "mu", en "acciones": { "sismo": {…} }; sus casos EX+e, EX-e, EY+e y EY-e entran en las combinaciones sísmicas (--situacion ELU-SIS) y en --caso
 Salida: un objeto JSON. Códigos: 0 bien, 1 errores del modelo o del cálculo, 2 orden mal dada, 3 error interno.`;
 
 // ─── Diagnósticos y números ─────────────────────────────────────────────────────────────────────
@@ -316,7 +321,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if ("codigo" in r) return r;
       const est = r.cabecera.estadisticas;
       // VS3: con el espectro en el sismo de las acciones, sus casos y el cortante en la base (el detalle, con `fem consultar sismo`)
-      const sismo = l.proyecto.modelo.acciones?.sismo?.ab !== undefined && r.modal ? new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal).sismo() : null;
+      const sismo = tieneEspectro(l.proyecto.modelo) && r.modal ? new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal).sismo() : null;
       return {
         codigo: sismo && !sismo.valido ? CODIGO.errores : CODIGO.bien,
         json: {
@@ -490,6 +495,18 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
     }
     case "importar-dxf":
       return importarDxfOrden(a, mal);
+    case "emplazamiento": {
+      // VS4: el municipio de la obra, para el sismo (ine, ab y K) y el viento (zona eólica). No lleva proyecto.
+      const consulta = a.posicionales.join(" ").trim();
+      if (!consulta) return mal("fem emplazamiento necesita el nombre del municipio (o parte) o su código INE de 5 cifras.");
+      const top = a.banderas.get("top")?.[0];
+      const limite = top === undefined ? LIMITE_EMPLAZAMIENTO : Number(top);
+      if (!(Number.isInteger(limite) && limite >= 1)) return mal(`--top: «${top}» no es un número entero mayor que cero.`);
+      const { noEncontrado, ...e } = emplazamiento(consulta, limite);
+      // Sin municipios no se da nada por bueno: no estar en el Anejo 1 no es estar exento
+      const diagnosticos = noEncontrado ? [{ codigo: "emplazamiento/no-encontrado", severidad: "error", mensaje: `«${consulta}»: ${noEncontrado[0]!.toLowerCase()}${noEncontrado.slice(1)}` }] : [];
+      return { codigo: noEncontrado ? CODIGO.errores : CODIGO.bien, json: { orden, ok: !noEncontrado, ...e, diagnosticos } };
+    }
     case "alinear":
       return alinearOrden(a, mal);
     case "vigas-borde":

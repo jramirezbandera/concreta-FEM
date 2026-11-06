@@ -609,6 +609,11 @@ export interface AccionesEdificio {
  * modo de más masa en esa dirección, más el del torsor de la excentricidad. Con `ab` hacen falta
  * `K`, `terreno` y `mu`. Sin `ab`, sólo las masas y los modos.
  *
+ * VS4: `ab` y `K` salen también del municipio, por su código INE (`ine`), de la tabla del Anejo 1
+ * de la norma (`src/normas/peligrosidad.ts`; `fem emplazamiento <nombre>` da el código). Con `ine`
+ * hay espectro como con `ab`; un `ab` o un `K` escritos mandan sobre los de la tabla, cada uno por
+ * su lado. Un código que no está en la tabla es un error: no estar en el Anejo 1 no es estar exento.
+ *
  * La masa sale de las cargas (art. 3.2): de cada caso, la fracción que le toca de la componente
  * vertical de sus cargas, entre g. Por defecto, la de su acción:
  * - G (y el caso del peso propio), 1;
@@ -632,11 +637,24 @@ export interface SismoEdificio {
    */
   nievePermanente?: boolean;
   /**
+   * VS4. Código INE del municipio, de 5 cifras ("29008" es Alhaurín el Grande): `ab` y `K` salen de
+   * la tabla del Anejo 1 de la norma, salvo los que se escriban. Los nombres, como en la publicación
+   * del sismo de Concreta (`ine` y `municipio`). Se busca con `fem emplazamiento`, nunca de memoria.
+   */
+  ine?: string;
+  /**
+   * Nombre del municipio, para quien lee el fichero. No decide nada: con `ine`, tiene que ser el de
+   * ese código (si no, es un error: uno de los dos está mal), y sin `ine` sólo acompaña a un `ab` y
+   * un `K` escritos a mano.
+   */
+  municipio?: string;
+  /**
    * VS3. Aceleración sísmica básica del emplazamiento, en g (art. 2.1 y anejo 1 de la norma, por
-   * municipio): 0,11 es 0,11 g. Con ella se calculan los casos del sismo.
+   * municipio): 0,11 es 0,11 g. Con ella se calculan los casos del sismo. Escrita, manda sobre la
+   * del municipio.
    */
   ab?: number;
-  /** Coeficiente de contribución K del emplazamiento (anejo 1): de 1,0 a 1,3. */
+  /** Coeficiente de contribución K del emplazamiento (anejo 1): de 1,0 a 1,3. Escrito, manda sobre el del municipio. */
   K?: number;
   /** Importancia de la construcción (art. 1.2.2): ρ = 1,0 con "normal" (por defecto) y 1,3 con "especial". */
   importancia?: "normal" | "especial";

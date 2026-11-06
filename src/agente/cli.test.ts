@@ -360,3 +360,64 @@ describe("MA: vigas-borde", () => {
     expect(fem(["vigas-borde", ruta, "--ancho", "ancho"]).codigo).toBe(2);
   });
 });
+
+describe("VS4: emplazamiento", () => {
+  type Mun = { ine: string; nombre: string; provincia: string; ab: number; K: number; procedencia: string; viento: { zona: string; qb: number; frontera?: string } };
+  it("da el código INE, ab y K del municipio y la zona eólica de su provincia, con el aviso de frontera; no lleva proyecto", () => {
+    const r = fem(["emplazamiento", "Alhaurín", "el", "Grande"]);
+    expect(r.codigo).toBe(0);
+    expect(r.json).toMatchObject({ orden: "emplazamiento", ok: true, consulta: "Alhaurín el Grande", provincias: [], diagnosticos: [] });
+    expect((r.json.municipios as Mun[])[0]).toEqual({
+      ine: "29008",
+      nombre: "Alhaurín el Grande",
+      provincia: "Málaga",
+      ab: 0.08,
+      K: 1,
+      procedencia: "Anejo 1 de la NCSE-02",
+      viento: { zona: "A", qb: 0.42, frontera: "El oeste (Estepona, Campo de Gibraltar) está en zona C." },
+    });
+    expect((r.json.notas as string[]).length).toBe(2);
+    // Por su código, el mismo; y con Bun, lo mismo que con Node
+    const porIne = fem(["emplazamiento", "29008"]);
+    expect(porIne.json.municipios).toEqual([(r.json.municipios as Mun[])[0]]);
+    if (bun) expect(fem(["emplazamiento", "29008"], "bun").json).toEqual(porIne.json);
+  });
+
+  it("los homónimos, cada uno con su provincia; «granada», primero Granada; y --top", () => {
+    const t = (fem(["emplazamiento", "torrent"]).json.municipios as Mun[]).filter((m) => m.nombre === "Torrent");
+    expect(t.map((m) => [m.provincia, m.ab, m.viento.zona])).toEqual([
+      ["Girona", 0.05, "C"],
+      ["Valencia", 0.07, "A"],
+    ]);
+    const g = fem(["emplazamiento", "granada", "--top", "2"]);
+    expect((g.json.municipios as Mun[]).map((m) => [m.ine, m.nombre, m.ab])).toEqual([
+      ["18087", "Granada", 0.23],
+      ["08094", "Granada (La)", 0.04],
+    ]);
+    expect(g.json.total).toBeGreaterThan(2);
+    // «Granada» es también una provincia: su viento, aparte
+    expect(g.json.provincias).toEqual([{ ine: "18", nombre: "Granada", viento: { zona: "A", qb: 0.42 } }]);
+    // Uno creado después de 2002 dice de quién hereda
+    expect((fem(["emplazamiento", "29902"]).json.municipios as Mun[])[0]!.procedencia).toBe("Heredado de Antequera · el municipio se creó en 2010 y el Anejo 1, de 2002, no lo nombra");
+  });
+
+  it("lo que no figura no se da por exento: error, con las tres causas; la provincia da al menos el viento", () => {
+    const m = fem(["emplazamiento", "Madrid"]);
+    expect(m.codigo).toBe(1);
+    expect(m.json.ok).toBe(false);
+    expect(m.json.municipios).toEqual([]);
+    const d = (m.json.diagnosticos as { codigo: string; severidad: string; mensaje: string }[])[0]!;
+    expect([d.codigo, d.severidad]).toEqual(["emplazamiento/no-encontrado", "error"]);
+    expect(d.mensaje).toContain("«Madrid»: no figura en el Anejo 1 de la NCSE-02");
+    expect(d.mensaje).toContain("Compruébalo antes de darlo por exento");
+    expect(m.json.provincias).toEqual([{ ine: "28", nombre: "Madrid", viento: { zona: "A", qb: 0.42 } }]);
+    expect(fem(["emplazamiento", "28079"]).codigo).toBe(1);
+    const nada = fem(["emplazamiento", "Villanada de Ninguna Parte"]);
+    expect(nada.codigo).toBe(1);
+    expect(nada.json.provincias).toEqual([]);
+    expect(nada.json.notas).toEqual([]);
+    // Sin nombre, o con un --top que no es un número, la orden está mal dada
+    expect(fem(["emplazamiento"]).codigo).toBe(2);
+    expect(fem(["emplazamiento", "granada", "--top", "muchos"]).codigo).toBe(2);
+  });
+});

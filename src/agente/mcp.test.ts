@@ -134,3 +134,20 @@ describe("servidor MCP", () => {
     expect(lineas).toHaveLength(2);
   }, 60_000);
 });
+
+describe("servidor MCP: emplazamiento (VS4)", () => {
+  it("da lo mismo que la CLI, y lo que no figura es un error que no se da por exento", async () => {
+    const r = await llamar("emplazamiento", { municipio: "Alhaurín el Grande" });
+    expect(r.isError).toBeUndefined();
+    const cli = await ejecutar(["emplazamiento", "Alhaurín el Grande"]);
+    expect(json(r)).toEqual(JSON.parse(JSON.stringify(cli.json)));
+    expect((json(r).municipios as { ine: string; ab: number; K: number; viento: { zona: string } }[])[0]).toMatchObject({ ine: "29008", ab: 0.08, K: 1, viento: { zona: "A" } });
+    expect(((await llamar("emplazamiento", { municipio: "granada", top: 1 })).content[0] as { text: string }).text).toContain('"18087"');
+    const no = await llamar("emplazamiento", { municipio: "Madrid" });
+    expect(no.isError).toBe(true);
+    expect((json(no).diagnosticos as { codigo: string }[])[0]!.codigo).toBe("emplazamiento/no-encontrado");
+    expect((await llamar("emplazamiento", {})).isError).toBe(true);
+    expect((await llamar("emplazamiento", { municipio: "--exacto" })).isError).toBe(true);
+    expect(HERRAMIENTAS.some((h) => h.name === "emplazamiento")).toBe(true);
+  });
+});

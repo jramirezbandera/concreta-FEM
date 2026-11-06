@@ -17,6 +17,12 @@
  * que es donde llevan su factor en las combinaciones (familias `EX` y `EY`, con su ± y el 30 % de la
  * otra dirección: el generador no cambia).
  *
+ * **El municipio (VS4, VS-l):** `ab` y `K` salen también del municipio, por su código INE (`ine`), de
+ * la tabla del Anejo 1 de la norma (`src/normas/peligrosidad.ts`). Los escritos mandan, cada uno por
+ * su lado; un código que no está en la tabla es un error (no estar en el anejo no es estar exento), y
+ * la hipótesis dice de dónde sale cada uno. `tieneEspectro` dice si el sismo lleva lo que da un
+ * espectro: `ab` o el municipio.
+ *
  * Convenio de la excentricidad, el del viento: `+e` desplaza la recta de acción hacia +Y con el sismo
  * según X y hacia +X con el sismo según Y.
  */
@@ -38,6 +44,7 @@ import {
   type Importancia,
   type SistemaEstructural,
 } from "../normas/ncse02.ts";
+import { esNombreDe, MENSAJE_NO_ENCONTRADO, municipioPorIne, textoProcedencia } from "../normas/peligrosidad.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { casosModales, respuestaEspectral, TOL_TORSOR, type CasoEspectral, type CasoLogico, type RespuestaEspectral } from "../motor/espectral.ts";
 import { GRAVEDAD, type CasoCarga, type ResultadoCaso, type ResultadoModal } from "../motor/modelo.ts";
@@ -65,10 +72,26 @@ export interface MasasSismo {
   nievePorDefecto: boolean;
 }
 
+/** El municipio del que salen ab y K (VS4): su fila de la tabla del Anejo 1 (`src/normas/peligrosidad.ts`). */
+export interface MunicipioSismo {
+  ine: string;
+  nombre: string;
+  provincia: string;
+  /** Los de la tabla, se usen o no (un `ab` o un `K` escritos mandan). */
+  ab: number;
+  K: number;
+  /** De dónde salen en la tabla, en una frase (`textoProcedencia`). */
+  procedencia: string;
+}
+
 /** El espectro del sismo (VS3): el emplazamiento y los coeficientes de la respuesta, de `acciones.sismo`. */
 export interface EspectroSismo {
   /** Cap. 2: ab, K, ρ, C, S, ac (en g), TA y TB. */
   emplazamiento: Emplazamiento;
+  /** VS4: el municipio (`ine`), si se dio. */
+  municipio?: MunicipioSismo;
+  /** VS4, con municipio: de dónde sale cada uno, escrito en el sismo o de la tabla. Sin municipio, los dos son los escritos. */
+  origen?: { ab: "escrita" | "municipio"; K: "escrita" | "municipio" };
   importancia: Importancia;
   /** Cómo se dio el terreno, para la hipótesis. */
   terreno: string;
@@ -116,6 +139,16 @@ function conCasosDelPrograma(m: ModeloFisico): boolean {
 const esNumero = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 
 /**
+ * ¿Lleva el sismo de `m` lo que da un espectro: la aceleración básica `ab` escrita o el municipio
+ * (`ine`), del que sale? Sin ninguno de los dos, sólo hay masas y modos.
+ */
+export function tieneEspectro(m: ModeloFisico | null | undefined): boolean {
+  const s: unknown = typeof m === "object" && m !== null ? m.acciones?.sismo : undefined;
+  if (typeof s !== "object" || s === null) return false;
+  return (s as SismoEdificio).ab !== undefined || (s as SismoEdificio).ine !== undefined;
+}
+
+/**
  * El sismo de `m` (con los casos del viento del programa ya resueltos: cuentan 0 como masa): las
  * fracciones de masa de sus casos y, con `ab`, el espectro; o por qué no se pueden saber. Sin
  * `acciones.sismo`, null.
@@ -133,7 +166,7 @@ export function calcularSismo(m: ModeloFisico): CalculoSismo | null {
   }
   if (s.nievePermanente !== undefined && typeof s.nievePermanente !== "boolean") err("sismo/no-valido", "«nievePermanente» del sismo tiene que ser true o false.");
   // Los casos del sismo del programa, si ya están (los pone `Consultas` al final), no son del usuario
-  const resuelto = s.ab !== undefined && conCasosDelPrograma(m);
+  const resuelto = tieneEspectro(m) && conCasosDelPrograma(m);
   const casosM: readonly CasoFisico[] = resuelto ? m.casos.slice(0, m.casos.length - CASOS_SISMO.length) : m.casos;
   const escritas = new Map<string, number>();
   if (s.masas !== undefined) {
@@ -182,9 +215,14 @@ export function calcularSismo(m: ModeloFisico): CalculoSismo | null {
 
 /** El espectro de `acciones.sismo` (VS3), o null sin `ab`; sus errores, con `err`. */
 function espectroDe(s: SismoEdificio, casos: readonly CasoFisico[], m: ModeloFisico, err: (codigo: string, mensaje: string, ids?: string[]) => void, avisos: ProblemaSismo[]): EspectroSismo | null {
-  const delEspectro = (["K", "importancia", "terreno", "mu", "omega", "regla", "excentricidad", "sistema"] as const).filter((c) => s[c] !== undefined);
-  if (s.ab === undefined) {
-    if (delEspectro.length) err("sismo/sin-ab", `El sismo lleva ${delEspectro.join(", ")} y no la aceleración sísmica básica «ab» del emplazamiento (en g): sin ella no hay espectro ni casos del sismo, sólo las masas y los modos.`);
+  const delEspectro = (["municipio", "K", "importancia", "terreno", "mu", "omega", "regla", "excentricidad", "sistema"] as const).filter((c) => s[c] !== undefined);
+  if (s.ab === undefined && s.ine === undefined) {
+    if (delEspectro.length)
+      err(
+        "sismo/sin-ab",
+        `El sismo lleva ${delEspectro.join(", ")} y no la aceleración sísmica básica «ab» del emplazamiento (en g) ni el código INE de su municipio («ine», del que sale): sin ella no hay espectro ni casos del sismo, sólo las masas y los modos.` +
+          (s.municipio !== undefined ? " El nombre del municipio no basta (hay municipios con el mismo nombre y distinta aceleración): su código se busca por su nombre, con «fem emplazamiento»." : ""),
+      );
     return null;
   }
   let bien = true;
@@ -192,9 +230,32 @@ function espectroDe(s: SismoEdificio, casos: readonly CasoFisico[], m: ModeloFis
     err("sismo/dato-no-valido", mensaje);
     bien = false;
   };
-  if (!(esNumero(s.ab) && s.ab > 0 && s.ab <= 0.5)) mal(`La aceleración sísmica básica «ab» va en g (0,11 es 0,11 g): tiene que estar entre 0 y 0,5 (es ${String(s.ab)}).`);
-  if (s.K === undefined) mal("Con «ab», el sismo necesita el coeficiente de contribución «K» del emplazamiento (anejo 1 de la NCSE-02: de 1,0 a 1,3).");
-  else if (!(esNumero(s.K) && s.K >= 1 && s.K <= 1.3)) mal(`El coeficiente de contribución «K» va de 1,0 a 1,3 (es ${String(s.K)}).`);
+  // VS4: el municipio, por su código INE; ab y K escritos mandan, cada uno por su lado
+  let municipio: MunicipioSismo | undefined;
+  const conNombre = typeof s.municipio === "string" && s.municipio.trim() !== "";
+  if (s.municipio !== undefined && !conNombre) mal(`El «municipio» del sismo es su nombre, un texto (es ${JSON.stringify(s.municipio)}): no decide nada; el que cuenta es su código, «ine».`);
+  if (s.ine !== undefined) {
+    if (!(typeof s.ine === "string" && /^\d{5}$/.test(s.ine))) mal(`El «ine» del sismo es el código INE del municipio, un texto de 5 cifras ("29008"; es ${JSON.stringify(s.ine)}): se busca por el nombre del municipio, con «fem emplazamiento».`);
+    else {
+      const f = municipioPorIne(s.ine);
+      if (!f) {
+        err(
+          "sismo/municipio-desconocido",
+          `El municipio de código INE ${s.ine} no está en la tabla de peligrosidad sísmica. ${MENSAJE_NO_ENCONTRADO} No se da por exento en silencio: o se corrige el código (se busca por el nombre del municipio, con «fem emplazamiento»), o se quita «ine» y se escriben «ab» y «K», o se quitan «ab» e «ine» del sismo si de verdad no hay que calcularlo.`,
+        );
+        bien = false;
+      } else if (conNombre && !esNombreDe(f.ine, s.municipio!)) {
+        err("sismo/municipio-no-casa", `El sismo dice que el municipio es «${s.municipio}» y su código INE, ${s.ine}, es el de ${f.nombre} (${f.provincia}): uno de los dos está mal. El código de cada municipio se busca por su nombre, con «fem emplazamiento».`);
+        bien = false;
+      } else municipio = { ine: f.ine, nombre: f.nombre, provincia: f.provincia, ab: f.ab, K: f.K, procedencia: textoProcedencia(f.procedencia) };
+    }
+  }
+  const ab = s.ab !== undefined ? s.ab : municipio?.ab;
+  const K = s.K !== undefined ? s.K : municipio?.K;
+  if (s.ab !== undefined && !(esNumero(s.ab) && s.ab > 0 && s.ab <= 0.5)) mal(`La aceleración sísmica básica «ab» va en g (0,11 es 0,11 g): tiene que estar entre 0 y 0,5 (es ${String(s.ab)}).`);
+  if (s.K !== undefined) {
+    if (!(esNumero(s.K) && s.K >= 1 && s.K <= 1.3)) mal(`El coeficiente de contribución «K» va de 1,0 a 1,3 (es ${String(s.K)}).`);
+  } else if (s.ine === undefined) mal("Con «ab», el sismo necesita el coeficiente de contribución «K» del emplazamiento (anejo 1 de la NCSE-02: de 1,0 a 1,3), o el código INE del municipio («ine»), del que salen los dos.");
   if (s.importancia !== undefined && !(s.importancia in COEFICIENTE_RIESGO)) mal(`La importancia de la construcción es "normal" o "especial" (es ${JSON.stringify(s.importancia)}).`);
   const importancia: Importancia = s.importancia ?? "normal";
   // Terreno: su tipo, su C o los estratos
@@ -244,7 +305,7 @@ function espectroDe(s: SismoEdificio, casos: readonly CasoFisico[], m: ModeloFis
   const reservados = new Set(CASOS_SISMO.map((c) => c.id));
   const repetidos = casos.filter((c) => reservados.has(c.id)).map((c) => c.id);
   if (repetidos.length) {
-    err("sismo/caso-existente", `Los casos ${repetidos.join(", ")} son los del sismo del programa: hay que renombrarlos o quitar «ab» del sismo de las acciones.`, repetidos);
+    err("sismo/caso-existente", `Los casos ${repetidos.join(", ")} son los del sismo del programa: hay que renombrarlos o quitar «ab» (y «ine») del sismo de las acciones.`, repetidos);
     bien = false;
   }
   const enReservados = (m.cargas ?? []).filter((c) => reservados.has(c.caso)).map((c) => c.id);
@@ -258,7 +319,8 @@ function espectroDe(s: SismoEdificio, casos: readonly CasoFisico[], m: ModeloFis
   if (excentricidad < EXCENTRICIDAD_ACCIDENTAL) avisos.push({ codigo: "sismo/excentricidad-menor", mensaje: `La excentricidad accidental del sismo (${coma(excentricidad)}) es menor que el 1/20 que pide el art. 3.2 de la NCSE-02.` });
   const nu = factorAmortiguamiento(omega);
   return {
-    emplazamiento: emplazamiento(s.ab!, s.K!, COEFICIENTE_RIESGO[importancia], C),
+    emplazamiento: emplazamiento(ab!, K!, COEFICIENTE_RIESGO[importancia], C),
+    ...(municipio ? { municipio, origen: { ab: s.ab !== undefined ? ("escrita" as const) : ("municipio" as const), K: s.K !== undefined ? ("escrita" as const) : ("municipio" as const) } } : {}),
     importancia,
     terreno,
     omega,
@@ -294,7 +356,7 @@ export function hipotesisEspectro(e: EspectroSismo): string {
   const una = e.mu[0] === e.mu[1];
   return (
     `Sismo de la NCSE-02 por espectros de respuesta (VS3; art. 3.6.2, el método de referencia): casos del programa ${CASOS_SISMO.map((c) => c.id).join(", ")} (familias EX y EY), que no llevan cargas. ` +
-    `Emplazamiento: ab = ${coma(em.ab)} g, K = ${coma(em.K)}, importancia ${e.importancia} (ρ = ${coma(em.rho)}), terreno ${e.terreno} con C = ${coma(em.C)}; S = ${coma(em.S)}, ac = S·ρ·ab = ${coma(em.ac)} g, TA = ${coma(em.TA)} s y TB = ${coma(em.TB)} s. ` +
+    `Emplazamiento: ab = ${coma(em.ab)} g, K = ${coma(em.K)}${deDonde(e)}, importancia ${e.importancia} (ρ = ${coma(em.rho)}), terreno ${e.terreno} con C = ${coma(em.C)}; S = ${coma(em.S)}, ac = S·ρ·ab = ${coma(em.ac)} g, TA = ${coma(em.TA)} s y TB = ${coma(em.TB)} s. ` +
     `Amortiguamiento Ω = ${coma(e.omega)} % (ν = ${coma(e.nu)})${s5(e)}; ductilidad μ = ${una ? coma(e.mu[0]) : `${coma(e.mu[0])} según X y ${coma(e.mu[1])} según Y`} (β = ν/μ = ${una ? coma(e.beta[0]) : `${coma(e.beta[0])} y ${coma(e.beta[1])}`}). ` +
     `Cada modo responde con la aceleración αᵢ·ac del art. 3.6.2.2 (αᵢ = α(Tᵢ)·β con Tᵢ ≥ TA, y 1 + (2,5·β − 1)·Tᵢ/TA por debajo), y los valores de todos los modos se combinan en cada resultado (esfuerzos, reacciones, desplazamientos: art. 3.6.2.4) ` +
     (e.regla === "cqc"
@@ -308,6 +370,20 @@ export function hipotesisEspectro(e: EspectroSismo): string {
 }
 
 const s5 = (e: EspectroSismo): string => (e.omega === 5 ? ", el de referencia del espectro" : "");
+
+/** De dónde salen ab y K, para la hipótesis: nada sin municipio (los dos, escritos), como antes de VS4. */
+function deDonde(e: EspectroSismo): string {
+  const m = e.municipio;
+  if (!m) return "";
+  const lugar = `${m.nombre} (${m.provincia})`;
+  const escritos = (["ab", "K"] as const).filter((c) => e.origen?.[c] === "escrita");
+  if (!escritos.length) return ` (de ${lugar}, código INE ${m.ine}: ${m.procedencia})`;
+  const tabla = `ab = ${coma(m.ab)} g y K = ${coma(m.K)}`;
+  if (escritos.length === 2) return ` (los dos, escritos en el sismo: mandan sobre los de ${lugar}, código INE ${m.ine}, que en la tabla tiene ${tabla}; ${m.procedencia})`;
+  const escrito = escritos[0]!;
+  const otro = escrito === "ab" ? "K" : "ab";
+  return ` (${escrito}, escrit${escrito === "ab" ? "a" : "o"} en el sismo: manda sobre ${escrito === "ab" ? "la" : "el"} de la tabla; ${otro}, de ${lugar}, código INE ${m.ine}, que en la tabla tiene ${tabla}; ${m.procedencia})`;
+}
 
 // ─── Con los modos calculados: la respuesta y los casos lógicos ─────────────────────────────────
 

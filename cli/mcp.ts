@@ -131,6 +131,12 @@ export const HERRAMIENTAS: Herramienta[] = [
   { name: "revisar", description: "Sensatez e informe de revisión (Markdown y HTML) de esta huella. Ningún resultado se da por bueno sin él.", inputSchema: obj({ proyecto: PROYECTO, recalcular: { type: "boolean" } }, ["proyecto"]) },
   { name: "seleccion", description: "Lo que el ingeniero tiene elegido en la app (planta, espacio y objetos, tal como están en el fichero): para «esta viga» o «lo que tengo elegido».", inputSchema: obj({ proyecto: PROYECTO }, ["proyecto"]) },
   {
+    name: "emplazamiento",
+    description:
+      "El municipio de la obra para el sismo y el viento: su código INE (el «ine» de acciones.sismo), ab y K del Anejo 1 de la NCSE-02 y la zona eólica de la capital de su provincia, con el aviso si la provincia tiene más de una. Estos datos salen de aquí, nunca de memoria. Un municipio que no figura no se da por exento.",
+    inputSchema: obj({ municipio: { type: "string", description: "El nombre del municipio (o parte), su código INE de 5 cifras, o una provincia." }, top: { type: "integer", minimum: 1, description: "Cuántos municipios dar (por defecto, 20)." } }, ["municipio"]),
+  },
+  {
     name: "importar_dxf",
     description: "Lee un plano DXF o DWG (de R14 a 2018) y propone el proyecto (plantas, pilares, contornos de losa, ejes). Sin «salida», sólo dice lo que ve y las capas; con ella, escribe el proyecto (nunca encima de otro).",
     inputSchema: obj(
@@ -324,6 +330,12 @@ export async function llamar(nombre: string, a: Record<string, unknown> = {}): P
         }
       }
       return { content, ...(r.codigo !== 0 ? { isError: true } : {}) };
+    }
+    case "emplazamiento": {
+      if (typeof a.municipio !== "string" || !a.municipio.trim()) return fallo("Falta «municipio».");
+      if (a.municipio.trim().startsWith("--")) return fallo(`«${a.municipio}» no es un municipio.`);
+      const r = await ejecutar(["emplazamiento", a.municipio, ...(a.top !== undefined ? ["--top", String(a.top)] : [])]);
+      return { content: [texto(r.json)], ...(r.codigo !== 0 ? { isError: true } : {}) };
     }
     case "importar_dxf": {
       const f = absoluta(a.plano, "plano");

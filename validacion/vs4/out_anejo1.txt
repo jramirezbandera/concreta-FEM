@@ -1,0 +1,133 @@
+Anejo 1 de la NCSE-02: municipios con su ab y su K, leídos del texto
+Origen: NCSE02 bonita.pdf (sha256 ec19898c69cbe2dcdba7b8fc304a6b170bd497bc21dbc22a3db6db81ba691136), con pdftotext version 4.06 [www.xpdfreader.com] -layout -enc UTF-8
+
+Municipios: 2615
+
+Por provincia (en el orden del texto):
+    102  Almería  (ANDALUCÍA)
+     44  Cádiz  (ANDALUCÍA)
+     50  Córdoba  (ANDALUCÍA)
+    168  Granada  (ANDALUCÍA)
+     79  Huelva  (ANDALUCÍA)
+     82  Jaén  (ANDALUCÍA)
+    100  Málaga  (ANDALUCÍA)
+    105  Sevilla  (ANDALUCÍA)
+     50  Huesca  (ARAGÓN)
+      9  Zaragoza  (ARAGÓN)
+     34  Las Palmas  (CANARIAS)
+     53  Santa Cruz de Tenerife  (CANARIAS)
+     29  Albacete  (CASTILLA-LA MANCHA)
+    290  Barcelona  (CATALUÑA)
+    221  Girona  (CATALUÑA)
+     48  Lleida  (CATALUÑA)
+    160  Tarragona  (CATALUÑA)
+    141  Alicante/Alacant  (COMUNIDAD VALENCIANA)
+    221  Valencia/València  (COMUNIDAD VALENCIANA)
+     73  Badajoz  (EXTREMADURA)
+      7  Cáceres  (EXTREMADURA)
+      3  A Coruña  (GALICIA)
+     60  Lugo  (GALICIA)
+     84  Ourense  (GALICIA)
+     16  Pontevedra  (GALICIA)
+     67  Illes Balears  (ILLES BALEARS)
+     45  Murcia  (REGIÓN DE MURCIA)
+    194  Navarra  (COMUNIDAD FORAL DE NAVARRA)
+      3  Álava  (PAÍS VASCO)
+     75  Guipúzcoa  (PAÍS VASCO)
+      1  Ciudad de Ceuta  (Ciudad de Ceuta)
+      1  Ciudad de Melilla  (Ciudad de Melilla)
+
+Por valor de ab:
+  0.04   1042
+  0.05    210
+  0.06    231
+  0.07    409
+  0.08    172
+  0.09     94
+  0.10     66
+  0.11     40
+  0.12     31
+  0.13     39
+  0.14    120
+  0.15     30
+  0.16     30
+  0.17     12
+  0.18     10
+  0.19     11
+  0.20      6
+  0.21     18
+  0.22      9
+  0.23     14
+  0.24     20
+  0.25      1
+
+Por valor de K:
+  1.0   2323
+  1.1     85
+  1.2     80
+  1.3    127
+
+Columnas (página del anejo, columna, municipios = valores):
+    1 1   32 =  32
+    1 2   37 =  37
+    2 1   58 =  58
+    2 2   58 =  58
+    3 1   57 =  57
+    3 2   62 =  62
+    4 1   60 =  60
+    4 2   60 =  60
+    5 1   58 =  58
+    5 2   58 =  58
+    6 1   62 =  62
+    6 2   58 =  58
+    7 1   62 =  62
+    7 2   56 =  56
+    8 1   47 =  47
+    8 2   56 =  56
+    9 1   56 =  56
+    9 2   62 =  62
+   10 1   62 =  62
+   10 2   61 =  61
+   11 1   62 =  62
+   11 2   58 =  58
+   12 1   61 =  61
+   12 2   62 =  62
+   13 1   58 =  58
+   13 2   58 =  58
+   14 1   62 =  62
+   14 2   62 =  62
+   15 1   55 =  55
+   15 2   60 =  60
+   16 1   56 =  56
+   16 2   61 =  61
+   17 1   62 =  62
+   17 2   62 =  62
+   18 1   56 =  56
+   18 2   52 =  52
+   19 1   60 =  60
+   19 2   60 =  60
+   20 1   52 =  52
+   20 2   56 =  56
+   21 1   53 =  53
+   21 2   62 =  62
+   22 1   62 =  62
+   22 2   61 =  61
+   23 1   38 =  38
+   23 2   42 =  42
+
+Nombres partidos en dos líneas, unidos:
+  San Sebastián de los Ballesteros
+  Santa María de Guía de Gran Canaria
+  Pont de Vilomara i Rocafort, El
+  Cruïlles, Monells i Sant Sadurní de l’Heura
+  Vandellòs i l’Hospitalet de l’Infant
+  Benitachell/Poble Nou de Benitatxell,El
+  Campo de Mirra/Camp de Mirra, El
+  San Vicente del Raspeig/ Sant Vicent del Raspeig
+  Torremanzanas/Torre de les Maçanes, La
+  Alquería de la Condesa/ Alquería de la Comtessa, L’
+  Noáin (Valle de Elorz)/Noain (Elortzibar)
+
+Arreglos del texto del PDF:
+  «Abaltzisketa  Sebastián  0,04 (1,0)  Lasarte Oria             0,04 (1,0)» → «Abaltzisketa             0,04 (1,0)  Lasarte Oria             0,04 (1,0)»: «Sebastián» es la segunda línea de «Donosita San Sebastián» (26 líneas más abajo), que el texto deja aquí
+  «Donosita San             0,04 (1,0)  Zestoa                   0,04 (1,0)» → «Donosita San Sebastián   0,04 (1,0)  Zestoa                   0,04 (1,0)»: con su segunda línea («Donosita» es errata de la edición: Donostia)

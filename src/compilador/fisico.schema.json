@@ -1823,6 +1823,12 @@
         "nievePermanente": {
           "type": "boolean"
         },
+        "ine": {
+          "type": "string"
+        },
+        "municipio": {
+          "type": "string"
+        },
         "ab": {
           "type": "number"
         },
