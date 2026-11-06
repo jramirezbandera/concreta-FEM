@@ -29,7 +29,7 @@ function montar(ids: string[]) {
   return { editar, setElegidos };
 }
 
-const abacos = (o: Operacion) => (o as { objeto: { reticular: { abacos: number[][][] } } }).objeto.reticular.abacos;
+const abacos = (o: Operacion) => (o as unknown as { objeto: { reticular: { abacos: number[][][] } } }).objeto.reticular.abacos;
 
 describe("AC: Propiedades de un ábaco", () => {
   it("uno: a × b y su centro; ensancharlo hasta el de P7 los une y deja elegido el unido", () => {

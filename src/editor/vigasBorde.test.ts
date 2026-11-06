@@ -137,8 +137,7 @@ describe("Vigas de borde en una losa hecha a mano", () => {
     const m = modelo();
     delete (m.losas![0] as { huecos?: unknown }).huecos;
     // (sin el P2 de la esquina, que pisa la banda por dentro: con los dos, el eje iría a la media, con aviso)
-    m.pilares = m.pilares!.filter((p) => p.id !== "P2");
-    m.pilares.push({ id: "P3", x: 8.15, y: 1, desde: "N0", hasta: "N1", seccion: "P30" }, { id: "P4", x: 8.15, y: 5, desde: "N0", hasta: "N1", seccion: "P30" });
+    m.pilares = [...m.pilares!.filter((p) => p.id !== "P2"), { id: "P3", x: 8.15, y: 1, desde: "N0", hasta: "N1", seccion: "P30" }, { id: "P4", x: 8.15, y: 5, desde: "N0", hasta: "N1", seccion: "P30" }];
     const r2 = propuesta(m, "L", 0.25, 0.25);
     const e2 = r2.vigas.find((x) => x.pilares.includes("P3"))!;
     expect(e2.regla).toBe("pilares");
@@ -156,7 +155,7 @@ describe("Vigas de borde en una losa hecha a mano", () => {
   it("un pilar lejos del borde por fuera no cuenta", () => {
     const m = modelo();
     delete (m.losas![0] as { huecos?: unknown }).huecos;
-    m.pilares!.push({ id: "P3", x: 8.3, y: 3, desde: "N0", hasta: "N1", seccion: "P30" });
+    m.pilares = [...m.pilares!, { id: "P3", x: 8.3, y: 3, desde: "N0", hasta: "N1", seccion: "P30" }];
     const este = propuesta(m, "L", 0.25, 0.25).vigas.find((x) => x.puntos.every((q) => q[0] > 7));
     expect(este?.pilares ?? []).not.toContain("P3");
   });
