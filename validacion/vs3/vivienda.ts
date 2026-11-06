@@ -20,7 +20,8 @@ import { iniciarNucleo } from "../../src/nucleo/index.ts";
 const RAIZ = join(import.meta.dirname, "..", "..");
 await iniciarNucleo(readFileSync(join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm")));
 
-const p = JSON.parse(readFileSync(join(RAIZ, "ejemplos", "vivienda", "proyecto.json"), "utf8")) as Proyecto;
+// (con una ruta, ese proyecto: para medir el versionado si el del árbol de trabajo está a medias)
+const p = JSON.parse(readFileSync(process.argv[2] ?? join(RAIZ, "ejemplos", "vivienda", "proyecto.json"), "utf8")) as Proyecto;
 const f = { ...p.modelo, acciones: { ...p.modelo.acciones, sismo: { ab: 0.1, K: 1.0, terreno: "II" as const, mu: 2 } } };
 const c = compilar(f, p.opciones);
 if (!c.valido) throw new Error(c.diagnosticos.filter((d) => d.severidad === "error").map((d) => `${d.codigo}: ${d.mensaje}`).join("\n"));
