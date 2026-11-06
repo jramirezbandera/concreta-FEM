@@ -10,11 +10,11 @@
  * Puro: sin IO.
  */
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
-import { deriva, diagramaCombinado, flechas, pieza, reacciones, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
+import { deriva, flechas, pieza, reacciones, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
 import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
-import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
+import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type CasoBase, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { componerRevision, prepararRevision, type RevisionPreparada } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion, type PesoCalculado } from "../agente/sensatez.ts";
@@ -178,17 +178,13 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
   const env = d.valor.envolvente;
   if (env) {
     // El valor de cada caso en el punto; cada combinación, su suma con sus factores
-    const porCaso = s.q!.casos.map((_, k) => {
-      const f = new Float64Array(s.q!.casos.length);
-      f[k] = 1;
-      return valorEnPuntoCon(s, planta, campo, f, x, y);
-    });
+    // (VS3: el de cada caso base; el de una combinación con casos del sismo, el de los modos, combinado)
+    const porCaso = s.q!.casos.map((_, base) => valorEnPuntoCon(s, planta, campo, { base }, x, y));
     const h = porCaso[0];
     if (!h) return { valido: true, valor: null };
     let [max, min] = [{ valor: -Infinity, comb: "" }, { valor: Infinity, comb: "" }];
     conj.valor.factores.forEach((f, kc) => {
-      let v = 0;
-      for (let k = 0; k < f.length; k++) if (f[k]) v += f[k]! * porCaso[k]!.valor;
+      const v = s.q!.sup.valor(f, (k) => porCaso[k]!.valor, campo === "uz");
       if (v > max.valor) max = { valor: v, comb: conj.valor.nombres[kc]! };
       if (v < min.valor) min = { valor: v, comb: conj.valor.nombres[kc]! };
     });
@@ -202,8 +198,8 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
   return { valido: true, valor: r ? { ...r, comb: dib.nombre } : null };
 }
 
-/** El valor de un campo en un punto de la planta con unos factores de los casos (`valorEnPunto`). */
-function valorEnPuntoCon(s: Sesion, planta: string, campo: Campo, f: ArrayLike<number>, x: number, y: number): Omit<ValorPunto, "comb"> | null {
+/** El valor de un campo en un punto de la planta con unos factores de los casos, o en un caso base (`valorEnPunto`). */
+function valorEnPuntoCon(s: Sesion, planta: string, campo: Campo, f: ArrayLike<number> | CasoBase, x: number, y: number): Omit<ValorPunto, "comb"> | null {
   const rr = s.rr!;
   const c = s.compilado!;
   const { laminas, v } = valoresCampo(rr, planta, campo, f);
@@ -404,7 +400,7 @@ export function estacionViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: Elecc
     let max: ValorEstacion | null = null;
     let min: ValorEstacion | null = null;
     conj.valor.factores.forEach((f, kc) => {
-      const v = diagramaCombinado(rr.ep, t.barra, f).esfuerzosEn(x, lad)[comp]!;
+      const v = rr.q.diagramaBarra(t.barra, f).esfuerzosEn(x, lad)[comp]!;
       if (!max || v > max.v) max = { v, comb: conj.valor.nombres[kc]!, etiqueta: conj.valor.etiquetas[kc]! };
       if (!min || v < min.v) min = { v, comb: conj.valor.nombres[kc]!, etiqueta: conj.valor.etiquetas[kc]! };
     });
@@ -452,8 +448,7 @@ export function filasPilarQ(q: Consultas, conj: ConjuntoCombinaciones, id: strin
         const fcd = (mat.fck / 1.5) * 1000;
         conj.factores.forEach((fa, kc) => {
           for (const e of [t.base.esfuerzos, t.cabeza.esfuerzos]) {
-            let N = 0;
-            for (let k = 0; k < fa.length; k++) if (fa[k]) N += fa[k]! * e[6 * k]!;
+            const N = q.combinar(e, 6, fa)[0]!;
             const x = -N / (areaSeccion(sec) * fcd);
             if (!nu || x > nu.nu) nu = { nu: x, Nd: -N, comb: conj.nombres[kc]! };
           }
@@ -661,20 +656,27 @@ export interface DatosDeformada {
 
 /** Desplazamientos ux, uy, uz de cada nudo en una combinación (m), y sus extremos. */
 export function desplazamientos(s: Sesion, e: EleccionCombinaciones): Resultado<DatosDeformada> {
-  const casos = s.casos;
-  if (!casos) return no("visor/sin-resultados", "No hay resultados de esta huella.");
+  const q = s.q;
+  if (!s.casos || !q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
+  // Los casos base de las consultas (VS3: con el sismo del programa, también los modos)
+  const casos = q.casos;
   const conj = s.conjunto(e, "desplazamientos");
   if (!conj.valido) return conj;
   if (conj.valor.factores.length !== 1) return no("visor/una-combinacion", "La deformada es de una sola combinación.");
-  const f = conj.valor.factores[0]!;
+  const partes = q.sup.partes(conj.valor.factores[0]!);
+  const fl = partes.lineal;
+  const conSismo = partes.espectrales.length > 0;
   const n = casos[0]!.u.length / 6;
   const u = new Float32Array(3 * n);
   let [nmax, umax, nmin, zmin] = [-1, -1, -1, Infinity];
+  // Con casos del sismo, cada desplazamiento es el de los modos, combinado (por μ): la deformada es una envolvente con signo
+  const sismo = conSismo ? [0, 1, 2].map((a) => q.sup.deEspectralesVector(partes, (k) => casos[k]!.u, n, true, a, 6)) : null;
   for (let i = 0; i < n; i++) {
     const w = [0, 0, 0];
     for (let a = 0; a < 3; a++) {
       let v = 0;
-      for (let k = 0; k < f.length; k++) if (f[k]) v += f[k]! * casos[k]!.u[6 * i + a]!;
+      for (let k = 0; k < fl.length; k++) if (fl[k]) v += fl[k]! * casos[k]!.u[6 * i + a]!;
+      if (sismo) v += sismo[a]![i]!;
       u[3 * i + a] = v;
       w[a] = v;
     }

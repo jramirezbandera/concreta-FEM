@@ -1,0 +1,21 @@
+# VS3: la memoria de las consultas con el sismo del programa (edificio de losas, 7 plantas de 9 × 7 vanos)
+
+Memoria de JavaScript tras recoger la basura, MiB: objetos y, aparte, los vectores de números (los resultados y lo que se guarda por caso). Cada paso, sobre el anterior.
+
+## sin el sismo: 86796 nudos, 22470 barras, 46298 láminas, 4 casos
+
+paso | objetos, MiB | vectores, MiB | total sobre el arranque, MiB
+compilado y calculado | 681 | 206 | 886
+las consultas | 681 | 206 | 886
+envolventes de todas las piezas (16 combinaciones, 8.7 s) | 1206 | 208 | 1414
+franjas de armado de N7 (3.3 s) | 1579 | 223 | 1801
+mapa de M11 de N7, envolvente (0.0 s) | 1579 | 223 | 1801
+
+## con el sismo del programa: 86796 nudos, 22470 barras, 46298 láminas, 4 casos y 21 modos
+
+paso | objetos, MiB | vectores, MiB | total sobre el arranque, MiB
+compilado y calculado | 1476 | 234 | 1709
+las consultas | 1476 | 234 | 1709
+envolventes de todas las piezas (80 combinaciones, 36.6 s) | 3502 | 237 | 3738
+franjas de armado de N7 (6.9 s) | 2293 | 282 | 2574
+mapa de M11 de N7, envolvente (1.1 s) | 2293 | 282 | 2574

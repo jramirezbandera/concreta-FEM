@@ -26,7 +26,8 @@ import { cotasPlantas } from "../../compilador/cotas.ts";
 import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados.ts";
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
-import { diagramaCombinado } from "../consultas.ts";
+import { esfuerzoProyectado, type DiagramaLeible } from "../../motor/diagramaCompuesto.ts";
+import type { PartesCombinacion } from "../../motor/espectral.ts";
 import { area, cajaDe, numeroFijo, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
@@ -81,12 +82,13 @@ export class ResultadosRender {
 
   get campos(): CamposLaminas {
     // Los de las consultas: los cortes de las bandas y los mapas comparten lo recuperado
-    return (this.camposC ??= this.q.modelo === this.c.modelo ? this.q.campos : new CamposLaminas(this.c.modelo));
+    return (this.camposC ??= this.q.compilado === this.c.modelo ? this.q.campos : new CamposLaminas(this.c.modelo));
   }
 
   get ep(): EsfuerzosPiezas {
     // Los de las consultas, como los campos: los diagramas se preparan una vez para las vistas y las consultas
-    return (this.epC ??= this.q.modelo === this.c.modelo && this.q.mapeo === this.c.mapeo ? this.q.esfuerzosPiezas : new EsfuerzosPiezas(this.c.modelo, this.c.mapeo, this.q.casos));
+    // (con el sismo del programa, el modelo de las consultas lleva además los casos de los modos: siempre los suyos)
+    return (this.epC ??= (this.q.compilado === this.c.modelo && this.q.mapeo === this.c.mapeo) || this.q.modelo.casos.length !== this.c.modelo.casos.length ? this.q.esfuerzosPiezas : new EsfuerzosPiezas(this.c.modelo, this.c.mapeo, this.q.casos));
   }
 
   /**
@@ -286,15 +288,33 @@ export function capaMalla(r: ResultadosRender, planta: string): { primitivas: Pr
 
 // ─── Isovalores ─────────────────────────────────────────────────────────────────────────────────
 
-/** Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación. El visor interpola con ellos el valor de un punto. */
-export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number>, de: SuperficieMapa = "losas"): { laminas: number[]; v: Float64Array } {
+/** Un caso base suelto, en lugar de los factores de una combinación (VS3: para lo que es lineal y se combina después). */
+export interface CasoBase {
+  readonly base: number;
+}
+const esCasoBase = (f: ArrayLike<number> | CasoBase): f is CasoBase => typeof (f as CasoBase).base === "number";
+
+/**
+ * Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación
+ * (los factores de los casos lógicos) o en un caso base. El visor interpola con ellos el valor de un punto.
+ */
+export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number> | CasoBase, de: SuperficieMapa = "losas"): { laminas: number[]; v: Float64Array } {
+  // VS3: los factores son los de los casos lógicos; la parte lineal, como siempre, y la de los casos del sismo, combinada en cada nudo
+  let partes: PartesCombinacion;
+  if (esCasoBase(f)) {
+    partes = { lineal: new Float64Array(r.q.nb), espectrales: [] };
+    partes.lineal[f.base] = 1;
+  } else partes = r.q.sup.partes(f);
+  const fl = partes.lineal;
+  const conSismo = partes.espectrales.length > 0;
   if (campo === "uz") {
     const { laminas } = r.laminas(planta, de);
     const v = new Float64Array(4 * laminas.length);
     laminas.forEach((l, i) => {
       r.c.modelo.laminas![l]!.nudos.forEach((n, a) => {
         let s = 0;
-        for (let k = 0; k < f.length; k++) if (f[k]) s += f[k]! * r.q.casos[k]!.u[6 * n + 2]!;
+        for (let k = 0; k < fl.length; k++) if (fl[k]) s += fl[k]! * r.q.casos[k]!.u[6 * n + 2]!;
+        if (conSismo) s += r.q.sup.deEspectrales(partes, (k) => r.q.casos[k]!.u[6 * n + 2]!, true);
         v[4 * i + a] = s * 1000;
       });
     });
@@ -303,6 +323,8 @@ export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, 
   const comp = COMPONENTE[campo];
   const { laminas, region, valores } = r.valores(planta, de, comp < 3 ? "membrana" : "flexion");
   const v = new Float64Array(4 * laminas.length);
+  // Lo de los casos del sismo, de todos los nudos a la vez (el valor del nudo a de la lámina i es el 32·i + 8·a + comp de cada caso)
+  const sismo = conSismo ? r.q.sup.deEspectralesVector(partes, (k) => valores[k]!, 4 * laminas.length, false, comp, 8) : null;
   laminas.forEach((_, i) => {
     for (let a = 0; a < 4; a++) {
       if (!region[i]) {
@@ -310,7 +332,8 @@ export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, 
         continue;
       }
       let s = 0;
-      for (let k = 0; k < f.length; k++) if (f[k]) s += f[k]! * valores[k]![32 * i + 8 * a + comp]!;
+      for (let k = 0; k < fl.length; k++) if (fl[k]) s += fl[k]! * valores[k]![32 * i + 8 * a + comp]!;
+      if (sismo) s += sismo[4 * i + a]!;
       v[4 * i + a] = s;
     }
   });
@@ -559,19 +582,20 @@ export function envolventePieza(r: ResultadosRender, id: string, conjunto: Conju
 
 /**
  * La envolvente de un tramo flexible (la parte de `envolventePieza` de ese tramo, con las mismas
- * estaciones). `comp`: una componente de [N, Vy, Vz, T, My, Mz] o una función de las seis (el
- * momento en el plano de un alzado, que combina My, Mz y T).
+ * estaciones). `comp`: una componente de [N, Vy, Vz, T, My, Mz] o una combinación lineal de ellas,
+ * [componente, coeficiente]… (el momento en el plano de un alzado, que combina My, Mz y T).
  */
-export function envolventeTramo(r: ResultadosRender, t: TramoFlexible, conjunto: ConjuntoCombinaciones, comp: number | ((e: readonly number[]) => number)): PuntoEnvolvente[] {
+export function envolventeTramo(r: ResultadosRender, t: TramoFlexible, conjunto: ConjuntoCombinaciones, comp: number | readonly (readonly [number, number])[]): PuntoEnvolvente[] {
   const curva: PuntoEnvolvente[] = [];
-  const D = conjunto.factores.map((f) => diagramaCombinado(r.ep, t.barra, f));
+  const D = conjunto.factores.map((f) => r.q.diagramaBarra(t.barra, f));
   const L = t.s1 - t.s0;
   const xs = [...new Set([...D.flatMap((x) => x.estaciones()), ...Array.from({ length: DIVISIONES + 1 }, (_, i) => (L * i) / DIVISIONES)])].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
-  const valor = typeof comp === "number" ? (e: readonly number[]) => e[comp]! : comp;
+  // Con varias componentes ([c, k]…), su combinación lineal: en una combinación con casos del sismo, la de cada modo, combinada
+  const valor = typeof comp === "number" ? (dg: DiagramaLeible, x: number, lado: -1 | 1) => dg.esfuerzosEn(x, lado)[comp]! : (dg: DiagramaLeible, x: number, lado: -1 | 1) => esfuerzoProyectado(dg, x, lado, comp);
   for (const x of xs)
     for (const lado of [-1, 1] as const) {
       if ((x === 0 && lado < 0) || (x === L && lado > 0)) continue;
-      const vs = D.map((dg) => valor(dg.esfuerzosEn(x, lado)));
+      const vs = D.map((dg) => valor(dg, x, lado));
       const e = { s: t.s0 + x, max: Math.max(...vs), min: Math.min(...vs) };
       const prev = curva[curva.length - 1];
       if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
@@ -698,7 +722,6 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
 export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: ConjuntoCombinaciones, d: DatosVista): Escena {
   const pl = new PlantaFisica(r.q.fisico, planta);
   const q = r.q;
-  const nc = q.nc;
   const fondo = fondoModelo(pl, { atenuado: true });
   const P: Primitiva[] = [...fondo.primitivas];
   const datos: { id: string; p: Vec2; huella: ReturnType<typeof huellaSeccion>; min: { v: number; comb: string }; max: { v: number; comb: string } }[] = [];
@@ -712,8 +735,7 @@ export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: Conju
     let max = { v: -Infinity, comb: "" };
     conjunto.factores.forEach((f, kc) => {
       for (const e of [tramo.base.esfuerzos, tramo.cabeza.esfuerzos]) {
-        let n = 0;
-        for (let k = 0; k < nc; k++) if (f[k]) n += f[k]! * e[6 * k]!;
+        const n = q.combinar(e, 6, f)[0]!;
         if (n < min.v) min = { v: n, comb: conjunto.nombres[kc]! };
         if (n > max.v) max = { v: n, comb: conjunto.nombres[kc]! };
       }

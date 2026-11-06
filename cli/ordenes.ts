@@ -114,6 +114,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
 Combinaciones de las consultas: --casos | --situacion ELU-PT[,ELS-C…] | --combinacion "1.35*G+1.5*Q" (repetible) | --caso G
 Otras: --planta P --tipo pilar|viga|vigueta --objeto id --losa id --armadura x-inf|x-sup|y-inf|y-sup (refuerzos, con la base del proyecto) --top N --todos --estaciones --exacto --cifras N
 modos: masas por planta y modos de vibración (periodos, masa efectiva y forma); necesita "acciones": { "sismo": {} } en el modelo y no depende de las combinaciones
+sismo: el sismo del programa por espectros de respuesta (NCSE-02): emplazamiento y espectro y, según X y según Y, cortante en la base, cortantes y fuerzas de planta, desplazamientos, θ de segundo orden y el contraste con el método simplificado; necesita "ab", "K", "terreno" y "mu" en "acciones": { "sismo": {…} }; sus casos EX+e, EX-e, EY+e y EY-e entran en las combinaciones sísmicas (--situacion ELU-SIS) y en --caso
 Salida: un objeto JSON. Códigos: 0 bien, 1 errores del modelo o del cálculo, 2 orden mal dada, 3 error interno.`;
 
 // ─── Diagnósticos y números ─────────────────────────────────────────────────────────────────────
@@ -246,7 +247,7 @@ function guardar(carpeta: string, cabecera: object, bytes: Uint8Array): void {
 // ─── Revisión ───────────────────────────────────────────────────────────────────────────────────
 
 function revision(l: { ruta: string; proyecto: Proyecto }, r: Calculado): Revision {
-  const q = new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones);
+  const q = new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal);
   return revisar(l.proyecto, r.compilacion, q, {
     motor: huellaMotor(),
     diagnosticos: [...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos],
@@ -314,20 +315,23 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       const r = await calculado(orden, l.ruta, l.proyecto, a.banderas.has("recalcular"));
       if ("codigo" in r) return r;
       const est = r.cabecera.estadisticas;
+      // VS3: con el espectro en el sismo de las acciones, sus casos y el cortante en la base (el detalle, con `fem consultar sismo`)
+      const sismo = l.proyecto.modelo.acciones?.sismo?.ab !== undefined && r.modal ? new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal).sismo() : null;
       return {
-        codigo: CODIGO.bien,
+        codigo: sismo && !sismo.valido ? CODIGO.errores : CODIGO.bien,
         json: {
           orden,
-          ok: true,
+          ok: !sismo || sismo.valido,
           huella: r.compilacion.huella,
           resultados: relative(process.cwd(), carpetaResultados(l.ruta, r.compilacion.huella)).split(sep).join("/"),
           reutilizados: r.reutilizados,
           casos: r.cabecera.casos.map((c) => ({ id: c.id, equilibrio: c.equilibrio })),
           // VS2: con el sismo en las acciones, los modos (el detalle, con `fem consultar modos`)
           ...(r.modal ? { modos: { numero: r.modal.modos.length, T1: r.modal.modos[0]?.periodo ?? null, masa: r.modal.masas.diafragmas, equilibrio: Math.max(0, ...r.modal.modos.flatMap((m) => [m.equilibrio.fuerzas, m.equilibrio.momentos])) } } : {}),
+          ...(sismo?.valido ? { sismo: { casos: sismo.valor.casos, periodo: sismo.valor.direcciones.map((d) => d.dominante.periodo), cortanteBasal: sismo.valor.direcciones.map((d) => d.basal), coeficiente: sismo.valor.direcciones.map((d) => d.coeficiente) } } : {}),
           estadisticas: { nudos: est.nudos, ecuaciones: est.ecuaciones, barras: r.compilacion.estadisticas.barras, laminas: r.compilacion.estadisticas.laminas },
           segundos: r.tiempos,
-          ...listaDiagnosticos([...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos]),
+          ...listaDiagnosticos([...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos, ...(sismo?.diagnosticos ?? [])]),
         },
       };
     }
@@ -362,7 +366,8 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
         ...(a.banderas.get("armadura") ? { armadura: a.banderas.get("armadura")![0]! } : {}),
         ...(l.proyecto.armado ? { armado: l.proyecto.armado } : {}),
         id: a.posicionales[2],
-        combinaciones: (proposito: Proposito) => conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(l.proyecto.modelo.casos, proposito)),
+        // Los casos de las consultas: con los del programa (el viento y el sismo), que el fichero no lleva
+        combinaciones: (proposito: Proposito) => conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(q.fisico.casos, proposito)),
       };
       const res = consultar(q, consulta as (typeof CONSULTAS)[number], opciones);
       return {
@@ -399,7 +404,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if (vistas.some(necesitaCalculo)) {
         const r = await calculado(orden, l.ruta, l.proyecto, a.banderas.has("recalcular"));
         if ("codigo" in r) return r;
-        const q = new Consultas(f, r.compilacion, r.casos, l.proyecto.opciones);
+        const q = new Consultas(f, r.compilacion, r.casos, l.proyecto.opciones, r.modal);
         rr = new ResultadosRender(q, r.compilacion);
         diags = [...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos];
         const res = resumen(l.proyecto, r.compilacion);
@@ -407,7 +412,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
         for (const proposito of ["desplazamientos", "esfuerzos", "reacciones"] as const) {
           if (seleccion || proposito === "reacciones") {
             // Las reacciones, por defecto, en la ELS característica (UI-11; por casos si no llevan su acción)
-            const x = conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(f.casos, "reacciones"));
+            const x = conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(q.fisico.casos, "reacciones"));
             if (!x.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos(x.diagnosticos) } };
             conjuntos.set(proposito, x.valor);
           } else conjuntos.set(proposito, conjuntoPorDefecto(q, res.valor, proposito));

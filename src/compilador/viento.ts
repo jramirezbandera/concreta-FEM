@@ -151,7 +151,7 @@ const cubre = (iv: readonly Intervalo[], s: number): boolean => iv.some(([a, b])
  * alrededor (el de una cubierta más alta junto a otra más baja) no es de ella, y su nudo no está en
  * su diafragma (C2-f).
  */
-function huellaPlanta(m: ModeloFisico, k: number, secciones: ReadonlyMap<string, Seccion>): [Intervalo[], Intervalo[]] {
+export function huellaPlanta(m: ModeloFisico, k: number, secciones: ReadonlyMap<string, Seccion>): [Intervalo[], Intervalo[]] {
   const id = m.plantas[k]!.id;
   const res: [Intervalo[], Intervalo[]] = [[], []];
   const puntos = (ps: readonly Vec2[]) => {
@@ -181,6 +181,18 @@ function huellaPlanta(m: ModeloFisico, k: number, secciones: ReadonlyMap<string,
   // Las vigas, sólo sin losas ni paños: con ellos, las que salen son una pérgola o un voladizo, abiertos
   if (!res[0].length) for (const v of m.vigas ?? []) if (v.planta === id) banda(v.puntos, medidasSeccion(secciones.get(v.seccion))?.b ?? 0);
   return res;
+}
+
+/**
+ * Lo que mide una planta en X y en Y, m: la caja de lo que ocupa (`huellaPlanta`). null si no ocupa
+ * nada. Es la dimensión de la planta de la excentricidad accidental del sismo (VS3).
+ */
+export function dimensionesPlanta(m: ModeloFisico, k: number): [number, number] | null {
+  const secciones = new Map((m.secciones ?? []).map((s) => [s.id, s] as const));
+  const h = huellaPlanta(m, k, secciones);
+  if (!h[0].length || !h[1].length) return null;
+  const caja = (iv: Intervalo[]) => Math.max(...iv.map((x) => x[1])) - Math.min(...iv.map((x) => x[0]));
+  return [caja(h[0]), caja(h[1])];
 }
 
 /** El viento del modelo: sus fuerzas por planta, o por qué no se puede calcular. Sin `acciones.viento`, null. */

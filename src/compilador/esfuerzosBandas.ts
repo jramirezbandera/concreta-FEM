@@ -31,7 +31,7 @@ import { Cortes, type Corte } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso } from "../motor/modelo.ts";
 import { cotasPlantas } from "./cotas.ts";
-import { combinar } from "./envolventes.ts";
+import { combinar, type Combinar } from "./envolventes.ts";
 import { ejesBanda, estacionesBanda, ladoEstacion, puntoBanda } from "./estaciones.ts";
 import type { Banda, Losa, ModeloFisico, Vec2 } from "./fisico.ts";
 import { fraccionEnRegiones, puntoEnRegion, type Region } from "./poligonos.ts";
@@ -92,7 +92,11 @@ export class EsfuerzosBandas {
    * @param fisico el modelo físico con sus bandas (las que se compilaron).
    * @param modelo el modelo analítico compilado, y `casos`, sus resultados (válidos).
    */
-  constructor(fisico: ModeloFisico, modelo: ModeloAnalitico, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; epsGeom?: number } = {}) {
+  /** VS3: cómo se combinan los valores por caso (`Consultas.combinar` con los casos del sismo; si no, la lineal). */
+  private readonly combinar: Combinar;
+
+  constructor(fisico: ModeloFisico, modelo: ModeloAnalitico, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; epsGeom?: number; combinar?: Combinar } = {}) {
+    this.combinar = opciones.combinar ?? combinar;
     this.fisico = fisico;
     this.modelo = modelo;
     this.casos = casos;
@@ -165,7 +169,7 @@ export class EsfuerzosBandas {
         const clave = `${x.tipo}@${Math.round(s / this.eps)}`;
         let li = lineas.get(clave);
         if (!li) lineas.set(clave, (li = { tipo: x.tipo, s, pilares: 0, centrales: 0, fraccion: Number.NaN, rango: x.tipo === "cara" ? [0.6, 0.8] : [0.5, 0.7], fuera: false, bandas: [] }));
-        const M = combinar(x.esfuerzos, 6, factores)[4]!;
+        const M = this.combinar(x.esfuerzos, 6, factores)[4]!;
         if (b.tipo === "pilares") li.pilares += M;
         else li.centrales += M;
         li.bandas.push(b.id);
@@ -306,10 +310,16 @@ export type MetodoWoodArmer = "medios" | "puntos";
  *   para que integren el My exacto del corte; la media de lo que pide cada punto.
  * Momentos de dimensionado por metro (kN·m/m), en los ejes de la banda: X a lo largo de su eje.
  */
-export function woodArmerEstacion(e: EstacionResultado, combinaciones: readonly ArrayLike<number>[], metodo: MetodoWoodArmer = "medios"): { porCombinacion: MomentosWoodArmer[]; envolvente: EnvolventeWoodArmer } {
+export function woodArmerEstacion(
+  e: EstacionResultado,
+  combinaciones: readonly ArrayLike<number>[],
+  metodo: MetodoWoodArmer = "medios",
+  /** VS3: con los casos del sismo del programa, `Consultas.combinar` (cada momento, combinado en los modos, antes de Wood–Armer). */
+  combina: Combinar = combinar,
+): { porCombinacion: MomentosWoodArmer[]; envolvente: EnvolventeWoodArmer } {
   if (metodo === "medios") {
     const ternas = new Float64Array(3 * combinaciones.length);
-    combinaciones.forEach((f, c) => ternas.set(combinar(e.medios, 3, f), 3 * c));
+    combinaciones.forEach((f, c) => ternas.set(combina(e.medios, 3, f), 3 * c));
     const porCombinacion = combinaciones.map((_, c) => woodArmer(ternas[3 * c]!, ternas[3 * c + 1]!, ternas[3 * c + 2]!));
     return { porCombinacion, envolvente: envolventeWoodArmer(ternas) };
   }
@@ -320,10 +330,10 @@ export function woodArmerEstacion(e: EstacionResultado, combinaciones: readonly 
   const todos = new Float64Array(3 * np * momentos.length);
   momentos.forEach((m, k) => todos.set(m, 3 * np * k));
   const porCombinacion = combinaciones.map((f) => {
-    const m = combinar(todos, 3 * np, f);
+    const m = combina(todos, 3 * np, f);
     let integral = 0;
     for (let i = 0; i < np; i++) integral += pesos[i]! * m[3 * i]!;
-    const My = combinar(e.esfuerzos, 6, f)[4]!;
+    const My = combina(e.esfuerzos, 6, f)[4]!;
     const correccion = (My - integral) / suma;
     const r: MomentosWoodArmer = { inferiorX: 0, inferiorY: 0, superiorX: 0, superiorY: 0 };
     for (let i = 0; i < np; i++) {

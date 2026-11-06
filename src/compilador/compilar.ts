@@ -22,7 +22,7 @@ import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, Mo
 import { avisarAbacosUnidos, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
 import { resolverBordes } from "./bordes.ts";
-import { calcularSismo, hipotesisSismo } from "./sismo.ts";
+import { calcularSismo, hipotesisEspectro, hipotesisSismo } from "./sismo.ts";
 import { hipotesisViento, resolverViento } from "./viento.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
@@ -199,7 +199,11 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
   // VS2: las masas del sismo, de los casos (con los del viento); sus errores ya los ha dado `validar`
-  const sismo = calcularSismo(viento.modelo)?.masas ?? null;
+  const calculoSismo = calcularSismo(viento.modelo);
+  const sismo = calculoSismo?.masas ?? null;
+  // VS3: el espectro y los casos del sismo no cambian el modelo analítico (son casos lógicos sobre los modos)
+  const espectro = calculoSismo?.espectro ?? null;
+  for (const a of calculoSismo?.avisos ?? []) diag.aviso(a.codigo, a.mensaje, a.ids);
   if (sismo) {
     // VS-h: una planta con forjado y sin diafragma rígido tiene masa que no va a ningún diafragma
     const sueltas = ctx.plantas
@@ -469,6 +473,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       ...hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma.filter((id) => !delViento.has(id)), planas),
       ...(viento.calculo?.viento ? [hipotesisViento(viento.calculo.viento)] : []),
       ...(sismo ? [hipotesisSismo(sismo)] : []),
+      ...(espectro ? [hipotesisEspectro(espectro)] : []),
     ],
     huella,
     estadisticas: {

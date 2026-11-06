@@ -83,7 +83,7 @@ describe("VS2: el análisis modal, con los resultados guardados", () => {
       const o = otro.modos[i]!;
       expect(o.omega2).toBe(m.omega2);
       expect(o.masaEfectiva).toEqual(m.masaEfectiva);
-      for (const campo of ["forma", "fuerzas", "u"] as const) expect(Buffer.from(o[campo].buffer, o[campo].byteOffset, o[campo].byteLength).equals(Buffer.from(m[campo].buffer, m[campo].byteOffset, m[campo].byteLength)), `${campo} del modo ${i + 1}`).toBe(true);
+      for (const campo of ["forma", "fuerzas", "u", "reacciones", "esfuerzosBarras", "esfuerzosLaminas"] as const) expect(Buffer.from(o[campo].buffer, o[campo].byteOffset, o[campo].byteLength).equals(Buffer.from(m[campo].buffer, m[campo].byteOffset, m[campo].byteLength)), `${campo} del modo ${i + 1}`).toBe(true);
     });
     // los casos, como sin el modal
     r.casos.forEach((caso, k) => expect(Buffer.from(d.casos[k]!.u.buffer).equals(Buffer.from(caso.u.buffer))).toBe(true));

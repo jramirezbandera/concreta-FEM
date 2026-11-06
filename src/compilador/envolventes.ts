@@ -3,10 +3,20 @@
  * lineal en los casos: el valor de una combinación es Σ fₖ·valorₖ, con fₖ los factores de sus casos
  * (los de `src/combinaciones/`, o unos dados). Los vectores por caso van seguidos: n valores del
  * caso 0, n del caso 1… (el formato de los esfuerzos de `Cortes`, 6·nc).
+ *
+ * VS3: esto es la combinación **lineal**, la de un modelo sin los casos del sismo del programa, en
+ * el que cada caso con factor es un caso con resultados. Con ellos, los vectores «por caso» de las
+ * consultas van por caso base (los modos detrás) y los factores, por caso lógico: no son los mismos
+ * casos, y la combinación es la de `Consultas.combinar` (`Superposicion`). Por eso `combinar` exige
+ * que el vector tenga un caso por factor: mezclar las dos cosas lanza en vez de dar un número.
  */
+
+/** La combinación de un vector por caso (n valores por caso) con unos factores por caso: la lineal, o la de `Consultas.combinar`. */
+export type Combinar = (porCaso: ArrayLike<number>, n: number, factores: ArrayLike<number>) => Float64Array;
 
 /** Combinación lineal de un vector por caso (n valores por caso) con unos factores por caso. */
 export function combinar(porCaso: ArrayLike<number>, n: number, factores: ArrayLike<number>): Float64Array {
+  if (porCaso.length !== n * factores.length) throw new Error(`combinar: ${porCaso.length} valores no son ${n} por cada uno de los ${factores.length} casos con factor (con los casos del sismo del programa, se combina con Consultas.combinar)`);
   const r = new Float64Array(n);
   for (let k = 0; k < factores.length; k++) {
     const a = factores[k]!;
@@ -28,7 +38,7 @@ export interface Envolvente {
   combinacionMin: Int32Array;
 }
 
-export function envolvente(porCaso: ArrayLike<number>, n: number, combinaciones: readonly ArrayLike<number>[]): Envolvente {
+export function envolvente(porCaso: ArrayLike<number>, n: number, combinaciones: readonly ArrayLike<number>[], combina: Combinar = combinar): Envolvente {
   const e: Envolvente = {
     max: new Float64Array(n).fill(Number.NaN),
     min: new Float64Array(n).fill(Number.NaN),
@@ -36,7 +46,7 @@ export function envolvente(porCaso: ArrayLike<number>, n: number, combinaciones:
     combinacionMin: new Int32Array(n).fill(-1),
   };
   combinaciones.forEach((f, c) => {
-    const v = combinar(porCaso, n, f);
+    const v = combina(porCaso, n, f);
     for (let q = 0; q < n; q++) {
       const x = v[q]!;
       if (Number.isNaN(x)) continue;

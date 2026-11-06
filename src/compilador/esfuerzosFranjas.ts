@@ -101,7 +101,7 @@ import { CamposLaminas } from "../motor/campos.ts";
 import { Cortes, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/modelo.ts";
-import { combinar } from "./envolventes.ts";
+import { combinar, type Combinar } from "./envolventes.ts";
 import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
 import { alineada, anchoNominal, carasFranjas, COSENO_APOYO_PILAR, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, tramosRectaLosa, type Franja } from "./franjas.ts";
@@ -215,7 +215,16 @@ export class EsfuerzosFranjas {
    * @param ctx el contexto del modelo físico que se compiló; `compilado`, su modelo analítico y su
    *   mapeo; `casos`, sus resultados (válidos).
    */
-  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number } = {}) {
+  /** VS3: cómo se combinan los valores por caso (`Consultas.combinar` con los casos del sismo; si no, la lineal). */
+  private readonly combinar: Combinar;
+
+  constructor(
+    ctx: Contexto,
+    compilado: { modelo: ModeloAnalitico; mapeo: Mapeo },
+    casos: readonly ResultadoCaso[],
+    opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number; combinar?: Combinar } = {},
+  ) {
+    this.combinar = opciones.combinar ?? combinar;
     this.ctx = ctx;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
@@ -266,7 +275,7 @@ export class EsfuerzosFranjas {
       const v: EnvolventeEstacionFranja = { inferior: 0, superior: 0, combInferior: -1, combSuperior: -1, mxMax: -Infinity, mxMin: Infinity, combMax: -1, combMin: -1 };
       if (!e.valido) return { ...v, inferior: NaN, superior: NaN, mxMax: NaN, mxMin: NaN };
       combinaciones.forEach((f, c) => {
-        const [mx, my, mxy] = combinar(e.medios, 3, f);
+        const [mx, my, mxy] = this.combinar(e.medios, 3, f);
         const w = woodArmer(mx!, my!, mxy!);
         if (w.inferiorX > v.inferior) [v.inferior, v.combInferior] = [w.inferiorX, c];
         if (w.superiorX > v.superior) [v.superior, v.combSuperior] = [w.superiorX, c];

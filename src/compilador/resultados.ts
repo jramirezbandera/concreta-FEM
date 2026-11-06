@@ -12,6 +12,13 @@
  * cumple el equilibrio con su par repartido. Lo demás (una carga nodal o una puntual de la barra en
  * el nudo) se queda como salto. Mz no se toca: en él actúa también el diafragma. Con
  * `suavizado: false`, los diagramas del motor tal cual.
+ *
+ * Los casos ligeros (VS3): los de los modos de vibración, que van detrás de los del modelo, no llevan
+ * cargas en las barras, así que sus esfuerzos son lineales en cada barra y quedan dichos por los de
+ * sus dos extremos, que ya están en sus resultados (`esfuerzosBarras`). De ellos no se guarda ningún
+ * diagrama (son un objeto por barra y por caso: con 21 modos, el edificio objetivo no cabía en
+ * memoria): `extremos` da sus esfuerzos de extremo, con los pares de la losa, y `diagrama` lo hace
+ * cada vez que se pide.
  */
 import { DiagramasBarras } from "../motor/barras.ts";
 import type { DiagramaBarra } from "../elementos/cargasBarra.ts";
@@ -53,13 +60,21 @@ export class EsfuerzosPiezas {
   /** Cargas nodales de cada caso, por nudo. */
   private nodales: Map<number, Float64Array>[] = [];
 
-  /** `casos`: los de un cálculo válido del `modelo`, en su orden. */
-  constructor(modelo: ModeloAnalitico, mapeo: Mapeo, casos: readonly ResultadoCaso[], opciones: { suavizado?: boolean } = {}) {
+  /** Primer caso ligero (los de detrás también lo son); sin ellos, el número de casos. */
+  readonly ligeros: number;
+
+  /**
+   * `casos`: los de un cálculo válido del `modelo`, en su orden. `ligeros`: el índice del primer caso
+   * ligero (cabecera): los de los modos, sin cargas en las barras.
+   */
+  constructor(modelo: ModeloAnalitico, mapeo: Mapeo, casos: readonly ResultadoCaso[], opciones: { suavizado?: boolean; ligeros?: number } = {}) {
     this.modelo = modelo;
     this.mapeo = mapeo;
     this.casos = casos;
     this.diagramas = new DiagramasBarras(modelo);
     this.suavizado = opciones.suavizado ?? true;
+    this.ligeros = opciones.ligeros ?? casos.length;
+    for (let k = this.ligeros; k < casos.length; k++) if (modelo.casos[k]?.barras?.length) throw new Error(`EsfuerzosPiezas: el caso ${modelo.casos[k]!.id} lleva cargas en las barras y no puede ser ligero`);
   }
 
   /** Tramos flexibles de una pieza, en orden. */
@@ -72,24 +87,51 @@ export class EsfuerzosPiezas {
 
   /** Diagrama de la barra `b` en el caso `k` (con los pares de la losa repartidos si `suavizado`). */
   diagrama(b: number, k: number): DiagramaBarra {
+    const ligero = k >= this.ligeros;
     const clave = `${b}/${k}`;
-    let d = this.cache.get(clave);
+    let d = ligero ? undefined : this.cache.get(clave);
     if (!d) {
       d = this.crudo(b, k);
       const j = this.suavizado ? this.saltosLosa(b)?.[k] : undefined;
       // −J_i/2·(1 − x/L) + J_j/2·x/L: la mitad de cada salto a cada lado de su nudo
       if (j && j.some((v) => v !== 0)) d = d.conPares([-j[0]! / 2, -j[1]! / 2, 0], [(j[0]! + j[2]!) / (2 * d.L), (j[1]! + j[3]!) / (2 * d.L), 0]);
-      this.cache.set(clave, d);
+      if (!ligero) this.cache.set(clave, d);
     }
     return d;
   }
 
   /** El diagrama del motor, sin repartir nada. */
   private crudo(b: number, k: number): DiagramaBarra {
+    if (k >= this.ligeros) return this.diagramas.diagrama(b, k, this.casos[k]!);
     const clave = `${b}/${k}`;
     let d = this.crudos.get(clave);
     if (!d) this.crudos.set(clave, (d = this.diagramas.diagrama(b, k, this.casos[k]!)));
     return d;
+  }
+
+  /**
+   * Los esfuerzos [N, Vy, Vz, T, My, Mz] de la barra `b` en los dos extremos de su tramo flexible (en
+   * 0⁺ y en L⁻: 12 números) en el caso `k`, con los pares de la losa repartidos si `suavizado`: los de
+   * `diagrama(b, k)` en sus extremos. En un caso ligero salen de sus resultados, sin hacer el diagrama.
+   */
+  extremos(b: number, k: number, destino: Float64Array = new Float64Array(12), o = 0): Float64Array {
+    if (k < this.ligeros) {
+      const d = this.diagrama(b, k);
+      destino.set(d.esfuerzosEn(0, 1), o);
+      destino.set(d.esfuerzosEn(d.L, -1), o + 6);
+      return destino;
+    }
+    const e = this.casos[k]!.esfuerzosBarras;
+    for (let c = 0; c < 12; c++) destino[o + c] = e[12 * b + c]!;
+    const j = this.suavizado ? this.saltosLosa(b)?.[k] : undefined;
+    if (j) {
+      // el par repartido de `diagrama`: −J_i/2 en 0 y +J_j/2 en L, en T y en My
+      destino[o + 3]! -= j[0]! / 2;
+      destino[o + 4]! -= j[1]! / 2;
+      destino[o + 9]! += j[2]! / 2;
+      destino[o + 10]! += j[3]! / 2;
+    }
+    return destino;
   }
 
   /**
@@ -139,11 +181,16 @@ export class EsfuerzosPiezas {
       const P = this.paresLaminas(n);
       return P.map((C) => salto(C));
     }
-    return this.casos.map((_, q) => {
+    return this.casos.map((caso, q) => {
+      const [T, M] = salto(this.parCargas(n, q));
+      if (q >= this.ligeros) {
+        // Un caso ligero (sin cargas en las barras): las fuerzas de extremo, las de sus resultados
+        const e = caso.esfuerzosBarras;
+        return [e[12 * b + 3]! - e[12 * a + 9]! - T, e[12 * b + 4]! - e[12 * a + 10]! - M];
+      }
       // Entre las fuerzas de extremo: en L por la derecha y en 0 por la izquierda (con las puntuales de las barras en el nudo)
       const [ea, eb] = [this.crudo(a, q), this.crudo(b, q)];
       const [fa, fb] = [ea.esfuerzosEn(ea.L, 1), eb.esfuerzosEn(0, -1)];
-      const [T, M] = salto(this.parCargas(n, q));
       return [fb[3]! - fa[3]! - T, fb[4]! - fa[4]! - M];
     });
   }

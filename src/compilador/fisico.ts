@@ -589,7 +589,7 @@ export interface ModeloFisico {
   acciones?: AccionesEdificio;
 }
 
-/** Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento; VS2, las masas y los modos del sismo. */
+/** Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento; VS2, las masas y los modos del sismo; VS3, su espectro y sus casos. */
 export interface AccionesEdificio {
   viento?: VientoEdificio;
   sismo?: SismoEdificio;
@@ -598,8 +598,16 @@ export interface AccionesEdificio {
 /**
  * Sismo de la NCSE-02 (fase VS). Con VS2, sus masas y sus modos de vibración: basta `"sismo": {}`
  * para que el cálculo dé la masa, el centro de masas y la inercia de giro de cada planta con
- * diafragma rígido, y los periodos y las formas de todos sus modos (`fem consultar modos`). El
- * espectro y los casos del sismo llegan con VS3.
+ * diafragma rígido, y los periodos y las formas de todos sus modos (`fem consultar modos`).
+ *
+ * Con VS3, y con la aceleración básica `ab` del emplazamiento, el análisis por espectros de respuesta
+ * (art. 3.6.2, el método de referencia): cuatro casos del programa, `EX+e`, `EX-e`, `EY+e` y `EY-e`
+ * (el sismo según X y según Y, con la excentricidad accidental a un lado y al otro; familias `EX` y
+ * `EY`), que entran en las combinaciones de la situación sísmica con su ± y con el 30 % de la otra
+ * dirección. No son casos con cargas: el valor de cada resultado (un esfuerzo, una reacción, un
+ * desplazamiento) es la combinación de los valores de todos los modos de vibración, con el signo del
+ * modo de más masa en esa dirección, más el del torsor de la excentricidad. Con `ab` hacen falta
+ * `K`, `terreno` y `mu`. Sin `ab`, sólo las masas y los modos.
  *
  * La masa sale de las cargas (art. 3.2): de cada caso, la fracción que le toca de la componente
  * vertical de sus cargas, entre g. Por defecto, la de su acción:
@@ -623,7 +631,50 @@ export interface SismoEdificio {
    * "nieve-mas-de-1000" y que no en los de "nieve-hasta-1000".
    */
   nievePermanente?: boolean;
+  /**
+   * VS3. Aceleración sísmica básica del emplazamiento, en g (art. 2.1 y anejo 1 de la norma, por
+   * municipio): 0,11 es 0,11 g. Con ella se calculan los casos del sismo.
+   */
+  ab?: number;
+  /** Coeficiente de contribución K del emplazamiento (anejo 1): de 1,0 a 1,3. */
+  K?: number;
+  /** Importancia de la construcción (art. 1.2.2): ρ = 1,0 con "normal" (por defecto) y 1,3 con "especial". */
+  importancia?: "normal" | "especial";
+  /**
+   * Terreno de cimentación (art. 2.4): su tipo ("I", C = 1,0; "II", 1,3; "III", 1,6; "IV", 2,0), su
+   * coeficiente C, o los estratos de los 30 primeros metros bajo la superficie, de arriba abajo, cada
+   * uno con su tipo o su C y su espesor en metros (se ponderan).
+   */
+  terreno?: TipoTerrenoSismo | number | readonly { tipo?: TipoTerrenoSismo; C?: number; espesor: number }[];
+  /**
+   * Coeficiente de comportamiento por ductilidad μ (art. 3.7.3.1): 1 (sin ductilidad), 2 (baja), 3
+   * (alta) o 4 (muy alta), según la organización estructural y los detalles del capítulo 4. Uno para
+   * las dos direcciones o uno por dirección.
+   */
+  mu?: number | { x: number; y: number };
+  /** Amortiguamiento Ω, en % del crítico (tabla 3.1). Por defecto, 5. */
+  omega?: number;
+  /**
+   * Regla de combinación de los modos: "srss" (por defecto), la del art. 3.6.2.4 (raíz de la suma de
+   * los cuadrados, con los modos de periodos a menos del 10 % sumados en valor absoluto), o "cqc", la
+   * combinación cuadrática completa de su comentario, con el amortiguamiento Ω.
+   */
+  regla?: "srss" | "cqc";
+  /**
+   * Excentricidad accidental, como fracción de la dimensión de cada planta perpendicular al sismo.
+   * Por defecto, 0,05 (el 1/20 del art. 3.2, que es el mínimo); 0, sin ella.
+   */
+  excentricidad?: number;
+  /**
+   * Sistema estructural, para el periodo fundamental aproximado del art. 3.7.2.2 con el que se
+   * contrasta el cortante en la base (método simplificado): "porticos-ha", "porticos-ha-pantallas",
+   * "porticos-acero", "acero-triangulado" o "fabrica". No cambia el cálculo.
+   */
+  sistema?: "fabrica" | "porticos-ha" | "porticos-ha-pantallas" | "porticos-acero" | "acero-triangulado";
 }
+
+/** Tipo de terreno de la NCSE-02 (art. 2.4). */
+export type TipoTerrenoSismo = "I" | "II" | "III" | "IV";
 
 /**
  * Viento del CTE DB SE-AE (art. 3.3, Anejo D) para el análisis global (VS1). Da 8 casos del

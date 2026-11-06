@@ -1,0 +1,17 @@
+# VS3, VS-i: la excentricidad accidental como torsor estático, frente a mover el centro de masas
+
+Espectro de prueba: ab = 0.16 g, terreno III, μ = 2 y 3. e = L/20. En la base de cada tramo de pilar, la envolvente de sus dos cortantes: con el torsor, |E| + |T|; moviendo la masa, el mayor de |E(+e)| y |E(−e)|. El cociente es torsor / masa movida, en los tramos con al menos el 5 % del mayor cortante del edificio. «En la dirección del sismo», el cortante mayor de cada tramo; «perpendicular», el otro, que sale de la torsión.
+
+edificio | dirección | regla | e, m | T del modo dominante / del de giro, s | cortante en la base, kN (sin mover / +e / −e) | lo que añade la excentricidad al tramo más cargado, % (torsor / masa movida) | en la dirección del sismo, torsor / masa movida: mínimo / mediana / máximo (tramos) | perpendicular: mínimo / mediana / máximo (tramos); el mayor con la masa movida frente al mayor cortante
+losas, 3 plantas de 3 × 2 vanos | X | la del articulado | 0.50 | 0.315 / 0.239 | 1089 / 1091 / 1065 | 0.1 / 0.3 | 0.95 / 0.98 / 1.00 (36) | 0.69 / 0.76 / 1.05 (36); hasta 113 kN frente a 145
+losas, 3 plantas de 3 × 2 vanos | X | cuadrática completa | 0.50 | 0.315 / 0.239 | 1090 / 1092 / 1059 | 0.1 / 0.4 | 0.95 / 0.99 / 1.00 (36) | 0.53 / 0.61 / 0.65 (34); hasta 40 kN frente a 145
+losas, 3 plantas de 3 × 2 vanos | Y | la del articulado | 0.90 | 0.309 / 0.239 | 726 / 747 / 682 | 4.5 / 14.4 | 0.80 / 0.98 / 1.28 (36) | 0.42 / 0.68 / 1.54 (36); hasta 66 kN frente a 114
+losas, 3 plantas de 3 × 2 vanos | Y | cuadrática completa | 0.90 | 0.309 / 0.239 | 729 / 749 / 685 | 4.5 / 14.6 | 0.83 / 0.98 / 1.03 (36) | 0.53 / 0.75 / 0.84 (28); hasta 22 kN frente a 112
+pórtico, 3 plantas de 3 × 2 vanos | X | la del articulado | 0.50 | 0.340 / 0.287 | 1138 / 1106 / 1106 | 3.8 / 9.7 | 0.95 / 0.95 / 1.03 (36) | 0.04 / 0.10 / 0.23 (36); hasta 97 kN frente a 137
+pórtico, 3 plantas de 3 × 2 vanos | X | cuadrática completa | 0.50 | 0.340 / 0.287 | 1140 / 1111 / 1111 | 3.8 / 8.1 | 0.96 / 0.96 / 1.03 (36) | 0.19 / 0.27 / 0.28 (32); hasta 38 kN frente a 136
+pórtico, 3 plantas de 3 × 2 vanos | Y | la del articulado | 0.90 | 0.333 / 0.287 | 753 / 748 / 670 | 11.2 / 15.5 | 0.73 / 0.96 / 1.06 (36) | 0.67 / 0.67 / 0.69 (24); hasta 27 kN frente a 124
+pórtico, 3 plantas de 3 × 2 vanos | Y | cuadrática completa | 0.90 | 0.333 / 0.287 | 763 / 758 / 690 | 11.8 / 17.6 | 0.81 / 0.95 / 1.05 (36) | 0.64 / 0.65 / 0.66 (24); hasta 25 kN frente a 122
+pórtico objetivo, 7 plantas de 9 × 7 vanos | X | la del articulado | 1.75 | 0.898 / 0.812 | 18670 / 16842 / 16577 | 6.6 / 13.3 | 0.90 / 1.01 / 1.10 (560) | 0.15 / 0.22 / 0.25 (535); hasta 227 kN frente a 341
+pórtico objetivo, 7 plantas de 9 × 7 vanos | X | cuadrática completa | 1.75 | 0.898 / 0.812 | 18705 / 17522 / 17312 | 6.8 / 11.8 | 0.93 / 1.01 / 1.06 (560) | 0.21 / 0.27 / 0.28 (456); hasta 160 kN frente a 328
+pórtico objetivo, 7 plantas de 9 × 7 vanos | Y | la del articulado | 2.70 | 0.861 / 0.812 | 13059 / 10271 / 9897 | 10.7 / 39.5 | 0.83 / 1.15 / 1.27 (560) | 0.13 / 0.43 / 0.59 (541); hasta 146 kN frente a 297
+pórtico objetivo, 7 plantas de 9 × 7 vanos | Y | cuadrática completa | 2.70 | 0.861 / 0.812 | 13001 / 11366 / 10832 | 13.0 / 35.7 | 0.85 / 1.05 / 1.18 (560) | 0.43 / 0.44 / 0.44 (381); hasta 90 kN frente a 276

@@ -485,8 +485,17 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     uI.fill(0);
     for (let e = 0; e < n; e++) uI[num.gdlDeEcuacion[e]!] = uE[e]!;
     const u = desplazamientosFisicos(num, uI);
-    const eq = equilibrio(geo, fNodal, reaccionesDe(uI, u, -1), magnitud);
-    if (!u.every(Number.isFinite) || !(eq.fuerzas <= TOL_EQUILIBRIO && eq.momentos <= TOL_EQUILIBRIO)) rotos.push(im + 1);
+    const reacciones = reaccionesDe(uI, u, -1);
+    const eq = equilibrio(geo, fNodal, reacciones, magnitud);
+    // VS3: el modo como un caso: los esfuerzos de sus barras (no lleva cargas de barra) y, después, los de sus láminas
+    const esfuerzosBarras = new Float64Array(12 * (modelo.barras?.length ?? 0));
+    for (const e of elementos) {
+      if (!e.barra) continue;
+      const ul = desplazamientosLocales(e.barra, u, e.nudos[0]!, e.nudos[1]!);
+      esfuerzosDeExtremo(fuerzasLocales(e.barra, ul), undefined, esfuerzosBarras, 12 * e.indice);
+    }
+    const esfuerzosLaminas = new Float64Array(8 * (modelo.laminas?.length ?? 0));
+    if (!u.every(Number.isFinite) || !reacciones.every(Number.isFinite) || !esfuerzosBarras.every(Number.isFinite) || !(eq.fuerzas <= TOL_EQUILIBRIO && eq.momentos <= TOL_EQUILIBRIO)) rotos.push(im + 1);
     const forma = new Float64Array(3 * nDiaf);
     elPlan.diafragmas.forEach((df, d) => {
       const m = df.maestro;
@@ -495,8 +504,18 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
       forma[3 * d + 1] = u[6 * m + 1]! + (df.cm[0] - geo.xyz[3 * m]!) * rz;
       forma[3 * d + 2] = rz;
     });
-    modos.push({ omega2: md.omega2, periodo: (2 * Math.PI) / Math.sqrt(md.omega2), forma, fuerzas, participacion: md.participacion, masaEfectiva: md.masaEfectiva, u, equilibrio: eq });
+    modos.push({ omega2: md.omega2, periodo: (2 * Math.PI) / Math.sqrt(md.omega2), forma, fuerzas, participacion: md.participacion, masaEfectiva: md.masaEfectiva, u, reacciones, esfuerzosBarras, esfuerzosLaminas, equilibrio: eq });
   });
+  if (modelo.laminas?.length && modos.length) {
+    resultantesEnCentroides(
+      elementos.filter((e) => e.lamina),
+      modos.map((m) => m.u),
+      modos.map((m) => m.esfuerzosLaminas),
+    );
+    modos.forEach((m, im) => {
+      if (!m.esfuerzosLaminas.every(Number.isFinite) && !rotos.includes(im + 1)) rotos.push(im + 1);
+    });
+  }
   if (rotos.length) {
     diag.error(
       "modal/equilibrio",

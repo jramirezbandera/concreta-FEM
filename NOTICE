@@ -140,6 +140,11 @@ Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
   src/normas/cteViento.ts (tablas del DB SE-AE, ce de la fórmula D.2, tabla 3.5 y alturas
     tributarias del viento, fase VS1)  ←  src/lib/acciones/tablasAE.ts, interp.ts y viento.ts
     (commit aebd12d; sin el rozamiento, la cubierta a dos aguas ni los paramentos)
+  src/normas/ncse02.ts (NCSE-02, fase VS3: el coeficiente del terreno ponderado, la amplificación
+    S, ac, TA y TB, ν, el espectro elástico y, del método simplificado del art. 3.7, el periodo
+    fundamental aproximado, el número de modos y los cortantes de planta)  ←
+    src/lib/codes/seismic/ncse02.ts (commit aebd12d; sin el reparto por elementos, la torsión del
+    art. 3.7.5 ni las puertas de aplicabilidad; el coeficiente αᵢ del art. 3.6.2.2 es propio)
 Copyright (c) Javier Ramírez Bandera. El lienzo 2D que se copió para V1 (transform.ts,
 useCanvasView2D.ts y ZoomControls.tsx) se quitó en I2: la planta se dibuja con el motor de vistas
 propio (app/src/vistas/).

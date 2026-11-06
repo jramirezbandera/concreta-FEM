@@ -1,0 +1,7 @@
+# VS3, criterio 3: el análisis por espectros de respuesta del motor frente a OpenSeesPy 3.8 (responseSpectrumAnalysis, modo a modo)
+
+El cortante en la base de OpenSees es la suma de sus reacciones en cada modo, combinada aquí (art. 3.6.2.4); el del motor, el de `respuestaEspectral`. Los valores, uno a uno, en `src/motor/oraculo-vs3.test.ts`.
+
+modelo | nudos | modos | modos por debajo de TA | pares de modos a menos del 10 % | cortante en la base X, kN (motor / OpenSees) | Y, kN (motor / OpenSees) | diferencia relativa
+portico-3x3x2 | 78 | 9 | 6 | 3 | 1180.7476 / 1180.7476 | 781.8267 / 781.8267 | 3.5e-14
+portico-7x9x7 | 1151 | 21 | 14 | 21 | 19316.6645 / 19316.6645 | 13582.8547 / 13582.8547 | 3.3e-12

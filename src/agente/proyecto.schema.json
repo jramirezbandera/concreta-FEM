@@ -172,7 +172,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento; VS2, las masas y los modos del sismo."
+      "description": "Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento; VS2, las masas y los modos del sismo; VS3, su espectro y sus casos."
     },
     "ApoyoFisico": {
       "type": "object",
@@ -2201,10 +2201,111 @@
         "nievePermanente": {
           "type": "boolean",
           "description": "¿Permanece la nieve más de 30 días al año? Si no se da, se toma que sí en los casos con el ψ\n\"nieve-mas-de-1000\" y que no en los de \"nieve-hasta-1000\"."
+        },
+        "ab": {
+          "type": "number",
+          "description": "VS3. Aceleración sísmica básica del emplazamiento, en g (art. 2.1 y anejo 1 de la norma, por\nmunicipio): 0,11 es 0,11 g. Con ella se calculan los casos del sismo."
+        },
+        "K": {
+          "type": "number",
+          "description": "Coeficiente de contribución K del emplazamiento (anejo 1): de 1,0 a 1,3."
+        },
+        "importancia": {
+          "enum": [
+            "especial",
+            "normal"
+          ],
+          "description": "Importancia de la construcción (art. 1.2.2): ρ = 1,0 con \"normal\" (por defecto) y 1,3 con \"especial\"."
+        },
+        "terreno": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "tipo": {
+                    "$ref": "#/$defs/TipoTerrenoSismo"
+                  },
+                  "C": {
+                    "type": "number"
+                  },
+                  "espesor": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "espesor"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "enum": [
+                "I",
+                "II",
+                "III",
+                "IV"
+              ]
+            }
+          ],
+          "description": "Terreno de cimentación (art. 2.4): su tipo (\"I\", C = 1,0; \"II\", 1,3; \"III\", 1,6; \"IV\", 2,0), su\ncoeficiente C, o los estratos de los 30 primeros metros bajo la superficie, de arriba abajo, cada\nuno con su tipo o su C y su espesor en metros (se ponderan)."
+        },
+        "mu": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Coeficiente de comportamiento por ductilidad μ (art. 3.7.3.1): 1 (sin ductilidad), 2 (baja), 3\n(alta) o 4 (muy alta), según la organización estructural y los detalles del capítulo 4. Uno para\nlas dos direcciones o uno por dirección."
+        },
+        "omega": {
+          "type": "number",
+          "description": "Amortiguamiento Ω, en % del crítico (tabla 3.1). Por defecto, 5."
+        },
+        "regla": {
+          "enum": [
+            "cqc",
+            "srss"
+          ],
+          "description": "Regla de combinación de los modos: \"srss\" (por defecto), la del art. 3.6.2.4 (raíz de la suma de\nlos cuadrados, con los modos de periodos a menos del 10 % sumados en valor absoluto), o \"cqc\", la\ncombinación cuadrática completa de su comentario, con el amortiguamiento Ω."
+        },
+        "excentricidad": {
+          "type": "number",
+          "description": "Excentricidad accidental, como fracción de la dimensión de cada planta perpendicular al sismo.\nPor defecto, 0,05 (el 1/20 del art. 3.2, que es el mínimo); 0, sin ella."
+        },
+        "sistema": {
+          "enum": [
+            "acero-triangulado",
+            "fabrica",
+            "porticos-acero",
+            "porticos-ha",
+            "porticos-ha-pantallas"
+          ],
+          "description": "Sistema estructural, para el periodo fundamental aproximado del art. 3.7.2.2 con el que se\ncontrasta el cortante en la base (método simplificado): \"porticos-ha\", \"porticos-ha-pantallas\",\n\"porticos-acero\", \"acero-triangulado\" o \"fabrica\". No cambia el cálculo."
         }
       },
       "additionalProperties": false,
-      "description": "Sismo de la NCSE-02 (fase VS). Con VS2, sus masas y sus modos de vibración: basta `\"sismo\": {}`\npara que el cálculo dé la masa, el centro de masas y la inercia de giro de cada planta con\ndiafragma rígido, y los periodos y las formas de todos sus modos (`fem consultar modos`). El\nespectro y los casos del sismo llegan con VS3.\n\nLa masa sale de las cargas (art. 3.2): de cada caso, la fracción que le toca de la componente\nvertical de sus cargas, entre g. Por defecto, la de su acción:\n- G (y el caso del peso propio), 1;\n- Q, por el nombre de su ψ: \"uso-A\", 0,5; \"uso-B\", \"uso-C\" y \"uso-D\", 0,6; \"uso-E\", 0,6 y\n  \"uso-G\", 0 (estas dos no están en la norma);\n- S, 0,5 si la nieve permanece más de 30 días al año (`nievePermanente`) y 0 si no;\n- W, T, E, A y N, 0.\n\nUn caso Q o S sin ψ por su nombre, o sin acción, necesita su fracción en `masas`. Todas las plantas\ncon forjado, salvo la más baja, tienen que tener diafragma rígido."
+      "description": "Sismo de la NCSE-02 (fase VS). Con VS2, sus masas y sus modos de vibración: basta `\"sismo\": {}`\npara que el cálculo dé la masa, el centro de masas y la inercia de giro de cada planta con\ndiafragma rígido, y los periodos y las formas de todos sus modos (`fem consultar modos`).\n\nCon VS3, y con la aceleración básica `ab` del emplazamiento, el análisis por espectros de respuesta\n(art. 3.6.2, el método de referencia): cuatro casos del programa, `EX+e`, `EX-e`, `EY+e` y `EY-e`\n(el sismo según X y según Y, con la excentricidad accidental a un lado y al otro; familias `EX` y\n`EY`), que entran en las combinaciones de la situación sísmica con su ± y con el 30 % de la otra\ndirección. No son casos con cargas: el valor de cada resultado (un esfuerzo, una reacción, un\ndesplazamiento) es la combinación de los valores de todos los modos de vibración, con el signo del\nmodo de más masa en esa dirección, más el del torsor de la excentricidad. Con `ab` hacen falta\n`K`, `terreno` y `mu`. Sin `ab`, sólo las masas y los modos.\n\nLa masa sale de las cargas (art. 3.2): de cada caso, la fracción que le toca de la componente\nvertical de sus cargas, entre g. Por defecto, la de su acción:\n- G (y el caso del peso propio), 1;\n- Q, por el nombre de su ψ: \"uso-A\", 0,5; \"uso-B\", \"uso-C\" y \"uso-D\", 0,6; \"uso-E\", 0,6 y\n  \"uso-G\", 0 (estas dos no están en la norma);\n- S, 0,5 si la nieve permanece más de 30 días al año (`nievePermanente`) y 0 si no;\n- W, T, E, A y N, 0.\n\nUn caso Q o S sin ψ por su nombre, o sin acción, necesita su fracción en `masas`. Todas las plantas\ncon forjado, salvo la más baja, tienen que tener diafragma rígido."
     },
     "TipoAccion": {
       "enum": [
@@ -2226,6 +2327,15 @@
         "planta",
         "sotano"
       ]
+    },
+    "TipoTerrenoSismo": {
+      "enum": [
+        "I",
+        "II",
+        "III",
+        "IV"
+      ],
+      "description": "Tipo de terreno de la NCSE-02 (art. 2.4)."
     },
     "Vec2": {
       "type": "array",

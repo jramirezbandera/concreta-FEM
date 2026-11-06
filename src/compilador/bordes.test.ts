@@ -153,7 +153,7 @@ describe("MA4: la carga de borde de losa", () => {
     expect(c.diagnosticos.some((d) => d.codigo === "reticular/abacos-unidos")).toBe(true);
     const q = new Consultas(g, c, casosValidos(calcular(c.modelo)));
     // G (peso propio), CM, Q y N
-    expect(q.nc).toBe(4);
+    expect(q.nb).toBe(4);
   });
 
   it("sin cargas de borde, el mismo objeto", () => {

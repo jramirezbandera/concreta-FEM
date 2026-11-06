@@ -15,6 +15,11 @@
  * ceros de Vz y Vy, H36). La flecha de una vigueta, que no tiene nudos intermedios, es el extremo
  * de su deformada (un polinomio por tramo) con sus raíces refinadas por bisección.
  *
+ * Los factores de un conjunto son los de los casos lógicos (VS3, cabecera de
+ * `compilador/consultas.ts`): aquí nadie los aplica a mano. Lo que es por caso base se combina con
+ * `q.combinar`, y los diagramas, con `q.diagramaBarra`; con los casos del sismo del programa, cada
+ * valor es la combinación de los de los modos.
+ *
  * Puro: entra lo compilado y calculado y salen objetos JSON; la CLI los escribe.
  */
 import { DiagramaBarra } from "../elementos/cargasBarra.ts";
@@ -24,8 +29,8 @@ import type { Consultas } from "../compilador/consultas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
 import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
-import { EsfuerzosPiezas } from "../compilador/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
+import type { DiagramaLeible } from "../motor/diagramaCompuesto.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 import type { ConjuntoCombinaciones, Proposito } from "./combinaciones.ts";
 import type { Proyecto } from "./proyecto.ts";
@@ -34,7 +39,7 @@ import { ARMADURAS, losasDe, refuerzosDe, type Armadura, type ZonaRefuerzo } fro
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
-export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "modos", "combinaciones"] as const;
+export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "modos", "sismo", "combinaciones"] as const;
 export type NombreConsulta = (typeof CONSULTAS)[number];
 
 /** Elementos de una lista que se dan por defecto (los mayores); `todos` los da todos. */
@@ -218,16 +223,13 @@ export const EXTREMOS: Record<"pilar" | "viga" | "vigueta" | "barra", readonly s
   barra: ["N+", "N-", "Vy", "Vz", "My", "Mz"],
 };
 
-/** Diagrama de la barra `b` en la combinación de factores `f`. */
-export function diagramaCombinado(ep: EsfuerzosPiezas, b: number, f: ArrayLike<number>): DiagramaBarra {
-  const ks: number[] = [];
-  for (let k = 0; k < f.length; k++) if (f[k]) ks.push(k);
-  if (!ks.length) return DiagramaBarra.combinar([ep.diagrama(b, 0)], [0]);
-  return DiagramaBarra.combinar(
-    ks.map((k) => ep.diagrama(b, k)),
-    ks.map((k) => f[k]!),
-  );
+/** Diagrama de la barra `b` en la combinación de factores `f` (los de los casos lógicos): `Consultas.diagramaBarra`. */
+export function diagramaCombinado(q: Consultas, b: number, f: ArrayLike<number>): DiagramaLeible {
+  return q.diagramaBarra(b, f);
 }
+
+/** Puntos de la barra en los que se muestrea la deformada de una combinación con casos del sismo. */
+const MUESTRAS_DEFORMADA = 20;
 
 /** Mejora `actual` con un candidato según el extremo: "X+" máximo, "X-" mínimo, "X" mayor |·|. */
 function mejora(extremo: string, actual: Extremo | undefined, v: number): boolean {
@@ -256,7 +258,6 @@ export function envolventes(q: Consultas, conjunto: ConjuntoCombinaciones, o: { 
   const { modelo, mapeo } = q;
   if (o.tipo && !(o.tipo in EXTREMOS)) return no("consulta/tipo", `El tipo de pieza «${o.tipo}» no existe: pilar, viga, vigueta o barra.`);
   if (o.planta && !q.fisico.plantas.some((p) => p.id === o.planta)) return no("consulta/no-existe", `La planta ${o.planta} no existe.`, [o.planta]);
-  const ep = q.esfuerzosPiezas;
   const plantaDe = (b: number) => {
     const m = mapeo.barras[b]!;
     return m.tipo === "pilar" ? q.fisico.plantas[m.tramo]!.id : mapeo.nudos[modelo.barras![b]!.nudos[0]]!.planta;
@@ -281,16 +282,19 @@ export function envolventes(q: Consultas, conjunto: ConjuntoCombinaciones, o: { 
         if (sinAxil) g.sinAxil.add(pieza);
       }
       const extremos = sinAxil ? EXTREMOS[m.tipo].filter((e) => !e.startsWith("N")) : EXTREMOS[m.tipo];
+      // La componente de cada extremo, una vez (no en cada estación de cada combinación)
+      const componentes = extremos.map((ex) => COMPONENTES.indexOf(ex.replace(/[+-]$/, "") as (typeof COMPONENTES)[number]));
+      const grupo = g;
       conjunto.factores.forEach((f, kc) => {
-        const D = diagramaCombinado(ep, b, f);
+        const D = q.diagramaBarra(b, f);
         for (const x of D.estaciones())
           for (const lado of [-1, 1] as const) {
             if ((x === 0 && lado < 0) || (x === D.L && lado > 0)) continue;
             const e = D.esfuerzosEn(x, lado);
-            for (const ex of extremos) {
-              const c = COMPONENTES.indexOf(ex.replace(/[+-]$/, "") as (typeof COMPONENTES)[number]);
-              const v = e[c]!;
-              if (mejora(ex, g.extremos[ex], v)) g.extremos[ex] = { v, pieza, s: m.s[1] + x, comb: conjunto.nombres[kc]! };
+            for (let i = 0; i < extremos.length; i++) {
+              const ex = extremos[i]!;
+              const v = e[componentes[i]!]!;
+              if (mejora(ex, grupo.extremos[ex], v)) grupo.extremos[ex] = { v, pieza, s: m.s[1] + x, comb: conjunto.nombres[kc]! };
             }
           }
       });
@@ -378,7 +382,6 @@ export function flechas(q: Consultas, conjunto: ConjuntoCombinaciones, o: { losa
     r.push({ id: l.id, planta: l.planta, tipo: "losa", maxima: maxima!, relativa });
   }
   if (panos.length) {
-    const ep = q.esfuerzosPiezas;
     for (const p of panos) {
       let maxima: Extremo | undefined;
       let relativa: Extremo | null = null;
@@ -386,15 +389,28 @@ export function flechas(q: Consultas, conjunto: ConjuntoCombinaciones, o: { losa
         for (const b of q.mapeo.piezas[vig] ?? []) {
           const s0 = q.mapeo.barras[b]!.s[1];
           conjunto.factores.forEach((f, kc) => {
-            const D = diagramaCombinado(ep, b, f);
-            const uz = D.desplazamientos[2]!;
-            const [u0, uL] = [D.desplazamientosEn(0)[2]!, D.desplazamientosEn(D.L)[2]!];
+            const D = q.diagramaBarra(b, f);
             const comb = conjunto.nombres[kc]!;
+            // La parte estática de la combinación: un polinomio por tramo
+            const P = D instanceof DiagramaBarra ? D : D.lineal;
+            const uz = P.desplazamientos[2]!;
+            const [u0, uL] = [P.desplazamientosEn(0)[2]!, P.desplazamientosEn(P.L)[2]!];
             // Puntos críticos de la deformada y de la deformada menos su cuerda (misma derivada salvo una constante)
             const xs = new Set([...puntosCriticos(uz, D.L), ...puntosCriticos(restarCuerda(uz, u0, uL, D.L), D.L)]);
+            if (D instanceof DiagramaBarra) {
+              for (const x of xs) {
+                const u = D.desplazamientosEn(x)[2]!;
+                const rel = u0 + ((uL - u0) * x) / D.L - u;
+                if (!maxima || -u > maxima.v) maxima = { v: -u, pieza: vig, s: s0 + x, comb };
+                if (!relativa || rel > relativa.v) relativa = { v: rel, pieza: vig, s: s0 + x, comb };
+              }
+              return;
+            }
+            // Con casos del sismo la deformada no es un polinomio: además, muestreada a lo largo de la barra
+            for (let i = 0; i <= MUESTRAS_DEFORMADA; i++) xs.add(i === MUESTRAS_DEFORMADA ? D.L : (D.L * i) / MUESTRAS_DEFORMADA);
             for (const x of xs) {
               const u = D.desplazamientosEn(x)[2]!;
-              const rel = u0 + ((uL - u0) * x) / D.L - u;
+              const rel = D.relativoEn(x)[2]!;
               if (!maxima || -u > maxima.v) maxima = { v: -u, pieza: vig, s: s0 + x, comb };
               if (!relativa || rel > relativa.v) relativa = { v: rel, pieza: vig, s: s0 + x, comb };
             }
@@ -438,7 +454,6 @@ export interface DerivaPlanta {
 export function deriva(q: Consultas, conjunto: ConjuntoCombinaciones, o: { planta?: string } = {}): Respuesta<DerivaPlanta[]> {
   const plantas = q.fisico.plantas.filter((p) => !o.planta || p.id === o.planta);
   if (!plantas.length) return no("consulta/no-existe", `La planta ${o.planta} no existe.`, [o.planta!]);
-  const nc = q.casos.length;
   const r: DerivaPlanta[] = [];
   for (const p of plantas) {
     const pc = q.planta(p.id);
@@ -448,9 +463,9 @@ export function deriva(q: Consultas, conjunto: ConjuntoCombinaciones, o: { plant
     if (m) {
       const ext: Record<"ux" | "uy" | "rz", Extremo | undefined> = { ux: undefined, uy: undefined, rz: undefined };
       conjunto.factores.forEach((f, kc) => {
+        const u = q.combinar(m.u, 3, f, true);
         (["ux", "uy", "rz"] as const).forEach((c, i) => {
-          let v = 0;
-          for (let k = 0; k < nc; k++) if (f[k]) v += f[k]! * m.u[3 * k + i]!;
+          const v = u[i]!;
           if (mejora(c, ext[c], v)) ext[c] = { v, comb: conjunto.nombres[kc]! };
         });
       });
@@ -486,13 +501,9 @@ export interface Reacciones {
 }
 
 export function reacciones(q: Consultas, conjunto: ConjuntoCombinaciones, o: { objeto?: string; top?: number; todos?: boolean } = {}): Respuesta<Reacciones> {
-  const nc = q.casos.length;
-  const comb = (porCaso: ArrayLike<number>, n: number, f: ArrayLike<number>) => {
-    const v = new Array<number>(n).fill(0);
-    for (let k = 0; k < nc; k++) if (f[k]) for (let i = 0; i < n; i++) v[i]! += f[k]! * porCaso[n * k + i]!;
-    return v;
-  };
-  // Totales: por caso, la suma sobre todos los nudos respecto al origen
+  const nc = q.nb;
+  const comb = (porCaso: ArrayLike<number>, n: number, f: ArrayLike<number>): number[] => Array.from(q.combinar(porCaso, n, f));
+  // Totales: por caso base, la suma sobre todos los nudos respecto al origen
   const T = new Float64Array(6 * nc);
   q.casos.forEach((c, k) => {
     q.modelo.nudos.forEach((nd, n) => {
@@ -560,7 +571,6 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
     if (!d.valido) return d;
     return si({ pieza: id, comb: conjunto.nombres[0], estaciones: d.valor.map((e) => ({ s: e.s, izquierda: e.izquierda, derecha: e.derecha })) });
   }
-  const nc = q.casos.length;
   if (q.fisico.pilares?.some((p) => p.id === id)) {
     const r = q.pilar(id);
     if (!r.valido) return r;
@@ -568,8 +578,7 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
       const ext: Record<string, { comb: string; esfuerzos: number[] }> = {};
       const valor: Record<string, number> = {};
       conjunto.factores.forEach((f, kc) => {
-        const e = [0, 0, 0, 0, 0, 0];
-        for (let k = 0; k < nc; k++) if (f[k]) for (let i = 0; i < 6; i++) e[i]! += f[k]! * porCaso[6 * k + i]!;
+        const e = Array.from(q.combinar(porCaso, 6, f));
         for (const [nombre, c] of [["N+", 0], ["N-", 0], ["My", 4], ["Mz", 5]] as const) {
           const v = e[c]!;
           if (mejora(nombre, nombre in valor ? { v: valor[nombre]!, comb: "" } : undefined, v)) {
@@ -638,14 +647,12 @@ export function banda(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
   if (!id) return no("consulta/sin-id", "La consulta «banda» necesita el id de la banda (fem consultar <proyecto> banda <id>).");
   const r = q.banda(id);
   if (!r.valido) return r;
-  const nc = q.casos.length;
   const ancho = q.fisico.bandas!.find((b) => b.id === id)!.ancho;
   const estaciones = r.valor.map((e): EstacionEnvolvente => {
     let max: Extremo | undefined;
     let min: Extremo | undefined;
     conjunto.factores.forEach((f, kc) => {
-      let v = 0;
-      for (let k = 0; k < nc; k++) if (f[k]) v += f[k]! * e.esfuerzos[6 * k + 4]!;
+      const v = q.combinar(e.esfuerzos, 6, f)[4]!;
       if (mejora("+", max, v)) max = { v, comb: conjunto.nombres[kc]! };
       if (mejora("-", min, v)) min = { v, comb: conjunto.nombres[kc]! };
     });
@@ -863,6 +870,93 @@ export function modos(q: Consultas, o: Pick<OpcionesConsulta, "top" | "todos"> =
   });
 }
 
+// ─── El sismo del programa (VS3) ────────────────────────────────────────────────────────────────
+
+export interface SismoAgente {
+  norma: "NCSE-02";
+  metodo: "espectros de respuesta (art. 3.6.2)";
+  /** Los casos del sismo del programa: van al final de los casos y entran en las combinaciones sísmicas. */
+  casos: string[];
+  /** El emplazamiento (cap. 2): ab y ac en g; TA y TB en s. */
+  emplazamiento: { ab: number; K: number; importancia: string; rho: number; terreno: string; C: number; S: number; ac: number; TA: number; TB: number };
+  /** Amortiguamiento Ω (%), ν, la regla de combinación de los modos y la excentricidad accidental (fracción de la dimensión de la planta). */
+  omega: number;
+  nu: number;
+  regla: "srss" | "cqc";
+  excentricidad: number;
+  /** Peso sísmico (la masa de las plantas por g), kN. */
+  peso: number;
+  direcciones: {
+    eje: "X" | "Y";
+    mu: number;
+    beta: number;
+    /** El modo de más masa en la dirección (da el signo de los resultados): su número, su periodo (s) y su fracción de masa. */
+    dominante: { modo: number; T: number; masaEfectiva: number };
+    /** Cortante combinado en la base, kN, y entre el peso sísmico. */
+    cortanteBasal: number;
+    coeficienteSismico: number;
+    /** El mayor desplazamiento combinado (ya por μ), m, y la mayor θ = P·d/(V·h) del art. 3.8. */
+    desplazamientoMaximo: number;
+    thetaMaxima: number;
+    /** De arriba abajo: cortante combinado bajo la planta y fuerza equivalente (kN), excentricidad (m) y par (kN·m), desplazamiento y deriva (m, por μ) y θ. */
+    plantas: { plantas: string[]; cota: number; masa: number; cortante: number; fuerza: number; excentricidad: number; par: number; desplazamiento: number; deriva: number; altura: number; theta: number }[];
+    /** Los modos que más cortante dan en la base: periodo, αᵢ (art. 3.6.2.2), fracción de masa en la dirección y su cortante en la base (kN, con signo). */
+    modos: { modo: number; T: number; alfa: number; masaEfectiva: number; cortanteBasal: number }[];
+    modosOmitidos?: number;
+    /** Se ha tomado α = 2,5 por encima de TB (art. 2.4: C > 1,8 y el periodo fundamental mayor que TB). */
+    mesetaLarga?: true;
+    /** El cortante en la base del método simplificado (art. 3.7), para contrastar: no se calcula con él. */
+    simplificado: { periodo: "el del modo dominante" | "el aproximado del art. 3.7.2.2"; TF: number; modos: number; cortanteBasal: number; frente: number }[];
+  }[];
+}
+
+/** El sismo del programa (`fem consultar sismo`): espectro, cortantes, desplazamientos y θ por dirección. */
+export function sismo(q: Consultas, o: Pick<OpcionesConsulta, "top" | "todos"> = {}): Respuesta<SismoAgente> {
+  const r = q.sismo();
+  if (!r.valido) return r;
+  const { espectro, direcciones, casos } = r.valor;
+  const em = espectro.emplazamiento;
+  return si(
+    {
+      norma: "NCSE-02",
+      metodo: "espectros de respuesta (art. 3.6.2)",
+      casos,
+      emplazamiento: { ab: em.ab, K: em.K, importancia: espectro.importancia, rho: em.rho, terreno: espectro.terreno, C: em.C, S: em.S, ac: em.ac, TA: em.TA, TB: em.TB },
+      omega: espectro.omega,
+      nu: espectro.nu,
+      regla: espectro.regla,
+      excentricidad: espectro.excentricidad,
+      peso: direcciones[0].peso,
+      direcciones: direcciones.map((d) => {
+        const orden = d.modos.map((m, i) => ({ modo: i + 1, T: m.periodo, alfa: m.alfa, masaEfectiva: m.masaEfectiva, cortanteBasal: m.basal })).sort((a, b) => Math.abs(b.cortanteBasal) - Math.abs(a.cortanteBasal));
+        const n = o.todos ? orden.length : Math.min(orden.length, o.top ?? TOP_POR_DEFECTO);
+        return {
+          eje: d.eje,
+          mu: d.mu,
+          beta: d.beta,
+          dominante: { modo: d.dominante.modo, T: d.dominante.periodo, masaEfectiva: d.dominante.masaEfectiva },
+          cortanteBasal: d.basal,
+          coeficienteSismico: d.coeficiente,
+          desplazamientoMaximo: d.desplazamientoMaximo,
+          thetaMaxima: d.thetaMaxima,
+          plantas: d.niveles,
+          modos: orden.slice(0, n),
+          ...(n < orden.length ? { modosOmitidos: orden.length - n } : {}),
+          ...(d.mesetaLarga ? { mesetaLarga: true as const } : {}),
+          simplificado: d.simplificado.map((s) => ({
+            periodo: s.origen === "modal" ? ("el del modo dominante" as const) : ("el aproximado del art. 3.7.2.2" as const),
+            TF: s.TF,
+            modos: s.modos,
+            cortanteBasal: s.basal,
+            frente: s.basal > 0 ? d.basal / s.basal : 0,
+          })),
+        };
+      }),
+    },
+    r.diagnosticos,
+  );
+}
+
 // ─── Entrada común ──────────────────────────────────────────────────────────────────────────────
 
 const PROPOSITO: Record<NombreConsulta, Proposito> = {
@@ -875,13 +969,15 @@ const PROPOSITO: Record<NombreConsulta, Proposito> = {
   franjas: "esfuerzos",
   franja: "esfuerzos",
   refuerzos: "esfuerzos",
-  // los modos no dependen de las combinaciones
+  // los modos y el sismo no dependen de las combinaciones
   modos: "lineal",
+  sismo: "lineal",
   combinaciones: "esfuerzos",
 };
 
 export function consultar(q: Consultas, consulta: NombreConsulta, o: OpcionesConsulta): Respuesta<unknown> {
   if (consulta === "modos") return modos(q, o);
+  if (consulta === "sismo") return sismo(q, o);
   const c = o.combinaciones(PROPOSITO[consulta]);
   if (!c.valido) return c;
   const conjunto = c.valor;

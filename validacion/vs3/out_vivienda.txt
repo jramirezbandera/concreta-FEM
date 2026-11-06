@@ -1,0 +1,42 @@
+# VS3: el sismo del programa en la vivienda (emplazamiento de prueba: ab = 0,10 g, K = 1,0, terreno II, μ = 2)
+
+3420 nudos, 9006 ecuaciones, 4 casos y 6 modos (0,48 s). Casos lógicos: G, CM, Q, N, EX+e, EX-e, EY+e, EY-e.
+Emplazamiento: C = 1,30, S = 1,0400, ac = 0,1040 g, TA = 0,130 s, TB = 0,520 s; ν = 1,00. Peso sísmico: 2104 kN.
+
+dirección | T dominante, s | su masa, % | cortante en la base, kN | entre el peso | desplazamiento máximo, mm (por μ) | θ máxima | método simplificado, con el periodo del modo dominante
+X | 0,317 | 50,9 | 256,2 | 0,1218 | 6,88 | 0,0143 | 273,3 kN (el modal, ×0,938)
+Y | 0,317 | 47,2 | 231,7 | 0,1101 | 7,65 | 0,0325 | 273,3 kN (el modal, ×0,848)
+
+dirección | planta | cota, m | masa, t | cortante, kN | fuerza equivalente, kN | excentricidad, m | par, kN·m | desplazamiento, mm | θ
+X | CUB-S | 4,30 | 97,1 | 125,6 | 125,6 | 0,494 | 62,1 | 6,88 | 0,0081
+X | CUB | 3,40 | 117,4 | 256,2 | 130,6 | 0,784 | 102,3 | 5,93 | 0,0143
+Y | CUB-S | 4,30 | 97,1 | 138,9 | 138,9 | 0,500 | 69,5 | 7,65 | 0,0325
+Y | CUB | 3,40 | 117,4 | 231,7 | 92,8 | 0,653 | 60,6 | 4,34 | 0,0116
+
+dirección | modo | T, s | αᵢ | masa, % | cortante en la base, kN
+X | 2 | 0,3170 | 1,250 | 50,9 | 139,2
+X | 1 | 0,3330 | 1,250 | 42,6 | 116,5
+X | 3 | 0,2668 | 1,250 | 5,9 | 16,2
+X | 5 | 0,0749 | 1,144 | 0,4 | 1,1
+X | 4 | 0,1089 | 1,209 | 0,1 | 0,4
+X | 6 | 0,0498 | 1,096 | 0,0 | 0,0
+Y | 2 | 0,3170 | 1,250 | 47,2 | 129,0
+Y | 1 | 0,3330 | 1,250 | 35,8 | 98,1
+Y | 3 | 0,2668 | 1,250 | 16,8 | 46,1
+Y | 6 | 0,0498 | 1,096 | 0,1 | 0,3
+Y | 4 | 0,1089 | 1,209 | 0,0 | 0,0
+Y | 5 | 0,0749 | 1,144 | 0,0 | 0,0
+
+dirección | cortante en la base con la regla del articulado, kN | con la cuadrática completa (C.3.6.2.4), kN | con la raíz de la suma de los cuadrados sin más, kN
+X | 256,2 | 247,1 | 182,3
+Y | 231,7 | 230,7 | 168,5
+
+Pilares, ELU-PT (8 combinaciones):
+  bajo CUB-S: N+ -3,7 (P19, ELU-PT-5); N- -255,7 (P13, ELU-PT-3); Vy -66,4 (P4, ELU-PT-3); Vz 10,1 (P17, ELU-PT-3); My -26,4 (P17, ELU-PT-3); Mz -27,2 (P4, ELU-PT-3)
+  bajo CUB: N+ 9,4 (P1, ELU-PT-3); N- -313,1 (P11, ELU-PT-3); Vy 11,5 (P10, ELU-PT-3); Vz 10,1 (P17, ELU-PT-3); My -20,3 (P17, ELU-PT-3); Mz -21,0 (P10, ELU-PT-3)
+
+Pilares, ELU-SIS (32 combinaciones):
+  bajo CUB-S: N+ -1,0 (P19, ELU-SIS-19); N- -179,7 (P8, ELU-SIS-14); Vy 70,1 (P12, ELU-SIS-8); Vz 38,1 (P12, ELU-SIS-9); My 55,0 (P5, ELU-SIS-8); Mz -40,0 (P17, ELU-SIS-14)
+  bajo CUB: N+ 16,7 (P1, ELU-SIS-30); N- -210,6 (P11, ELU-SIS-14); Vy 26,1 (P19, ELU-SIS-14); Vz -33,2 (P5, ELU-SIS-8); My -77,8 (P5, ELU-SIS-8); Mz 48,7 (P17, ELU-SIS-14)
+  desplome bajo CUB-S: 1/288 (P21, ELU-SIS-14)
+  desplome bajo CUB: 1/238 (P9, ELU-SIS-9)

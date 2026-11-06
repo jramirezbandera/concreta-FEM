@@ -16,7 +16,8 @@
  * deformada muestreada en las estaciones de cada tramo flexible y en `MUESTRAS` puntos más. Puro.
  */
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones } from "./combinaciones.ts";
-import { diagramaCombinado, type Resumen } from "./consultas.ts";
+import type { Resumen } from "./consultas.ts";
+import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { ModeloFisico, OpcionesCompilacion, Pilar } from "../compilador/fisico.ts";
 import { bajadaTributaria, type TramoTributario } from "./tributaria.ts";
@@ -123,6 +124,7 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
       if (!r.valido) continue;
       for (const t of r.valor) {
         let N = 0;
+        // Los casos gravitatorios son casos base: su índice es el mismo en los casos lógicos y en los base (VS3)
         for (const c of grav) N -= t.cabeza.esfuerzos[6 * indiceCaso.get(c)!]!;
         axiles.set(`${p.id}@${t.planta}`, N);
       }
@@ -178,7 +180,7 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
     return Math.max(d(c[0]!, c[1]!), d(c[2]!, c[3]!), d(c[0]!, c[2]!), d(c[1]!, c[3]!));
   };
   for (const l of f.losas ?? []) {
-    const f0 = cjFlechas?.factores[0] ?? new Float64Array(f.casos.length);
+    const f0 = cjFlechas?.factores[0] ?? new Float64Array(q.nl);
     const geo = q.flechas(l.id, f0);
     if (!geo.valido || !geo.valor.recuadros.length) continue;
     const limite = l.reticular ? U.esbeltezReticular : U.esbeltezLosa;
@@ -217,11 +219,28 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
       if (!r.valido || !ts.length) continue;
       let peor: { x: number; flecha: number; L: number; comb: string } | null = null;
       cjFlechas.factores.forEach((fa, kc) => {
-        const Ds = ts.map((t) => ({ ...t, D: diagramaCombinado(ep, t.barra, fa) }));
-        const u = (s: number) => {
+        // La parte estática de la combinación (un diagrama por tramo) y, si lleva casos del sismo (VS3),
+        // la de cada modo: la flecha relativa es lineal en los desplazamientos y se combina ella
+        const partes = q.sup.partes(fa);
+        const conSismo = partes.espectrales.length > 0;
+        const Ds = ts.map((t) => {
+          const D = q.diagramaBarra(t.barra, fa);
+          return { ...t, D, P: D instanceof DiagramaBarra ? D : D.lineal };
+        });
+        const tramoDe = (s: number) => {
           let t = Ds[0]!;
           for (const x of Ds) if (s >= x.s0 - 1e-9) t = x;
-          return t.D.desplazamientosEn(Math.min(t.D.L, Math.max(0, s - t.s0)))[2]!;
+          return t;
+        };
+        const u = (s: number) => {
+          const t = tramoDe(s);
+          return t.P.desplazamientosEn(Math.min(t.P.L, Math.max(0, s - t.s0)))[2]!;
+        };
+        /** uz de la pieza en s en el caso base k. */
+        const uBase = (k: number, s: number) => {
+          const t = tramoDe(s);
+          const D = ep.diagrama(t.barra, k);
+          return D.desplazamientosEn(Math.min(D.L, Math.max(0, s - t.s0)))[2]!;
         };
         for (const va of r.valor.vanos) {
           if (!va.apoyoInicio || !va.apoyoFin) continue; // la flecha de un voladizo no es relativa a una cuerda
@@ -234,7 +253,8 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
             const xs = new Set([...t.D.estaciones().map((x) => t.s0 + x), ...Array.from({ length: MUESTRAS + 1 }, (_, i) => a + ((b - a) * i) / MUESTRAS)]);
             for (const s of xs) {
               if (s < a || s > b) continue;
-              const rel = ua + ((ub - ua) * (s - va.desde)) / L - t.D.desplazamientosEn(Math.min(t.D.L, Math.max(0, s - t.s0)))[2]!;
+              let rel = ua + ((ub - ua) * (s - va.desde)) / L - t.P.desplazamientosEn(Math.min(t.P.L, Math.max(0, s - t.s0)))[2]!;
+              if (conSismo) rel += q.sup.deEspectrales(partes, (k) => uBase(k, va.desde) + ((uBase(k, va.hasta) - uBase(k, va.desde)) * (s - va.desde)) / L - uBase(k, s), true);
               const xr = rel / L;
               if (!peor || xr > peor.x) peor = { x: xr, flecha: rel, L, comb: cjFlechas.nombres[kc]! };
             }
@@ -280,8 +300,7 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
         const fcd = (m.fck / 1.5) * 1000;
         cjAxil.factores.forEach((fa, kc) => {
           for (const e of [t.base.esfuerzos, t.cabeza.esfuerzos]) {
-            let N = 0;
-            for (let k = 0; k < fa.length; k++) if (fa[k]) N += fa[k]! * e[6 * k]!;
+            const N = q.combinar(e, 6, fa)[0]!;
             const nu = -N / (areaSeccion(s) * fcd);
             if (!peor || nu > peor.nu) peor = { nu, Nd: -N, planta: t.planta, comb: cjAxil.nombres[kc]! };
           }

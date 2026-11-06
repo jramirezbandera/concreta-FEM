@@ -329,6 +329,15 @@ export interface ModoVibracion {
   masaEfectiva: [number, number, number];
   /** La forma completa: desplazamientos de todos los nudos, 6 por nudo. */
   u: Float64Array;
+  /**
+   * VS3: el modo como un caso (la respuesta estática a `fuerzas`): sus reacciones (6 por nudo), los
+   * esfuerzos de extremo de las barras (12 por barra) y las resultantes de las láminas en su
+   * centroide (8 por lámina), como en `ResultadoCaso`. Con ellos cada modo es un caso base de la
+   * combinación espectral (`espectral.ts`), que se hace en cada variable.
+   */
+  reacciones: Float64Array;
+  esfuerzosBarras: Float64Array;
+  esfuerzosLaminas: Float64Array;
   /** Regla de oro 2 en el modo: sus fuerzas de inercia contra las reacciones que dan. */
   equilibrio: { fuerzas: number; momentos: number };
 }

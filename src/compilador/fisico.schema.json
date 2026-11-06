@@ -1822,6 +1822,98 @@
         },
         "nievePermanente": {
           "type": "boolean"
+        },
+        "ab": {
+          "type": "number"
+        },
+        "K": {
+          "type": "number"
+        },
+        "importancia": {
+          "enum": [
+            "especial",
+            "normal"
+          ]
+        },
+        "terreno": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "tipo": {
+                    "$ref": "#/$defs/TipoTerrenoSismo"
+                  },
+                  "C": {
+                    "type": "number"
+                  },
+                  "espesor": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "espesor"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "enum": [
+                "I",
+                "II",
+                "III",
+                "IV"
+              ]
+            }
+          ]
+        },
+        "mu": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "omega": {
+          "type": "number"
+        },
+        "regla": {
+          "enum": [
+            "cqc",
+            "srss"
+          ]
+        },
+        "excentricidad": {
+          "type": "number"
+        },
+        "sistema": {
+          "enum": [
+            "acero-triangulado",
+            "fabrica",
+            "porticos-acero",
+            "porticos-ha",
+            "porticos-ha-pantallas"
+          ]
         }
       },
       "additionalProperties": false
@@ -1844,6 +1936,14 @@
         "escalon",
         "planta",
         "sotano"
+      ]
+    },
+    "TipoTerrenoSismo": {
+      "enum": [
+        "I",
+        "II",
+        "III",
+        "IV"
       ]
     },
     "Vec2": {

@@ -766,17 +766,13 @@ export class Sesion {
       // La de ese punto: cada combinación en él (lineal en los casos) y, de ellas, la mayor o la menor
       const conj = this.conjunto(p.combinaciones, proposito);
       if (!conj.valido) return conj;
-      const porCaso = rr.q.casos.map((_, k) => {
-        const f = new Float64Array(rr.q.casos.length);
-        f[k] = 1;
-        return valorEnLamina(rr, p.campo, f, p.lamina, p.punto);
-      });
+      // (VS3: el valor de cada caso base en el punto; el de una combinación con casos del sismo, el de los modos, combinado)
+      const porCaso = rr.q.casos.map((_, base) => valorEnLamina(rr, p.campo, { base }, p.lamina, p.punto));
       const h = porCaso[0];
       if (!h) return { valido: true, valor: null };
       let mejor = { valor: p.envolvente === "max" ? -Infinity : Infinity, comb: "" };
       conj.valor.factores.forEach((f, kc) => {
-        let v = 0;
-        for (let k = 0; k < f.length; k++) if (f[k]) v += f[k]! * porCaso[k]!.valor;
+        const v = rr.q.sup.valor(f, (k) => porCaso[k]!.valor, p.campo === "uz");
         if (p.envolvente === "max" ? v > mejor.valor : v < mejor.valor) mejor = { valor: v, comb: conj.valor.nombres[kc]! };
       });
       return { valido: true, valor: { valor: mejor.valor, objeto: h.objeto, planta: h.planta, unidad: UNIDADES_CAMPO[p.campo], lamina: p.lamina, comb: mejor.comb } };

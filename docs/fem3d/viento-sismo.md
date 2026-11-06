@@ -1,6 +1,6 @@
 # VS: viento y sismo generados desde la situación
 
-> **Fecha:** 2026-11-06. **Estado:** decidido el 2026-11-06 (§8); VS1 (§10) y VS2 (§11), hechos; sigue VS3.
+> **Fecha:** 2026-11-06. **Estado:** decidido el 2026-11-06 (§8); VS1 (§10), VS2 (§11) y VS3 (§12), hechos; sigue VS4.
 >
 > **Origen:** el usuario, el 2026-11-05: viento y sismo «como en CYPECAD». Hoy son casos con las cargas metidas a mano, y el sismo, como fuerzas estáticas equivalentes con signo (`investigacion/03-resultados.md`, RES-13).
 
@@ -63,7 +63,7 @@
 - **3.5:** el análisis por espectros de respuesta (3.6.2) es **el método de referencia**. El simplificado (3.7) sólo vale con las condiciones de 3.5.1.
 - **3.6.2.1:** con forjados rígidos en su plano, **tres GDL por planta**. Es lo que ya tenemos.
 - **3.6.2.2:**
-  - la aceleración del modo i es a = αᵢ·β·ηᵢⱼ·ac, con αᵢ = α(Tᵢ) si Tᵢ ≥ TA y 1 + 1,5·Tᵢ/TA si Tᵢ < TA;
+  - la aceleración del modo i es a = αᵢ·ηᵢⱼ·ac, con αᵢ = α(Tᵢ)·β si Tᵢ ≥ TA y 1 + (2,5·β − 1)·Tᵢ/TA si Tᵢ < TA (corregido con VS3: el plan decía α(Tᵢ) y 1 + 1,5·Tᵢ/TA, por β; VS3-1);
   - **esa rama ascendente no está en el simplificado** (3.7.3), y Concreta lo avisa: son dos funciones distintas y no se cambian una por otra;
   - los desplazamientos se multiplican por μ.
 - **3.6.2.3.1:** como mínimo, 4 modos en un modelo espacial (2 traslacionales y 2 rotacionales) y todos los de periodo mayor que TA.
@@ -140,7 +140,7 @@ Cuatro piezas, todas en código puro:
 
 - **El espectro** es el de la NCSE-02 2.3:
   - ac = S·ρ·ab, TA = K·C/10, TB = K·C/2,5 y β = ν/μ;
-  - αᵢ de 3.6.2.2, con la rama ascendente.
+  - αᵢ de 3.6.2.2, con la rama ascendente (que no es la del espectro elástico por β: VS3-1, §12).
 
   Se copia de Concreta, sin su `staticForceAlpha`, que es del 3.7.
 - **La respuesta de cada modo en cada dirección** es uᵢ = Γᵢ·αᵢ·β·ac·g/ωᵢ²·φᵢ. Cada modo entra en los resultados como un «caso modal» con su vector u, y cualquier consulta (esfuerzos y diagramas de barras, láminas, franjas, cortes, reacciones, desplomes) lo trata como un caso más.
@@ -394,3 +394,122 @@ Pasan los seis criterios de §5; el 4, con las losas y los muros por otro camino
 - el espectro, los casos del sismo y su combinación (VS3); la app (VS4: el modo «Modal», la ficha «Sismo»);
 - las plantas con forjado y sin diafragma rígido (error, VS-h, hasta VS6);
 - la inercia vertical y la de giro de los nudos alrededor de ejes horizontales (§9: la componente vertical del sismo queda fuera de la fase).
+
+## 12. VS3 hecho (2026-11-06): el espectro y los casos del sismo
+
+Pasan los seis criterios de §5. No se ve todavía en la app (VS4). Las consultas con la situación sísmica cuestan más (son cinco veces más combinaciones: abajo) y la excentricidad como torsor estático se queda corta en la torsión frente a mover la masa (VS3-6): lo que decide el usuario está al final (VS3-a…VS3-g).
+
+**Ya en el repo:**
+- `src/normas/ncse02.ts`: el emplazamiento (cap. 2: C ponderado, S, ac, TA, TB), ν, el espectro elástico y el coeficiente αᵢ del análisis por espectros (art. 3.6.2.2); y del método simplificado (art. 3.7), lo justo para su cortante en la base. Copiado de Concreta con su cita (`NOTICE`), salvo αᵢ, que allí no está.
+- `acciones.sismo` en el modelo físico (`fisico.ts`, en la huella y en los dos esquemas): `ab` (en g), `K`, `importancia`, `terreno` (su tipo, su C o sus estratos), `mu` (uno o `{ x, y }`), `omega`, `regla` (`"srss"` o `"cqc"`), `excentricidad` y `sistema`. Con `ab` hacen falta `K`, `terreno` y `mu`; sin `ab`, sólo las masas y los modos, como en VS2.
+- `src/motor/espectral.ts`: la regla de combinación, la respuesta espectral de una dirección (`respuestaEspectral`) y `Superposicion`, que lleva los factores de los casos lógicos a los valores de los casos base. `src/motor/diagramaCompuesto.ts`: el diagrama de una barra en una combinación con casos del sismo.
+- Cada modo, en el motor, es un caso completo: `ModoVibracion` lleva también sus reacciones y los esfuerzos de sus barras y sus láminas. Se guardan con los resultados (`.fem/`: unos resultados con los modos de VS2 no valen y se recalculan).
+- `src/compilador/sismo.ts`: `calcularSismo` da además el espectro (y sus errores y avisos); `sismoDelCalculo`, con los modos, la respuesta en X y en Y y los cuatro casos; `hipotesisEspectro`, la hipótesis del cálculo.
+- `Consultas`: los casos base (`casos`), los lógicos (`fisico.casos`), `sup`, `combinar`, `diagramaBarra` y la consulta `sismo()`. `fem consultar sismo`, también en el servidor MCP y en la skill; `fem calcular` dice el cortante en la base.
+
+**Casos base y casos lógicos (§3.4, como quedó):**
+- Los casos del sismo, `EX+e`, `EX-e`, `EY+e` y `EY-e` (familias `EX` y `EY`), **no son casos del cálculo**: el compilador y el motor no los ven, no ocupan en los resultados y el modelo analítico es el de VS2. `Consultas` los añade al final de los casos del modelo físico, que son los que llevan factor (los **lógicos**), y pone detrás de los casos del cálculo un caso por modo (los **base**, con las fuerzas de inercia del modo como cargas): todo lo que trabaja por caso (diagramas, campos, cortes, franjas) los trata como a los demás.
+- El valor de una variable en una combinación es Σ fₖ·vₖ de los casos estáticos más, por cada caso del sismo, su factor por s·√(Σ xᵢ² + 2·Σ_pares |xᵢ·xⱼ|) + Σ tᵢ·vᵢ, con xᵢ = cᵢ·vᵢ y cᵢ = Γᵢ·Sa(Tᵢ)/ωᵢ² (el modo, normalizado a la masa).
+  - **La regla,** la del art. 3.6.2.4, par a par: cada par de modos con periodos a menos del 10 % (del mayor) añade 2·|xᵢ·xⱼ|. Es la suma de valores absolutos de la norma cuando los próximos lo son todos entre sí, y no depende de cómo se agrupen cuando no (VS3-2). Con `"regla": "cqc"`, la cuadrática completa del comentario C.3.6.2.4, con Ω.
+  - **El signo** s, el de la respuesta del modo de más masa efectiva en la dirección, en esa variable (VS-g).
+  - **La excentricidad accidental** (VS-i): un par en cada planta, el de su fuerza equivalente (la diferencia de los cortantes combinados, como en 3.7.4) por e = 0,05·L, con L la dimensión de la planta perpendicular al sismo (la caja de sus losas y paños, la del viento). Es un caso estático, y con todos los modos se escribe exacto en ellos: tᵢ = φᵢᵀ·m/ωᵢ². `+e` desplaza la recta hacia +Y (sismo según X) o +X (según Y), como en el viento.
+  - **μ:** en los desplazamientos (flechas, desplomes, maestros, deformada, uz de los mapas), todo el caso del sismo va por μ.
+- **Nadie aplica factores a mano.** Lo lineal se hace por caso base y la combinación, al final, en la variable que se da: los esfuerzos de un pilar, cada estación de un diagrama, una reacción, el desplome (la diferencia de desplazamientos de cada modo, combinada: no la diferencia de los combinados), la flecha relativa de un recuadro, cada nudo de un mapa, los momentos medios de una franja antes de Wood–Armer. Sin casos del sismo, `Superposicion` suma en el orden de siempre: los mismos bits.
+- **El diagrama de una barra** con casos del sismo no es un polinomio: `DiagramaCompuesto` lo evalúa en cada punto. Los modos no llevan cargas en las barras, así que sus esfuerzos salen de los de sus dos extremos, que ya están en sus resultados. El sismo desplaza el máximo del vano: a las estaciones de la parte estática se añaden los décimos, los puntos donde el modo dominante cambia de signo y el vértice de la parábola alrededor del mayor y del menor My y Mz (VS3-3).
+
+**Criterios:**
+1. **SAP2000 1-022 y 1-024** (`validacion/e6/csi.ts`, `csi.test.ts`), ya con el código del motor: los modos como casos base y `Superposicion`, con la SRSS, la CQC, la suma de valores absolutos y la NRC del 10 % como opciones de la regla. Dentro del redondeo de lo publicado, como en E6. `src/pruebas/modal.ts` desaparece.
+2. **A mano** (`src/motor/espectral.test.ts`): la ménsula de dos masas (cortantes, fuerzas equivalentes, desplazamientos por μ y derivas, y el cortante y el momento de cada pilar) a 1e-9 de su solución cerrada; un edificio con la traslación y el giro acoplados en dos modos a menos del 10 %, cuyos cortantes se suman en valor absoluto; y la cuadrática completa con la fórmula del comentario.
+3. **OpenSeesPy 3.8** (`validacion/vs3/`, `oraculo-vs3.test.ts`): `responseSpectrumAnalysis` modo a modo en el pórtico compilado de 3 plantas, con el espectro de la NCSE-02 programado aparte en Python. La respuesta de cada modo (desplazamientos, esfuerzos de extremo de las barras con sus zonas rígidas y reacciones, con su signo) y las dos combinaciones de cada variable, a ≤ 1e-8. El cortante en la base, a 3,5e-14; en el pórtico objetivo de 7 plantas (21 modos, 14 por debajo de TA y 21 pares próximos), a 3,3e-12.
+4. **El equilibrio de cada caso modal,** a 1e-9 (lo exige el motor desde VS2). Además: las reacciones de cada modo equilibran sus fuerzas de inercia; el modelo con los modos como casos, calculado otra vez, da sus resultados; el cortante en la base combinado es el combinado de los de los modos; y el torsor escrito en los modos es el caso estático con los pares (un cálculo aparte), a 1e-9.
+5. **Frente al método simplificado** (`out_banco.txt`, `out_vivienda.txt`): con el periodo del modo dominante, el cortante modal queda entre 0,936 y 0,941 del simplificado en los edificios objetivo y a 0,94 y 0,85 en la vivienda. El simplificado da a su primer modo toda la masa en la meseta; el modal la reparte entre los modos.
+6. **Nadie mezcla un caso de un modo con un factor:**
+   - `src/pruebas/factores.test.ts` busca en `src`, `cli` y `app/src` quien aplique un factor por su índice de caso, importe la combinación lineal o combine diagramas a mano, fuera de los ficheros que lo tienen que hacer;
+   - `Superposicion` y `combinar` lanzan si el vector no tiene un caso por factor;
+   - `src/agente/sismoEspectral.test.ts` pasa un edificio con sismo (8 casos lógicos y 13 base) por cada consulta y la compara con la regla aplicada a mano sobre los valores de cada caso base.
+
+**Validación de la norma** (`src/normas/ncse02.test.ts`): lo copiado, contra Concreta en cinco casos congelados por `validacion/vs3/oraculo-concreta.ts` (uno, dos y tres modos, un periodo menor que TA, estratos), a 1e-12; αᵢ, contra el texto.
+
+**En la vivienda** (`validacion/vs3/vivienda.ts`; emplazamiento de prueba: ab = 0,10 g, K = 1, terreno II, μ = 2): 6 modos, peso sísmico de 2 104 kN y cortante en la base de 256 kN según X y 232 según Y (el 12 y el 11 % del peso). Sus dos primeros modos están a un 5 % (0,333 y 0,317 s): con la regla del articulado dan 256 kN; con la cuadrática completa, 247; con la raíz de la suma de los cuadrados sin más, 182.
+
+**El coste** (`validacion/vs3/banco.ts`, `memoria.ts`, `retenido.ts`):
+
+- **Las ecuaciones no cambian** (los casos del sismo no son casos del cálculo; los lados son los de VS2). Lo que crece son los resultados, porque cada modo es un caso:
+
+  | Edificio (7 plantas) | Nudos | Ecuaciones | Modos | Resultados sin modos, MiB | Con los modos de VS2 | Con los modos como casos (VS3) | Cada modo, MiB |
+  |---|---|---|---|---|---|---|---|
+  | Losas | 86796 | 149814 | 21 | 51 | 135 | 321 | 12,8 |
+  | Reticular | 107306 | 199962 | 21 | 64 | 167 | 398 | 15,9 |
+  | Unidireccional | 6695 | 19845 | 21 | 7 | 14 | 46 | 1,8 |
+
+- **Los modos que hacen falta:** con «el 90 % de la masa de la dirección y todos los de periodo mayor que TA» (art. 3.6.2.3.1 y su comentario) bastarían entre la mitad y dos tercios; el cortante en la base con sólo ésos se queda a menos de un 1 %. Se toman todos (VS2-3).
+
+  | Edificio | Dirección | T dominante, s (su masa) | Cortante en la base, kN (entre el peso) | Modos: todos / hasta el 90 % / con T > TA | Pares a menos del 10 % | Con la cuadrática completa | Método simplificado, con el T modal / con el del art. 3.7.2.2 |
+  |---|---|---|---|---|---|---|---|
+  | Losas | X | 0,840 (75,5 %) | 21326 (0,1447) | 21 / 13 / 8 | 23 | ×1,000 | ×0,941 / ×0,718 |
+  | Losas | Y | 0,818 (73,2 %) | 21911 (0,1486) | 21 / 14 / 8 | 23 | ×0,990 | ×0,941 / ×0,737 |
+  | Reticular | X | 0,763 (75,3 %) | 19982 (0,1587) | 21 / 13 / 7 | 23 | ×0,999 | ×0,937 / ×0,787 |
+  | Reticular | Y | 0,746 (72,7 %) | 20452 (0,1625) | 21 / 14 / 7 | 23 | ×0,987 | ×0,939 / ×0,806 |
+  | Unidireccional | X | 0,818 (75,6 %) | 17234 (0,1479) | 21 / 10 / 8 | 18 | ×1,003 | ×0,936 / ×0,733 |
+  | Unidireccional | Y | 0,790 (72,7 %) | 17944 (0,1540) | 21 / 14 / 8 | 18 | ×0,985 | ×0,941 / ×0,763 |
+
+  El modal queda a un 6 % por debajo del simplificado con su mismo periodo (el simplificado pone toda la masa en sus dos modos; el modal, el 73–76 % en el primero) y entre un 19 y un 28 % con el periodo aproximado de la norma (0,09·n = 0,63 s, más corto que el del modelo: más cortante). Es el criterio 5: la diferencia es el periodo.
+
+- **Las consultas,** en segundos (sólo como información: mínimo de tres pasadas, o una si pasa de 15 s; cada una con unas `Consultas` nuevas). La situación sísmica son 64 combinaciones más sobre las 16 de la persistente, y cada una cuesta lo que una estática; donde se trabaja caso a caso (las franjas, los mapas), lo que pesa son los 21 casos de los modos:
+
+  | Edificio | Consulta | Sin el sismo | Con los modos, las mismas combinaciones | Con la situación sísmica |
+  |---|---|---|---|---|
+  | Losas | Envolventes de todas las piezas | 10,33 (16) | 8,23 | 36,57 (80) |
+  | Losas | Envolventes de los pilares de N7 | 0,06 (16) | 0,09 | 0,25 (80) |
+  | Losas | Franjas de armado de N7 | 3,67 (16) | 7,92 | 6,09 (80) |
+  | Losas | Mapa de M11 de N7 (envolvente máxima) | 0,44 (16) | 1,08 | 1,57 (80) |
+  | Reticular | Envolventes de todas las piezas | 8,53 (16) | 8,94 | 42,24 (80) |
+  | Reticular | Envolventes de los pilares de N7 | 0,22 (16) | 0,22 | 0,36 (80) |
+  | Reticular | Franjas de armado de N7 | 3,86 (16) | 6,35 | 7,40 (80) |
+  | Reticular | Mapa de M11 de N7 (envolvente máxima) | 0,83 (16) | 1,61 | 2,56 (80) |
+  | Unidireccional | Envolventes de todas las piezas | 3,95 (16) | 3,98 | 23,69 (80) |
+  | Unidireccional | Envolventes de los pilares de N7 | 0,09 (16) | 0,11 | 0,29 (80) |
+
+  Las reacciones y la deriva de todo el edificio, por debajo de 0,3 s en los tres. Las franjas de losas con los modos y sin sus combinaciones (7,92) salen por encima de las de la situación sísmica (6,09): es ruido de la máquina, con otras sesiones trabajando; lo que dicen las dos es que los modos cuestan de 2,5 a 4 s más por planta.
+
+- **La memoria de JavaScript** (`memoria.ts`: en Bun, tras recoger la basura y sobre el arranque; edificio de losas), en MiB:
+
+  | Paso | Sin el sismo | Con el sismo |
+  |---|---|---|
+  | Compilado y calculado | 886 | 1709 |
+  | Tras las envolventes de todas las piezas | 1414 | 3738 |
+  | Tras las franjas y el mapa de una planta | 1801 | 2574 |
+
+  De los 823 MiB de más tras calcular, 270 son los vectores de los modos (`retenido.ts`: cada modo retiene lo que un caso, 12,8 MiB); el resto no está en el resultado y queda sin explicar (se mide en Chrome con VS4, que es donde cuenta). Las envolventes con el sismo guardan lo de cada barra mientras se recorren y lo sueltan después. Antes de hacer ligeros los casos de los modos, el banco se iba a 16 GB (VS3-4).
+- **Pendiente:** el mapa de una planta guarda los campos de todos los casos base (con 21 modos, seis veces más que sin el sismo), y la envolvente de las 64 combinaciones sísmicas se puede factorizar (el máximo es el de la parte estática más el de cada caso del sismo con su signo), sin recorrerlas: para VS4, donde importa la espera en la app. Y falta medirlo en un móvil (con E4-9).
+
+**La excentricidad, frente a mover la masa (VS-i;** `validacion/vs3/excentricidad.ts`**):** la masa de cada planta movida ±e y los modos rehechos, frente al torsor, en los cortantes de la base de cada tramo de pilar:
+- **en la dirección del sismo,** lo mismo: el cociente torsor / masa movida tiene una mediana de 0,95 a 1,15 (de 0,73 a 1,28 en los extremos);
+- **en la perpendicular** (los pórticos que con ese sismo sólo trabajan por la torsión), el torsor da menos: una mediana de 0,10 a 0,76 con la regla del articulado y de 0,27 a 0,75 con la cuadrática completa. Con la masa movida, la traslación y el giro se acoplan en modos próximos, y la respuesta de giro se amplifica; con la regla del articulado, además, esos modos se suman en valor absoluto. En el pórtico objetivo, con el sismo según X, los pórticos según Y reciben hasta 160 kN (cuadrática) frente a los 43 del torsor, con un cortante mayor de 328 kN.
+- Esos pórticos se dimensionan con el sismo en su dirección más el 30 % del otro: la diferencia en su envolvente es del orden del 10 %. La norma admite las dos cosas («de las masas o de las fuerzas sísmicas equivalentes», art. 3.2).
+
+**Hallazgos:**
+- **VS3-1, la rama ascendente del art. 3.6.2.2 no es la que decía el plan.** La norma da αᵢ = α(Tᵢ)·β con Tᵢ ≥ TA y 1 + (2,5·β − 1)·Tᵢ/TA por debajo: de 1 (un modo muy rígido se mueve con el suelo, sin reducir) a 2,5·β. No es β·(1 + 1,5·T/TA), que con μ = 2 da 0,875 a media rama donde la norma da 1,125. En el pórtico objetivo hay 14 de 21 modos por debajo de TA.
+- **VS3-2, la regla del 10 %, par a par.** «Agrupando […] las variables que difieren entre sí menos del 10 %» no dice qué hacer con tres modos encadenados (el primero y el tercero, a más del 10 %). Par a par no hay que decidirlo, y es lo que valida el ejemplo 1-024 de SAP2000 (su «NRC 10 %»). «Menos del 10 %», del periodo mayor (más pares que del menor: del lado seguro).
+- **VS3-3, el sismo desplaza el máximo del vano.** Con G + E, el momento positivo mayor no está donde se anula el cortante de G: con sólo las estaciones de la parte estática se quedaba corto.
+- **VS3-4, un diagrama por barra y por modo no cabe.** El primer banco se fue a 16 GB en el edificio objetivo: `EsfuerzosPiezas` guardaba un `DiagramaBarra` por barra y por caso, y con 21 modos son seis veces más. Los casos de los modos son ahora «ligeros»: sus esfuerzos de extremo salen de sus resultados y no se guarda ningún diagrama suyo.
+- **VS3-5, el coste está en el número de combinaciones.** La situación sísmica son 64 combinaciones (2 direcciones × 2 excentricidades × 2 signos × 4 de la otra × la sobrecarga presente o no), y cada una cuesta lo que una estática.
+- **VS3-6, la excentricidad estática se queda corta en la torsión** (arriba).
+- **VS3-7, en la vivienda la regla pesa un 40 %:** sus dos modos de traslación están a un 5 % de periodo, y la raíz de la suma de los cuadrados sin más daría un cortante un 29 % menor que la regla del articulado, que queda a un 4 % de la cuadrática completa.
+- **VS3-8, g se cancela.** La norma toma g = 9,8 m/s² (C.2.1) y las masas van con 9,80665: la masa es el peso entre g y la aceleración, ab por g, así que las fuerzas y los desplazamientos no dependen de cuál se tome mientras sea la misma.
+- **VS3-9, C > 1,8.** Con el periodo fundamental de una dirección mayor que TB, el art. 2.4 manda α = 2,5 también por encima de TB: se hace y se avisa (`sismo/meseta-larga`).
+- **VS3-10, de paso:** las consultas por defecto de la CLI miraban los casos del fichero, no los del programa: con el viento de VS1, las combinaciones salían bien (las da `Consultas`), pero la selección por defecto no veía sus casos.
+
+**Lo que decidí al hacerlo, para el usuario:**
+- **VS3-a:** los casos del sismo son lógicos (no van al modelo analítico ni a los resultados) y sus nombres, `EX+e`, `EX-e`, `EY+e` y `EY-e`.
+- **VS3-b:** con `ab`, son obligatorios `K`, `terreno` y `mu` (no hay valor por defecto que no sea una hipótesis de proyecto); por defecto, importancia normal, Ω = 5 % y e = 1/20.
+- **VS3-c:** la regla del 10 %, par a par y respecto al periodo mayor (VS3-2).
+- **VS3-d:** la fuerza equivalente de cada planta, para el par de la excentricidad, es la diferencia de los cortantes combinados (puede salir negativa en plantas altas, como en Concreta).
+- **VS3-e:** si el par no se puede escribir con los modos (un diafragma con masa y sin inercia de giro), es un error y no hay casos del sismo; con `"excentricidad": 0` se calcula sin ella.
+- **VS3-f:** todos los modos, sin truncar (VS2-3). Con los de «el 90 % y T > TA» serían de 10 a 14 de los 21 de los edificios objetivo.
+- **VS3-g:** la excentricidad, como torsor estático (VS-i), con lo medido arriba. Mover la masa son cuatro juegos de modos (cuatro veces los casos base); queda para decidir con VS5, cuando se vea qué hace el CYPECAD del usuario.
+
+**Fuera de VS3:**
+- la app (VS4): las fichas, el modo «Modal», los casos del sismo en los selectores (hoy la app los usa en las combinaciones por defecto, pero no los lista) y la sección del informe;
+- el municipio: los datos de peligrosidad del IGN y su prueba contra el Anejo 1 (VS-l) van con la ficha de VS4; hasta entonces, `ab` y `K` se escriben;
+- la componente vertical, el segundo orden (sólo el aviso con θ) y las plantas sin diafragma (VS6).

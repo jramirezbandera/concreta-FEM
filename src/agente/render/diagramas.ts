@@ -21,7 +21,7 @@
 import type { TramoFlexible } from "../../compilador/resultados.ts";
 import { marcoBarra } from "../../elementos/barra.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
-import { diagramaCombinado } from "../consultas.ts";
+import { esfuerzoProyectado } from "../../motor/diagramaCompuesto.ts";
 import { envolventeTramo, type PuntoEnvolvente, type ResultadosRender } from "./resultados.ts";
 
 export type V3 = [number, number, number];
@@ -95,7 +95,7 @@ export function envolventeGuardada(r: ResultadosRender, t: TramoFlexible, conjun
   const clave = JSON.stringify([t.barra, conjunto.descripcion, conjunto.nombres, comp]);
   let x = m.get(clave);
   if (!x) {
-    const f = typeof comp === "number" ? comp : comp.length === 1 && comp[0]![1] === 1 ? comp[0]![0] : (e: readonly number[]) => comp.reduce((s, [c, k]) => s + k * e[c]!, 0);
+    const f = typeof comp === "number" ? comp : comp.length === 1 && comp[0]![1] === 1 ? comp[0]![0] : comp;
     m.set(clave, (x = envolventeTramo(r, t, conjunto, f)));
   }
   return x;
@@ -171,10 +171,10 @@ export function extremosCurva(puntos: readonly PuntoEnvolvente[]): { max: { v: n
  */
 export function combinacionEn(r: ResultadosRender, t: TramoFlexible, conjunto: ConjuntoCombinaciones, comp: number | readonly (readonly [number, number])[], s: number, objetivo: number): string | null {
   const x = Math.min(t.s1 - t.s0, Math.max(0, s - t.s0));
-  const valor = (e: readonly number[]) => (typeof comp === "number" ? e[comp]! : comp.length === 1 && comp[0]![1] === 1 ? e[comp[0]![0]]! : comp.reduce((a, [c, k]) => a + k * e[c]!, 0));
+  const una = typeof comp === "number" ? comp : comp.length === 1 && comp[0]![1] === 1 ? comp[0]![0] : null;
   for (let k = 0; k < conjunto.factores.length; k++) {
-    const dg = diagramaCombinado(r.ep, t.barra, conjunto.factores[k]!);
-    for (const lado of [-1, 1] as const) if (valor(dg.esfuerzosEn(x, lado)) === objetivo) return conjunto.nombres[k]!;
+    const dg = r.q.diagramaBarra(t.barra, conjunto.factores[k]!);
+    for (const lado of [-1, 1] as const) if ((una !== null ? dg.esfuerzosEn(x, lado)[una]! : esfuerzoProyectado(dg, x, lado, comp as readonly (readonly [number, number])[])) === objetivo) return conjunto.nombres[k]!;
   }
   return null;
 }

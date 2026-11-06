@@ -63,3 +63,5 @@ validacion/dwg/.muestras/
 
 # VS2: los modelos del oráculo de los modos (validacion/vs2/modelos-oraculo.ts)
 validacion/vs2/opensees-modelos.json
+# VS3: los del oráculo del análisis por espectros (validacion/vs3/modelos-oraculo.ts)
+validacion/vs3/opensees-modelos.json

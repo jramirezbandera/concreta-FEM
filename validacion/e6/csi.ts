@@ -19,14 +19,17 @@
  *
  * Los periodos y los modos son los del motor (VS2, `src/motor/modal.ts`): las masas sólo están en
  * los GDL de los maestros de los diafragmas, y la rigidez condensada a esos GDL, que sale de
- * soluciones estáticas, es exacta. La combinación espectral sigue en `src/pruebas/modal.ts` (VS3).
+ * soluciones estáticas, es exacta. La respuesta espectral también es la del motor (VS3,
+ * `src/motor/espectral.ts`): cada modo es un caso base, con sus desplazamientos y sus esfuerzos, y
+ * cada variable se combina con `Superposicion` (SRSS, CQC, ABS y NRC 10 %, con las opciones de la
+ * regla).
  */
 import type { SeccionBarra } from "../../src/elementos/barra.ts";
 import { calcular } from "../../src/motor/calcular.ts";
-import type { Apoyo, ModeloAnalitico, ResultadoCaso, ResultadoModal, Vec3 } from "../../src/motor/modelo.ts";
+import { respuestaEspectral, Superposicion, type OpcionesRegla } from "../../src/motor/espectral.ts";
+import type { Apoyo, ModeloAnalitico, ModoVibracion, ResultadoCaso, ResultadoModal, Vec3 } from "../../src/motor/modelo.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
 import { carga, Constructor, EMPOTRADO } from "../../src/pruebas/constructor.ts";
-import { combinar } from "../../src/pruebas/modal.ts";
 
 /** Un GDL con masa: el de un maestro de diafragma. */
 export interface GdlMasa {
@@ -41,6 +44,31 @@ export function modalCsi(modelo: ModeloAnalitico, masas: readonly GdlMasa[], mi:
   casosValidos(r);
   if (!r.valido || !r.modal) throw new Error("sin modal");
   return r.modal;
+}
+
+/** Las cuatro reglas de combinación de los ejemplos de CSI, como opciones de la regla del motor. */
+export const REGLAS_CSI: Record<"srss" | "cqc" | "abs" | "nrc10", (zeta: number) => OpcionesRegla> = {
+  // SRSS pura: ningún par de modos cuenta como próximo
+  srss: () => ({ tipo: "srss", proximos: () => false }),
+  cqc: (zeta) => ({ tipo: "cqc", zeta }),
+  // Suma de valores absolutos: todos los pares, próximos
+  abs: () => ({ tipo: "srss", proximos: () => true }),
+  // NRC (Regulatory Guide 1.92) del 10 %: pares de frecuencias que difieren ≤ 10 % de la menor
+  nrc10: () => ({ tipo: "srss", proximos: (Ti, Tj) => Math.max(Ti, Tj) / Math.min(Ti, Tj) - 1 <= 0.1 }),
+};
+
+/**
+ * La respuesta espectral del motor con el sismo según X: de cada regla, una función que combina una
+ * variable (`valor(modo)`, la del modo, que es un caso base) y da su valor absoluto, que es lo que
+ * publica CSI.
+ */
+export function espectralCsi(md: ResultadoModal, aceleracion: (T: number) => number, zeta: number): Record<keyof typeof REGLAS_CSI, (valor: (modo: ModoVibracion) => number) => number> {
+  const con = (regla: OpcionesRegla) => {
+    const r = respuestaEspectral(md, { direccion: [1, 0], aceleracion, regla });
+    const sup = new Superposicion(md.modos.length, [{ id: "E", espectral: { modos: Int32Array.from(md.modos.keys()), coeficientes: r.coeficientes, regla: r.regla, dominante: r.dominante, lineal: null, ductilidad: 1 } }]);
+    return (valor: (modo: ModoVibracion) => number) => Math.abs(sup.valor([1], (b) => valor(md.modos[b]!)));
+  };
+  return { srss: con(REGLAS_CSI.srss(zeta)), cqc: con(REGLAS_CSI.cqc(zeta)), abs: con(REGLAS_CSI.abs(zeta)), nrc10: con(REGLAS_CSI.nrc10(zeta)) };
 }
 
 // Unidades de CSI → kN, m
@@ -303,16 +331,13 @@ export function resultados1022(): Publicado[] {
   const mi = (0.49 * KIP) / IN;
   const md = modalCsi(modelo, masas, mi);
   const periodos = [1.2732, 0.4313, 0.242, 0.1602, 0.119, 0.0951, 0.0795];
-  // Espectro (5 %): por modo, fuerzas estáticas equivalentes M·φₙ·Γₙ·Sa(Tₙ) = (fuerzas de inercia/ω²)·Γₙ·Sa, un caso por modo
-  const casos = md.modos.map((modo, n) => ({
-    id: `modo${n + 1}`,
-    nodales: md.diafragmas.map((df, d) => carga(df.maestro, { fx: (modo.fuerzas[3 * d]! / modo.omega2) * modo.participacion[0] * espectro1022(modo.periodo) * G_CSI })),
-  }));
-  const rm = casosValidos(calcular({ ...modelo, casos }));
-  const omega = md.modos.map((modo) => Math.sqrt(modo.omega2));
-  const ux = combinar(rm.map((c) => c.u[6 * nudo(22)]! / IN), omega, 0.05);
-  const N = combinar(rm.map((c) => c.esfuerzosBarras[12 * b1]! / KIP), omega, 0.05);
-  const M = combinar(rm.map((c) => c.esfuerzosBarras[12 * b1 + 4]! / (KIP * IN)), omega, 0.05);
+  // Espectro (5 %), con el motor (VS3): cada modo es un caso base (sus desplazamientos y los esfuerzos
+  // de sus barras salen del cálculo), y cada variable se combina con su regla
+  const esp = espectralCsi(md, (T) => espectro1022(T) * G_CSI, 0.05);
+  const variable = (valor: (modo: ModoVibracion) => number) => ({ srss: esp.srss(valor), cqc: esp.cqc(valor) });
+  const ux = variable((modo) => modo.u[6 * nudo(22)]! / IN);
+  const N = variable((modo) => modo.esfuerzosBarras[12 * b1]! / KIP);
+  const M = variable((modo) => modo.esfuerzosBarras[12 * b1 + 4]! / (KIP * IN));
   // El modo 1 (T₁ = 1,2732 s) cae justo después del punto 1,2730 de la tabla del espectro, y SAP2000
   // no documenta cómo interpola ahí: en el espectro se admite el redondeo o un 0,02 % (el Ux SRSS
   // queda a 0,013 %, 1,4 unidades de su última cifra; los otros cinco, dentro del redondeo).
@@ -378,9 +403,9 @@ export function resultados1024(J?: number): Publicado[] {
   // La masa va en el maestro (el centro de masas), sin inercia de giro: 2 GDL dinámicos por planta
   const md = modalCsi(modelo, masas, mi);
   // Espectro constante de 0,4g en X; flecha en X del CM de la cubierta (nudo 29: el segundo diafragma, componente X)
-  const sa = 0.4 * G_CSI;
-  const R = md.modos.map((modo) => (modo.forma[3]! * modo.participacion[0] * sa) / modo.omega2 / FT);
-  const c = combinar(R, md.modos.map((modo) => Math.sqrt(modo.omega2)), 0.04);
+  const esp = espectralCsi(md, () => 0.4 * G_CSI, 0.04);
+  const ux = (modo: ModoVibracion) => modo.forma[3]! / FT;
+  const c = { cqc: esp.cqc(ux), srss: esp.srss(ux), abs: esp.abs(ux), nrc10: esp.nrc10(ux) };
   const fuente = "SAP2000 1-024, p. 3";
   return [
     ...[0.2271, 0.2156, 0.0733, 0.072].map((T, n) => ({ nombre: `1-024 periodo del modo ${n + 1} (s)`, valor: T, decimales: 4, motor: md.modos[n]!.periodo, fuente })),
