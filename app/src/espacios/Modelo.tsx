@@ -59,6 +59,8 @@ import { nuevaPlantilla } from "../../../src/editor/dibujo/plantilla.ts";
 import { importarDxf, nombreLibre, usePlantillasDxf } from "../plantilla/plantillas.ts";
 import { NavPlantillas } from "../plantilla/NavPlantillas.tsx";
 import { abrirGestor } from "../editor/referencia.tsx";
+import { FichaAbacos } from "../editor/FichaAbaco.tsx";
+import { borrarAbacos, esIdAbaco, leerIdAbaco, nombreAbaco, toleranciaAbacos } from "../../../src/editor/abacos.ts";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
@@ -132,8 +134,11 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     const a = ed.editar(h.operacion, h.etiqueta);
     if (!a.ok) return a.errores.map((x) => x.mensaje).join(" ");
     ctrl.ponerModelo(a.proyecto.modelo);
+    // AC: un ábaco unido con otro cambia de id de selección
+    if (h.elegir) setElegidos(h.elegir);
     return null;
   };
+  ctrl.toleranciaAbacos = toleranciaAbacos(ed?.proyecto.opciones);
   ctrl.alSalir = () => ctrl.ponerHerramienta("elegir");
   ctrl.repintar = repintarVistas;
   {
@@ -229,6 +234,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     const m = ed.proyecto.modelo;
     const ctx = contexto(m);
     const queda = elegidos.filter((id) => {
+      // AC: un ábaco, con la planta de su losa
+      const ab = leerIdAbaco(m, id);
+      if (ab) return ab.losa.planta === planta;
       const t = tablaDe(m, id);
       const o = t ? objetosTabla(m, t).find((x) => x.id === id) : undefined;
       const ps = t && o ? DEF_TABLAS[t].plantas(o, ctx) : null;
@@ -299,6 +307,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
 
   // Lo elegido que está en el proyecto (un eje propuesto no lo está; en Cargas, sólo las cargas) y lo que de ello se copia
   const enTablas = ed ? elegidosHerr.filter((id) => tablaDe(ed.proyecto.modelo, id)) : [];
+  // AC: los ábacos elegidos (por su id de selección, que no está en ninguna tabla)
+  const abacosElegidos = ed && !cargas ? elegidosHerr.filter((id) => esIdAbaco(ed.proyecto.modelo, id)) : [];
   const copiables = ed ? enTablas.filter((id) => COPIABLES.has(tablaDe(ed.proyecto.modelo, id)!)) : [];
 
   // Copiar y Borrar sin nada que les sirva elegido esperan a que se elija: un clic (o una ventana)
@@ -335,9 +345,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   };
   // C-40: los oyentes de la ventana se ponen al cambiar lo que los activa, no en cada render; lo que
   // leen y cambia en cada uno (lo elegido, la selección), de esta ref
-  const ultimo = useRef({ paraAccion, enTablas, seleccion });
+  const ultimo = useRef({ paraAccion, enTablas, seleccion, abacosElegidos });
   useLayoutEffect(() => {
-    ultimo.current = { paraAccion, enTablas, seleccion };
+    ultimo.current = { paraAccion, enTablas, seleccion, abacosElegidos };
   });
   useEffect(() => {
     if (!eligiendo) return;
@@ -359,13 +369,21 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   }, [elegidos]);
   // Supr borra lo elegido: si nada más lo usa, en el acto (se deshace con Ctrl+Z); si no, el diálogo
   // de Borrar dice qué lo usa. La hoja tiene su Supr (vaciar celdas) y un diálogo abierto, el suyo.
-  const hayEnTablas = enTablas.length > 0;
+  const hayEnTablas = enTablas.length > 0 || abacosElegidos.length > 0;
   useEffect(() => {
     if (dibujando || estirando || conAsa || dialogo || !ed || !hayEnTablas) return;
     const tecla = (x: KeyboardEvent) => {
       if (x.key !== "Delete" || x.ctrlKey || x.metaKey || x.altKey || x.shiftKey || enCampo(x.target)) return;
-      const { enTablas, seleccion } = ultimo.current;
+      const { enTablas, seleccion, abacosElegidos } = ultimo.current;
       x.preventDefault();
+      // AC: los ábacos elegidos (no los de una losa que también se borra), en el mismo paso
+      const abacos = abacosElegidos.filter((id) => !enTablas.includes(leerIdAbaco(ed.proyecto.modelo, id)?.losa.id ?? ""));
+      if (abacos.length && !enTablas.length) {
+        const r = borrarAbacos(ed.proyecto.modelo, abacos);
+        if (!r.ok || !ed.editar(r.operacion, `Borrar ${abacos.length > 1 ? `${abacos.length} ábacos` : `el ábaco ${nombreAbaco(abacos[0]!)}`}`).ok) return;
+        setElegidos([]);
+        return setHecho(abacos.length > 1 ? `Borrados ${abacos.length} ábacos.` : `Borrado el ábaco ${nombreAbaco(abacos[0]!)}.`);
+      }
       if (!aplicar(ed.proyecto, { op: "borrar", ids: enTablas }).ok) return setDialogo("borrar");
       const r = ed.editar({ op: "borrar", ids: enTablas }, `Borrar ${enTablas.length > 3 ? `${enTablas.length} objetos` : enTablas.join(", ")}`);
       if (!r.ok) return;
@@ -451,7 +469,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Separador />
           <Herramienta icono={IcLosa} nombre="Forjado" activa={foto.herramienta === "forjado"} onClick={() => elegirHerramienta("forjado")} title="Dibujar forjados (maciza, reticular o unidireccional, en Propiedades): un clic dentro de un recuadro cerrado, o un polígono. Esc vuelve a Elegir" />
           <Herramienta icono={IcHueco} nombre="Hueco" activa={foto.herramienta === "hueco"} onClick={() => elegirHerramienta("hueco")} title="Dibujar huecos: en un forjado, un rectángulo o un polígono; en un muro, dos clics por su eje. Esc vuelve a Elegir" />
-          <Herramienta icono={IcAbacos} nombre="Ábacos" onClick={() => setDialogo("abacos")} title="Ábacos macizos en los pilares de un forjado reticular, del tamaño que diga" />
+          <Herramienta icono={IcAbacos} nombre="Ábaco" activa={foto.herramienta === "abaco"} onClick={() => elegirHerramienta("abaco")} title="Dibujar ábacos en un forjado reticular: un clic en un pilar, o un rectángulo (o en todos los pilares, en Propiedades). Si solapa con otro, se unen. Esc vuelve a Elegir" />
           <Separador />
           <Herramienta icono={IcApoyo} nombre="Apoyo" activa={foto.herramienta === "apoyo"} onClick={() => elegirHerramienta("apoyo")} title="Dibujar apoyos: un clic donde va. Esc vuelve a Elegir" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" activa={foto.herramienta === "apoyoLineal"} onClick={() => elegirHerramienta("apoyoLineal")} title="Dibujar apoyos lineales: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
@@ -630,7 +648,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           titulo: "Propiedades",
           contenido:
             dibujando && modeloEd ? (
-              <PlantillaDibujo foto={foto} ctrl={ctrl} modelo={modeloEd} planta={planta} plantillas={plantillas} setPlantillas={setPlantillasDibujo} editar={editarDibujo} abrirTabla={(t) => abrirTabla(t)} />
+              <PlantillaDibujo foto={foto} ctrl={ctrl} modelo={modeloEd} planta={planta} plantillas={plantillas} setPlantillas={setPlantillasDibujo} editar={editarDibujo} abrirTabla={(t) => abrirTabla(t)} abacosEnPilares={() => setDialogo("abacos")} />
+            ) : !cargas && modeloEd && abacosElegidos.length && abacosElegidos.length === elegidos.length ? (
+              <FichaAbacos ids={abacosElegidos} />
             ) : elegidos.length > 1 ? (
               <ListaElegidos />
             ) : seleccion && cargas && modeloEd && tipoPieza(modeloEd, seleccion) ? (

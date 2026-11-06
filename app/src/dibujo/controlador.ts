@@ -37,6 +37,7 @@
  * no se anula al pasar a otra vista, se ve en todas y el segundo clic puede ir en cualquiera. Con las
  * demás herramientas, un alzado sigue como siempre (elegir).
  */
+import { nombreAbaco } from "../../../src/editor/abacos.ts";
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
 import { apuntar, bajoCursor, FUENTES_ENGANCHE, indiceEnganches, RADIO_ENGANCHE, rotuloEnganche, TIPOS_ENGANCHE, type Apunte, type FuenteEnganche, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import type { IndicePlantilla } from "../../../src/editor/dibujo/plantilla.ts";
@@ -131,6 +132,8 @@ export class ControladorDibujo {
    * haya pasado por ninguna planta (antes pedía «Lleve el cursor a una planta»).
    */
   plantaVista: string | null = null;
+  /** AC: la distancia por debajo de la cual dos ábacos se unen (la mitad del tamaño de malla del proyecto). */
+  toleranciaAbacos: number | undefined = undefined;
   private apunte: Apunte | null = null;
   private silueta: Silueta | null = null;
   private foto: Instantanea;
@@ -320,7 +323,7 @@ export class ControladorDibujo {
   private cotas(): CotaTemporal[] {
     const ix = this.indiceActual();
     if (!this.modelo || !this.planta || !ix || !this.cursorQ) return [];
-    return borrador(this.herramienta, this.estado, this.apunte?.p ?? this.cursorQ, { modelo: this.modelo, planta: this.planta, indice: ix, plantillas: this.plantillas }, this.cursorQ).cotas;
+    return borrador(this.herramienta, this.estado, this.apunte?.p ?? this.cursorQ, { modelo: this.modelo, planta: this.planta, indice: ix, plantillas: this.plantillas, toleranciaAbacos: this.toleranciaAbacos }, this.cursorQ).cotas;
   }
 
   anular(): void {
@@ -596,7 +599,8 @@ export class ControladorDibujo {
     const a = this.asaActiva;
     if (!a) return null;
     // M-22: con mayúscula inicial, como los demás avisos de la herramienta
-    const que = a.coleccion === "pilares" ? `${a.id} (su punto fijo)` : a.ruta[0] === "x" ? a.id : `Un vértice de ${a.id}`;
+    // AC: en un ábaco rectangular, el vértice va con el opuesto fijo y el lado, en paralelo
+    const que = a.ruta[0] === "abaco" ? (a.ruta[1] === "lado" ? `Un lado del ábaco ${nombreAbaco(a.id)}` : `Una esquina del ábaco ${nombreAbaco(a.id)}`) : a.coleccion === "pilares" ? `${a.id} (su punto fijo)` : a.ruta[0] === "x" ? a.id : `Un vértice de ${a.id}`;
     return `${que}: el punto nuevo (clic, o «x; y», «@dx; dy» e Intro)${a.coleccion === "pilares" ? "; con Ctrl, sin sus vigas" : ""}. Esc lo suelta.`;
   }
 
@@ -613,13 +617,13 @@ export class ControladorDibujo {
   private dejarAsa(q: Vec2, solo: boolean): string | null {
     const a = this.asaActiva;
     if (!a || !this.modelo) return "No hay ningún vértice cogido.";
-    const r = moverAsa(this.modelo, a, q, !solo);
+    const r = moverAsa(this.modelo, a, q, !solo, this.toleranciaAbacos);
     if (!r.ok) {
       this.cambiar({ error: r.mensaje });
       return r.mensaje;
     }
-    const etiqueta = `Mover ${a.coleccion === "pilares" || a.ruta[0] === "x" ? a.id : `un vértice de ${a.id}`}${solo && a.coleccion === "pilares" ? ", sin sus vigas" : ""}`;
-    const error = this.aplicar({ operacion: r.operacion, etiqueta });
+    const etiqueta = a.ruta[0] === "abaco" ? `Cambiar el ábaco ${nombreAbaco(a.id)}` : `Mover ${a.coleccion === "pilares" || a.ruta[0] === "x" ? a.id : `un vértice de ${a.id}`}${solo && a.coleccion === "pilares" ? ", sin sus vigas" : ""}`;
+    const error = this.aplicar({ operacion: r.operacion, etiqueta, ...(r.elegidos ? { elegir: r.elegidos } : {}) });
     if (error) {
       this.cambiar({ error });
       return error;
@@ -1065,7 +1069,7 @@ export class ControladorDibujo {
     if (!this.modelo || !planta) return;
     const ix = this.indice(planta);
     if (!ix) return;
-    const r = paso(this.herramienta, this.estado, ev, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas, elegidos: this.elegidos });
+    const r = paso(this.herramienta, this.estado, ev, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas, elegidos: this.elegidos, toleranciaAbacos: this.toleranciaAbacos });
     this.estado = r.estado;
     let error = r.error ?? null;
     let hecho: string | null = this.foto.hecho;
@@ -1203,7 +1207,7 @@ export class ControladorDibujo {
     }
     if (this.herramienta === "elegir" || !ix) return;
     // El borrador
-    const b = borrador(this.herramienta, this.estado, this.cursorQ ? (this.apunte?.p ?? this.cursorQ) : null, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas }, this.cursorQ);
+    const b = borrador(this.herramienta, this.estado, this.cursorQ ? (this.apunte?.p ?? this.cursorQ) : null, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas, toleranciaAbacos: this.toleranciaAbacos }, this.cursorQ);
     ctx.strokeStyle = c.acento;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);

@@ -25,8 +25,9 @@ import { LONGITUD_MAXIMA } from "../../../src/editor/celdas.ts";
 import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
 import { esPlantillaDxf, type NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
 import { seccionBarra, type PlantillaBarra } from "../../../src/editor/dibujo/barra.ts";
+import { LADO_ABACO } from "../../../src/editor/dibujo/abaco.ts";
 import { leerLuces, operacionReticula } from "../../../src/editor/dibujo/reticula.ts";
-import { IcApoyo, IcApoyoLineal, IcBarra, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAbacos, IcApoyo, IcApoyoLineal, IcBarra, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
@@ -50,6 +51,7 @@ const TITULO: Record<Herramienta, string> = {
   barraNiveles: "Barra",
   forjado: "Forjado",
   hueco: "Hueco",
+  abaco: "Ábaco",
   muro: "Muro",
   apoyo: "Apoyo",
   apoyoLineal: "Apoyo lineal",
@@ -59,7 +61,7 @@ const TITULO: Record<Herramienta, string> = {
   barra: "Carga en barra",
   empuje: "Empuje",
 };
-const ICONO = { ejes: IcEjes, pilar: IcPilar, viga: IcViga, barraNiveles: IcBarra, forjado: IcLosa, hueco: IcHueco, muro: IcMuro, apoyo: IcApoyo, apoyoLineal: IcApoyoLineal, puntual: IcPuntual, lineal: IcLineal, superficie: IcSuperficie, barra: IcEnBarra, empuje: IcEmpuje } as const;
+const ICONO = { ejes: IcEjes, pilar: IcPilar, viga: IcViga, barraNiveles: IcBarra, forjado: IcLosa, hueco: IcHueco, abaco: IcAbacos, muro: IcMuro, apoyo: IcApoyo, apoyoLineal: IcApoyoLineal, puntual: IcPuntual, lineal: IcLineal, superficie: IcSuperficie, barra: IcEnBarra, empuje: IcEmpuje } as const;
 const TABLA: Record<Herramienta, NombreTabla> = {
   ejes: "ejes",
   pilar: "pilares",
@@ -67,6 +69,7 @@ const TABLA: Record<Herramienta, NombreTabla> = {
   barraNiveles: "barras",
   forjado: "forjados",
   hueco: "forjados",
+  abaco: "forjados",
   muro: "muros",
   apoyo: "apoyos",
   apoyoLineal: "apoyosLineales",
@@ -170,9 +173,11 @@ interface Props {
   setPlantillas: (p: Plantillas) => void;
   editar: (o: Operacion, etiqueta: string) => string | null;
   abrirTabla: (t: NombreTabla) => void;
+  /** AC: «En todos los pilares…» de la herramienta Ábaco (el diálogo de antes). */
+  abacosEnPilares?: () => void;
 }
 
-export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, setPlantillas, editar, abrirTabla }: Props) {
+export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, setPlantillas, editar, abrirTabla, abacosEnPilares }: Props) {
   const h = foto.herramienta;
   if (h === "elegir") return null;
   if (esEditar(h)) return <PlantillaEditarPanel h={h} foto={foto} ctrl={ctrl} modelo={m} planta={planta} t={t.editar ?? {}} poner={(c) => setPlantillas({ ...t, editar: { ...t.editar, ...c } })} />;
@@ -332,6 +337,39 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
               <NumeroCampo etiqueta="z1" unidad="m" valor={t.hueco?.z1} onCambio={(z1) => setPlantillas({ ...t, hueco: { ...t.hueco, z1 } })} ayuda="La del borde de arriba, desde el mismo forjado." />
             </div>
           </Seccion>
+        </>
+      )}
+
+      {h === "abaco" && (
+        <>
+          <p className="nota">Un ábaco macizo en un forjado reticular. Si solapa con otro, o queda a menos de media malla, se unen en el rectángulo que los envuelve según los nervios.</p>
+          <Seccion titulo="Plantilla" valor="para los siguientes">
+            <div className="py-1">
+              <Segmentado
+                etiqueta="forma"
+                valor={t.abaco?.modo ?? "pilar"}
+                opciones={[
+                  ["pilar", "En un pilar"],
+                  ["rectangulo", "Rectángulo"],
+                ]}
+                onCambio={(modo) => setPlantillas({ ...t, abaco: { ...t.abaco, modo } })}
+                ayuda={(t.abaco?.modo ?? "pilar") === "pilar" ? "Un clic en un pilar: un rectángulo centrado en él, de estas medidas." : "Dos esquinas opuestas, según los nervios del forjado del primer clic."}
+              />
+              {(t.abaco?.modo ?? "pilar") === "pilar" && (
+                <>
+                  <NumeroCampo etiqueta="según los nervios" unidad="m" valor={t.abaco?.a ?? LADO_ABACO} onCambio={(a) => setPlantillas({ ...t, abaco: { ...t.abaco, a } })} ayuda="El lado del ábaco en la dirección de los nervios (el eje 1 del forjado)." />
+                  <NumeroCampo etiqueta="en perpendicular" unidad="m" valor={t.abaco?.b ?? t.abaco?.a ?? LADO_ABACO} onCambio={(b) => setPlantillas({ ...t, abaco: { ...t.abaco, b } })} ayuda="El lado en la perpendicular a los nervios." />
+                </>
+              )}
+            </div>
+          </Seccion>
+          {abacosEnPilares && (
+            <div className="px-3.5 py-2">
+              <button type="button" className="btn" onClick={abacosEnPilares} title="Un ábaco en cada pilar que llega a un forjado reticular, diciendo antes qué hace">
+                En todos los pilares…
+              </button>
+            </div>
+          )}
         </>
       )}
 

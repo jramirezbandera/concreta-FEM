@@ -32,3 +32,30 @@ A petición del usuario (2026-11-06): «ahora mismo no se pueden editar y si se 
 2. Crear con solape, unir, mover, estirar y borrar dan byte a byte lo que se escribiría a mano en la tabla, y deshacer da los bytes de antes.
 3. Los proyectos que no se tocan no cambian: ni la huella, ni el SVG de `fem render`, ni las referencias congeladas.
 4. La puerta de uso, del usuario: crear, unir y retocar los ábacos de la vivienda con el ratón.
+
+## 5. Hecho (2026-11-06)
+
+Pasan los criterios 1 a 3; el 4 (puerta de uso) es del usuario.
+
+- **Núcleo** (`src/editor/abacos.ts`, puro):
+  - `idAbaco` y `leerIdAbaco`, que no casa con un id del modelo;
+  - `rectanguloDe`, que reconoce un rectángulo según los nervios;
+  - `unirComoCompilador` y `escribirAbacos`, la regla de `abacosLosa` aplicada al fichero;
+  - `crearAbaco`, `cambiarAbaco`, `cambiarAbacos`, `borrarAbacos`, `unirAbacos` y `fijarAbacosPilares`;
+  - `asasAbaco` y `moverAsaAbaco`.
+
+  Cada operación dice lo que hay que dejar elegido, porque un ábaco unido cambia de id. «Ábacos en los pilares» ya no se salta los solapados: los une.
+- **Mover, Copiar, Girar, Simetría y los pinzamientos** (`transformar.ts`, `dibujo/editar.ts`): con ábacos elegidos, salvo los de una losa que también se elige. Copiar no los lleva a otras plantas, y se avisa. La losa elegida ya no enseña los vértices de sus ábacos.
+- **La herramienta Ábaco** (`dibujo/abaco.ts`): en un pilar, a × b (2,40 por defecto) centrado en el eje del tramo que atraviesa el reticular; o un rectángulo de dos esquinas según los nervios del reticular del primer clic. Un pilar que ya tiene ábaco da error y dice cuál es.
+- **El dibujo** (`render/modelo.ts`): cada ábaco lleva su id de selección. Uno que el compilador une a otros lleva el del primero de los suyos, y los de `abacosPilares`, el de la losa. El SVG de `fem render` no cambia, porque no escribe el objeto.
+- **En la app:**
+  - «Ábaco» en la barra de Modelo, con su plantilla y «En todos los pilares…» (el diálogo de antes);
+  - Propiedades de uno: a × b y centro, editables; de un polígono, sus vértices. De varios: «Unir». Con todos: «Borrar»; Supr también borra;
+  - la ficha del forjado tiene «Fijar como polígonos» si lleva ábacos en los pilares;
+  - al cambiar de planta se sueltan los ábacos de otra.
+- **Validación:**
+  - `src/editor/abacosAC.test.ts`: cada operación deja el fichero como lo resuelve el compilador, sale byte a byte lo escrito a mano y el clic en la escena elige el ábaco antes que la losa;
+  - `src/editor/abacos.test.ts`, con los solapados unidos;
+  - `app/src/test/fichaAbaco.test.tsx` y `editor.test.tsx`;
+  - la batería de `src/editor`, `src/agente/render` y `src/visor` (811 pruebas) y la de la app (122);
+  - a mano en la app con el muestrario: un clic en el ábaco de P6 lo elige con sus ocho asas, y ensancharlo a 9,5 m lo une con los de P5 y P7 en uno de 14,4 × 2,4 m.

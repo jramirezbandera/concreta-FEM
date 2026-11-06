@@ -12,6 +12,8 @@
  *
  * Lo que escriben va por `escribir`, como un campo más (un paso de deshacer).
  */
+import { fijarAbacosPilares, toleranciaAbacos } from "../../../src/editor/abacos.ts";
+import { useVisor } from "../contexto.ts";
 import { useEffect, useMemo, useState } from "react";
 import { gammaMaterial } from "../../../src/agente/sensatez.ts";
 import { pesoMedioConMacizo } from "../../../src/compilador/pesoForjado.ts";
@@ -33,6 +35,34 @@ interface Props {
   escribir: (clave: string, valor: string) => void;
   /** El error del último intento en cada campo. */
   errores: Readonly<Record<string, string>>;
+}
+
+// ─── Ábacos en los pilares ──────────────────────────────────────────────────────────────────────
+
+/**
+ * AC: los ábacos de «ábacos en pilares» siguen a sus pilares y no se eligen uno a uno; «Fijar como
+ * polígonos» los deja en la columna «ábacos» tal como los calcula el compilador (`fijarAbacosPilares`).
+ */
+export function FijarAbacos({ losa }: { losa: string }) {
+  const { proyecto } = useVisor();
+  const ed = proyecto.edicion;
+  const [error, setError] = useState<string | null>(null);
+  if (!ed) return null;
+  const fijar = () => {
+    const r = fijarAbacosPilares(ed.proyecto.modelo, losa, toleranciaAbacos(ed.proyecto.opciones));
+    if (!r.ok) return setError(r.mensaje);
+    const a = ed.editar(r.operacion, `Fijar los ábacos de ${losa}`);
+    setError(a.ok ? null : a.errores.map((e) => e.mensaje).join(" "));
+  };
+  return (
+    <div className="px-3.5 py-2">
+      <p className="nota">Los ábacos en los pilares los pone el cálculo y siguen a los pilares: no se eligen uno a uno. Fijados, quedan como ábacos propios del forjado, que se mueven, se estiran y se unen.</p>
+      <button type="button" className="btn" onClick={fijar}>
+        Fijar como polígonos
+      </button>
+      {error && <p className="nota text-state-fail">{error}</p>}
+    </div>
+  );
 }
 
 // ─── Peso propio ────────────────────────────────────────────────────────────────────────────────

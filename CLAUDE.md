@@ -828,6 +828,19 @@
     - Diagramas: el primer fotograma de la escena se llevaba ~40 ms, con la esfera envolvente de cada geometría (Three.js la calcula para ordenar aunque no se recorte; en la planta no ordena nada, `sinEsfera` en `capas.ts`) y la primera pasada de los 17 materiales nuevos y sus búferes, que ahora se hace en una tarea propia antes del fotograma (`Entorno.preparar`: pintar con un viewport de 0 × 0; `compile` no sirve, Three.js la repite al pintar). Sin fotogramas de más de 40 ms en 3 de 4 pasadas (antes, 58–74 ms en 4 de 4, con tareas largas de 59 y 63 ms en 2). Queda, a veces, el fotograma de 59 ms si el rAF llega antes que esa tarea, con 35 ms de rAF.
   - Pasan los bancos de I1, I2, I4 y V2c, la batería de la app y la de `src/visor` y `firma`.
   - **Visto de paso, sin tocar:** Pilares tiene un fotograma de 56–80 ms casi todo de estilos y layout (la tabla), y la Revisión, uno de 200–245 ms al pintar el informe (34–47 ms de layout); ninguno es una tarea larga de JS.
+- **2026-11-06: fase AC hecha** (los ábacos uno a uno, a petición del usuario: no se podían editar, los que se solapaban no se creaban y no se podían unir; `docs/fem3d/abacos.md`).
+  - **Decidido por el usuario:**
+    - AC-a: la unión es el rectángulo envolvente según los nervios, la regla del compilador (MA-c);
+    - AC-b: lo que solapa, o queda a menos de h/2, se une en el acto, así que el fichero tiene lo que se dibuja y se calcula;
+    - AC-c: siguen en `reticular.abacos`, sin cambiar el formato ni la huella.
+  - **Ya en el repo:**
+    - `src/editor/abacos.ts`: ids de selección `<losa>/A<n>`, crear, cambiar, borrar, Unir, «Fijar como polígonos» para `abacosPilares` y pinzamientos que conservan el rectángulo;
+    - la herramienta «Ábaco» (`dibujo/abaco.ts`): en un pilar, o un rectángulo de dos esquinas;
+    - Mover, Copiar, Girar y Simetría con ábacos;
+    - Propiedades de uno (a × b y centro) o de varios (Unir), y Supr.
+  - «Ábacos en los pilares» queda en la plantilla de la herramienta y une los solapados en vez de saltárselos.
+  - **Validación:** `abacosAC.test.ts`, `app/src/test/fichaAbaco.test.tsx`, y a mano en la app con el muestrario.
+  - **Pendiente del usuario:** la puerta de uso.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

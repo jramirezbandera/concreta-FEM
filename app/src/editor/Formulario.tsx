@@ -25,7 +25,7 @@ import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { PlantaForjado, SeccionForjado } from "./CroquisForjado.tsx";
 import { ValorCarga } from "./FichaCarga.tsx";
-import { PesoForjado, RigidezAligeradoPanel } from "./FichaForjado.tsx";
+import { FijarAbacos, PesoForjado, RigidezAligeradoPanel } from "./FichaForjado.tsx";
 import { TramosPilarPanel } from "./FichaPilar.tsx";
 import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
 
@@ -36,7 +36,7 @@ const AVANZADAS = "Opciones avanzadas";
 const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly string[]])[]>> = {
   forjados: [
     ["General", ["id", "nombre", "planta", "tipo"]],
-    ["Geometría en planta", ["contorno", "huecos", "abacos", "direccion"]],
+    ["Geometría en planta", ["contorno", "huecos", "abacos", "abacosPilares", "direccion"]],
     ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion", "bovedilla"]],
     ["Material y peso", ["material", "pp", "relleno", "procedencia"]],
     ["Rigidez del aligerado", ["multiplicadores"]],
@@ -103,7 +103,12 @@ interface PropsCroquis {
 /** El dibujo (o la tabla) que encabeza un grupo de una tabla. */
 const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCroquis>>>> = {
   forjados: {
-    "Geometría en planta": ({ fila, ctx, activo, onCampo }) => <PlantaForjado c={croquisForjado(fila, ctx)} activo={activo} onCampo={onCampo} />,
+    "Geometría en planta": ({ id, fila, ctx, activo, onCampo }) => (
+      <>
+        <PlantaForjado c={croquisForjado(fila, ctx)} activo={activo} onCampo={onCampo} />
+        {(fila.abacosPilares ?? "").trim() && <FijarAbacos losa={id} />}
+      </>
+    ),
     Sección: ({ fila, ctx, activo, onCampo }) => <SeccionForjado c={croquisForjado(fila, ctx)} activo={activo} onCampo={onCampo} />,
     "Material y peso": PesoForjado,
     "Rigidez del aligerado": ({ rigidezReticular, ...p }) => <RigidezAligeradoPanel {...p} rigidez={rigidezReticular} />,

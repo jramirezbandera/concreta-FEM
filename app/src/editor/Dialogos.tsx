@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
-import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
+import { operacionAbacos, proponerAbacos, toleranciaAbacos } from "../../../src/editor/abacos.ts";
 import { operacionVigasBorde, proponerVigasBorde, vigasDelBorde } from "../../../src/editor/vigasBorde.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
@@ -440,7 +440,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
     if (!losa) return { error: "No hay ningún forjado reticular." };
     return mal || typeof na === "string" || typeof nb === "string" ? { error: mal ?? "" } : proponerAbacos(m, losa, na, nb);
   }, [m, losa, na, nb]);
-  const op = "error" in p ? null : operacionAbacos(m, p);
+  const op = "error" in p ? null : operacionAbacos(m, p, toleranciaAbacos(ed.proyecto.opciones));
 
   const hacer = () => {
     if (!op || "error" in p) return;
@@ -469,7 +469,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
         <p>No hay ningún forjado reticular. Un forjado es reticular por su columna «tipo» en la tabla Forjados.</p>
       ) : (
         <>
-          <p>Un ábaco macizo centrado en cada pilar que llega al forjado, con sus lados según los nervios (la dirección del forjado) y su perpendicular. Quedan en la columna «ábacos» de la tabla Forjados, donde se pueden retocar.</p>
+          <p>Un ábaco macizo centrado en cada pilar que llega al forjado, con sus lados según los nervios (la dirección del forjado) y su perpendicular. Cada uno se elige después en la planta para retocarlo, y los que se solapan o quedan a menos de media malla se unen.</p>
           <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
             <label htmlFor="abacos-losa">Forjado</label>
             <select id="abacos-losa" className="sel" value={losa} onChange={(e) => setLosa(e.target.value)}>
@@ -491,7 +491,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
             <ul className="mt-3 list-disc pl-5" aria-label="Lo que se va a hacer">
               <li>{p.nuevos.length ? `${plural(p.nuevos.length, "ábaco nuevo", "ábacos nuevos")}: ${p.nuevos.map((x) => x.pilar).join(", ")}.` : "Ningún ábaco nuevo."}</li>
               {p.conAbaco.length > 0 && <li>Ya tienen ábaco, y se dejan: {p.conAbaco.join(", ")}.</li>}
-              {p.solapados.length > 0 && <li className="text-state-warn">Se solaparían con otro, y no se crean: {p.solapados.join(", ")}.</li>}
+              {p.solapados.length > 0 && <li className="text-state-warn">Se solapan con otro y se unen en el rectángulo que los envuelve: {p.solapados.join(", ")}.</li>}
               {p.fuera.length > 0 && <li className="text-text-secondary">Se salen del forjado (cuenta lo de dentro): {p.fuera.join(", ")}.</li>}
             </ul>
           )}

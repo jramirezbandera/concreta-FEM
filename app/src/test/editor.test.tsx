@@ -527,7 +527,9 @@ describe("Ábacos en los pilares", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /^Muestrario/ }));
     await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(huella(p)), { timeout: 30_000 });
-    fireEvent.click(screen.getByRole("button", { name: "Ábacos" }));
+    // AC: desde la plantilla de la herramienta Ábaco
+    fireEvent.click(screen.getByRole("button", { name: "Ábaco" }));
+    fireEvent.click(await screen.findByRole("button", { name: "En todos los pilares…" }));
     const d = screen.getByRole("dialog", { name: "Ábacos en los pilares" });
     expect(within(d).getByRole("combobox", { name: "Forjado" })).toHaveProperty("value", "L2");
     expect(within(d).getByText(/Ningún ábaco nuevo/)).toBeTruthy();
