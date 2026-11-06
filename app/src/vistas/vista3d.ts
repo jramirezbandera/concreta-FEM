@@ -224,6 +224,19 @@ const PLANOS = [new Plane(new Vector3(1, 0, 0), LEJOS), new Plane(new Vector3(0,
 /** Vértices de cada lámina: dos triángulos, 0-1-2 y 0-2-3. */
 const ESQ_LAMINA = [0, 1, 2, 0, 2, 3];
 
+/**
+ * Un color en `veces` vértices seguidos de A desde q. Con escalares: `A.set(c, q)` por vértice (un
+ * array de JS como fuente) costaba ~10 ms al entrar en Deformada en el edificio objetivo.
+ */
+function pon3(A: Float32Array, q: number, c: readonly [number, number, number], veces: number): void {
+  const [r, g, b] = c;
+  for (let v = 0, j = q; v < veces; v++, j += 3) {
+    A[j] = r;
+    A[j + 1] = g;
+    A[j + 2] = b;
+  }
+}
+
 /** Los materiales del 3D, de la página (la resolución de las líneas se pone antes de pintar cada vista). */
 const MAT = {
   lineas: new LineMaterial({ vertexColors: true, linewidth: 1.5, worldUnits: false }),
@@ -1089,44 +1102,57 @@ export class Vista3D extends Vista {
     const X = g.nudos;
     const u = this.u;
     const k = u ? this.escalaU * (this.animar ? this.fase : 1) : 0;
-    const v = (n: number, a: number) => X[n + a]! - o[a]! + (u ? k * u[n + a]! : 0);
+    // Sin cierres, arrays de paso ni Math.hypot en el bucle: va en la tarea de entrar en Deformada
+    // (~15 ms de ~35 en el edificio objetivo) y en cada fotograma de la deformada animada
+    const [o0, o1, o2] = o;
+    /** La posición del nudo n (3·índice) en P[q..q+2], como x + escala·u − origen. */
+    const poner = (A: Float32Array, q: number, n: number) => {
+      A[q] = X[n]! - o0! + (u ? k * u[n]! : 0);
+      A[q + 1] = X[n + 1]! - o1! + (u ? k * u[n + 1]! : 0);
+      A[q + 2] = X[n + 2]! - o2! + (u ? k * u[n + 2]! : 0);
+    };
+    /** La normal del triángulo de P[q..q+8], en sus tres vértices de N. */
+    const normal = (P: Float32Array, N: Float32Array, q: number) => {
+      const ax = P[q + 3]! - P[q]!;
+      const ay = P[q + 4]! - P[q + 1]!;
+      const az = P[q + 5]! - P[q + 2]!;
+      const bx = P[q + 6]! - P[q]!;
+      const by = P[q + 7]! - P[q + 1]!;
+      const bz = P[q + 8]! - P[q + 2]!;
+      const cx = ay * bz - az * by;
+      const cy = az * bx - ax * bz;
+      const cz = ax * by - ay * bx;
+      const l = Math.sqrt(cx * cx + cy * cy + cz * cz) || 1;
+      const nx = cx / l;
+      const ny = cy / l;
+      const nz = cz / l;
+      for (let w = 0; w < 9; w += 3) {
+        N[q + w] = nx;
+        N[q + w + 1] = ny;
+        N[q + w + 2] = nz;
+      }
+    };
     const pos = this.laminas.geometry.getAttribute("position") as BufferAttribute;
     const nor = this.laminas.geometry.getAttribute("normal") as BufferAttribute;
     const P = pos.array as Float32Array;
     const N = nor.array as Float32Array;
-    const nl = g.laminas.length / 4;
+    const L = g.laminas;
+    const nl = L.length / 4;
     for (let i = 0; i < nl; i++) {
-      for (let w = 0; w < 6; w++) {
-        const n = 3 * g.laminas[4 * i + ESQ_LAMINA[w]!]!;
-        const q = 18 * i + 3 * w;
-        P[q] = v(n, 0);
-        P[q + 1] = v(n, 1);
-        P[q + 2] = v(n, 2);
-      }
-      for (let t = 0; t < 2; t++) {
-        const q = 18 * i + 9 * t;
-        const [ax, ay, az] = [P[q + 3]! - P[q]!, P[q + 4]! - P[q + 1]!, P[q + 5]! - P[q + 2]!];
-        const [bx, by, bz] = [P[q + 6]! - P[q]!, P[q + 7]! - P[q + 1]!, P[q + 8]! - P[q + 2]!];
-        let [nx, ny, nz] = [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
-        const l = Math.hypot(nx, ny, nz) || 1;
-        [nx, ny, nz] = [nx / l, ny / l, nz / l];
-        for (let w = 0; w < 3; w++) {
-          N[q + 3 * w] = nx;
-          N[q + 3 * w + 1] = ny;
-          N[q + 3 * w + 2] = nz;
-        }
-      }
+      const q = 18 * i;
+      for (let w = 0; w < 6; w++) poner(P, q + 3 * w, 3 * L[4 * i + ESQ_LAMINA[w]!]!);
+      normal(P, N, q);
+      normal(P, N, q + 9);
     }
     pos.needsUpdate = true;
     nor.needsUpdate = true;
     const pb = this.barras.geometry.getAttribute("position") as BufferAttribute;
     const B = pb.array as Float32Array;
     const nb = g.barras.length / 2;
-    for (let i = 0; i < nb; i++)
-      for (let e = 0; e < 2; e++) {
-        const n = 3 * g.barras[2 * i + e]!;
-        for (let a = 0; a < 3; a++) B[6 * i + 3 * e + a] = v(n, a);
-      }
+    for (let i = 0; i < nb; i++) {
+      poner(B, 6 * i, 3 * g.barras[2 * i]!);
+      poner(B, 6 * i + 3, 3 * g.barras[2 * i + 1]!);
+    }
     pb.needsUpdate = true;
     this.entorno.pintar();
   }
@@ -1154,7 +1180,7 @@ export class Vista3D extends Vista {
       this.segVis.forEach((i, k) => {
         const t = a.objetos[a.objeto[i]!]!.tipo;
         const cc = ia < 0 || a.planta[i] === ia ? tipos[t]! : tenues[t]!;
-        for (let j = 0; j < 2; j++) col.set(cc, 6 * k + 3 * j);
+        pon3(col, 6 * k, cc, 2);
       });
       this.lineas.geometry.setColors(col);
     }
@@ -1197,17 +1223,13 @@ export class Vista3D extends Vista {
       const tipos = [rgb(c.pilar), rgb(c.viga), rgb(c.vigueta), rgb(c.viga)];
       const C = (this.laminas.geometry.getAttribute("color") as BufferAttribute).array as Float32Array;
       const nl = g.laminas.length / 4;
-      for (let i = 0; i < nl; i++) {
-        const cc = g.esMuro[i] ? muro : g.plantaLamina[i] === ia ? activa : losa;
-        for (let w = 0; w < 6; w++) C.set(cc, 18 * i + 3 * w);
-      }
+      for (let i = 0; i < nl; i++) pon3(C, 18 * i, g.esMuro[i] ? muro : g.plantaLamina[i] === ia ? activa : losa, 6);
       (this.laminas.geometry.getAttribute("color") as BufferAttribute).needsUpdate = true;
       const CB = (this.barras.geometry.getAttribute("color") as BufferAttribute).array as Float32Array;
       const nb = g.barras.length / 2;
       for (let i = 0; i < nb; i++) {
         const t = g.tipoBarra[i]!;
-        const cc = t !== 0 && g.plantaBarra[i] === ia ? activa : tipos[t]!;
-        for (let e = 0; e < 2; e++) CB.set(cc, 6 * i + 3 * e);
+        pon3(CB, 6 * i, t !== 0 && g.plantaBarra[i] === ia ? activa : tipos[t]!, 2);
       }
       (this.barras.geometry.getAttribute("color") as BufferAttribute).needsUpdate = true;
       MAT.originales.color.set(c.original);

@@ -19,7 +19,7 @@ import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import { RADIO_CLIC, type Eleccion, type EscenaPreparada, type Glifo } from "../../../src/visor/escena.ts";
 import { fmt } from "../fmt.ts";
 import { pintura } from "../lienzo/pintura.ts";
-import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
+import { Capas2D, MATERIALES, relleno, sinEsfera, trazo } from "./capas.ts";
 import { CAJA_VACIA, ENCUADRE_MINIMO, iconoEjes, MATERIAL_LINEAS, Rejilla2D } from "./fondo.ts";
 import type { GeometriaPlantilla } from "../plantilla/plantillas.ts";
 import { fuente, textoConHalo, Vista, type Colores, type Entorno } from "./motor.ts";
@@ -159,6 +159,12 @@ export class Vista2D extends Vista {
     this.escena = e;
     this.reconstruir();
     if (!e) return this.entorno.pintar();
+    // Lo caro del primer fotograma de una escena grande (en Diagramas del edificio objetivo, 17
+    // materiales nuevos y sus búferes), en una tarea propia, que suele llegar antes del fotograma:
+    // con el commit de React y el fotograma pasaba de 50 ms
+    window.setTimeout(() => {
+      if (this.escena === e) this.entorno.preparar(this.escena3, this.cam);
+    }, 0);
     // M-26: un objeto muy lejos (un pilar tecleado a 1 km) no reencuadra la vista ajustada: el edificio
     // se quedaba en unos píxeles, y al deshacer volvía a saltar. La vista se queda donde estaba (deja de
     // ser el encuadre automático: F encuadra todo) y la sensatez del modelo avisa del objeto lejano.
@@ -200,7 +206,7 @@ export class Vista2D extends Vista {
     const col = new Float32Array(n * 4);
     for (let i = 0; i < n; i++) col.set([k.r, k.g, k.b, a], 4 * i);
     geo.setAttribute("color", new BufferAttribute(col, 4));
-    const l = new LineSegments(geo, MATERIAL_LINEAS);
+    const l = new LineSegments(sinEsfera(geo), MATERIAL_LINEAS);
     // Delante de la rejilla; con una escena, encima de su relleno de fondo (`render`, V2c4-6)
     l.renderOrder = -500;
     l.frustumCulled = false;

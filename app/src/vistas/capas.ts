@@ -35,6 +35,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   NotEqualStencilFunc,
+  Sphere,
   ZeroStencilOp,
   type Side,
   type StencilOp,
@@ -59,6 +60,20 @@ function a3D(xy: Float32Array): Float32Array {
 function geometria(pos: Float32Array): BufferGeometry {
   const g = new BufferGeometry();
   g.setAttribute("position", new BufferAttribute(pos, 3));
+  return sinEsfera(g);
+}
+
+/**
+ * Una geometría de la planta con su esfera envolvente puesta, sin calcularla. Three.js la calcula
+ * para ordenar los objetos (`sortObjects`) aunque no se recorten, y en el primer fotograma de una
+ * escena eso es recorrer dos veces todos sus vértices (en Diagramas del edificio objetivo, ~15 % del
+ * fotograma). En la planta no ordena nada: todo está en z = 0 y el orden lo da `renderOrder`, que
+ * decide antes que la z; la esfera en el origen da la misma z que la de verdad. Nada más la usa (sin
+ * recorte por frustum ni `Raycaster`).
+ */
+export function sinEsfera<T extends BufferGeometry>(g: T): T {
+  g.boundingSphere = new Sphere();
+  g.boundingSphere.radius = 0;
   return g;
 }
 

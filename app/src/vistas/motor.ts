@@ -13,7 +13,7 @@
  *
  * Sin WebGL, `disponible` es false y las vistas no pintan nada.
  */
-import { Vector2, type WebGLRenderer } from "three";
+import { Vector2, type Camera, type Scene, type WebGLRenderer } from "three";
 import type { Theme } from "../tema/types.ts";
 import { rendererCompartido } from "./renderer.ts";
 
@@ -44,6 +44,12 @@ export interface Entorno {
   tema(): Theme;
   /** Ancho de un texto en px, con la fuente de la interfaz. */
   medir(texto: string, tam: number, negrita: boolean): number;
+  /**
+   * Pinta la escena sin dibujar nada (viewport de 0 × 0): la primera pasada de sus materiales nuevos
+   * (`getProgram`, que `compile` no ahorra: Three.js la repite al pintar si el material no se ha
+   * pintado nunca) y la subida de sus búferes. Así, en la tarea que la monta y no en el fotograma.
+   */
+  preparar(escena: Scene, camara: Camera): void;
 }
 
 /** Lo que una vista sabe hacer; el motor la pinta y le pasa los eventos de su superficie. */
@@ -239,6 +245,13 @@ export class Motor {
       colores: () => this.coloresV,
       tema: () => this.temaV,
       medir: (t, tam, negrita) => this.anchoTexto(t, tam, negrita),
+      preparar: (escena, camara) => {
+        const r = this.renderer;
+        if (!r) return;
+        r.setScissorTest(false);
+        r.setViewport(0, 0, 0, 0);
+        r.render(escena, camara);
+      },
     };
   }
 

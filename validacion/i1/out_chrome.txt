@@ -3,44 +3,60 @@ BIEN  1920×1080: la vista ocupa el 72.7 % de la ventana (≥ 70 %)
 BIEN  1366×768: la vista ocupa el 65.6 % de la ventana (≥ 60 %)
 
 ## Criterio 4: espacios, modos, paneles y paleta en el edificio objetivo (1440×900)
-  planta N3: 255 ms
-  3D: 66 ms
+  planta N3: 359 ms
+  3D: 100 ms
   planta: 34 ms
-  elegir un pilar (navegador): 97 ms
-  Esc: 50 ms
-  tablas: 39 ms
-  plegar el panel inferior: 33 ms
+  elegir un pilar (navegador): 99 ms
+  Esc: 68 ms
+  tablas: 50 ms
+  plegar el panel inferior: 44 ms
   espacio Cargas: 39 ms
-  espacio Resultados (losas): 171 ms
-  M11: 331 ms
-  modo Diagramas: 617 ms
-  modo Pilares: 121 ms
-  elegir un pilar (cuadro): 43 ms
-  modo Deformada: 72 ms
-  plegar las propiedades: 41 ms
-  abrir las propiedades: 34 ms
-  espacio Revisión: 3104 ms
-  paleta: 44 ms
-  buscar en la paleta: 38 ms
-  elegir desde la paleta: 32 ms
-  espacio Modelo: 1746 ms
-  tema oscuro: 40 ms
-  tema claro: 37 ms
+  espacio Resultados (losas): 217 ms
+  M11: 457 ms
+  modo Diagramas: 821 ms
+  modo Pilares: 155 ms
+  elegir un pilar (cuadro): 38 ms
+  modo Deformada: 79 ms
+  plegar las propiedades: 49 ms
+  abrir las propiedades: 35 ms
+  espacio Revisión: 4392 ms
+  Revisión con el peso propio calculado: 79 ms
+  paleta: 40 ms
+  buscar en la paleta: 41 ms
+  elegir desde la paleta: 36 ms
+  espacio Modelo: 51 ms
+  tema oscuro: 41 ms
+  tema claro: 38 ms
 BIEN  ninguna tarea larga de más de 50 ms en el recorrido (la peor, 0 ms; 0 en total)
 
 ## Pedidos al worker de cada paso (tipo: proceso en el worker / desde el envío, ms)
-  planta N3: escena 4/250
-  3D: alambrico 2/9 · solido 50/53
+  planta N3: escena 6/351
+  3D: alambrico 2/10 · solido 75/79
   planta: escena 0/2
-  elegir un pilar (navegador): elegir 0/19 · objeto 0/19
-  espacio Cargas: escena 4/4
-  espacio Resultados (losas): losas 131/134 · precalentar 240/240
-  M11: losas 100/322
-  modo Diagramas: escena 543/546 · piezas 0/546 · elegir 1/37 · viga 10/38 · estacion 0/0
-  modo Pilares: pilares 50/52 · pilares 11/60
-  elegir un pilar (cuadro): elegir 0/3 · pilar 0/4
-  modo Deformada: escena 2/4 · elegir 0/4 · desplomes 1/4 · alambrico 1/2 · geometria 22/23 · deformada 9/41
-  espacio Revisión: revision 2917/2920
-  espacio Modelo: alambrico 1/1719 · solido 0/1723 · objeto 0/1723
+  elegir un pilar (navegador): elegir 0/23 · objeto 0/22
+  espacio Cargas: escena 5/6
+  espacio Resultados (losas): losas 196/200
+  M11: losas 141/405 · precalentar 0/38
+  modo Diagramas: escena 719/722 · piezas 0/722 · elegir 1/49 · viga 19/50 · estacion 0/1
+  modo Pilares: pilares 67/69 · pilares 16/82
+  elegir un pilar (cuadro): elegir 0/14 · pilar 0/14
+  modo Deformada: escena 2/6 · elegir 0/6 · desplomes 2/6 · alambrico 1/4 · geometria 19/21 · deformada 11/33
+  espacio Revisión: revision 4133/4136
+  espacio Modelo: alambrico 2/4 · solido 0/4 · objeto 0/4
+
+## Fotogramas de más de 40 ms de cada paso (t desde el principio del paso)
+  planta N3: t=15 80 ms (bloqueo 0; render desde t=94, estilos y layout 0 ms)
+  elegir un pilar (navegador): t=93 58 ms (bloqueo 0; render desde t=135, estilos y layout 13 ms)
+    script t=103 5 ms (compilar 0, estilos forzados 0) user-callback VoidFunction @index-Brnldd11.js:160641
+  espacio Cargas: t=55 67 ms (bloqueo 0; render desde t=122, estilos y layout 0 ms)
+  espacio Resultados (losas): t=15 67 ms (bloqueo 0; render desde t=82, estilos y layout 0 ms)
+  modo Diagramas: t=727 51 ms (bloqueo 0; render desde t=742, estilos y layout 6 ms)
+    script t=729 13 ms (compilar 0, estilos forzados 0) event-listener MessagePort.onmessage D@index-Brnldd11.js:9835
+    script t=742 30 ms (compilar 0, estilos forzados 1) user-callback FrameRequestCallback @index-Brnldd11.js:1521924
+  modo Pilares: t=100 51 ms (bloqueo 1; render desde t=113, estilos y layout 39 ms)
+    script t=100 12 ms (compilar 0, estilos forzados 0) event-listener MessagePort.onmessage D@index-Brnldd11.js:9835
+  espacio Revisión: t=4139 60 ms (bloqueo 10; render desde t=4163, estilos y layout 36 ms)
+    script t=4139 25 ms (compilar 0, estilos forzados 0) event-listener MessagePort.onmessage D@index-Brnldd11.js:9835
+  espacio Revisión: t=4201 190 ms (bloqueo 0; render desde t=4390, estilos y layout 1 ms)
 
 TODO BIEN

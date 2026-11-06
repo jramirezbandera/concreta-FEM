@@ -5,7 +5,10 @@
  *   node validacion/i1/chrome.ts                      escribe out_chrome.txt
  *   node validacion/i1/chrome.ts --capturas <carpeta> además, una PNG por espacio y modo
  *   node validacion/i1/chrome.ts --pedidos            además, los pedidos al worker de cada paso
- *                                                     (espera en la cola y tiempo de proceso)
+ *                                                     (espera en la cola y tiempo de proceso) y los
+ *                                                     fotogramas largos con sus scripts
+ *   PERFIL=<carpeta> node validacion/i1/chrome.ts     además, el perfil de CPU del hilo principal de
+ *                                                     Diagramas y de Deformada (la app sin minificar)
  *
  * - Criterio 1: en Modelo, con los paneles por defecto y nada elegido, la vista ocupa ≥ 70 % de la
  *   ventana en 1920×1080 y ≥ 60 % en 1366×768 (el rectángulo de `.vista` frente a la ventana).
@@ -39,7 +42,7 @@ const comprobar = (ok: boolean, que: string) => {
 
 // ─── 1. La app compilada y los proyectos ────────────────────────────────────────────────────────
 
-execFileSync("bunx", ["vite", "build", "--logLevel", "warn"], { cwd: APP, stdio: "inherit", shell: true });
+execFileSync("bunx", ["vite", "build", "--logLevel", "warn", ...(process.env.PERFIL ? ["--minify", "false"] : [])], { cwd: APP, stdio: "inherit", shell: true });
 const DIST = join(APP, "dist");
 const datos = mkdtempSync(join(tmpdir(), "i1-proyectos-"));
 for (const [nombre, ruta] of [
@@ -126,6 +129,12 @@ window.__pedidos = [];
   };
 }
 new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__largas.push({ t: e.startTime, ms: e.duration }); }).observe({ type: "longtask", buffered: true });
+// --pedidos: los fotogramas largos con lo que los ocupa (Long Animation Frames: scripts, estilos y layout forzados, render)
+window.__loaf = [];
+try {
+  new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__loaf.push({ t: e.startTime, ms: e.duration, bloqueo: e.blockingDuration, render: e.renderStart, estilos: e.styleAndLayoutStart,
+    scripts: e.scripts.map((x) => ({ t: x.startTime, ms: x.duration, forzado: x.forcedStyleAndLayoutDuration, compilar: x.executionStart - x.startTime, quien: x.invoker, tipo: x.invokerType, fn: x.sourceFunctionName, url: x.sourceURL, car: x.sourceCharPosition })) }); }).observe({ type: "long-animation-frame", buffered: true });
+} catch {}
 window.__i1 = {
   esperar: async (f, ms = 120000) => { const t0 = performance.now(); for (;;) { const v = f(); if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 15)); } },
   estado: () => document.querySelector("[data-estado]")?.dataset.estado ?? null,
@@ -177,9 +186,21 @@ try {
   await abrir("edificio", 1440, 900);
   await pagina(`window.__largas = [];`);
   const pasos: [string, number, number][] = [];
+  const perfilar = new Set(["modo Diagramas", "modo Deformada"]);
   const medir = async (que: string, js: string, cond = "true", cap?: string) => {
+    const perfil = process.env.PERFIL && perfilar.has(que);
+    if (perfil) {
+      await cdp("Profiler.enable");
+      await cdp("Profiler.setSamplingInterval", { interval: 100 });
+      await cdp("Profiler.start");
+    }
     const t = await pagina<number>(`return performance.now();`);
     pasos.push([que, t, await accion(js, cond)]);
+    if (perfil) {
+      const { profile } = (await cdp("Profiler.stop")) as { profile: unknown };
+      mkdirSync(process.env.PERFIL!, { recursive: true });
+      writeFileSync(join(process.env.PERFIL!, `${que.replace(/\W+/g, "-")}.cpuprofile`), JSON.stringify(profile));
+    }
     if (cap) await captura(cap);
   };
   const espacio = (n: string) => `__i1.boton("${n}", document.querySelector("nav")).click()`;
@@ -201,6 +222,7 @@ try {
   await medir("plegar las propiedades", `__i1.boton("Plegar propiedades").click()`);
   await medir("abrir las propiedades", `__i1.boton("Abrir propiedades").click()`);
   await medir("espacio Revisión", espacio("Revisión"), `document.querySelector("article")`, "11-revision");
+  await medir("Revisión con el peso propio calculado", "", `!document.body.innerText.includes("Calculando el peso propio")`);
   await medir("paleta", `document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`, `document.querySelector(".paleta")`);
   await medir("buscar en la paleta", `const i = document.querySelector(".paleta input"); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(i, "P-x24"); i.dispatchEvent(new Event("input", { bubbles: true }))`, `document.querySelector(".paleta li")`, "12-paleta");
   await medir("elegir desde la paleta", `document.querySelector(".paleta input").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`, `!document.querySelector(".paleta")`);
@@ -218,6 +240,15 @@ try {
       const de = ps.filter((p) => p.t0 >= t0 && p.t0 < t0 + ms);
       if (de.length) log(`  ${que}: ${de.map((p) => `${p.tipo} ${p.ms.toFixed(0)}/${(p.fin - p.t0).toFixed(0)}`).join(" · ")}`);
     }
+    // Los fotogramas de más de 40 ms de cada paso, con sus scripts (t desde el principio del paso)
+    const fs = await pagina<{ t: number; ms: number; bloqueo: number; render: number; estilos: number; scripts: { t: number; ms: number; forzado: number; compilar: number; quien: string; tipo: string; fn: string; url: string; car: number }[] }[]>(`return window.__loaf;`);
+    log("\n## Fotogramas de más de 40 ms de cada paso (t desde el principio del paso)");
+    for (const [que, t0, ms] of pasos)
+      for (const f of fs.filter((f) => f.t >= t0 && f.t < t0 + ms + 50 && f.ms > 40)) {
+        const fin = f.t + f.ms;
+        log(`  ${que}: t=${(f.t - t0).toFixed(0)} ${f.ms.toFixed(0)} ms (bloqueo ${f.bloqueo.toFixed(0)}; render desde t=${f.render ? (f.render - t0).toFixed(0) : "—"}, estilos y layout ${f.estilos ? (fin - f.estilos).toFixed(0) : 0} ms)`);
+        for (const x of f.scripts) log(`    script t=${(x.t - t0).toFixed(0)} ${x.ms.toFixed(0)} ms (compilar ${x.compilar.toFixed(0)}, estilos forzados ${x.forzado.toFixed(0)}) ${x.tipo} ${x.quien} ${x.fn}@${x.url.split("/").pop()}:${x.car}`);
+      }
   }
 } catch (e) {
   comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
