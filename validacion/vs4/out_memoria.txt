@@ -1,0 +1,30 @@
+# VS4: la memoria de la app en Chrome con el sismo del programa (2026-11-06; edificio objetivo de losas, 7 plantas)
+
+Tras recoger la basura en cada destino. «Worker»: el montón de JavaScript del worker de sesión (los resultados y las consultas); «página», el del hilo principal; «otros», los demás workers. «Proceso mayor», la memoria privada del renderer de la pestaña, y «todos», la de los procesos de este Chrome (cuántos). El tiempo de cada paso, desde la navegación (abrir y calcular) o desde el clic, sólo como información.
+
+Edificio | Paso | s | Worker MiB | Página MiB | Otros MiB | Proceso mayor MiB | Todos MiB
+---|---|---|---|---|---|---|---
+sin | abrir y calcular | 7.8 | 234 | 9 | 0 | 653 | 1108 (12)
+sin | Resultados · Modal | 0.3 | 236 | 24 | 0 | 657 | 1149 (12)
+sin | Resultados · Losas, M11 | 2.5 | 574 | 37 | 0 | 1169 | 1701 (13)
+sin | Resultados · Armado | 5.2 | 1027 | 19 | 0 | 1746 | 2235 (10)
+sin | Resultados · Pilares | 0.2 | 1044 | 10 | 0 | 1772 | 2261 (10)
+con | abrir y calcular | 12.1 | 607 | 9 | 0 | 1153 | 1512 (9)
+con | Resultados · Modal | 0.5 | 608 | 26 | 0 | 1175 | 1572 (9)
+con | Resultados · Losas, M11 | 10.0 | 2507 | 35 | 0 | 4048 | 4463 (8)
+con | Resultados · Armado | 17.8 | 3807 | 19 | 0 | 5898 | 6312 (8)
+con | Resultados · Pilares | 1.5 | 3846 | 11 | 0 | 5898 | 6271 (8)
+
+
+## Edificio sin sismo
+sin | abrir y calcular | 7.8 | 234 | 9 | 0 | 653 | 1108 (12)   [página 9, worker-D2jnYJBO.js 234]
+sin | Resultados · Modal | 0.3 | 236 | 24 | 0 | 657 | 1149 (12)   [página 24, worker-D2jnYJBO.js 236]
+sin | Resultados · Losas, M11 | 2.5 | 574 | 37 | 0 | 1169 | 1701 (13)   [página 37, worker-D2jnYJBO.js 574]
+sin | Resultados · Armado | 5.2 | 1027 | 19 | 0 | 1746 | 2235 (10)   [página 19, worker-D2jnYJBO.js 1027]
+sin | Resultados · Pilares | 0.2 | 1044 | 10 | 0 | 1772 | 2261 (10)   [página 10, worker-D2jnYJBO.js 1044]
+## Edificio con sismo
+con | abrir y calcular | 12.1 | 607 | 9 | 0 | 1153 | 1512 (9)   [página 9, worker-D2jnYJBO.js 607]
+con | Resultados · Modal | 0.5 | 608 | 26 | 0 | 1175 | 1572 (9)   [página 26, worker-D2jnYJBO.js 608]
+con | Resultados · Losas, M11 | 10.0 | 2507 | 35 | 0 | 4048 | 4463 (8)   [página 35, worker-D2jnYJBO.js 2507]
+con | Resultados · Armado | 17.8 | 3807 | 19 | 0 | 5898 | 6312 (8)   [página 19, worker-D2jnYJBO.js 3807]
+con | Resultados · Pilares | 1.5 | 3846 | 11 | 0 | 5898 | 6271 (8)   [página 11, worker-D2jnYJBO.js 3846]
