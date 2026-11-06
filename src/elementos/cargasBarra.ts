@@ -151,20 +151,26 @@ export class DiagramaBarra {
   readonly cortes: Float64Array;
   /** [N, Vy, Vz, T, My, Mz]. */
   readonly esfuerzos: Tramos[];
-  /** [ux, uy, uz, rx, ry, rz] en ejes locales. */
-  readonly desplazamientos: Tramos[];
+  /** Los desplazamientos, o cómo hacerlos (los de una combinación, cuando se piden). */
+  private desp: Tramos[] | (() => Tramos[]);
   /**
    * Pares repartidos uniformes sumados a [T, My, Mz] (`conPares`): la pendiente que añaden. Con
    * ellos, dMy/dx = −Vz + p[1] y dMz/dx = −Vy + p[2], y los extremos interiores se mueven.
    */
   readonly pares: Float64Array | null;
 
-  constructor(L: number, cortes: Float64Array, esfuerzos: Tramos[], desplazamientos: Tramos[], pares: Float64Array | null = null) {
+  constructor(L: number, cortes: Float64Array, esfuerzos: Tramos[], desplazamientos: Tramos[] | (() => Tramos[]), pares: Float64Array | null = null) {
     this.L = L;
     this.cortes = cortes;
     this.esfuerzos = esfuerzos;
-    this.desplazamientos = desplazamientos;
+    this.desp = desplazamientos;
     this.pares = pares;
+  }
+
+  /** [ux, uy, uz, rx, ry, rz] en ejes locales. */
+  get desplazamientos(): Tramos[] {
+    if (typeof this.desp === "function") this.desp = this.desp();
+    return this.desp;
   }
 
   /**
@@ -219,7 +225,15 @@ export class DiagramaBarra {
       pares ??= new Float64Array(3);
       for (let c = 0; c < 3; c++) pares[c]! += factores[k]! * d.pares[c]!;
     });
-    return new DiagramaBarra(d0.L, cortes, sumar((d) => d.esfuerzos), sumar((d) => d.desplazamientos), pares);
+    // Los desplazamientos de la combinación, cuando se pidan (las mismas cuentas): quien busca los extremos
+    // de los esfuerzos en muchas combinaciones no los lee, y eran la mitad de lo que costaba combinar
+    return new DiagramaBarra(
+      d0.L,
+      cortes,
+      sumar((d) => d.esfuerzos),
+      () => sumar((d) => d.desplazamientos),
+      pares,
+    );
   }
 
   /**
@@ -229,7 +243,7 @@ export class DiagramaBarra {
   conPares(b0: readonly number[], b1: readonly number[]): DiagramaBarra {
     const e = this.esfuerzos.map((t, c) => (c >= 3 && (b0[c - 3] || b1[c - 3]) ? t.afin(1, b0[c - 3]!, b1[c - 3]!) : t));
     const pares = Float64Array.from([0, 1, 2], (c) => (this.pares?.[c] ?? 0) + b1[c]!);
-    return new DiagramaBarra(this.L, this.cortes, e, this.desplazamientos, pares);
+    return new DiagramaBarra(this.L, this.cortes, e, () => this.desplazamientos, pares);
   }
 
   /**

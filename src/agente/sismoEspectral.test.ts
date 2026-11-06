@@ -27,7 +27,8 @@ import { iniciarNucleo } from "../nucleo/index.ts";
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones } from "./combinaciones.ts";
 import { deriva, envolventes, flechas, pieza, reacciones, sismo } from "./consultas.ts";
 import { VERSION_ESQUEMA } from "./proyecto.ts";
-import { ResultadosRender, valoresCampo } from "./render/resultados.ts";
+import { envolventeCampo, ResultadosRender, valoresCampo } from "./render/resultados.ts";
+import { recorrerDiagrama } from "../motor/diagramaCompuesto.ts";
 import { desempaquetarResultados, empaquetarResultados } from "./resultados.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
@@ -599,5 +600,89 @@ describe("VS3: los modos, como casos, con los resultados guardados; y la CLI", (
     // (la salida va redondeada a 6 cifras)
     esperado.valor.direcciones.forEach((d, i) => expect(rel(calc.json.sismo.cortanteBasal[i], d.cortanteBasal)).toBeLessThan(1e-5));
     expect(calc.json.sismo.casos).toEqual(["EX+e", "EX-e", "EY+e", "EY-e"]);
+  });
+});
+
+describe("VS4: las envolventes de la situación sísmica no rehacen en cada combinación lo que comparten", () => {
+  /** El conjunto entero de la situación sísmica con la persistente: 16 + 64 combinaciones. */
+  const todas = () => {
+    const x = conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: ["ELU-PT", "ELU-SIS"] });
+    if (!x.valido) throw new Error("sin combinaciones");
+    return x.valor;
+  };
+
+  it("recorrer un diagrama compuesto da, en el mismo orden, las estaciones y los esfuerzos de leerlo combinación a combinación", () => {
+    const conjunto = todas();
+    expect(conjunto.factores.length).toBe(80);
+    let barras = 0;
+    for (const b of [...(q.mapeo.piezas[PILAR] ?? []), ...(q.mapeo.piezas[f.vigas![0]!.id] ?? [])]) {
+      barras++;
+      for (const fa of conjunto.factores) {
+        const D = q.diagramaBarra(b, fa);
+        const esperado: [number, number, number[]][] = [];
+        for (const x of D.estaciones())
+          for (const lado of [-1, 1] as const) {
+            if ((x === 0 && lado < 0) || (x === D.L && lado > 0)) continue;
+            esperado.push([x, lado, D.esfuerzosEn(x, lado)]);
+          }
+        const leido: [number, number, number[]][] = [];
+        // (unas Consultas nuevas: nada guardado de la lectura de arriba)
+        const q2 = new Consultas(f, c, r.casos, {}, r.modal);
+        recorrerDiagrama(q2.diagramaBarra(b, fa), (x, lado, e) => leido.push([x, lado, Array.from(e)]));
+        expect(leido).toEqual(esperado);
+      }
+    }
+    expect(barras).toBeGreaterThan(2);
+  });
+
+  it("el mapa de la envolvente de un campo es, nudo a nudo, el de recorrer `valoresCampo` en cada combinación", () => {
+    const conjunto = todas();
+    const rr = new ResultadosRender(q, c);
+    const planta = f.plantas[0]!.id;
+    for (const [campo, cual] of [
+      ["m11", "max"],
+      ["uz", "min"],
+      ["f22", "max"],
+    ] as const) {
+      const env = envolventeCampo(rr, planta, campo, conjunto, cual);
+      const porComb = conjunto.factores.map((fa) => valoresCampo(rr, planta, campo, fa).v);
+      env.v.forEach((v, j) => {
+        let mejor = porComb[0]![j]!;
+        let comb = 0;
+        porComb.forEach((x, k) => {
+          if (cual === "max" ? x[j]! > mejor : x[j]! < mejor) [mejor, comb] = [x[j]!, k];
+        });
+        if (Number.isNaN(mejor)) expect(v).toBeNaN();
+        else expect(v).toBe(mejor);
+        expect(env.comb[j]).toBe(comb);
+      });
+    }
+  });
+
+  it("las franjas: la envolvente en dos pasos (los casos del sismo combinados una vez por estación) es la de combinar cada combinación", () => {
+    const conjunto = todas();
+    const fr = q.franjas(f.losas![0]!.id);
+    if (!fr.valido) throw new Error("sin franjas");
+    const id = fr.valor[Math.floor(fr.valor.length / 2)]!.id;
+    const a = q.armadoFranja(id, conjunto.factores);
+    const e = q.franja(id);
+    if (!a.valido || !e.valido) throw new Error("sin estaciones");
+    e.valor.estaciones.forEach((est, i) => {
+      if (!est.valido) return;
+      const w = a.valor[i]!;
+      let [inf, sup, mxMax, mxMin] = [0, 0, -Infinity, Infinity];
+      for (const fa of conjunto.factores) {
+        const [mx, my, mxy] = q.combinar(est.medios, 3, fa);
+        const wa = woodArmer(mx!, my!, mxy!);
+        inf = Math.max(inf, wa.inferiorX);
+        sup = Math.max(sup, wa.superiorX);
+        mxMax = Math.max(mxMax, mx!);
+        mxMin = Math.min(mxMin, mx!);
+      }
+      expect(w.inferior).toBe(inf);
+      expect(w.superior).toBe(sup);
+      expect(w.mxMax).toBe(mxMax);
+      expect(w.mxMin).toBe(mxMin);
+    });
   });
 });

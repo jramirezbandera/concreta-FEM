@@ -101,7 +101,7 @@ import { CamposLaminas } from "../motor/campos.ts";
 import { Cortes, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/modelo.ts";
-import { combinar, type Combinar } from "./envolventes.ts";
+import { combinar, type Combinar, type CombinarEnDosPasos } from "./envolventes.ts";
 import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
 import { alineada, anchoNominal, carasFranjas, COSENO_APOYO_PILAR, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, tramosRectaLosa, type Franja } from "./franjas.ts";
@@ -217,14 +217,17 @@ export class EsfuerzosFranjas {
    */
   /** VS3: cómo se combinan los valores por caso (`Consultas.combinar` con los casos del sismo; si no, la lineal). */
   private readonly combinar: Combinar;
+  /** VS4: lo mismo en dos pasos, para las envolventes (los casos del sismo, combinados una vez por estación). */
+  private readonly logicos: CombinarEnDosPasos | null;
 
   constructor(
     ctx: Contexto,
     compilado: { modelo: ModeloAnalitico; mapeo: Mapeo },
     casos: readonly ResultadoCaso[],
-    opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number; combinar?: Combinar } = {},
+    opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number; combinar?: Combinar; logicos?: CombinarEnDosPasos } = {},
   ) {
     this.combinar = opciones.combinar ?? combinar;
+    this.logicos = opciones.logicos ?? null;
     this.ctx = ctx;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
@@ -274,8 +277,10 @@ export class EsfuerzosFranjas {
     return r.estaciones.map((e) => {
       const v: EnvolventeEstacionFranja = { inferior: 0, superior: 0, combInferior: -1, combSuperior: -1, mxMax: -Infinity, mxMin: Infinity, combMax: -1, combMin: -1 };
       if (!e.valido) return { ...v, inferior: NaN, superior: NaN, mxMax: NaN, mxMin: NaN };
+      // Los momentos medios de cada caso con factor (los del sismo, ya combinados de sus modos), una vez por estación
+      const porLogico = this.logicos?.porLogico(e.medios, 3);
       combinaciones.forEach((f, c) => {
-        const [mx, my, mxy] = this.combinar(e.medios, 3, f);
+        const [mx, my, mxy] = porLogico ? this.logicos!.combinarLogico(porLogico, 3, f) : this.combinar(e.medios, 3, f);
         const w = woodArmer(mx!, my!, mxy!);
         if (w.inferiorX > v.inferior) [v.inferior, v.combInferior] = [w.inferiorX, c];
         if (w.superiorX > v.superior) [v.superior, v.combSuperior] = [w.superiorX, c];

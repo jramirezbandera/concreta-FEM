@@ -53,7 +53,7 @@ import { huellaPilar } from "./geometria2d.ts";
 import type { Mapeo } from "./mapeo.ts";
 import { diafragmaDe } from "./piezas.ts";
 import { EsfuerzosPiezas } from "./resultados.ts";
-import { calcularSismo, sismoDelCalculo, type EspectroSismo, type SismoCalculado } from "./sismo.ts";
+import { calcularSismo, sismoDelCalculo, tieneEspectro, type EspectroSismo, type SismoCalculado } from "./sismo.ts";
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 import { dimensionesPlanta, resolverViento } from "./viento.ts";
 import { DESPLAZAMIENTO_SIN_SEGUNDO_ORDEN, LIMITE_SEGUNDO_ORDEN, periodoFundamental, simplificado } from "../normas/ncse02.ts";
@@ -716,7 +716,7 @@ export class Consultas {
   readonly combinarBase = (porBase: ArrayLike<number>, n: number, factores: ArrayLike<number>): Float64Array => this.sup.combinar(porBase, n, factores);
 
   private esfuerzosFranjas(): EsfuerzosFranjas {
-    return (this.franjasC ??= new EsfuerzosFranjas(this.ctx, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { campos: this.campos, cortes: this.cortes, combinar: this.combinarBase }));
+    return (this.franjasC ??= new EsfuerzosFranjas(this.ctx, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { campos: this.campos, cortes: this.cortes, combinar: this.combinarBase, logicos: this.sup }));
   }
 
   /** Las franjas de armado de una losa maciza o reticular, o de todas (fase F). */
@@ -884,9 +884,9 @@ export class Consultas {
       return this.no(
         "consulta/sin-sismo",
         s === undefined
-          ? 'El proyecto no tiene el sismo en sus acciones: con "acciones": { "sismo": { "ab": …, "K": …, "terreno": …, "mu": … } } se calcula por espectros de respuesta.'
-          : s.ab === undefined
-            ? "El sismo de las acciones no lleva la aceleración básica «ab» del emplazamiento: sin ella sólo hay masas y modos (fem consultar modos)."
+          ? 'El proyecto no tiene el sismo en sus acciones: con "acciones": { "sismo": { "ine": "29008", "terreno": …, "mu": … } } (o con "ab" y "K" en lugar del código INE del municipio) se calcula por espectros de respuesta.'
+          : !tieneEspectro(this.fisico)
+            ? "El sismo de las acciones no lleva la aceleración básica «ab» del emplazamiento ni el código INE de su municipio («ine»): sin ellos sólo hay masas y modos (fem consultar modos)."
             : "Los resultados no llevan el análisis modal: hay que volver a calcular.",
         [],
       );

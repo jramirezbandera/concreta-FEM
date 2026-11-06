@@ -14,6 +14,17 @@
 /** La combinación de un vector por caso (n valores por caso) con unos factores por caso: la lineal, o la de `Consultas.combinar`. */
 export type Combinar = (porCaso: ArrayLike<number>, n: number, factores: ArrayLike<number>) => Float64Array;
 
+/**
+ * `Combinar` en dos pasos, para quien combina el mismo vector en muchas combinaciones (VS4): con los
+ * casos del sismo del programa, `porLogico` deja el vector por caso con factor (cada caso del sismo, ya
+ * combinado de sus modos) y `combinarLogico` lo combina linealmente. Los mismos números que `Combinar`,
+ * sin volver a combinar los modos en cada combinación (`Superposicion`).
+ */
+export interface CombinarEnDosPasos {
+  porLogico(porBase: ArrayLike<number>, n: number): Float64Array;
+  combinarLogico(porLogico: ArrayLike<number>, n: number, factores: ArrayLike<number>): Float64Array;
+}
+
 /** Combinación lineal de un vector por caso (n valores por caso) con unos factores por caso. */
 export function combinar(porCaso: ArrayLike<number>, n: number, factores: ArrayLike<number>): Float64Array {
   if (porCaso.length !== n * factores.length) throw new Error(`combinar: ${porCaso.length} valores no son ${n} por cada uno de los ${factores.length} casos con factor (con los casos del sismo del programa, se combina con Consultas.combinar)`);

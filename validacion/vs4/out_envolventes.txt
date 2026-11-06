@@ -1,0 +1,15 @@
+# VS4: las consultas con la situación sísmica (2026-11-06; edificio objetivo de losas, 7 plantas; 86796 nudos, 4 casos y 21 modos; Node)
+
+Una pasada por consulta, en caliente, con unas Consultas nuevas. El sha256 es el de la respuesta en JSON: tiene que ser el mismo que el de un árbol de trabajo en el commit anterior.
+
+Consulta | s | sha256
+---|---|---
+envolventes | 18.47 | 221e4796d6eaeb4a
+franjas N7 | 6.89 | 045faf98d701522f
+mapa M11 (máx.) | 1.72 | 90197077eb850633
+mapa uz (mín.) | 0.06 | 1fd995c44d6edbf2
+flechas | 11.74 | 62535fa32a0b4077
+deriva | 0.14 | 09e825ecea18ed09
+reacciones | 0.07 | 3496006f20d9dc78
+pieza (viga) | 0.31 | c2c40ca755060054
+pieza (pilar) | 0.03 | 3e11a58dce196ed9

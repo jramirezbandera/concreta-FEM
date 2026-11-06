@@ -27,7 +27,7 @@ import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { esfuerzoProyectado, type DiagramaLeible } from "../../motor/diagramaCompuesto.ts";
-import type { PartesCombinacion } from "../../motor/espectral.ts";
+import type { CasoEspectral, PartesCombinacion } from "../../motor/espectral.ts";
 import { area, cajaDe, numeroFijo, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
@@ -295,6 +295,121 @@ export interface CasoBase {
 const esCasoBase = (f: ArrayLike<number> | CasoBase): f is CasoBase => typeof (f as CasoBase).base === "number";
 
 /**
+ * Un campo en los nudos de las láminas de una planta (4 por lámina), para una o muchas combinaciones.
+ *
+ * El valor de una combinación es su parte estática (Σ factor·valor de sus casos estáticos) más, por
+ * cada caso del sismo, su factor por el valor del caso, que es la combinación de los modos en cada
+ * nudo (VS3). Ni la parte estática ni el valor de un caso del sismo dependen de los demás factores,
+ * así que se guardan (VS4): las 64 combinaciones de la situación sísmica son 2 partes estáticas (con
+ * las variables o sin ellas) y 4 casos del sismo con su ± y su 30 %, y antes cada una volvía a
+ * combinar los modos en cada nudo. Las cuentas son las mismas y en el mismo orden: los mismos números.
+ */
+class CampoPlanta {
+  readonly laminas: number[];
+  /** Valores por combinación: 4 por lámina. */
+  readonly N: number;
+  private readonly r: ResultadosRender;
+  private readonly uz: boolean;
+  private readonly comp: number;
+  /** uz: el nudo de cada valor. Los demás: los campos de cada caso base (32 por lámina) y si la lámina tiene. */
+  private readonly nudos: Int32Array | null = null;
+  private readonly valores: readonly Float64Array[] | null = null;
+  private readonly region: ArrayLike<unknown> | null = null;
+  private readonly estaticas = new Map<string, Float64Array>();
+  private readonly espectrales = new Map<CasoEspectral, Float64Array>();
+  private readonly uzBase = new Map<number, Float64Array>();
+
+  constructor(r: ResultadosRender, planta: string, campo: Campo, de: SuperficieMapa) {
+    this.r = r;
+    this.uz = campo === "uz";
+    this.comp = campo === "uz" ? 0 : COMPONENTE[campo];
+    if (this.uz) {
+      const { laminas } = r.laminas(planta, de);
+      this.laminas = laminas;
+      this.nudos = new Int32Array(4 * laminas.length);
+      laminas.forEach((l, i) => r.c.modelo.laminas![l]!.nudos.forEach((n, a) => (this.nudos![4 * i + a] = n)));
+    } else {
+      const { laminas, region, valores } = r.valores(planta, de, this.comp < 3 ? "membrana" : "flexion");
+      this.laminas = laminas;
+      this.region = region;
+      this.valores = valores;
+    }
+    this.N = 4 * this.laminas.length;
+  }
+
+  /** La parte estática: Σ factor·valor de los casos base con factor (NaN donde la lámina no tiene campo). */
+  private estatica(fl: Float64Array): Float64Array {
+    const clave = fl.join(",");
+    let v = this.estaticas.get(clave);
+    if (v) return v;
+    v = new Float64Array(this.N);
+    if (this.nudos) {
+      const casos = this.r.q.casos;
+      for (let j = 0; j < this.N; j++) {
+        const n = this.nudos[j]!;
+        let s = 0;
+        for (let k = 0; k < fl.length; k++) if (fl[k]) s += fl[k]! * casos[k]!.u[6 * n + 2]!;
+        v[j] = s;
+      }
+    } else {
+      const valores = this.valores!;
+      const comp = this.comp;
+      for (let j = 0; j < this.N; j++) {
+        if (!this.region![j >> 2]) {
+          v[j] = Number.NaN;
+          continue;
+        }
+        let s = 0;
+        for (let k = 0; k < fl.length; k++) if (fl[k]) s += fl[k]! * valores[k]![8 * j + comp]!;
+        v[j] = s;
+      }
+    }
+    this.estaticas.set(clave, v);
+    return v;
+  }
+
+  /** El valor de un caso del sismo en cada nudo, sin su factor (uz, por μ). */
+  private espectral(caso: CasoEspectral): Float64Array {
+    let v = this.espectrales.get(caso);
+    if (v) return v;
+    const sup = this.r.q.sup;
+    if (this.nudos) {
+      // uz de cada modo en los nudos de las láminas, seguidos
+      const nudos = this.nudos;
+      const base = (k: number) => {
+        let g = this.uzBase.get(k);
+        if (!g) {
+          const u = this.r.q.casos[k]!.u;
+          g = new Float64Array(this.N);
+          for (let j = 0; j < this.N; j++) g[j] = u[6 * nudos[j]! + 2]!;
+          this.uzBase.set(k, g);
+        }
+        return g;
+      };
+      v = sup.espectralVector(caso, base, this.N, true);
+    } else v = sup.espectralVector(caso, (k) => this.valores![k]!, this.N, false, this.comp, 8);
+    this.espectrales.set(caso, v);
+    return v;
+  }
+
+  /** Los valores de una combinación partida (`Superposicion.partes`), en `v` (N valores; uz, en mm). */
+  de(partes: PartesCombinacion, v: Float64Array): void {
+    const N = this.N;
+    v.set(this.estatica(partes.lineal));
+    if (partes.espectrales.length) {
+      // Lo de los casos del sismo, sumado aparte y después a la parte estática (como siempre)
+      const sismo = new Float64Array(N);
+      for (const { factor, caso } of partes.espectrales) {
+        const e = this.espectral(caso);
+        for (let j = 0; j < N; j++) sismo[j]! += factor * e[j]!;
+      }
+      for (let j = 0; j < N; j++) v[j]! += sismo[j]!;
+    }
+    if (this.uz) for (let j = 0; j < N; j++) v[j] = v[j]! * 1000;
+  }
+}
+
+/**
  * Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación
  * (los factores de los casos lógicos) o en un caso base. El visor interpola con ellos el valor de un punto.
  */
@@ -305,39 +420,10 @@ export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, 
     partes = { lineal: new Float64Array(r.q.nb), espectrales: [] };
     partes.lineal[f.base] = 1;
   } else partes = r.q.sup.partes(f);
-  const fl = partes.lineal;
-  const conSismo = partes.espectrales.length > 0;
-  if (campo === "uz") {
-    const { laminas } = r.laminas(planta, de);
-    const v = new Float64Array(4 * laminas.length);
-    laminas.forEach((l, i) => {
-      r.c.modelo.laminas![l]!.nudos.forEach((n, a) => {
-        let s = 0;
-        for (let k = 0; k < fl.length; k++) if (fl[k]) s += fl[k]! * r.q.casos[k]!.u[6 * n + 2]!;
-        if (conSismo) s += r.q.sup.deEspectrales(partes, (k) => r.q.casos[k]!.u[6 * n + 2]!, true);
-        v[4 * i + a] = s * 1000;
-      });
-    });
-    return { laminas, v };
-  }
-  const comp = COMPONENTE[campo];
-  const { laminas, region, valores } = r.valores(planta, de, comp < 3 ? "membrana" : "flexion");
-  const v = new Float64Array(4 * laminas.length);
-  // Lo de los casos del sismo, de todos los nudos a la vez (el valor del nudo a de la lámina i es el 32·i + 8·a + comp de cada caso)
-  const sismo = conSismo ? r.q.sup.deEspectralesVector(partes, (k) => valores[k]!, 4 * laminas.length, false, comp, 8) : null;
-  laminas.forEach((_, i) => {
-    for (let a = 0; a < 4; a++) {
-      if (!region[i]) {
-        v[4 * i + a] = Number.NaN;
-        continue;
-      }
-      let s = 0;
-      for (let k = 0; k < fl.length; k++) if (fl[k]) s += fl[k]! * valores[k]![32 * i + 8 * a + comp]!;
-      if (sismo) s += sismo[4 * i + a]!;
-      v[4 * i + a] = s;
-    }
-  });
-  return { laminas, v };
+  const c = new CampoPlanta(r, planta, campo, de);
+  const v = new Float64Array(c.N);
+  c.de(partes, v);
+  return { laminas: c.laminas, v };
 }
 
 /** UI-1: con varias combinaciones, el mapa de su envolvente: en cada nudo de cada lámina, el mayor o el menor valor. */
@@ -348,24 +434,25 @@ export type Envolvente = "max" | "min";
  * tiene): en cada nudo, el máximo o el mínimo de las combinaciones del conjunto y la que lo da (la
  * primera, si empatan). Entre los nudos, el mapa la interpola: en una lámina queda por encima del
  * máximo de cada combinación (por debajo del mínimo), del lado de la seguridad.
+ *
+ * VS4: las combinaciones se recorren, pero sin rehacer en cada una lo que comparten (`CampoPlanta`):
+ * cada una son unas sumas por nudo.
  */
 export function envolventeCampo(r: ResultadosRender, planta: string, campo: Campo, conjunto: ConjuntoCombinaciones, cual: Envolvente, de: SuperficieMapa = "losas"): { laminas: number[]; v: Float64Array; comb: Int32Array } {
-  let laminas: number[] = [];
-  let v: Float64Array = new Float64Array();
-  let comb: Int32Array = new Int32Array();
+  const c = new CampoPlanta(r, planta, campo, de);
+  const v = new Float64Array(c.N);
+  const comb = new Int32Array(c.N);
+  const x = new Float64Array(c.N);
   conjunto.factores.forEach((f, k) => {
-    const x = valoresCampo(r, planta, campo, f, de);
-    if (k === 0) {
-      [laminas, v, comb] = [x.laminas, x.v, new Int32Array(x.v.length)];
-      return;
-    }
+    if (k === 0) return c.de(r.q.sup.partes(f), v);
+    c.de(r.q.sup.partes(f), x);
     for (let j = 0; j < v.length; j++)
-      if (cual === "max" ? x.v[j]! > v[j]! : x.v[j]! < v[j]!) {
-        v[j] = x.v[j]!;
+      if (cual === "max" ? x[j]! > v[j]! : x[j]! < v[j]!) {
+        v[j] = x[j]!;
         comb[j] = k;
       }
   });
-  return { laminas, v, comb };
+  return { laminas: c.laminas, v, comb };
 }
 
 /**

@@ -461,6 +461,42 @@ export class Superposicion {
   }
 
   /**
+   * El valor de un caso espectral (sin su factor), elemento a elemento, de un vector de N valores por
+   * caso base: lo que `deEspectralesVector` y `vector` multiplican por el factor de cada combinación.
+   * No depende de la combinación: las de la situación sísmica (el ± y el 30 % de cada caso) comparten
+   * sus casos espectrales, y quien recorre muchas lo calcula una vez por caso (VS4).
+   */
+  espectralVector(caso: CasoEspectral, base: (b: number) => ArrayLike<number>, N: number, desplazamiento = false, desde = 0, paso = 1): Float64Array {
+    const r = new Float64Array(N);
+    const as = Array.from(caso.modos, (b) => base(b));
+    const v = this.v;
+    for (let j = 0; j < N; j++) {
+      const q = desde + paso * j;
+      for (let i = 0; i < as.length; i++) v[i] = as[i]![q]!;
+      r[j] = valorEspectral(caso, v, this.x, desplazamiento);
+    }
+    return r;
+  }
+
+  /**
+   * La combinación de un vector por caso **lógico** (`porLogico`: n valores por caso, con los casos
+   * espectrales ya combinados): Σ factor·valor, en el orden de los casos. Los mismos números que
+   * `combinar` con el vector por caso base, sin volver a combinar los modos en cada combinación (VS4).
+   */
+  combinarLogico(porLogico: ArrayLike<number>, n: number, factores: ArrayLike<number>): Float64Array {
+    this.comprobar(factores);
+    if (porLogico.length !== n * this.nl) throw new Error(`Superposicion.combinarLogico: ${porLogico.length} valores no son ${n} por cada uno de los ${this.nl} casos`);
+    const r = new Float64Array(n);
+    for (let k = 0; k < this.nl; k++) {
+      const f = factores[k]!;
+      if (!f) continue;
+      const o = n * k;
+      for (let q = 0; q < n; q++) r[q]! += f * porLogico[o + q]!;
+    }
+    return r;
+  }
+
+  /**
    * El valor de la combinación de una variable: `base(b)` da su valor en el caso base b (se llama sólo
    * con los que hacen falta). `desplazamiento`: la variable es un desplazamiento o un giro (los de los
    * casos espectrales van por μ).

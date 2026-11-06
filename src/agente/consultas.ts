@@ -30,7 +30,7 @@ import { cotasPlantas } from "../compilador/cotas.ts";
 import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
 import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { DiagramaLeible } from "../motor/diagramaCompuesto.ts";
+import { recorrerDiagrama, type DiagramaLeible } from "../motor/diagramaCompuesto.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 import type { ConjuntoCombinaciones, Proposito } from "./combinaciones.ts";
 import type { Proyecto } from "./proyecto.ts";
@@ -286,17 +286,14 @@ export function envolventes(q: Consultas, conjunto: ConjuntoCombinaciones, o: { 
       const componentes = extremos.map((ex) => COMPONENTES.indexOf(ex.replace(/[+-]$/, "") as (typeof COMPONENTES)[number]));
       const grupo = g;
       conjunto.factores.forEach((f, kc) => {
-        const D = q.diagramaBarra(b, f);
-        for (const x of D.estaciones())
-          for (const lado of [-1, 1] as const) {
-            if ((x === 0 && lado < 0) || (x === D.L && lado > 0)) continue;
-            const e = D.esfuerzosEn(x, lado);
-            for (let i = 0; i < extremos.length; i++) {
-              const ex = extremos[i]!;
-              const v = e[componentes[i]!]!;
-              if (mejora(ex, grupo.extremos[ex], v)) grupo.extremos[ex] = { v, pieza, s: m.s[1] + x, comb: conjunto.nombres[kc]! };
-            }
+        // (VS4: con casos del sismo, cada combinación se recorre por su rejilla, sin un vector por lectura)
+        recorrerDiagrama(q.diagramaBarra(b, f), (x, _lado, e) => {
+          for (let i = 0; i < extremos.length; i++) {
+            const ex = extremos[i]!;
+            const v = e[componentes[i]!]!;
+            if (mejora(ex, grupo.extremos[ex], v)) grupo.extremos[ex] = { v, pieza, s: m.s[1] + x, comb: conjunto.nombres[kc]! };
           }
+        });
       });
     }
   }
