@@ -829,9 +829,11 @@
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1, BN2 y BN3 hechas, falta su puerta de uso** (`barras.md`), de planta a planta y con `dz` previsto; después, lo de `barras.md` §7 (`dz`, el objeto `cruz`) y los desniveles de paño;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
-  - **pedido por el usuario el 2026-11-05, sin plan:** viento y sismo como en CYPECAD. Hoy son casos con las cargas metidas a mano (el sismo, como fuerzas estáticas equivalentes con signo; `investigacion/03-resultados.md`).
-    - Viento: generarlo desde los datos del edificio (CTE DB SE-AE), por planta y dirección.
-    - Sismo: el análisis modal espectral de la NCSE-02, que necesita el modal de E7, y la concomitancia de las combinaciones (SRSS o CQC, y 100/30).
-    - Las tablas de norma van en el programa, con su propia validación (`modelado.md`);
+  - **pedido por el usuario el 2026-11-05; plan del 2026-11-06, sin decidir** (`docs/fem3d/viento-sismo.md`): viento y sismo como en CYPECAD. Hoy son casos con las cargas metidas a mano (el sismo, como fuerzas estáticas equivalentes con signo; `investigacion/03-resultados.md`).
+    - **Viento (VS1):** el de `lib/acciones/viento.ts` de Concreta (CTE DB SE-AE, por planta y dirección), con el ancho de cada planta sacado del modelo; 8 casos del programa (4 direcciones × ±e).
+    - **Masas y modos (VS2):** masas desde las cargas (G entero y las Q con la fracción de la NCSE-02 3.2), condensadas exactas a los 3 GDL de cada diafragma con 3n soluciones sobre la factorización del cálculo; todos los 3n modos.
+    - **Espectral (VS3):** el espectro de la NCSE-02 (3.6.2.2, con la rama ascendente que el simplificado no tiene), cada modo como caso modal y la combinación en cada variable (3.6.2.4: SRSS con los modos a < 10 % sumados en valor absoluto), con el signo del modo dominante; excentricidad accidental como torsor estático.
+    - **Después:** VS4 (la app y el agente), VS5 (en sombra con CYPECAD) y VS6 (plantas semirrígidas).
+    - **Pendiente del usuario:** VS-a…VS-n (§8), entre ellas admitir la CC BY 4.0 del IGN para la peligrosidad por municipio (VS-l);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
