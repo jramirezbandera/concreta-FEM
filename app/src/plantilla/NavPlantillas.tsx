@@ -50,7 +50,7 @@ export function NavPlantillas({ pl, herramienta, error }: Props) {
   return (
     <Seccion titulo="Plantillas DXF o DWG" valor={lista.length || undefined}>
       {/* M-23: vacía, lo justo */}
-      {!lista.length && <p className="nota">Ninguna. Un plano DXF o DWG en gris detrás de la planta, para calcar: «Plantilla DXF o DWG» en la barra.</p>}
+      {!lista.length && <p className="nota">Ninguna. Un plano DXF o DWG en gris detrás de la planta, para calcar: «Plantilla» en la barra.</p>}
       {error && <p className="nota text-state-fail">{error}</p>}
       {lista.map((t) => (
         <Ficha key={t.nombre} t={t} abierta={abierta === t.nombre} alternar={() => setAbierta(abierta === t.nombre ? null : t.nombre)} pl={pl} cambiar={(n, e) => cambiar(t, n, e)} quitar={() => ed.editar({ op: "plantillas", plantillas: lista.filter((x) => x.nombre !== t.nombre) }, `Quitar la plantilla «${t.nombre}»`)} herramienta={(h) => herramienta(h, t.nombre)} />

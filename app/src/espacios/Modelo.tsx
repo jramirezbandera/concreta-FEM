@@ -436,7 +436,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él" />
           <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él" />
           <Separador />
-          <Herramienta icono={IcPlantillaDxf} nombre="Plantilla DXF o DWG" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF o DWG del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
+          <Herramienta icono={IcPlantillaDxf} nombre="Plantilla" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF o DWG del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
           <input ref={ficheroDxf} type="file" accept=".dxf,.dwg" hidden aria-label="Fichero DXF o DWG de la plantilla" onChange={(x) => {
             const f = x.target.files?.[0];
             x.target.value = "";
