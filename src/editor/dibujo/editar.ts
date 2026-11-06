@@ -22,6 +22,7 @@
  */
 import { rotuloCota } from "../../agente/render/ejes.ts";
 import type { Vec2 } from "../../compilador/fisico.ts";
+import { esIdAbaco, leerIdAbaco, nombreAbaco } from "../abacos.ts";
 import { indiceIds, lista } from "../referencias.ts";
 import { anguloDe, listaIds, transformar, Transformador, type Transformacion } from "../transformar.ts";
 import { igual, type Borrador, type ContextoHerramienta, type EstadoHerramienta, type Evento, type Paso, type Plantillas } from "./herramientas.ts";
@@ -46,9 +47,14 @@ function conGeometria(ctx: ContextoHerramienta, ids: readonly string[]): string[
   const idx = indiceIds(ctx.modelo);
   return ids.filter((id) => {
     const c = idx.get(id)?.coleccion;
-    return !!c && c !== "plantas" && c !== "materiales" && c !== "secciones" && c !== "casos";
+    // AC: los ábacos, por su id de selección
+    if (!c) return esIdAbaco(ctx.modelo, id);
+    return c !== "plantas" && c !== "materiales" && c !== "secciones" && c !== "casos";
   });
 }
+
+/** El nombre de un id para deshacer: un ábaco, «A3 de L2». */
+const nombreAbacoSiLoEs = (id: string) => (/\/A\d+$/.test(id) ? nombreAbaco(id) : id);
 
 /** El ángulo de un giro con centro c hasta el punto p, grados en (−180, 180]. */
 export function anguloGiro(c: Vec2, p: Vec2): number {
@@ -80,11 +86,13 @@ function hacer(h: NombreEditar, e: EstadoHerramienta, t: Transformacion, ctx: Co
   const ids = e.elegidos!;
   const p = ctx.plantillas.editar ?? {};
   const copiar = h === "copiar" || (h === "simetria" && !!p.conservar);
-  const r = transformar(ctx.modelo, ids, t, { copiar, ...(h === "copiar" && p.plantas?.length ? { plantas: p.plantas } : {}), conVigas: p.conVigas !== false && !ctrl });
+  const r = transformar(ctx.modelo, ids, t, { copiar, ...(h === "copiar" && p.plantas?.length ? { plantas: p.plantas } : {}), conVigas: p.conVigas !== false && !ctrl, ...(ctx.toleranciaAbacos !== undefined ? { toleranciaAbacos: ctx.toleranciaAbacos } : {}) });
   if (!r.ok) return { estado: e, error: r.mensaje };
-  // Copiar sigue en el destino (otra copia); lo demás vuelve al punto base con lo mismo elegido
-  const estado: EstadoHerramienta = h === "copiar" ? e : { puntos: [], elegidos: ids };
-  return { estado, hecho: { operacion: r.operacion, etiqueta: etiqueta(ids, t, copiar), ...(r.avisos.length ? { avisos: r.avisos } : {}) } };
+  // Copiar sigue en el destino (otra copia); lo demás vuelve al punto base con lo mismo elegido (AC:
+  // con los ábacos unidos, sus ids nuevos)
+  const despues = r.elegidos ?? ids;
+  const estado: EstadoHerramienta = h === "copiar" ? e : { puntos: [], elegidos: despues };
+  return { estado, hecho: { operacion: r.operacion, etiqueta: etiqueta(ids.map(nombreAbacoSiLoEs), t, copiar), ...(r.avisos.length ? { avisos: r.avisos } : {}), ...(r.elegidos ? { elegir: r.elegidos } : {}) } };
 }
 
 export function pasoEditar(h: NombreEditar, e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
@@ -154,7 +162,12 @@ function geometriaElegidos(ctx: ContextoHerramienta, ids: readonly string[]): { 
   const idx = indiceIds(ctx.modelo);
   for (const id of en) {
     const x = idx.get(id);
-    if (!x) continue;
+    if (!x) {
+      // AC: un ábaco, por su polígono
+      const ab = leerIdAbaco(ctx.modelo, id);
+      if (ab?.losa.planta === ctx.planta) r.cerrados.push(ab.losa.reticular!.abacos![ab.i] as Vec2[]);
+      continue;
+    }
     const o = lista(ctx.modelo, x.coleccion)[x.indice]!;
     if (o.planta !== undefined && o.planta !== ctx.planta) continue;
     if (typeof o.x === "number" && typeof o.y === "number") r.puntos.push([o.x, o.y as number]);

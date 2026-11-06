@@ -27,6 +27,7 @@
  *
  * Puro: sin IO, sin React ni DOM.
  */
+import type { PlantillaAbaco } from "./abaco.ts";
 import { rotuloCota } from "../../agente/render/ejes.ts";
 import { anchoViga, huellaSeccion, PlantaFisica } from "../../agente/render/modelo.ts";
 import { direccionEjes, ejesDe, letraEje, proponerEjes } from "../../compilador/ejes.ts";
@@ -89,6 +90,8 @@ export interface Plantillas {
   dxf?: PlantillaHerramientaDxf;
   /** BN3 (`barra.ts`): la Barra entre dos niveles. */
   barraNiveles?: PlantillaBarra;
+  /** AC (`abaco.ts`): el Ábaco de un reticular. */
+  abaco?: PlantillaAbaco;
 }
 
 /** Un punto de lo que se dibuja; `pilar`, si se enganchó a uno. */
@@ -123,6 +126,8 @@ export interface ContextoHerramienta {
   plantillas: Plantillas;
   /** V2c-3: lo elegido en las vistas, el navegador o la tabla. */
   elegidos?: readonly string[];
+  /** AC: la distancia por debajo de la cual dos ábacos se unen (la mitad del tamaño de malla del proyecto). */
+  toleranciaAbacos?: number;
 }
 
 export type Evento =
@@ -151,6 +156,8 @@ export interface Hecho {
   etiqueta: string;
   /** Lo que conviene saber de lo hecho (una viga que no sigue a su pilar, un apoyo que no gira). */
   avisos?: string[];
+  /** Lo que hay que dejar elegido después (AC: un ábaco unido con otro cambia de id de selección). */
+  elegir?: string[];
 }
 
 export interface Paso {

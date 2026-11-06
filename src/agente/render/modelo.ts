@@ -10,7 +10,7 @@
  *
  * Puro: sin IO.
  */
-import { resolverAbacos } from "../../compilador/abacos.ts";
+import { idAbaco, resolverAbacos } from "../../compilador/abacos.ts";
 import { tramosBorde } from "../../compilador/bordes.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { ejePilar, ejeSeccion, medidasSeccion } from "../../compilador/puntoFijo.ts";
@@ -37,10 +37,24 @@ export class PlantaFisica {
   readonly cota: number | null;
   private readonly indice = new Map<string, number>();
   private readonly cotas: (number | null)[];
+  /** AC: el objeto de cada ábaco resuelto, por losa: su id de selección (el primero de los dados que lo forman) o la losa (los de sus pilares). */
+  readonly objetosAbacos = new Map<string, string[]>();
 
   constructor(f: ModeloFisico, planta: string) {
     // MA2: los ábacos que usa el compilador (los de los pilares y los unidos)
-    this.f = resolverAbacos(f).modelo;
+    const r = resolverAbacos(f);
+    for (const [id, a] of r.porLosa) {
+      const dados = (f.losas ?? []).find((l) => l.id === id)?.reticular?.abacos ?? [];
+      this.objetosAbacos.set(
+        id,
+        a.abacos.map((p) => {
+          const u = a.unidos.find((x) => x.poligono === p);
+          const i = u ? Math.min(...u.origen.filter((o) => o.startsWith("ábaco ")).map((o) => Number(o.slice(6)) - 1)) : dados.indexOf(p);
+          return Number.isFinite(i) && i >= 0 ? idAbaco(id, i) : id;
+        }),
+      );
+    }
+    this.f = r.modelo;
     f = this.f;
     this.id = planta;
     (f.plantas ?? []).forEach((p, i) => this.indice.set(p.id, i));
@@ -232,20 +246,23 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     // Los ábacos, sólo en lo que cae en la losa, que es lo que cuenta el compilador (en una esquina,
     // un cuarto; en un borde, la mitad); uno no convexo, entero
     const region: Region = { contorno: l.contorno, huecos: l.huecos ?? [] };
-    for (const a of (l.reticular?.abacos ?? []) as Vec2[][]) {
+    const objetos = pl.objetosAbacos.get(l.id);
+    for (const [k, a] of ((l.reticular?.abacos ?? []) as Vec2[][]).entries()) {
+      // AC: cada ábaco se elige solo (su id de selección; los de los pilares, con la losa)
+      const objeto = objetos?.[k] ?? l.id;
       const dentro = recorteRegionConvexo(region, a);
       if (!dentro) {
-        P.push({ tipo: "poligono", anillos: [a], estilo: est("abaco"), objeto: l.id });
+        P.push({ tipo: "poligono", anillos: [a], estilo: est("abaco"), objeto });
         continue;
       }
       if (!dentro.length) continue;
       usados.add("abaco");
-      P.push({ tipo: "poligono", anillos: dentro, estilo: est("abaco-relleno"), objeto: l.id });
+      P.push({ tipo: "poligono", anillos: dentro, estilo: est("abaco-relleno"), objeto });
       // El borde, sin los puentes del recorte: los lados del ábaco dentro de la losa y los de la losa
       // dentro del ábaco (el relleno tapa la mitad de su trazo)
       const lados = (p: readonly Vec2[], otros: readonly (readonly Vec2[])[], dentro: (q: Vec2) => boolean) => {
         for (let i = 0; i < p.length; i++)
-          for (const s of trozosSegmento(p[i]!, p[(i + 1) % p.length]!, otros, dentro)) P.push({ tipo: "linea", puntos: s, estilo: est("abaco-borde"), objeto: l.id });
+          for (const s of trozosSegmento(p[i]!, p[(i + 1) % p.length]!, otros, dentro)) P.push({ tipo: "linea", puntos: s, estilo: est("abaco-borde"), objeto });
       };
       lados(a, anillos, (q) => puntoEnRegion(q, region));
       for (const p of anillos) lados(p, [a], (q) => puntoEnPoligono(q, a));

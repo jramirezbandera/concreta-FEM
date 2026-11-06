@@ -492,7 +492,7 @@ describe("los errores", () => {
     const m = portico();
     const t: Transformacion = { tipo: "mover", de: [0, 0], a: [1, 0] };
     expect(transformar(m, [], t)).toEqual({ ok: false, mensaje: "No hay nada elegido." });
-    expect(transformar(m, ["HA", "N1"], t)).toEqual({ ok: false, mensaje: "Lo elegido no tiene geometría que mover (elija pilares, vigas, forjados, muros, apoyos, cargas o ejes)." });
+    expect(transformar(m, ["HA", "N1"], t)).toEqual({ ok: false, mensaje: "Lo elegido no tiene geometría que mover (elija pilares, vigas, forjados, ábacos, muros, apoyos, cargas o ejes)." });
     expect(transformar(m, ["P1"], { tipo: "mover", de: [1, 1], a: [1, 1] })).toEqual({ ok: false, mensaje: "El destino es el punto base: no se mueve nada." });
     expect(transformar(m, ["P1"], { tipo: "girar", centro: [0, 0], angulo: 360 })).toEqual({ ok: false, mensaje: "Un giro de 0° no mueve nada." });
     expect(transformar(m, ["V1"], t, { copiar: true, plantas: ["N9"] })).toEqual({ ok: false, mensaje: "No hay ninguna planta «N9»." });

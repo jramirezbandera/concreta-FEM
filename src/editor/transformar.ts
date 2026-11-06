@@ -40,6 +40,8 @@ import { limpio } from "./dibujo/cotas.ts";
 import { reestacionar } from "./estaciones.ts";
 import { moverPilar } from "./estirar.ts";
 import type { Operacion } from "./operaciones.ts";
+import { TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
+import { asasAbaco, cambiarAbacos, leerIdAbaco, moverAsaAbaco, type ResultadoAbacos } from "./abacos.ts";
 import { conValor, indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 import { idCarga, idNuevo } from "./tablas.ts";
 
@@ -58,9 +60,15 @@ export interface OpcionesTransformar {
   plantas?: readonly string[];
   /** Al mover: las vigas no elegidas con un vértice en el punto fijo de un pilar que se transforma lo siguen (V2c-d). Por defecto, sí. */
   conVigas?: boolean;
+  /** AC: la distancia por debajo de la cual dos ábacos se unen (la mitad del tamaño de malla del proyecto). */
+  toleranciaAbacos?: number;
 }
 
-export type ResultadoTransformar = { ok: true; operacion: Operacion; avisos: string[]; nuevos: string[] } | { ok: false; mensaje: string };
+/**
+ * `elegidos`: lo que hay que dejar elegido después, si no es lo mismo (AC: un ábaco que se une con
+ * otro cambia de id de selección).
+ */
+export type ResultadoTransformar = { ok: true; operacion: Operacion; avisos: string[]; nuevos: string[]; elegidos?: string[] } | { ok: false; mensaje: string };
 
 /** Lo que se transforma (lo demás no tiene geometría). */
 const GEOMETRICAS: ReadonlySet<Coleccion> = new Set(["pilares", "vigas", "barras", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos", "ejes"]);
@@ -432,13 +440,41 @@ export function transformar(m: ModeloFisico, ids: readonly string[], t: Transfor
     avisos.push(`${listaIds(sueltas.map((x) => x.o.id))} ${sueltas.length > 1 ? "van" : "va"} sobre una pieza que no está elegida: ${sueltas.length > 1 ? "se mueven" : "se mueve"} con ella.`);
     for (const s of sueltas) elegidos.splice(elegidos.indexOf(s), 1);
   }
-  if (!elegidos.length) return { ok: false, mensaje: ids.length ? "Lo elegido no tiene geometría que mover (elija pilares, vigas, forjados, muros, apoyos, cargas o ejes)." : "No hay nada elegido." };
-  const enElegidos = new Set(elegidos.map((x) => x.o.id));
-  // Las cargas que van con lo elegido (y no están elegidas)
-  const acompanan = (m.cargas ?? []).filter((c) => !enElegidos.has(c.id) && enElegidos.has(soporteDe(c) ?? "")) as unknown as Objeto[];
-  const todas = [...elegidos, ...acompanan.map((x) => ({ c: "cargas" as Coleccion, o: x }))];
-
-  return o.copiar ? copiar(m, tr, todas, enElegidos, o, avisos) : mover(m, tr, todas, o, avisos);
+  // AC: los ábacos elegidos, salvo los de una losa que también se elige (van con ella)
+  const abacos = [...new Set(ids)].filter((id) => !idx.has(id)).map((id) => ({ id, x: leerIdAbaco(m, id) })).filter((a) => a.x && !vistos.has(a.x.losa.id)) as { id: string; x: NonNullable<ReturnType<typeof leerIdAbaco>> }[];
+  if (!elegidos.length && !abacos.length) return { ok: false, mensaje: ids.length ? "Lo elegido no tiene geometría que mover (elija pilares, vigas, forjados, ábacos, muros, apoyos, cargas o ejes)." : "No hay nada elegido." };
+  let rAbacos: ResultadoAbacos | null = null;
+  if (abacos.length) {
+    const tol = o.toleranciaAbacos ?? TOLERANCIA_ABACOS;
+    const poligono = (a: (typeof abacos)[number]) => (a.x.losa.reticular!.abacos![a.x.i] as Vec2[]).map((q) => tr.punto(q));
+    if (!o.copiar) rAbacos = tr.identidad ? null : cambiarAbacos(m, new Map(abacos.map((a) => [a.id, poligono(a)])), tol);
+    else if (!tr.identidad) {
+      const nuevos = new Map<string, Vec2[][]>();
+      for (const a of abacos) nuevos.set(a.x.losa.id, [...(nuevos.get(a.x.losa.id) ?? []), poligono(a)]);
+      rAbacos = cambiarAbacos(m, new Map(), tol, nuevos);
+      if (o.plantas?.some((p) => abacos.some((a) => a.x.losa.planta !== p))) avisos.push("Los ábacos se copian sólo en su forjado, no a otras plantas.");
+    }
+  }
+  let rPiezas: ResultadoTransformar | null = null;
+  if (elegidos.length) {
+    const enElegidos = new Set(elegidos.map((x) => x.o.id));
+    // Las cargas que van con lo elegido (y no están elegidas)
+    const acompanan = (m.cargas ?? []).filter((c) => !enElegidos.has(c.id) && enElegidos.has(soporteDe(c) ?? "")) as unknown as Objeto[];
+    const todas = [...elegidos, ...acompanan.map((x) => ({ c: "cargas" as Coleccion, o: x }))];
+    rPiezas = o.copiar ? copiar(m, tr, todas, enElegidos, o, avisos) : mover(m, tr, todas, o, avisos);
+  }
+  if (!rAbacos) return rPiezas ?? { ok: false, mensaje: tr.identidad ? (o.copiar ? "El destino es el punto base: la copia caería encima de lo copiado." : tr.t.tipo === "mover" ? "El destino es el punto base: no se mueve nada." : "Un giro de 0° no mueve nada.") : "La transformación no cambia nada." };
+  if (!rAbacos.ok) return rPiezas?.ok ? rPiezas : { ok: false, mensaje: rAbacos.mensaje };
+  const ops = [...(rPiezas?.ok ? [rPiezas.operacion] : []), rAbacos.operacion];
+  const nuevos = [...(rPiezas?.ok ? rPiezas.nuevos : []), ...(o.copiar ? rAbacos.elegidos : [])];
+  const quitados = new Set(abacos.map((a) => a.id));
+  return {
+    ok: true,
+    operacion: ops.length === 1 ? ops[0]! : { op: "lote", operaciones: ops },
+    avisos: [...(rPiezas?.ok ? rPiezas.avisos : avisos), ...rAbacos.avisos],
+    nuevos,
+    ...(o.copiar ? {} : { elegidos: [...ids.filter((id) => !quitados.has(id)), ...rAbacos.elegidos] }),
+  };
 }
 
 function mover(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Objeto }[], o: OpcionesTransformar, avisos: string[]): ResultadoTransformar {
@@ -589,7 +625,12 @@ export function asas(m: ModeloFisico, ids: readonly string[], planta: string): A
   const r: Asa[] = [];
   for (const id of ids) {
     const x = idx.get(id);
-    if (!x) continue;
+    if (!x) {
+      // AC: un ábaco elegido, con sus vértices y, si es un rectángulo según los nervios, los medios de sus lados
+      const ab = leerIdAbaco(m, id);
+      if (ab?.losa.planta === planta) for (const a of asasAbaco(m, id)) r.push({ id, coleccion: "losas", ruta: ["abaco", a.tipo, a.k], p: a.p });
+      continue;
+    }
     const c = x.coleccion;
     const o = lista(m, c)[x.indice]!;
     const add = (ruta: (string | number)[], p: Vec2) => r.push({ id, coleccion: c, ruta, p });
@@ -620,7 +661,7 @@ export function asas(m: ModeloFisico, ids: readonly string[], planta: string): A
         if (!enPlanta) break;
         linea("contorno", o.contorno as Vec2[]);
         anillos("huecos", o.huecos as Vec2[][] | undefined);
-        anillos("abacos", (o.reticular as { abacos?: Vec2[][] } | undefined)?.abacos, "reticular");
+        // AC: los ábacos, no: se eligen solos
         break;
       case "bandas":
         if (enPlanta) (["desde", "hasta"] as const).forEach((k) => add([k], o[k] as Vec2));
@@ -645,9 +686,14 @@ export function asas(m: ModeloFisico, ids: readonly string[], planta: string): A
  * false`); en un muro cerrado, el primer punto y el último van juntos. Los huecos del muro y los
  * tramos de las cargas de la viga se vuelven a medir en su tramo.
  */
-export function moverAsa(m: ModeloFisico, a: Asa, q: Vec2, conVigas = true): ResultadoTransformar {
+export function moverAsa(m: ModeloFisico, a: Asa, q: Vec2, conVigas = true, toleranciaAbacos = TOLERANCIA_ABACOS): ResultadoTransformar {
   if (!Number.isFinite(q[0]) || !Number.isFinite(q[1])) return { ok: false, mensaje: "La posición tiene que ser un número." };
   if (igual(a.p, q)) return { ok: false, mensaje: "El punto no se ha movido." };
+  if (a.ruta[0] === "abaco") {
+    // AC: el rectángulo sigue siéndolo (el vértice, con el opuesto fijo; el lado, en paralelo), unido con lo que pase a solapar
+    const r = moverAsaAbaco(m, { id: a.id, tipo: a.ruta[1] as "vertice" | "lado", k: a.ruta[2] as number, p: a.p }, q, toleranciaAbacos);
+    return r.ok ? { ok: true, operacion: r.operacion, avisos: r.avisos, nuevos: [], elegidos: r.elegidos } : r;
+  }
   const x = indiceIds(m).get(a.id);
   if (!x || x.coleccion !== a.coleccion) return { ok: false, mensaje: `No hay ningún objeto ${a.id}.` };
   if (a.coleccion === "pilares") {

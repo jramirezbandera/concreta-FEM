@@ -32,6 +32,13 @@ import { ejeSeccion } from "./puntoFijo.ts";
 /** Tolerancia de unión por defecto (MA-d): la mitad del tamaño de malla por defecto. */
 export const TOLERANCIA_ABACOS = TAMANO_MALLA / 2;
 
+/**
+ * El id de selección del ábaco i (desde 0) de `reticular.abacos` de una losa (fase AC,
+ * `docs/fem3d/abacos.md`): lo usan el dibujo y el editor para elegir cada ábaco. No es un id del
+ * modelo: no se guarda.
+ */
+export const idAbaco = (losa: string, i: number): string => `${losa}/A${i + 1}`;
+
 /** Un ábaco y de dónde sale: «ábaco 3» (el tercero dado) o el id del pilar. */
 export interface AbacoOrigen {
   poligono: Vec2[];

@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { huellaCompilacion } from "../compilador/compilar.ts";
 import { resolverOpciones, type Losa } from "../compilador/fisico.ts";
+import { resolverAbacos } from "../compilador/abacos.ts";
 import type { Proyecto } from "../agente/proyecto.ts";
 import { operacionAbacos, proponerAbacos, type PropuestaAbacos } from "./abacos.ts";
 import { aplicar } from "./operaciones.ts";
@@ -45,12 +46,23 @@ describe("Ábacos en los pilares", () => {
     expect(operacionAbacos(proyecto.modelo, r)).toBeNull();
   });
 
-  it("un ábaco que se solaparía con otro no se crea", () => {
-    // 7 m de lado con pilares a 6 m: el primero de cada fila entra y el siguiente choca
-    const r = propuesta(sinAbacos(), 7, 2);
-    expect(r.nuevos.length + r.solapados.length).toBe(12);
+  it("los que se solapan se crean y se unen en su rectángulo envolvente (AC-b)", () => {
+    // 7 m de lado con pilares a 6 m: cada fila de cuatro pilares queda en un solo ábaco
+    const p = sinAbacos();
+    const r = propuesta(p, 7, 2);
+    expect(r.nuevos).toHaveLength(12);
     expect(r.solapados.length).toBeGreaterThan(0);
-    for (const [i, x] of r.nuevos.entries()) for (const y of r.nuevos.slice(i + 1)) expect(Math.abs(x.poligono[0]![0] - y.poligono[0]![0]) >= 7 - 1e-9 || Math.abs(x.poligono[0]![1] - y.poligono[0]![1]) >= 2 - 1e-9, `${x.pilar}–${y.pilar}`).toBe(true);
+    const a = aplicar(p, operacionAbacos(p.modelo, r)!);
+    expect(a.ok).toBe(true);
+    if (!a.ok) return;
+    const l = a.proyecto.modelo.losas!.find((x) => x.id === "L2")!;
+    expect(l.reticular!.abacos).toStrictEqual([
+      [[-3.5, 10], [21.5, 10], [21.5, 12], [-3.5, 12]],
+      [[-3.5, 4.5], [21.5, 4.5], [21.5, 6.5], [-3.5, 6.5]],
+      [[-3.5, -1], [21.5, -1], [21.5, 1], [-3.5, 1]],
+    ]);
+    // Lo escrito es lo que calcula el compilador
+    expect(resolverAbacos(a.proyecto.modelo).modelo).toBe(a.proyecto.modelo);
   });
 
   it("los ábacos siguen la dirección de los nervios (eje 1)", () => {

@@ -39,8 +39,9 @@ import { unitario } from "./enganches.ts";
 import { ESTADO_INICIAL, igual, plantasPilar, seccionValida, type Alinear, type Borrador, type ContextoHerramienta, type EstadoHerramienta, type Evento, type Paso, type Plantillas } from "./herramientas.ts";
 import { contornoDesde, puntoEnPoligono, recuadroEn, recuadrosPlanta } from "./recuadros.ts";
 import { operacionVigasBorde, proponerVigasBorde } from "../vigasBorde.ts";
+import { ayudaAbaco, borradorAbaco, pasoAbaco } from "./abaco.ts";
 
-export const PIEZAS = ["forjado", "hueco", "muro", "apoyo", "apoyoLineal"] as const;
+export const PIEZAS = ["forjado", "hueco", "abaco", "muro", "apoyo", "apoyoLineal"] as const;
 export type NombrePieza = (typeof PIEZAS)[number];
 export const esPieza = (h: string): h is NombrePieza => (PIEZAS as readonly string[]).includes(h);
 
@@ -480,6 +481,8 @@ export function pasoPieza(h: NombrePieza, e: EstadoHerramienta, ev: Evento, ctx:
       return pasoForjado(e, ev, ctx);
     case "hueco":
       return pasoHueco(e, ev, ctx);
+    case "abaco":
+      return pasoAbaco(e, ev, ctx);
     case "muro":
       return pasoPolilinea(e, ev, { min: 2, cerrable: true, que: "Un muro", terminar: (ps, cerrada) => comoPaso(e, muroCon(ctx, ps, cerrada)) });
     case "apoyo":
@@ -514,7 +517,8 @@ export function borradorPieza(h: NombrePieza, e: EstadoHerramienta, cursor: Vec2
     else if (e.objeto && (ctx.plantillas.hueco?.modo ?? "rectangulo") === "rectangulo") {
       if (cursor && !igual(cursor, e.puntos[0]!.p)) r.anillos.push(rectangulo(e.puntos[0]!.p, cursor, ctx.indice.direccion));
     } else borradorPolilinea(e, cursor, r, true);
-  } else if (h === "muro") {
+  } else if (h === "abaco") borradorAbaco(e, cursor, ctx, r, crudo);
+  else if (h === "muro") {
     const ps = borradorPolilinea(e, cursor, r, false);
     const t = ctx.plantillas.muro ?? {};
     if (ps.length > 1 && t.espesor) {
@@ -536,6 +540,8 @@ export function ayudaPieza(h: NombrePieza, e: EstadoHerramienta, t: Plantillas):
       if (!n) return "Hueco: un clic en el forjado o en el muro donde va. Esc vuelve a Elegir.";
       if (e.enMuro) return `Hueco en el muro ${e.objeto}: el otro borde, por su eje y en el mismo tramo. Esc anula.`;
       return (t.hueco?.modo ?? "rectangulo") === "rectangulo" ? `Hueco en ${e.objeto}: la otra esquina. Esc anula.` : `Hueco en ${e.objeto}: el vértice siguiente (${nPuntos(e)}); Intro o un clic en el primero lo cierra. Esc anula.`;
+    case "abaco":
+      return ayudaAbaco(e, t.abaco?.modo);
     case "muro":
       return n ? `Muro: el punto siguiente (${nPuntos(e)}). Doble clic o Intro termina; un clic en el primero lo cierra; Retroceso quita el último; Esc anula.` : "Muro: el primer punto. Esc vuelve a Elegir.";
     case "apoyo":
