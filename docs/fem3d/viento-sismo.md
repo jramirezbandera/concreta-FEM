@@ -500,14 +500,14 @@ Pasan los seis criterios de §5. No se ve todavía en la app (VS4). Las consulta
 - **VS3-9, C > 1,8.** Con el periodo fundamental de una dirección mayor que TB, el art. 2.4 manda α = 2,5 también por encima de TB: se hace y se avisa (`sismo/meseta-larga`).
 - **VS3-10, de paso:** las consultas por defecto de la CLI miraban los casos del fichero, no los del programa: con el viento de VS1, las combinaciones salían bien (las da `Consultas`), pero la selección por defecto no veía sus casos.
 
-**Lo que decidí al hacerlo, para el usuario:**
+**Lo que decidí al hacerlo, confirmado por el usuario el 2026-11-06** (las recomendaciones de Claude, aceptadas):
 - **VS3-a:** los casos del sismo son lógicos (no van al modelo analítico ni a los resultados) y sus nombres, `EX+e`, `EX-e`, `EY+e` y `EY-e`.
 - **VS3-b:** con `ab`, son obligatorios `K`, `terreno` y `mu` (no hay valor por defecto que no sea una hipótesis de proyecto); por defecto, importancia normal, Ω = 5 % y e = 1/20.
 - **VS3-c:** la regla del 10 %, par a par y respecto al periodo mayor (VS3-2).
-- **VS3-d:** la fuerza equivalente de cada planta, para el par de la excentricidad, es la diferencia de los cortantes combinados (puede salir negativa en plantas altas, como en Concreta).
+- **VS3-d:** la fuerza equivalente de cada planta, para el par de la excentricidad, es la diferencia de los cortantes combinados (puede salir negativa en plantas altas, como en Concreta). El signo no importa (se calculan `+e` y `−e`); en las plantas altas puede quedar algo por debajo de la fuerza de cada modo combinada planta a planta: se contrasta en VS5 y, si sale corta, se cambia.
 - **VS3-e:** si el par no se puede escribir con los modos (un diafragma con masa y sin inercia de giro), es un error y no hay casos del sismo; con `"excentricidad": 0` se calcula sin ella.
-- **VS3-f:** todos los modos, sin truncar (VS2-3). Con los de «el 90 % y T > TA» serían de 10 a 14 de los 21 de los edificios objetivo.
-- **VS3-g:** la excentricidad, como torsor estático (VS-i), con lo medido arriba. Mover la masa son cuatro juegos de modos (cuatro veces los casos base); queda para decidir con VS5, cuando se vea qué hace el CYPECAD del usuario.
+- **VS3-f:** todos los modos, sin truncar (VS2-3). Con los de «el 90 % y T > TA» serían de 10 a 14 de los 21 de los edificios objetivo. Se reabre sólo si no cabe en el perfil móvil.
+- **VS3-g:** la excentricidad, como torsor estático (VS-i), con lo medido arriba. Mover la masa son cuatro juegos de modos (cuatro veces los casos base); el torsor se queda por ahora, y se decide en VS5, cuando se vea qué hace el CYPECAD del usuario: si mueve la masa, se cambia entonces.
 
 **Fuera de VS3:**
 - la app (VS4): las fichas, el modo «Modal», los casos del sismo en los selectores (hoy la app los usa en las combinaciones por defecto, pero no los lista) y la sección del informe;
