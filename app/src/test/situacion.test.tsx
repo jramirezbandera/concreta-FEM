@@ -107,5 +107,14 @@ describe("Situación", () => {
     await waitFor(() => expect(container.querySelector(".celda")?.getAttribute("data-tipo")).toBe("planta"));
     expect(sit().querySelector(".sit-alzado")).toBeTruthy();
     expect(sit().querySelector(".sit-planta")).toBeNull();
-  }, 120_000);
+
+    // En Resultados también: el navegador lleva la Situación y navega igual
+    // El ejemplo se calcula solo al abrirlo
+    await waitFor(() => expect(screen.getByRole("button", { name: "Resultados" }).hasAttribute("disabled")).toBe(false), { timeout: 90_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Resultados" }));
+    await waitFor(() => expect(screen.getByText("Situación", { selector: "h2 span" })).toBeTruthy());
+    fireEvent.click(within(sit()).getByRole("button", { name: `Ver la planta ${p1!.id}` }));
+    expect(within(sit()).getByRole("button", { name: `Ver la planta ${p1!.id}` }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("img", { name: `Planta ${p1!.id}` })).toBeTruthy();
+  }, 180_000);
 });
