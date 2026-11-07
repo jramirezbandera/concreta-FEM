@@ -840,7 +840,7 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
           onCambio={(modo) => poner({ modo })}
           ayuda={(t.modo ?? "recuadro") === "recuadro" ? "Un clic dentro de un recuadro cerrado por vigas, muros, apoyos lineales o bordes de forjado: el contorno, por sus ejes, desde el vértice más cercano al clic." : "Clic a clic; Intro, doble clic o un clic en el primero lo cierra."}
         />
-        <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x, zunchos: t.zunchos, anchoZuncho: t.anchoZuncho }, true)} />
+        <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x, zunchos: t.zunchos, anchoZuncho: t.anchoZuncho, abacos: t.abacos }, true)} />
         {tipo !== "unidireccional" && (
           <>
             {num("espesor", "canto", "m")}
@@ -865,6 +865,11 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="chk">
+              <input type="checkbox" checked={t.abacos !== false} onChange={(x) => poner({ abacos: x.target.checked })} />
+              <span>Con ábacos</span>
+              <Ayuda texto="Un ábaco macizo en cada pilar que llega al forjado: desde el eje del pilar, el 15 % de la luz de cada lado y en cada dirección de los nervios (hacia un borde sin vano, hasta el borde), redondeado a casetones enteros. Los que se tocan se unen. Después se retocan uno a uno con la herramienta Ábaco." />
             </label>
           </>
         )}

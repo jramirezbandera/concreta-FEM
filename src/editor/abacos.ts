@@ -13,8 +13,9 @@
  * Puro: sin IO.
  */
 import type { Losa, ModeloFisico, OpcionesCompilacion, Vec2 } from "../compilador/fisico.ts";
-import { abacosLosa, idAbaco, pilaresEnLosa, rectanguloAbaco, TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
-import { areaConSigno, areaInterseccionRegiones, puntoEnPoligono, type Region } from "../compilador/poligonos.ts";
+import { abacosLosa, idAbaco, pilaresEnLosa, rectanguloAbaco, reticulaCasetones, TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
+import { areaConSigno, areaInterseccionRegiones, puntoEnPoligono, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
+import { huellaSeccion, PlantaFisica } from "../agente/render/modelo.ts";
 import type { Operacion } from "./operaciones.ts";
 import { indiceIds } from "./referencias.ts";
 
@@ -382,11 +383,138 @@ export interface PropuestaAbacos {
 
 /** Los ábacos de `a` × `b` m (según los nervios y su perpendicular) en los pilares que llegan al reticular `losaId`. */
 export function proponerAbacos(m: ModeloFisico, losaId: string, a: number, b: number): PropuestaAbacos | { error: string } {
+  if (!(a > 0 && b > 0)) {
+    const l = reticularDe(m, losaId);
+    return { error: typeof l === "string" ? l : "El ábaco tiene que tener las dos medidas mayores que 0." };
+  }
+  return proponer(m, losaId, (l) => {
+    const { d, n } = ejesAbacos(l);
+    return (c) => rectanguloAbaco(c, a, b, d, n);
+  });
+}
+
+/**
+ * La fracción de la luz que el ábaco cubre a cada lado del eje del pilar, en cada dirección (AC-e,
+ * decisión del usuario del 2026-11-07): el 15 %, el mínimo habitual de la práctica española.
+ */
+export const FRACCION_LUZ_ABACO = 0.15;
+
+/** Hacia un lado sin luz y sin luz tampoco al lado contrario, lo que el ábaco llega como mucho desde el eje, m. */
+const SIN_LUZ = 1.2;
+
+/** Del canto al canto útil d del perímetro crítico, m (recubrimiento mecánico, una estimación de predimensionado). */
+export const RECUBRIMIENTO_MECANICO = 0.03;
+
+/**
+ * Los ábacos según las luces (AC-e) en los pilares que llegan al reticular `losaId`. En cada una de
+ * las cuatro direcciones de los nervios (±d, ±n), desde el eje del pilar:
+ *
+ * - **Con un vano:** `fraccion`·L, con L la luz hasta el pilar más cercano de la planta en esa
+ *   dirección (el de menor avance de los que caen en su cono de ±45°; los de todos los forjados de la
+ *   planta, por si el vano sigue en otro). Si los vanos de los dos lados son distintos, sale asimétrico.
+ * - **Sin vano** (pilar de borde o de esquina, o un voladizo): hasta el borde del forjado por ese lado,
+ *   sin pasar de lo que llega por el lado contrario (en un voladizo largo, simétrico); sin vano a
+ *   ningún lado, `SIN_LUZ` como mucho.
+ * - **El perímetro crítico como mínimo** (decisión del usuario del mismo día): con luces cortas, el
+ *   15 % dejaba ábacos diminutos (en la vivienda, P22 y P18 a 1,87 m: 0,67 × 0,34 m). Cada lado llega
+ *   al menos a 2d de la cara del pilar (el perímetro de control del punzonamiento del Código
+ *   Estructural, 6.4.2), con d = canto − `RECUBRIMIENTO_MECANICO`; salvo que el borde esté antes. Dos
+ *   pilares cercanos acaban con sus ábacos unidos.
+ * - **Casetones enteros:** cada lado (salvo el que llega justo al borde) crece hasta la cara del siguiente casetón de la retícula del
+ *   forjado (`reticulaCasetones`, la del sólido), así que el ábaco no corta ninguno y el nervio de su
+ *   borde queda dentro. Lo que se sale del forjado no cuenta, como en todos los ábacos.
+ */
+export function proponerAbacosLuces(m: ModeloFisico, losaId: string, fraccion = FRACCION_LUZ_ABACO): PropuestaAbacos | { error: string } {
+  if (!(fraccion > 0 && fraccion < 0.5)) return { error: "La fracción de la luz tiene que ir de más de 0 a menos de 0,5." };
+  return proponer(m, losaId, (l) => porLuces(m, l, fraccion));
+}
+
+/** La regla de `proponerAbacosLuces` para una losa: el ábaco de un pilar con el eje en c. */
+function porLuces(m: ModeloFisico, l: Losa, fraccion: number): (c: Vec2, pilar: string) => Vec2[] {
+  const { d, n } = ejesAbacos(l);
+  const R: Region = { contorno: l.contorno, huecos: l.huecos ?? [] };
+  const { intereje: s, nervio: bw } = l.reticular!;
+  const S = (q: Vec2) => q[0] * d[0] + q[1] * d[1];
+  const T = (q: Vec2) => q[0] * n[0] + q[1] * n[1];
+  const ls = l.contorno.map(S);
+  const lt = l.contorno.map(T);
+  const c0 = s - bw;
+  const [xs] = reticulaCasetones(Math.min(...ls), Math.max(...ls), s, c0);
+  const [xt] = reticulaCasetones(Math.min(...lt), Math.max(...lt), s, c0);
+  // Los pilares de la planta que llegan a algún forjado: los extremos de los vanos
+  const vistos = new Set<string>();
+  const ejes: Vec2[] = [];
+  for (const x of m.losas ?? [])
+    if (x.planta === l.planta)
+      for (const p of pilaresEnLosa(m, x))
+        if (!vistos.has(p.pilar)) {
+          vistos.add(p.pilar);
+          ejes.push(p.eje);
+        }
+  // El perímetro crítico: 2d desde la cara del pilar, con d = canto − RECUBRIMIENTO_MECANICO
+  const dosD = 2 * Math.max(0, l.espesor - RECUBRIMIENTO_MECANICO);
+  const huellas = new Map(new PlantaFisica(m, l.planta).pilares().map(({ p, seccion }) => [p.id, huellaSeccion(p, seccion)] as const));
+  return (c, pilar) => {
+    const [sc, tc] = [S(c), T(c)];
+    const h = huellas.get(pilar);
+    /** Lo que la huella del pilar llega desde su eje en la dirección u (0 sin huella). */
+    const cara = (u: Vec2) => (!h ? 0 : "anillo" in h ? Math.max(0, ...h.anillo.map((q) => (q[0] - c[0]) * u[0] + (q[1] - c[1]) * u[1])) : h.radio + (h.centro[0] - c[0]) * u[0] + (h.centro[1] - c[1]) * u[1]);
+    // [+d, −d, +n, −n]: la dirección, el avance y la desviación de cada pilar
+    const dirs: [Vec2, (q: Vec2) => number, (q: Vec2) => number][] = [
+      [d, (q) => S(q) - sc, (q) => T(q) - tc],
+      [[-d[0], -d[1]], (q) => sc - S(q), (q) => T(q) - tc],
+      [n, (q) => T(q) - tc, (q) => S(q) - sc],
+      [[-n[0], -n[1]], (q) => tc - T(q), (q) => S(q) - sc],
+    ];
+    const ext: (number | null)[] = dirs.map(([, av, desv]) => {
+      let L = Infinity;
+      for (const q of ejes) {
+        const a = av(q);
+        if (a > 1e-6 && Math.abs(desv(q)) <= a) L = Math.min(L, a);
+      }
+      return L < Infinity ? fraccion * L : null;
+    });
+    // Al menos hasta el perímetro crítico (AC-e): de luces cortas saldrían diminutos
+    const minimo = dirs.map(([u]) => cara(u) + dosD);
+    for (let k = 0; k < 4; k++) if (ext[k] !== null) ext[k] = Math.max(ext[k]!, minimo[k]!);
+    // Sin vano: hasta el borde (exacto, sin redondear: si no, se saldría hasta un intereje) o, si
+    // queda más lejos, lo del lado contrario
+    const borde = ext.map((e, k) => (e === null ? alBorde(R, c, dirs[k]![0]) : Infinity));
+    const lleno = ext.map((e, k) => e ?? Math.min(Math.max(ext[k ^ 1] ?? SIN_LUZ, minimo[k]!), borde[k]!));
+    const alBordeExacto = lleno.map((e, k) => ext[k] === null && e === borde[k]);
+    // Lo demás, hasta la cara del siguiente casetón: la celda i va de x0 + i·s a x0 + i·s + c0
+    const mas = (k: number, x0: number, x: number) => (alBordeExacto[k] ? x + lleno[k]! : x0 + Math.ceil((x + lleno[k]! - x0) / s - 1e-9) * s);
+    const menos = (k: number, x0: number, x: number) => (alBordeExacto[k] ? x - lleno[k]! : x0 + Math.floor((x - lleno[k]! - x0 - c0) / s + 1e-9) * s + c0);
+    const [s0, s1, t0, t1] = [menos(1, xs, sc), mas(0, xs, sc), menos(3, xt, tc), mas(2, xt, tc)];
+    const v = (a: number, b: number): Vec2 => [r6(a * d[0] + b * n[0]), r6(a * d[1] + b * n[1])];
+    return [v(s0, t0), v(s1, t0), v(s1, t1), v(s0, t1)];
+  };
+}
+
+/** Lo que hay desde c hasta el borde de la región R según la dirección unitaria u (0 si sale ya de ella). */
+function alBorde(R: Region, c: Vec2, u: Vec2): number {
+  if (!puntoEnRegion([c[0] + 1e-6 * u[0], c[1] + 1e-6 * u[1]], R)) return 0;
+  let t = Infinity;
+  for (const anillo of [R.contorno, ...R.huecos])
+    for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+      const [a, b] = [anillo[j]!, anillo[i]!];
+      const e: Vec2 = [b[0] - a[0], b[1] - a[1]];
+      const den = u[0] * e[1] - u[1] * e[0];
+      if (Math.abs(den) < 1e-12) continue;
+      const w: Vec2 = [a[0] - c[0], a[1] - c[1]];
+      const tt = (w[0] * e[1] - w[1] * e[0]) / den;
+      const k = (w[0] * u[1] - w[1] * u[0]) / den;
+      if (tt > 1e-6 && k >= -1e-12 && k <= 1 + 1e-12) t = Math.min(t, tt);
+    }
+  return t;
+}
+
+/** Lo común de las dos propuestas: `regla(l)` da el ábaco de un pilar con el eje en c. */
+function proponer(m: ModeloFisico, losaId: string, regla: (l: Losa) => (c: Vec2, pilar: string) => Vec2[]): PropuestaAbacos | { error: string } {
   const l = reticularDe(m, losaId);
   if (typeof l === "string") return { error: l };
-  if (!(a > 0 && b > 0)) return { error: "El ábaco tiene que tener las dos medidas mayores que 0." };
   const R: Region = { contorno: l.contorno, huecos: l.huecos ?? [] };
-  const { d, n } = ejesAbacos(l);
+  const abaco = regla(l);
   const existentes = (l.reticular!.abacos ?? []).map((p) => p as Vec2[]);
   const r: PropuestaAbacos = { losa: losaId, nuevos: [], conAbaco: [], solapados: [], fuera: [] };
   // Los pilares que llegan al forjado, con el eje del tramo que lo atraviesa (la regla de MA2)
@@ -395,7 +523,7 @@ export function proponerAbacos(m: ModeloFisico, losaId: string, a: number, b: nu
       r.conAbaco.push(pilar);
       continue;
     }
-    const poligono = rectanguloAbaco(c, a, b, d, n);
+    const poligono = abaco(c, pilar);
     if ([...existentes, ...r.nuevos.map((x) => x.poligono)].some((e) => areaInterseccionRegiones(region(e), region(poligono)) > 1e-9)) r.solapados.push(pilar);
     r.nuevos.push({ pilar, poligono });
     if (areaInterseccionRegiones(R, region(poligono)) < Math.abs(areaConSigno(poligono)) - 1e-9) r.fuera.push(pilar);

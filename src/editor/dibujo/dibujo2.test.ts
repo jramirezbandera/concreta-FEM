@@ -17,6 +17,7 @@ import { apuntar, indiceEnganches, RADIO_ENGANCHE } from "./enganches.ts";
 import { ESTADO_INICIAL, borrador, paso, type ContextoHerramienta, type EstadoHerramienta, type Evento, type NombreHerramienta, type Plantillas } from "./herramientas.ts";
 import { ANCHO_ZUNCHO, desplazar, rectangulo } from "./piezas.ts";
 import { operacionVigasBorde, proponerVigasBorde } from "../vigasBorde.ts";
+import { operacionAbacos, proponerAbacosLuces } from "../abacos.ts";
 import { contornoDesde, recuadroEn, recuadrosDe } from "./recuadros.ts";
 
 const SECCIONES = [
@@ -192,7 +193,8 @@ describe("Forjado (criterio 1)", () => {
 
   it("reticular con su plantilla, y lo que falta en ella se dice", () => {
     const p = reticula();
-    const ret: Plantillas = { ...PLANTILLAS, forjado: { tipo: "reticular", espesor: 0.3, material: "HA-30", intereje: 0.8, nervio: 0.12, capa: 0.05, pp: 4.3 } };
+    // Sin ábacos, lo que da la tabla (los prueba «Con ábacos»)
+    const ret: Plantillas = { ...PLANTILLAS, forjado: { tipo: "reticular", espesor: 0.3, material: "HA-30", intereje: 0.8, nervio: 0.12, capa: 0.05, pp: 4.3, abacos: false } };
     const r = dibujar(p, "forjado", [clic(p, [6, 1])], ret);
     const t = conTabla(p, "forjados", { planta: "N1", tipo: "reticular", contorno: "5 0; 10 0; 10 6,3; 5 6,3", espesor: "0,3", material: "HA-30", pp: "4,3", intereje: "0,8", nervio: "0,12", capa: "0,05" });
     expect(serializar(r.proyecto)).toBe(serializar(t));
@@ -202,6 +204,29 @@ describe("Forjado (criterio 1)", () => {
     expect(serializar(sinPp.proyecto)).toBe(serializar(conTabla(p, "forjados", { planta: "N1", tipo: "reticular", contorno: "5 0; 10 0; 10 6,3; 5 6,3", espesor: "0,3", material: "HA-30", intereje: "0,8", nervio: "0,12", capa: "0,05" })));
     expect(dibujar(p, "forjado", [clic(p, [6, 1])], { ...ret, forjado: { ...ret.forjado, pp: undefined, caseton: "perdido" } }).errores[0]).toMatch(/casetón perdido de otro material/);
     expect(dibujar(p, "forjado", [clic(p, [6, 1])], { ...PLANTILLAS, forjado: { tipo: "maciza", espesor: 0.25 } }).errores[0]).toMatch(/material/);
+  });
+
+  it("con ábacos (AC-e): los de «Según las luces» en sus pilares en el mismo paso, y compila; sin pilares, se avisa", () => {
+    const p = reticula();
+    const ret: Plantillas = { ...PLANTILLAS, forjado: { tipo: "reticular", espesor: 0.3, material: "HA-30", intereje: 0.8, nervio: 0.12, capa: 0.05 } };
+    const r = dibujar(p, "forjado", [clic(p, [6, 1])], ret);
+    expect(r.etiquetas).toEqual(["Forjado L1 (reticular) con 4 ábacos"]);
+    // Lo mismo que dibujarlo sin ellos y «En todos los pilares…» según las luces después
+    const sin = dibujar(p, "forjado", [clic(p, [6, 1])], { ...ret, forjado: { ...ret.forjado, abacos: false } }).proyecto;
+    const pr = proponerAbacosLuces(sin.modelo, "L1");
+    if ("error" in pr) throw new Error(pr.error);
+    const a = aplicar(sin, operacionAbacos(sin.modelo, pr)!);
+    if (!a.ok) throw new Error("no se aplica");
+    expect(serializar(r.proyecto)).toBe(serializar(a.proyecto));
+    expect(compilar(r.proyecto.modelo, r.proyecto.opciones).valido).toBe(true);
+    // Sin pilares que lleguen al forjado: sin ábacos, con aviso
+    const p0 = proyectoNuevo("sin pilares");
+    const q = { ...p0, modelo: { ...p0.modelo, secciones: SECCIONES as unknown as ModeloFisico["secciones"] } };
+    const ctx: ContextoHerramienta = { modelo: q.modelo, planta: "N1", indice: indiceEnganches(q.modelo, "N1"), plantillas: { ...ret, forjado: { ...ret.forjado, modo: "poligono" } } };
+    let e: EstadoHerramienta = ESTADO_INICIAL;
+    for (const x of [[0, 0], [4, 0], [4, 4], [0, 4]] as Vec2[]) e = paso("forjado", e, punto(x), ctx).estado;
+    const h = paso("forjado", e, { tipo: "terminar" }, ctx).hecho!;
+    expect(h.avisos!.some((x) => /Sin ábacos/.test(x))).toBe(true);
   });
 
   it("como polígono: clic a clic, y un clic en el primero lo cierra; no puede pisar otro", () => {

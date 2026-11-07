@@ -17,6 +17,9 @@
  *   mismo paso, las vigas de borde de «Vigas de borde» (`vigasBorde.ts`) en los lados que no van sobre
  *   una viga, un muro, un apoyo lineal u otro forjado; en un hueco, sólo en los suyos. Un forjado
  *   cerrado por vigas no tiene ninguno libre y sale igual que sin la casilla.
+ * - **Con ábacos** (por defecto, en un reticular; AC-e): en el mismo paso, un ábaco según las luces
+ *   en cada pilar que llega al forjado (`proponerAbacosLuces`: 0,15·L a cada lado, hasta la cara del
+ *   siguiente casetón), unidos como en el compilador. Sin pilares, el forjado sale sin ábacos y se avisa.
  * - **Hueco:** el primer clic dice dónde va. En un forjado, un rectángulo (dos esquinas, en los ejes
  *   del ortogonal) o un polígono, dentro de su contorno. En un muro, dos clics por su eje dan las
  *   estaciones de sus bordes (en un tramo) y las alturas, las de la plantilla sobre el suelo de la
@@ -43,6 +46,7 @@ import { unitario } from "./enganches.ts";
 import { ESTADO_INICIAL, igual, plantasPilar, seccionValida, type Alinear, type Borrador, type ContextoHerramienta, type EstadoHerramienta, type Evento, type Paso, type Plantillas } from "./herramientas.ts";
 import { contornoDesde, puntoEnPoligono, recuadroEn, recuadrosPlanta } from "./recuadros.ts";
 import { operacionVigasBorde, proponerVigasBorde } from "../vigasBorde.ts";
+import { proponerAbacosLuces, unirComoCompilador } from "../abacos.ts";
 import { ayudaAbaco, borradorAbaco, pasoAbaco } from "./abaco.ts";
 
 export const PIEZAS = ["forjado", "hueco", "abaco", "muro", "apoyo", "apoyoLineal"] as const;
@@ -75,6 +79,8 @@ export interface PlantillaForjado {
   zunchos?: boolean;
   /** Ancho de esas vigas, m (por defecto, `ANCHO_ZUNCHO`); el canto, el del forjado. */
   anchoZuncho?: number;
+  /** Reticular: un ábaco según las luces en cada pilar que llega al forjado (por defecto, sí; AC-e). */
+  abacos?: boolean;
 }
 
 /**
@@ -309,9 +315,23 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: numb
     reticular = { intereje: t.intereje!, nervio: t.nervio!, capa: t.capa!, ...(t.caseton && t.caseton !== CASETON_POR_DEFECTO ? { caseton: t.caseton } : {}) };
   }
   const id = idNuevo(m, "L");
-  const losa: Losa = { id, ...(nombre ? { nombre } : {}), planta: ctx.planta, contorno, espesor: t.espesor!, material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
-  const etiqueta = `Forjado ${id} (${tipo})`;
-  return t.zunchos === false ? hecho(crear("losas", losa), etiqueta) : conZunchos(ctx, crear("losas", losa), etiqueta, losa, t.anchoZuncho);
+  let losa: Losa = { id, ...(nombre ? { nombre } : {}), planta: ctx.planta, contorno, espesor: t.espesor!, material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
+  let etiqueta = `Forjado ${id} (${tipo})`;
+  // AC-e: los ábacos según las luces, en la misma losa (sin pilares, se avisa: AC-d pedirá uno en cada uno)
+  let avisoAbacos: string | null = null;
+  if (reticular && t.abacos !== false) {
+    const m2: ModeloFisico = { ...m, losas: [...(m.losas ?? []), losa] };
+    const p = proponerAbacosLuces(m2, id);
+    if ("error" in p || !p.nuevos.length) avisoAbacos = "Sin ábacos: ningún pilar llega al forjado. Al poner los pilares, póngale los suyos con la herramienta Ábaco.";
+    else {
+      const u = unirComoCompilador(m2, losa, p.nuevos.map((x) => x.poligono), ...((ctx.toleranciaAbacos !== undefined ? [ctx.toleranciaAbacos] : []) as [number?]));
+      losa = { ...losa, reticular: { ...reticular, abacos: u.abacos } };
+      etiqueta += ` con ${u.abacos.length} ${u.abacos.length === 1 ? "ábaco" : "ábacos"}`;
+    }
+  }
+  const r = t.zunchos === false ? hecho(crear("losas", losa), etiqueta) : conZunchos(ctx, crear("losas", losa), etiqueta, losa, t.anchoZuncho);
+  if (avisoAbacos && r.hecho) r.hecho.avisos = [...(r.hecho.avisos ?? []), avisoAbacos];
+  return r;
 }
 
 const comoPaso = (e: EstadoHerramienta, r: Paso | string): Paso => (typeof r === "string" ? { estado: e, error: r } : r);

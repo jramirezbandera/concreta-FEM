@@ -546,6 +546,7 @@ describe("Ábacos en los pilares", () => {
     expect(within(d).getByText(/Ya tienen ábaco/).textContent).toContain("P12");
     expect(within(d).getByRole("button", { name: "Crear" })).toHaveProperty("disabled", true);
     // Más grandes, chocan con los que hay: se sigue sin crear ninguno
+    fireEvent.click(within(d).getByRole("radio", { name: /De una medida/ }));
     fireEvent.change(within(d).getByRole("textbox", { name: /Según los nervios/ }), { target: { value: "8" } });
     expect(within(d).getByText(/Ningún ábaco nuevo/)).toBeTruthy();
   }, 120_000);

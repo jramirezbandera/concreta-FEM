@@ -38,7 +38,7 @@
  *
  * Puro: sin IO.
  */
-import { resolverAbacos } from "../compilador/abacos.ts";
+import { resolverAbacos, reticulaCasetones } from "../compilador/abacos.ts";
 import { ejesBarra, puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
@@ -904,11 +904,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       const [X0, X1] = [Math.min(...loc.map((q) => q[0])), Math.max(...loc.map((q) => q[0]))];
       const [Y0, Y1] = [Math.min(...loc.map((q) => q[1])), Math.max(...loc.map((q) => q[1]))];
       /** Inicio de las celdas (las enteras, centradas) y la primera y la última que tocan [a, b]. */
-      const reticula = (a: number, b: number): [number, number, number] => {
-        const k = Math.max(1, Math.floor((b - a - c) / s + 1e-9) + 1);
-        const x0 = (a + b) / 2 - ((k - 1) * s + c) / 2;
-        return [x0, Math.floor((a - x0) / s), Math.ceil((b - x0 - c) / s)];
-      };
+      const reticula = (a: number, b: number) => reticulaCasetones(a, b, s, c);
       const [ax, i0, i1] = reticula(X0, X1);
       const [ay, j0, j1] = reticula(Y0, Y1);
       const g = (x: number, y: number): Vec2 => [x * d[0] + y * n[0], x * d[1] + y * n[1]];

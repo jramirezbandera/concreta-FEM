@@ -1,0 +1,42 @@
+muestrario L2 (intereje 0,80): 12 ábacos suyos
+  P1   luces 1,06 × 1,16   suyo 2,40 × 2,40
+  P2   luces 2,52 × 1,16   suyo 2,40 × 2,40
+  P3   luces 2,52 × 1,16   suyo 2,40 × 2,40
+  P4   luces 1,06 × 1,16   suyo 2,40 × 2,40
+  P5   luces 1,06 × 2,52   suyo 2,40 × 2,40
+  P6   luces 2,52 × 2,52   suyo 2,40 × 2,40
+  P7   luces 2,52 × 2,52   suyo 2,40 × 2,40
+  P8   luces 1,06 × 2,52   suyo 2,40 × 2,40
+  P9   luces 1,06 × 1,16   suyo 2,40 × 2,40
+  P10  luces 2,52 × 1,16   suyo 2,40 × 2,40
+  P11  luces 2,52 × 1,16   suyo 2,40 × 2,40
+  P12  luces 1,06 × 1,16   suyo 2,40 × 2,40
+  tras unir: 12 ábacos (suyos: 12)
+vivienda L-CUB (intereje 0,72): 11 ábacos suyos
+  P1   luces 0,83 × 1,16   suyo 2,00 × 4,06
+  P2   luces 2,28 × 1,16   suyo 2,00 × 2,00
+  P3   luces 2,28 × 1,88   suyo 2,00 × 2,00
+  P4   luces 0,83 × 1,38   suyo 2,00 × 2,00
+  P7   luces 0,83 × 2,28   suyo 2,00 × 4,06  (se sale: cuenta lo de dentro)
+  P10  luces 1,38 × 2,28   suyo 2,00 × 2,00  (se sale: cuenta lo de dentro)
+  P11  luces 2,28 × 2,28   suyo 2,00 × 2,00  (se sale: cuenta lo de dentro)
+  P12  luces 0,83 × 2,28   suyo 2,00 × 2,00
+  P14  luces 2,28 × 2,28   suyo 2,00 × 2,00  (se sale: cuenta lo de dentro)
+  P15  luces 0,83 × 2,28   suyo 2,00 × 2,00
+  P18  luces 1,39 × 2,28   suyo 2,00 × 3,87
+  P19  luces 0,83 × 2,28   suyo 2,00 × 3,87
+  P22  luces 1,39 × 1,05   suyo 2,00 × 3,87
+  P23  luces 0,83 × 1,05   suyo 2,00 × 3,87
+  tras unir: 11 ábacos (suyos: 11); P1+P7 en uno de 0,83 × 3,32; P18+P22 en uno de 1,39 × 3,21; P19+P23 en uno de 0,83 × 3,21
+vivienda L-CUB-S (intereje 0,72): 10 ábacos suyos
+  P4   luces 0,74 × 1,37   suyo 2,00 × 2,00
+  P5   luces 2,28 × 2,28   suyo 2,00 × 2,00  (se sale: cuenta lo de dentro)
+  P6   luces 1,46 × 1,37   suyo 2,00 × 2,00
+  P8   luces 2,28 × 2,28   suyo 2,00 × 2,00
+  P9   luces 1,46 × 2,28   suyo 2,00 × 2,00
+  P12  luces 0,74 × 2,28   suyo 2,00 × 2,00
+  P13  luces 2,28 × 2,28   suyo 2,00 × 2,00
+  P15  luces 0,74 × 1,04   suyo 2,00 × 2,00
+  P16  luces 2,28 × 1,04   suyo 2,00 × 2,00
+  P17  luces 1,46 × 1,04   suyo 2,00 × 2,00
+  tras unir: 9 ábacos (suyos: 10); P5+P8 en uno de 2,28 × 4,44

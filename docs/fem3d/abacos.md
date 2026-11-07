@@ -15,6 +15,7 @@ A petición del usuario (2026-11-06): «ahora mismo no se pueden editar y si se 
 - **AC-b, al solapar: se unen en el acto.** Al crear, mover, copiar o estirar un ábaco que solapa con otro (o queda a menos de h/2), en el mismo paso de deshacer queda uno solo en el fichero, y se dice con cuál se unió. Lo que se ve es lo que hay.
 - **AC-c, en el fichero: dentro de la losa, como hasta ahora** (`reticular.abacos`). La app los trata como objetos, sin cambiar el formato ni la huella.
 - **AC-d (2026-11-07): un reticular lleva siempre un ábaco en cada pilar.** Antes nada impedía calcular un reticular sin ellos. Ahora un pilar que llega a un reticular (el eje del tramo que lo atraviesa, en la losa; la regla de `abacosPilares`) sin un ábaco en el que caiga su eje (dentro o en su borde) es el error `reticular/pilar-sin-abaco`, con la losa y los pilares, y no se calcula (§6).
+- **AC-e (2026-11-07): los ábacos que pone el programa, según las luces.** Desde el eje del pilar, a cada lado y en cada dirección de los nervios, el 15 % de la luz de ese lado, redondeado a casetones enteros, y al menos hasta el perímetro crítico (2d desde la cara del pilar). Hacia un borde sin vano, hasta el borde (§7).
 
 ## 3. Lo que se hace
 
@@ -66,4 +67,25 @@ Pasan los criterios 1 a 3; el 4 (puerta de uso) es del usuario.
 - **`pilaresSinAbaco` y `errorPilaresSinAbaco`** (`src/compilador/abacos.ts`): por cada reticular, los pilares de `pilaresEnLosa` cuyo eje no cae en ninguno de los ábacos resueltos (los dados, los de `abacosPilares` y los unidos). El compilador da el error detrás de la validación, para que los errores de datos vayan antes. Un pilar en un hueco o fuera de la losa no lo necesita; una maciza, tampoco.
 - **No cambia ningún modelo válido:** los edificios objetivo, la vivienda, el muestrario, los generadores de `src/pruebas` y las referencias congeladas ya llevaban un ábaco en cada pilar (sus pruebas pasan igual). Sólo cambian modelos hechos a mano en las pruebas: el de las entradas no válidas de C4 (ábacos también en los pilares de esquina, y una entrada nueva sin el de C0-0), el recuadro de `pesoAncho.test.ts` (`abacosPilares` de 1 × 1, que no llegan a la viga plana) y uno de `abacosPilares.test.ts`.
 - **Prueba:** `src/compilador/pilarSinAbaco.test.ts`.
-- **Sin hacer:** que la herramienta Forjado ponga los ábacos al dibujar un reticular (como «Con zunchos»); hoy el error aparece en Diagnósticos hasta que se ponen con la herramienta Ábaco.
+- **Hecho después** (§7): la herramienta Forjado los pone al dibujar un reticular.
+
+## 7. AC-e, los ábacos según las luces (2026-11-07)
+
+Decidido por el usuario: «0,15·L por lado», «casetones enteros» y, al ver los de luces cortas, «el perímetro crítico» como mínimo.
+
+- **La regla** (`proponerAbacosLuces`, `src/editor/abacos.ts`). En cada una de las cuatro direcciones de los nervios (±eje 1, ±su perpendicular), desde el eje del tramo del pilar que atraviesa el forjado:
+  - con un vano, 0,15·L. L es el avance hasta el pilar más cercano de la planta en esa dirección: de los que caen en su cono de ±45°, el de menor avance; vale también uno de otro forjado de la planta. Con vanos distintos a los dos lados, el ábaco sale asimétrico;
+  - al menos 2d desde la cara del pilar, con d = canto − 3 cm (`RECUBRIMIENTO_MECANICO`): el perímetro de control del punzonamiento (Código Estructural 6.4.2). En un 30 de canto y un pilar de 30, 0,69 m desde el eje;
+  - sin vano (pilar de borde o de esquina, voladizo), hasta el borde del forjado, exacto y sin redondear; si el borde queda más lejos, lo del lado contrario. Sin vano a ningún lado, 1,2 m como mucho;
+  - lo demás crece hasta la cara del siguiente casetón de la retícula del sólido (`reticulaCasetones`, ahora compartida con `visor/solido.ts`, que da los mismos bits). Así el ábaco no corta ningún casetón y el nervio de su borde queda dentro;
+  - los que se solapan o quedan a menos de h/2 se unen, como siempre (AC-b).
+- **Dónde se usa:**
+  - en la herramienta Forjado, la casilla «Con ábacos» (en un reticular, marcada por defecto). En el mismo paso, los ábacos de los pilares que llegan al forjado; sin pilares, sale sin ábacos y lo avisa;
+  - en «En todos los pilares…» de la herramienta Ábaco, «Según las luces» por defecto, o «De una medida» como antes;
+  - `abacosPilares` del fichero y el clic en un pilar con la herramienta Ábaco siguen con su medida fija.
+- **Medido** (`validacion/ac/lucesMuestrario.ts`, `out_lucesMuestrario.txt`):
+  - en el muestrario (luces de 6 a 8 m e intereje de 0,80), los interiores salen de 2,52 × 2,52 m, frente a los 2,40 × 2,40 dibujados a mano;
+  - en la vivienda, la cubierta L-CUB sale con 11 ábacos, como la suya, con las tres parejas que se unieron a mano (P1+P7, P18+P22, P19+P23). Sin el mínimo del perímetro crítico, P22 y P18, a 1,87 m, daban 0,67 × 0,34 m cada uno. En L-CUB-S salen 9 en lugar de 10, porque P5 y P8 se unen;
+  - los de borde quedan más estrechos que los dibujados (0,83 m frente a 2,00), porque acaban en el borde en lugar de salirse de la losa. Lo que se salía no contaba.
+- **Pruebas:** `src/editor/abacosLuces.test.ts` (los mínimos y el redondeo, los lados en la cara de un casetón, el borde y el voladizo, la regla girada 30° y que compila) y `dibujo2.test.ts` («Con ábacos» da lo mismo que dibujar sin ellos y añadir los de «Según las luces» después, y avisa sin pilares).
+- **Sin contrastar:** la regla frente a los ábacos que pone CYPECAD en el mismo modelo.

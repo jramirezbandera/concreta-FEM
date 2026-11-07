@@ -110,6 +110,19 @@ export function pilaresEnLosa(m: ModeloFisico, l: Losa): { pilar: string; eje: V
   return r;
 }
 
+/**
+ * La retícula de casetones de un reticular en una dirección: celdas de c = s − bw (s, el intereje;
+ * bw, el nervio) cada s, las enteras centradas en [a, b] (la caja de la losa según esa dirección).
+ * Devuelve el inicio x0 de la celda 0 y la primera y la última que tocan [a, b]: la celda i va de
+ * x0 + i·s a x0 + i·s + c. Es la del sólido (`visor/solido.ts`) y la de los ábacos por luces
+ * (`editor/abacos.ts`), así que un ábaco redondeado a ella cubre casetones enteros en el dibujo.
+ */
+export function reticulaCasetones(a: number, b: number, s: number, c: number): [number, number, number] {
+  const k = Math.max(1, Math.floor((b - a - c) / s + 1e-9) + 1);
+  const x0 = (a + b) / 2 - ((k - 1) * s + c) / 2;
+  return [x0, Math.floor((a - x0) / s), Math.ceil((b - x0 - c) / s)];
+}
+
 /** Distancia entre dos polígonos: 0 si se cortan o uno contiene al otro. */
 function distanciaPoligonos(a: readonly Vec2[], b: readonly Vec2[]): number {
   if (puntoEnPoligono(a[0]!, b) || puntoEnPoligono(b[0]!, a)) return 0;

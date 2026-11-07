@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
-import { operacionAbacos, proponerAbacos, toleranciaAbacos } from "../../../src/editor/abacos.ts";
+import { operacionAbacos, proponerAbacos, proponerAbacosLuces, toleranciaAbacos } from "../../../src/editor/abacos.ts";
 import { operacionVigasBorde, proponerVigasBorde, vigasDelBorde } from "../../../src/editor/vigasBorde.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
@@ -422,7 +422,8 @@ const malos = (campos: [string, number | string][]): string | null => {
 
 /**
  * Ábacos en los pilares de un forjado reticular (decisión del usuario, 2026-10-13): dice qué crea
- * antes de hacerlo. Los ábacos quedan como polígonos en la tabla Forjados.
+ * antes de hacerlo. Los ábacos quedan como polígonos en la tabla Forjados. Por defecto, según las
+ * luces (AC-e: 0,15·L a cada lado, a casetones enteros, `proponerAbacosLuces`); o de una medida fija.
  */
 export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void }) {
   const { proyecto, planta, seleccion } = useVisor();
@@ -431,15 +432,17 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
   const reticulares = (m.losas ?? []).filter((l) => l.reticular);
   const inicial = reticulares.find((l) => l.id === seleccion) ?? reticulares.find((l) => l.planta === planta) ?? reticulares[0];
   const [losa, setLosa] = useState(inicial?.id ?? "");
+  const [luces, setLuces] = useState(true);
   const [a, setA] = useState("2,4");
   const [b, setB] = useState("2,4");
   const [error, setError] = useState<string | null>(null);
   const [na, nb] = [numero(a), numero(b)];
   const p = useMemo(() => {
-    const mal = malos([["Según los nervios", na], ["En perpendicular", nb]]);
     if (!losa) return { error: "No hay ningún forjado reticular." };
+    if (luces) return proponerAbacosLuces(m, losa);
+    const mal = malos([["Según los nervios", na], ["En perpendicular", nb]]);
     return mal || typeof na === "string" || typeof nb === "string" ? { error: mal ?? "" } : proponerAbacos(m, losa, na, nb);
-  }, [m, losa, na, nb]);
+  }, [m, losa, luces, na, nb]);
   const op = "error" in p ? null : operacionAbacos(m, p, toleranciaAbacos(ed.proyecto.opciones));
 
   const hacer = () => {
@@ -469,7 +472,23 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
         <p>No hay ningún forjado reticular. Un forjado es reticular por su columna «tipo» en la tabla Forjados.</p>
       ) : (
         <>
-          <p>Un ábaco macizo centrado en cada pilar que llega al forjado, con sus lados según los nervios (la dirección del forjado) y su perpendicular. Cada uno se elige después en la planta para retocarlo, y los que se solapan o quedan a menos de media malla se unen.</p>
+          <p>Un ábaco macizo en cada pilar que llega al forjado, con sus lados según los nervios (la dirección del forjado) y su perpendicular. Cada uno se elige después en la planta para retocarlo, y los que se solapan o quedan a menos de media malla se unen.</p>
+          <div className="mt-3">
+            <label className="opcion">
+              <input type="radio" name="abacos-medida" checked={luces} onChange={() => setLuces(true)} />
+              <span>
+                Según las luces
+                <small>Desde el eje del pilar, el 15 % de la luz de cada lado y en cada dirección; hacia un borde sin vano, hasta el borde. Redondeado a casetones enteros.</small>
+              </span>
+            </label>
+            <label className="opcion">
+              <input type="radio" name="abacos-medida" checked={!luces} onChange={() => setLuces(false)} />
+              <span>
+                De una medida
+                <small>El mismo rectángulo centrado en todos los pilares.</small>
+              </span>
+            </label>
+          </div>
           <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
             <label htmlFor="abacos-losa">Forjado</label>
             <select id="abacos-losa" className="sel" value={losa} onChange={(e) => setLosa(e.target.value)}>
@@ -480,10 +499,14 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
                 </option>
               ))}
             </select>
-            <label htmlFor="abacos-a">Según los nervios (m)</label>
-            <input id="abacos-a" className="sel mono" value={a} inputMode="decimal" aria-invalid={typeof na === "string"} data-error={typeof na === "string"} onChange={(e) => setA(e.target.value)} />
-            <label htmlFor="abacos-b">En perpendicular (m)</label>
-            <input id="abacos-b" className="sel mono" value={b} inputMode="decimal" aria-invalid={typeof nb === "string"} data-error={typeof nb === "string"} onChange={(e) => setB(e.target.value)} />
+            {!luces && (
+              <>
+                <label htmlFor="abacos-a">Según los nervios (m)</label>
+                <input id="abacos-a" className="sel mono" value={a} inputMode="decimal" aria-invalid={typeof na === "string"} data-error={typeof na === "string"} onChange={(e) => setA(e.target.value)} />
+                <label htmlFor="abacos-b">En perpendicular (m)</label>
+                <input id="abacos-b" className="sel mono" value={b} inputMode="decimal" aria-invalid={typeof nb === "string"} data-error={typeof nb === "string"} onChange={(e) => setB(e.target.value)} />
+              </>
+            )}
           </div>
           {"error" in p ? (
             <p className="mt-3 text-state-fail">{p.error}</p>
