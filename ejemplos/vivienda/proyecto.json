@@ -41,6 +41,13 @@
         "forma": "rectangular",
         "b": 0.3,
         "h": 0.3
+      },
+      {
+        "id": "P30x40",
+        "material": "HA-30",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.4
       }
     ],
     "pilares": [
@@ -82,7 +89,7 @@
         "y": 14.56,
         "desde": "PB",
         "hasta": "CUB-S",
-        "seccion": "P30x30"
+        "seccion": "P30x40"
       },
       {
         "id": "P6",
