@@ -30,6 +30,7 @@
  * fachada es la que se ve desde X (el ancho, en Y). `W+X` empuja hacia +X; `+e` desplaza la recta
  * hacia +Y (según X) o hacia +X (según Y).
  */
+import { vientoEfectivo } from "./emplazamiento.ts";
 import { cotasPlantas } from "./cotas.ts";
 import type { AccionCaso, CargaFisica, CasoFisico, ModeloFisico, Seccion, Vec2, VientoEdificio } from "./fisico.ts";
 import { momentosRegion, puntoEnRegion, trozosSegmento, type Region } from "./poligonos.ts";
@@ -95,6 +96,10 @@ export interface DireccionViento {
 
 export interface VientoCalculado {
   zona: ZonaEolica;
+  /** De dónde sale la zona: escrita o la de la provincia del emplazamiento (con el aviso de frontera, si lo tiene). */
+  zonaOrigen: "escrita" | "provincia";
+  /** La provincia del emplazamiento, si la zona sale de ella. */
+  provincia?: { ine: string; nombre: string; frontera?: string };
   qb: number;
   qbOrigen: "zona" | "simplificado" | "dada";
   aspereza: GradoAspereza;
@@ -199,8 +204,9 @@ export function dimensionesPlanta(m: ModeloFisico, k: number): [number, number] 
 export function calcularViento(m: ModeloFisico): CalculoViento | null {
   // Un modelo que no es un objeto lo rechaza `validar`
   if (typeof m !== "object" || m === null || !Array.isArray(m.plantas) || !Array.isArray(m.casos)) return null;
-  const v: VientoEdificio | undefined = m.acciones?.viento;
-  if (!v) return null;
+  const ef = vientoEfectivo(m);
+  if (!ef) return null;
+  const v: VientoEdificio = ef.viento;
   const errores: ProblemaViento[] = [];
   const avisos: ProblemaViento[] = [];
   const err = (codigo: string, mensaje: string, ids?: string[]) => errores.push({ codigo, mensaje, ...(ids ? { ids } : {}) });
@@ -210,7 +216,9 @@ export function calcularViento(m: ModeloFisico): CalculoViento | null {
     err("viento/no-valido", "El viento de las acciones tiene que ser un objeto con su zona y su aspereza, y sus fachadas, una lista de { planta, x, y }.");
     return fallo();
   }
-  if (typeof v.zona !== "string" || !(v.zona in ZONAS_EOLICAS)) err("viento/zona", "La zona eólica del viento tiene que ser A, B o C (figura D.1 del DB SE-AE).");
+  if (v.zona === undefined)
+    err("viento/zona", "Falta la zona eólica del viento: se toma la de la provincia del emplazamiento (acciones.emplazamiento, con su provincia o su municipio), o se escribe la zona, A, B o C (figura D.1 del DB SE-AE).");
+  else if (typeof v.zona !== "string" || !(v.zona in ZONAS_EOLICAS)) err("viento/zona", "La zona eólica del viento tiene que ser A, B o C (figura D.1 del DB SE-AE).");
   if (typeof v.aspereza !== "string" || !(v.aspereza in ASPEREZAS)) err("viento/aspereza", "El grado de aspereza del viento tiene que ser I, II, III, IV o V (tabla 3.4 del DB SE-AE).");
   if (v.qb !== undefined && !(Number.isFinite(v.qb) && v.qb > 0)) err("viento/qb", "La presión dinámica del viento tiene que ser un número mayor que cero, en kN/m².");
   if (v.altitud !== undefined && !Number.isFinite(v.altitud)) err("viento/altitud", "La altitud del emplazamiento tiene que ser un número, en m.");
@@ -260,7 +268,7 @@ export function calcularViento(m: ModeloFisico): CalculoViento | null {
     return fallo();
   }
 
-  const zona = v.zona;
+  const zona = v.zona!;
   const qb = v.qb ?? ZONAS_EOLICAS[zona].qb;
   const qbOrigen = v.qb === undefined ? "zona" : v.qb === QB_SIMPLIFICADO ? "simplificado" : "dada";
   const conGeometria = sobre.filter((p) => p.huella[0].length > 0);
@@ -329,7 +337,11 @@ export function calcularViento(m: ModeloFisico): CalculoViento | null {
   if (sinDiafragma.length)
     err("viento/planta-sin-diafragma", `Las plantas ${sinDiafragma.join(", ")} reciben viento y no tienen el diafragma rígido: el viento del programa todavía no se reparte por los bordes de un forjado sin diafragma.`, sinDiafragma);
   if (errores.length) return fallo();
-  return { viento: { zona, qb, qbOrigen, aspereza: v.aspereza, rasante, altura, x, y, casos: CASOS_VIENTO.map((c) => c.id) }, errores, avisos };
+  const oz = ef.origenZona;
+  const provincia = oz?.tipo === "provincia" ? { ine: oz.provincia.ine, nombre: oz.provincia.nombre, ...(oz.provincia.frontera ? { frontera: oz.provincia.frontera.eolica } : {}) } : undefined;
+  if (provincia?.frontera && v.qb === undefined)
+    avisos.push({ codigo: "viento/zona-frontera", mensaje: `La zona eólica ${zona} es la de la capital de ${provincia.nombre}, y la figura D.1 parte la provincia: ${provincia.frontera} Si la obra cae al otro lado de la línea, escriba la zona.` });
+  return { viento: { zona, zonaOrigen: oz?.tipo === "provincia" ? "provincia" : "escrita", ...(provincia ? { provincia } : {}), qb, qbOrigen, aspereza: v.aspereza, rasante, altura, x, y, casos: CASOS_VIENTO.map((c) => c.id) }, errores, avisos };
 }
 
 /** Dónde va la puntual de una planta: un punto de la recta de acción en una losa o, si no, un punto con su momento. */
@@ -460,7 +472,7 @@ export function hipotesisViento(v: VientoCalculado): string {
   const dadas = [...v.x.plantas, ...v.y.plantas].some((p) => p.dada);
   return (
     `Viento del DB SE-AE generado por el programa (VS1): ${v.casos.length} casos de la familia «viento» (${v.casos.join(", ")}). ` +
-    `Zona ${v.zona}, qb = ${coma(v.qb, 3)} kN/m²${v.qbOrigen === "simplificado" ? " (el valor simplificado del art. 3.3.2-1)" : v.qbOrigen === "dada" ? " (escrita)" : ""}, aspereza ${v.aspereza} (${ASPEREZAS[v.aspereza].descripcion}), rasante a la cota ${coma(v.rasante)} m; ` +
+    `Zona ${v.zona}${v.zonaOrigen === "provincia" && v.provincia ? ` (la de la provincia del emplazamiento, ${v.provincia.nombre}, en la figura D.1${v.provincia.frontera ? `; ${v.provincia.frontera}` : ""})` : ""}, qb = ${coma(v.qb, 3)} kN/m²${v.qbOrigen === "simplificado" ? " (el valor simplificado del art. 3.3.2-1)" : v.qbOrigen === "dada" ? " (escrita)" : ""}, aspereza ${v.aspereza} (${ASPEREZAS[v.aspereza].descripcion}), rasante a la cota ${coma(v.rasante)} m; ` +
     `${dir(v.x)}; ${dir(v.y)}. ` +
     `Cada planta sobre la rasante recibe F = (cp − cs)·qb·ce(z)·A, con ce de la fórmula D.2 a su cota y A la fachada de su banda: en cada punto del ancho, media planta por debajo y media por encima entre las plantas que hay en él; la banda entre la rasante y la mitad de la primera planta va a la cimentación y lo que hay por encima de la última (petos, casetones) no se cuenta. ` +
     `Va como una puntual horizontal en el centro de su banda desplazado ±e. Fuerzas según X / Y, kN: ${plantas.map((id) => `${id} ${F(v.x, id)} / ${F(v.y, id)}`).join("; ")}${dadas ? " (*: con la fachada escrita)" : ""}. ` +

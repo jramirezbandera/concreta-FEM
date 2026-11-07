@@ -23,7 +23,7 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import { Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
-import { Espectro } from "../editor/FichaAcciones.tsx";
+import { Espectro } from "../editor/Espectro.tsx";
 
 const pct = (x: number) => `${fmt(100 * x, 1)} %`;
 
@@ -313,7 +313,7 @@ export function ModoModal() {
             <span className="v">{fmt(s.peso, 0)} kN</span>
           </div>
           {s.direcciones.some((d) => d.thetaMaxima >= 0.1) && <p className="nota text-state-warn">θ llega a {fmt(Math.max(...s.direcciones.map((d) => d.thetaMaxima)), 2)}: hay que considerar los efectos de segundo orden (art. 3.8), y este cálculo es de primer orden.</p>}
-          {sismo.datos?.curva && sismo.datos.espectro && <Espectro curva={sismo.datos.curva} periodos={sismo.datos.periodos} TA={sismo.datos.espectro.emplazamiento.TA} TB={sismo.datos.espectro.emplazamiento.TB} />}
+          {sismo.datos?.curva && sismo.datos.espectro && <Espectro curva={sismo.datos.curva} periodos={sismo.datos.periodos} TA={sismo.datos.espectro.emplazamiento.TA} TB={sismo.datos.espectro.emplazamiento.TB} ac={sismo.datos.espectro.emplazamiento.ac} />}
           <p className="nota">El emplazamiento y la curva, en Cargas · Sismo. Los casos EX±e y EY±e entran en las combinaciones de la situación sísmica de todas las pantallas.</p>
         </Seccion>
       )}

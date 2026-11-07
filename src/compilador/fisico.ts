@@ -591,8 +591,38 @@ export interface ModeloFisico {
 
 /** Fase VS (`docs/fem3d/viento-sismo.md`): las acciones generadas. VS1, el viento; VS2, las masas y los modos del sismo; VS3, su espectro y sus casos. */
 export interface AccionesEdificio {
+  /**
+   * Dónde está la obra, común al viento y al sismo: de la provincia sale la zona eólica del viento
+   * (si no se escribe la suya), del municipio, su ab y su K del sismo (si no se escriben), y la
+   * altitud vale para los dos. Un `ine` o una `altitud` escritos en el viento o en el sismo mandan.
+   */
+  emplazamiento?: EmplazamientoEdificio;
   viento?: VientoEdificio;
   sismo?: SismoEdificio;
+}
+
+/**
+ * El emplazamiento de la obra (VS4, a petición del usuario: como los datos de la obra de Concreta,
+ * `lib/obra`, que comparten viento, nieve y sismo). Se busca con `fem emplazamiento <municipio>`.
+ */
+export interface EmplazamientoEdificio {
+  /**
+   * Código INE de la provincia, de 2 cifras ("29" es Málaga): decide la zona eólica de la figura
+   * D.1 (la de su capital; el aviso de frontera lo dice si la figura parte la provincia). Con `ine`,
+   * sus dos primeras cifras, y si se dan los dos tienen que casar.
+   */
+  provincia?: string;
+  /**
+   * Código INE del municipio, de 5 cifras ("29008" es Alhaurín el Grande). Si está en la tabla del
+   * Anejo 1 de la NCSE-02, de él salen ab y K (es el `ine` del sismo cuando el sismo no lleva el
+   * suyo); si no está, es un error: no estar en el Anejo 1 no es estar exento. Un municipio que no
+   * figura se escribe sólo con `municipio` y la provincia.
+   */
+  ine?: string;
+  /** Nombre del municipio. Con `ine` tiene que ser el de ese código; sin él, sólo se imprime. */
+  municipio?: string;
+  /** Altitud topográfica, m: la del viento (el DB no es aplicable por encima de 2 000 m) si no lleva la suya. */
+  altitud?: number;
 }
 
 /**
@@ -638,7 +668,8 @@ export interface SismoEdificio {
   nievePermanente?: boolean;
   /**
    * VS4. Código INE del municipio, de 5 cifras ("29008" es Alhaurín el Grande): `ab` y `K` salen de
-   * la tabla del Anejo 1 de la norma, salvo los que se escriban. Los nombres, como en la publicación
+   * la tabla del Anejo 1 de la norma, salvo los que se escriban. Por defecto, el de
+   * `acciones.emplazamiento` (lo normal es escribirlo allí, común al viento). Los nombres, como en la publicación
    * del sismo de Concreta (`ine` y `municipio`). Se busca con `fem emplazamiento`, nunca de memoria.
    */
   ine?: string;
@@ -707,8 +738,12 @@ export type TipoTerrenoSismo = "I" | "II" | "III" | "IV";
  * banda desplazado ±e (con el diafragma rígido, exacta: SP-5).
  */
 export interface VientoEdificio {
-  /** Zona eólica de la figura D.1: qb = 0,42 (A), 0,45 (B) o 0,52 (C) kN/m². */
-  zona: "A" | "B" | "C";
+  /**
+   * Zona eólica de la figura D.1: qb = 0,42 (A), 0,45 (B) o 0,52 (C) kN/m². Por defecto, la de la
+   * provincia del emplazamiento (`acciones.emplazamiento`); escrita, manda (la figura va por líneas,
+   * no por provincias).
+   */
+  zona?: "A" | "B" | "C";
   /** Presión dinámica, kN/m², en lugar de la de la zona (0,5 es el valor simplificado del art. 3.3.2-1). */
   qb?: number;
   /**
@@ -717,7 +752,10 @@ export interface VientoEdificio {
    * negocios de una gran ciudad.
    */
   aspereza: "I" | "II" | "III" | "IV" | "V";
-  /** Altitud del emplazamiento, m: el DB no es aplicable por encima de 2 000 m (art. 3.3.1-2). */
+  /**
+   * Altitud del emplazamiento, m: el DB no es aplicable por encima de 2 000 m (art. 3.3.1-2). Por
+   * defecto, la de `acciones.emplazamiento`.
+   */
   altitud?: number;
   /** Cota de la rasante, m: la de la fachada a barlovento (art. 3.3.3-1). Por defecto, la ±0,00. */
   rasante?: number;

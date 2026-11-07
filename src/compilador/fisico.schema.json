@@ -107,6 +107,9 @@
     "AccionesEdificio": {
       "type": "object",
       "properties": {
+        "emplazamiento": {
+          "$ref": "#/$defs/EmplazamientoEdificio"
+        },
         "viento": {
           "$ref": "#/$defs/VientoEdificio"
         },
@@ -703,6 +706,24 @@
         "desde",
         "hasta"
       ],
+      "additionalProperties": false
+    },
+    "EmplazamientoEdificio": {
+      "type": "object",
+      "properties": {
+        "provincia": {
+          "type": "string"
+        },
+        "ine": {
+          "type": "string"
+        },
+        "municipio": {
+          "type": "string"
+        },
+        "altitud": {
+          "type": "number"
+        }
+      },
       "additionalProperties": false
     },
     "ExceptoBorde": {
@@ -2034,7 +2055,6 @@
         }
       },
       "required": [
-        "zona",
         "aspereza"
       ],
       "additionalProperties": false

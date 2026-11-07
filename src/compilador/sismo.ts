@@ -26,6 +26,7 @@
  * Convenio de la excentricidad, el del viento: `+e` desplaza la recta de acción hacia +Y con el sismo
  * según X y hacia +X con el sismo según Y.
  */
+import { municipioFueraDelAnejo, sismoEfectivo } from "./emplazamiento.ts";
 import {
   C_MESETA_LARGA,
   COEFICIENTE_RIESGO,
@@ -143,7 +144,7 @@ const esNumero = (x: unknown): x is number => typeof x === "number" && Number.is
  * (`ine`), del que sale? Sin ninguno de los dos, sólo hay masas y modos.
  */
 export function tieneEspectro(m: ModeloFisico | null | undefined): boolean {
-  const s: unknown = typeof m === "object" && m !== null ? m.acciones?.sismo : undefined;
+  const s: unknown = sismoEfectivo(m);
   if (typeof s !== "object" || s === null) return false;
   return (s as SismoEdificio).ab !== undefined || (s as SismoEdificio).ine !== undefined;
 }
@@ -155,7 +156,7 @@ export function tieneEspectro(m: ModeloFisico | null | undefined): boolean {
  */
 export function calcularSismo(m: ModeloFisico): CalculoSismo | null {
   if (typeof m !== "object" || m === null || !Array.isArray(m.casos)) return null;
-  const s: SismoEdificio | undefined = m.acciones?.sismo;
+  const s: SismoEdificio | undefined = sismoEfectivo(m);
   if (s === undefined) return null;
   const errores: ProblemaSismo[] = [];
   const avisos: ProblemaSismo[] = [];
@@ -210,6 +211,12 @@ export function calcularSismo(m: ModeloFisico): CalculoSismo | null {
     } else casos.push({ caso: c.id, fraccion: 0, origen: "no-cuenta", motivo: tipo });
   }
   const espectro = espectroDe(s, casosM, m, err, avisos);
+  const fuera = municipioFueraDelAnejo(m);
+  if (fuera !== undefined && !espectro)
+    avisos.push({
+      codigo: "sismo/municipio-fuera-del-anejo",
+      mensaje: `El municipio del emplazamiento, «${fuera}», no figura en el Anejo 1 de la NCSE-02, así que sin «ab» escrita no hay espectro ni casos del sismo: sólo las masas y los modos. ${MENSAJE_NO_ENCONTRADO}`,
+    });
   return errores.length ? { masas: null, espectro: null, errores, avisos } : { masas: { casos, nievePorDefecto }, espectro, errores, avisos };
 }
 

@@ -111,7 +111,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
       los zunchos de los bordes libres de cada losa, como «Vigas de borde» del editor (por el eje de los pilares del lado o enrasados por fuera);
       sólo propone: con --escribir, los pone y reescribe el proyecto (deja el de antes en <proyecto>.json.bak)
   fem emplazamiento <municipio | código INE> [--top N]
-      el municipio de la obra para el sismo y el viento: su código INE («ine» de acciones.sismo), ab y K del Anejo 1 de la NCSE-02
+      el municipio de la obra para el sismo y el viento: su código INE («ine» de acciones.emplazamiento), ab y K del Anejo 1 de la NCSE-02
       y la zona eólica de la capital de su provincia, con el aviso si la provincia tiene más de una; no lleva proyecto
   fem esquema
   fem visor <proyecto.json> [--nuevo]      abre la app sobre el proyecto (no escribe JSON; Ctrl+C la cierra)

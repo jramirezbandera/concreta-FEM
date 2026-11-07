@@ -164,6 +164,10 @@
     "AccionesEdificio": {
       "type": "object",
       "properties": {
+        "emplazamiento": {
+          "$ref": "#/$defs/EmplazamientoEdificio",
+          "description": "Dónde está la obra, común al viento y al sismo: de la provincia sale la zona eólica del viento\n(si no se escribe la suya), del municipio, su ab y su K del sismo (si no se escriben), y la\naltitud vale para los dos. Un `ine` o una `altitud` escritos en el viento o en el sismo mandan."
+        },
         "viento": {
           "$ref": "#/$defs/VientoEdificio"
         },
@@ -827,6 +831,29 @@
       ],
       "additionalProperties": false,
       "description": "Eje de replanteo (I2, `docs/fem3d/interfaz.md` §9): una recta en planta para los alzados, las\nburbujas y las cotas del dibujo, y para nombrar posiciones. Se ve en todas las plantas. El\ncompilador lo ignora, así que no cambia la huella ni los resultados; sin ejes, el dibujo usa los\nque propone `ejes.ts` con las alineaciones de los pilares."
+    },
+    "EmplazamientoEdificio": {
+      "type": "object",
+      "properties": {
+        "provincia": {
+          "type": "string",
+          "description": "Código INE de la provincia, de 2 cifras (\"29\" es Málaga): decide la zona eólica de la figura\nD.1 (la de su capital; el aviso de frontera lo dice si la figura parte la provincia). Con `ine`,\nsus dos primeras cifras, y si se dan los dos tienen que casar."
+        },
+        "ine": {
+          "type": "string",
+          "description": "Código INE del municipio, de 5 cifras (\"29008\" es Alhaurín el Grande). Si está en la tabla del\nAnejo 1 de la NCSE-02, de él salen ab y K (es el `ine` del sismo cuando el sismo no lleva el\nsuyo); si no está, es un error: no estar en el Anejo 1 no es estar exento. Un municipio que no\nfigura se escribe sólo con `municipio` y la provincia."
+        },
+        "municipio": {
+          "type": "string",
+          "description": "Nombre del municipio. Con `ine` tiene que ser el de ese código; sin él, sólo se imprime."
+        },
+        "altitud": {
+          "type": "number",
+          "description": "Altitud topográfica, m: la del viento (el DB no es aplicable por encima de 2 000 m) si no lleva la suya."
+        }
+      },
+      "additionalProperties": false,
+      "description": "El emplazamiento de la obra (VS4, a petición del usuario: como los datos de la obra de Concreta,\n`lib/obra`, que comparten viento, nieve y sismo). Se busca con `fem emplazamiento <municipio>`."
     },
     "ExceptoBorde": {
       "anyOf": [
@@ -2204,7 +2231,7 @@
         },
         "ine": {
           "type": "string",
-          "description": "VS4. Código INE del municipio, de 5 cifras (\"29008\" es Alhaurín el Grande): `ab` y `K` salen de\nla tabla del Anejo 1 de la norma, salvo los que se escriban. Los nombres, como en la publicación\ndel sismo de Concreta (`ine` y `municipio`). Se busca con `fem emplazamiento`, nunca de memoria."
+          "description": "VS4. Código INE del municipio, de 5 cifras (\"29008\" es Alhaurín el Grande): `ab` y `K` salen de\nla tabla del Anejo 1 de la norma, salvo los que se escriban. Por defecto, el de\n`acciones.emplazamiento` (lo normal es escribirlo allí, común al viento). Los nombres, como en la publicación\ndel sismo de Concreta (`ine` y `municipio`). Se busca con `fem emplazamiento`, nunca de memoria."
         },
         "municipio": {
           "type": "string",
@@ -2385,7 +2412,7 @@
             "B",
             "C"
           ],
-          "description": "Zona eólica de la figura D.1: qb = 0,42 (A), 0,45 (B) o 0,52 (C) kN/m²."
+          "description": "Zona eólica de la figura D.1: qb = 0,42 (A), 0,45 (B) o 0,52 (C) kN/m². Por defecto, la de la\nprovincia del emplazamiento (`acciones.emplazamiento`); escrita, manda (la figura va por líneas,\nno por provincias)."
         },
         "qb": {
           "type": "number",
@@ -2403,7 +2430,7 @@
         },
         "altitud": {
           "type": "number",
-          "description": "Altitud del emplazamiento, m: el DB no es aplicable por encima de 2 000 m (art. 3.3.1-2)."
+          "description": "Altitud del emplazamiento, m: el DB no es aplicable por encima de 2 000 m (art. 3.3.1-2). Por\ndefecto, la de `acciones.emplazamiento`."
         },
         "rasante": {
           "type": "number",
@@ -2433,7 +2460,6 @@
         }
       },
       "required": [
-        "zona",
         "aspereza"
       ],
       "additionalProperties": false,

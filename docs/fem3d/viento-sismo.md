@@ -595,3 +595,25 @@ Decisión del usuario: la opción (a) de §13, no truncar los modos. El motor y 
 **El tiempo, como información** (Node, en caliente, una pasada): el mapa de M11 de una planta, de 1,36 a 1,59 s (las coronas de los bloques); las franjas de una planta en X, de 2,8 a 4,4 s, y en Y, de 1,3 a 3,2 s: lo que cuesta es rehacer el SPR de los modos en cada grupo (~1,7 s), que antes se compartía con el mapa y entre las dos direcciones; la suelta periódica no se nota (lo mismo con 24 y con 48 rectas). En Chrome, Armado de N7 con sismo de 3,0 a 4,2 s. Sin acciones no cambia nada: los mismos evaluadores compartidos.
 
 **Lo que queda:** las estaciones de las franjas guardan sus medios por caso base (con 25 casos, ×6 lo de sin sismo); `Cortes` prepara otra vez los elementos del modelo (+160 MiB en el edificio objetivo, con o sin sismo); y en el perfil móvil (512 MiB) el edificio objetivo con sismo no cabe ya tras calcular (607), con independencia de esto.
+
+### 13.2. El emplazamiento común y la ficha rehecha (2026-11-07)
+
+De la prueba de uso de la ficha: la gráfica del espectro se veía mal, ningún campo decía qué era, y el municipio estaba sólo en el sismo cuando de la misma ubicación sale también el viento («por la ubicación sabes también qb»). Como en Concreta, donde los datos de la obra (`lib/obra`: provincia, municipio y altitud) los heredan viento, nieve y sismo.
+
+**El modelo:** `acciones.emplazamiento` = `{ provincia?, ine?, municipio?, altitud? }` (`src/compilador/emplazamiento.ts`).
+- **Viento:** `zona` pasa a ser opcional; sin ella, la de la provincia (la de su capital en la figura D.1, por el código de 2 cifras o por las dos primeras del `ine`), con el aviso `viento/zona-frontera` si la figura parte la provincia; sin `altitud`, la del emplazamiento. `VientoCalculado` dice de dónde sale la zona (`zonaOrigen`, `provincia`) y la hipótesis lo nombra.
+- **Sismo:** sin `ine`, el del emplazamiento (y su nombre); de ahí, ab y K. Un municipio que no figura en el Anejo 1 se escribe sólo con su nombre y la provincia; sin ab escrita, el sismo da masas y modos con el aviso `sismo/municipio-fuera-del-anejo` (no figurar no es estar exento).
+- **Lo escrito manda:** la zona o la altitud del viento y el `ine` del sismo están por encima del emplazamiento, así que los ficheros de antes dan lo mismo (las pruebas de viento y sismo, sin tocar, pasan).
+- **Errores** (`validar`): `emplazamiento/provincia` (código mal o que no casa con el del municipio), `emplazamiento/ine`, `emplazamiento/municipio-desconocido`, `emplazamiento/municipio`, `emplazamiento/altitud` y `emplazamiento/no-valido`; `viento/zona` dice que falta la provincia.
+- `fem emplazamiento`, el MCP y la skill dicen que el `ine` va en `acciones.emplazamiento`.
+
+**La ficha** (`app/src/editor/FichaAcciones.tsx`):
+- arriba, el emplazamiento, común a las dos pestañas: provincia, municipio (el buscador del Anejo 1 con los de la provincia primero y los de otras detrás; uno que no figura, «Guardarlo sólo con su nombre») y altitud, y lo que sale al momento: zona eólica y qb, ab y K con su procedencia, y el aviso de frontera;
+- viento: la zona «la de la provincia» o forzada (dice cuál es la de la provincia), qb como la de la zona, la simplificada (0,5) o escrita, la aspereza y la rasante; sismo: ab y K escritos, terreno con su C, μ como desplegable (1 sin ductilidad … 4 muy alta, uno por dirección), importancia, sistema, Ω, regla y excentricidad;
+- cada campo, su «?» (`Ayuda`) con lo que es, el artículo y de dónde sale el valor por defecto;
+- los resúmenes, en cifras con su significado al pasar el ratón (qb, zona, aspereza, altura; ab, K, C, S, ρ, ac, TA · TB, ν, μ, β), cp y cs en una tabla por dirección y la suma de las fuerzas en la tabla de plantas;
+- «Aplicar» pasa al emplazamiento el `ine` del sismo y la altitud del viento de un fichero de antes, y deja de escribir la zona si es la de la provincia.
+
+**La gráfica** (`app/src/editor/Espectro.tsx`, también en Resultados · Modal): se dibuja al ancho de su caja en píxeles (antes, un `viewBox` fijo estirado al 100 %: el texto crecía con el diálogo y la leyenda tapaba la curva); la leyenda, fuera, en HTML; ejes con marcas redondas y rejilla, T en s abajo, α a la izquierda y, con sitio, ac·αᵢ en g a la derecha (lo que llega a las fuerzas); TA y TB hasta la curva elástica (sólo sus nombres si no caben); X e Y en una sola curva si son iguales; los modos interpolados en la curva, con su periodo al pasar el ratón.
+
+**Validación:** `src/compilador/emplazamiento.test.ts` (sin zona, las fuerzas de la zona escrita con `toEqual`; el espectro del `ine` del emplazamiento, el del escrito; los errores; el aviso fuera del Anejo 1) y `app/src/test/fichaAcciones.test.tsx` (un fichero de antes pasa al emplazamiento; la provincia da la zona y forzarla la escribe; el buscador; un municipio sólo por su nombre; un «?» por campo). Capturas en Chrome de las dos pestañas, el buscador y Modal.

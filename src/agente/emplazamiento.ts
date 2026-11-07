@@ -4,7 +4,7 @@
  * `fem emplazamiento <nombre | código INE>`.
  *
  * - **Sismo:** `ab` y `K` de la tabla del Anejo 1 de la NCSE-02 (`src/normas/peligrosidad.ts`), con su
- *   código INE, que es lo que se escribe en `acciones.sismo.ine`.
+ *   código INE, que es lo que se escribe en `acciones.emplazamiento.ine` (común al viento).
  * - **Viento:** la zona eólica de la figura D.1 del DB SE-AE. Es un mapa, no una tabla: lo que se da
  *   es la zona de la capital de la provincia, y `frontera` avisa de la parte de la provincia que cae
  *   en otra zona (`src/normas/provincias.ts`).
@@ -26,7 +26,7 @@ export interface VientoProvincia {
 }
 
 export interface MunicipioEmplazamiento {
-  /** Código INE de 5 cifras: el `ine` de `acciones.sismo`. */
+  /** Código INE de 5 cifras: el `ine` de `acciones.emplazamiento`. */
   ine: string;
   nombre: string;
   provincia: string;
@@ -61,9 +61,9 @@ export interface Emplazamiento {
 export const LIMITE_EMPLAZAMIENTO = 20;
 
 const NOTA_SISMO =
-  "Sismo: «ine» es el código del municipio que se escribe en acciones.sismo (con él, ab y K salen de esta tabla, la del Anejo 1 de la NCSE-02). Hay municipios con el mismo nombre y distinta aceleración: se confirma la provincia.";
+  "Emplazamiento: «ine» es el código del municipio que se escribe, con su nombre, en acciones.emplazamiento ({ \"ine\", \"municipio\", \"altitud\" }), común al viento y al sismo: de él salen ab y K (esta tabla, la del Anejo 1 de la NCSE-02) y la zona eólica de su provincia. Hay municipios con el mismo nombre y distinta aceleración: se confirma la provincia.";
 const NOTA_VIENTO =
-  "Viento: la zona es la de la capital de la provincia (la figura D.1 del DB SE-AE es un mapa, no una tabla por provincias). Con «frontera», parte de la provincia cae en otra zona: se confirma con el ingeniero cuál es la del municipio.";
+  "Viento: la zona es la de la capital de la provincia (la figura D.1 del DB SE-AE es un mapa, no una tabla por provincias), y el viento la toma sola del emplazamiento. Con «frontera», parte de la provincia cae en otra zona: se confirma con el ingeniero cuál es la del municipio y, si es otra, se escribe en acciones.viento.zona. Un municipio que no está en la tabla del sismo se escribe con su nombre y la provincia (acciones.emplazamiento.provincia, el código de 2 cifras).";
 
 function vientoDe(p: Provincia): VientoProvincia {
   return { zona: p.zonaEolica, qb: ZONAS_EOLICAS[p.zonaEolica].qb, ...(p.frontera ? { frontera: p.frontera.eolica } : {}) };

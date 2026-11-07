@@ -1276,3 +1276,34 @@ select.sel { font-family: var(--font-sans); }
 .lista-candidatos { margin: 4px 0 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto; border: 1px solid var(--color-border-main); border-radius: 6px; background: var(--color-bg-elevated, var(--color-bg-main)); }
 .lista-candidatos button { padding: 4px 8px; border: 0; border-radius: 4px; background: none; font: inherit; color: inherit; cursor: pointer; }
 .lista-candidatos button:hover, .lista-candidatos button[aria-selected="true"] { background: var(--color-bg-hover, rgba(0, 0, 0, 0.06)); }
+/* El emplazamiento común, las filas con su «?» y los resúmenes en cifras (de la prueba de uso del 2026-11-07) */
+.acc-grupo { margin: 0; padding: 10px 14px 12px; border: 1px solid var(--color-border-main); border-radius: 8px; }
+.acc-grupo > legend { padding: 0 6px; font: 600 12px var(--font-sans); color: var(--color-text-secondary); }
+.acc-form { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); align-items: center; gap: 8px 16px; }
+.acc-form .sel { max-width: 100%; }
+.acc-etq { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.acc-elegido { display: flex; align-items: baseline; gap: 6px; margin: 0; padding: 5px 10px; border: 1px solid var(--color-border-main); border-radius: 6px; background: var(--color-tint-accent); }
+.acc-nota { margin: 0; }
+.acc-separador { margin: 4px 8px 2px; padding-top: 4px; border-top: 1px solid var(--color-border-sub); font-size: 11px; color: var(--color-text-tertiary); }
+.acc-nota p { margin: 0 0 4px; }
+.acc-derivados { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--color-border-sub); font-size: 12px; }
+.acc-derivados > div { display: flex; gap: 6px; }
+.acc-derivados dt { color: var(--color-text-secondary); }
+.acc-derivados dd { margin: 0; font-family: var(--font-mono); color: var(--color-accent-text); }
+.acc-fuente { flex-basis: 100%; margin: 0; color: var(--color-text-tertiary); }
+.acc-titulo { margin: 6px 0 0; font: 600 12px var(--font-sans); color: var(--color-text-secondary); }
+.acc-cifras { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; margin: 0; }
+.acc-cifras > div { padding: 5px 8px; border: 1px solid var(--color-border-sub); border-radius: 6px; cursor: default; }
+.acc-cifras dt { font-size: 11px; color: var(--color-text-tertiary); }
+.acc-cifras dd { margin: 0; font: 13px var(--font-mono); color: var(--color-text-primary); white-space: nowrap; }
+.tb .acc-total td { font-weight: 600; border-top: 1px solid var(--color-border-strong); }
+/* El espectro: la leyenda en HTML y la gráfica a su ancho en píxeles */
+.espectro { margin: 4px 0 0; }
+.espectro-leyenda { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 4px; padding: 0; list-style: none; font-size: 12px; color: var(--color-text-secondary); }
+.espectro-leyenda li { display: inline-flex; align-items: center; gap: 6px; }
+.espectro-leyenda i { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--color-accent); }
+.espectro-leyenda i.tr-elastico { border-top: 1.5px dashed var(--color-text-tertiary); }
+.espectro-leyenda i.tr-y { border-top: 2px dashed var(--color-uy); }
+.espectro-leyenda i.tr-modo { width: 9px; height: 9px; border: 1.6px solid var(--color-accent); border-radius: 50%; }
+.espectro-lienzo { width: 100%; min-width: 0; }
+.espectro-lienzo svg { display: block; }

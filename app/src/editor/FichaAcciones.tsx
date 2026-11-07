@@ -1,30 +1,35 @@
 /**
  * La ficha «Viento y sismo» (VS4, `docs/fem3d/viento-sismo.md` §3.5): las acciones del programa,
- * `acciones.viento` y `acciones.sismo` del modelo, en un diálogo desde la barra de Cargas.
+ * `acciones` del modelo, en un diálogo desde la barra de Cargas.
  *
- * - Viento: la zona eólica (o qb escrita), la aspereza, la altitud y la rasante; debajo, lo que sale
- *   de ellas en el modelo de ahora (pedido `viento`): qb, cp y cs, y la fuerza de cada planta según X
- *   y según Y, con el área de su banda. Se calcula sin calcular: cambia con cada dato.
- * - Sismo: el municipio (un buscador sobre la tabla del Anejo 1 de la NCSE-02; ab y K a mano,
- *   por encima), el terreno, μ, la importancia, Ω, la regla y la excentricidad; debajo, el
- *   emplazamiento (ac, TA, TB) y la curva del espectro (pedido `sismo`), con los periodos de los
- *   modos si hay resultados.
+ * - **Emplazamiento, común a los dos** (a petición del usuario, como los datos de la obra de Concreta):
+ *   la provincia, el municipio (un buscador sobre la tabla del Anejo 1 de la NCSE-02; uno que no
+ *   figura, sólo por su nombre) y la altitud. Debajo, lo que sale de ellos al momento: la zona eólica
+ *   de la provincia y el ab y el K del municipio.
+ * - **Viento:** la zona (la de la provincia o forzada), qb (la de la zona, la simplificada o escrita),
+ *   la aspereza y la rasante; debajo, lo que sale en el modelo aplicado (pedido `viento`): qb, cp y
+ *   cs por dirección y la fuerza de cada planta.
+ * - **Sismo:** ab y K escritos (por encima de los del municipio), el terreno, μ, la importancia, Ω, la
+ *   regla y la excentricidad; debajo, el emplazamiento sísmico (ac, TA, TB) y la curva del espectro.
  *
- * «Aplicar» escribe `acciones` entera en un paso de deshacer (operación `acciones`); lo que no vale
- * lo dice el compilador en Diagnósticos. Los textos no nombran programas comerciales.
+ * Cada campo lleva su «?» con lo que es y de dónde sale. «Aplicar» escribe `acciones` entera en un
+ * paso de deshacer (operación `acciones`); el `ine` y la `altitud` que los ficheros de antes llevan en
+ * el sismo o en el viento pasan al emplazamiento. Los textos no nombran programas comerciales.
  */
-import { useEffect, useMemo, useState } from "react";
-import type { AccionesEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AccionesEdificio, EmplazamientoEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
 import { leerNumero } from "../../../src/editor/celdas.ts";
 import { ASPEREZAS, ORDEN_ASPEREZAS, ZONAS_EOLICAS, type GradoAspereza, type ZonaEolica } from "../../../src/normas/cteViento.ts";
 import { buscarMunicipios, municipioPorIne, textoProcedencia, type Municipio } from "../../../src/normas/peligrosidad.ts";
-import { provinciaPorIne } from "../../../src/normas/provincias.ts";
+import { PROVINCIAS, provinciaPorIne } from "../../../src/normas/provincias.ts";
 import { SISTEMAS_ESTRUCTURALES, type SistemaEstructural } from "../../../src/normas/ncse02.ts";
 import type { DatosSismo, DatosViento } from "../../../src/visor/programa.ts";
+import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { Dialogo } from "./Dialogos.tsx";
+import { Espectro } from "./Espectro.tsx";
 
 const NOMBRE_SISTEMA: Record<SistemaEstructural, string> = {
   "porticos-ha": "Pórticos de hormigón armado",
@@ -34,18 +39,60 @@ const NOMBRE_SISTEMA: Record<SistemaEstructural, string> = {
   fabrica: "Muros de fábrica",
 };
 const TERRENOS = ["I", "II", "III", "IV"] as const;
-const DESCRIPCION_TERRENO: Record<(typeof TERRENOS)[number], string> = {
-  I: "roca compacta, suelo cementado o granular muy denso (vs > 750 m/s)",
-  II: "roca muy fracturada, suelo granular denso o cohesivo duro (400–750 m/s)",
-  III: "suelo granular de compacidad media o cohesivo firme (200–400 m/s)",
-  IV: "suelo granular suelto o cohesivo blando (vs ≤ 200 m/s)",
+const TERRENO: Record<(typeof TERRENOS)[number], { C: string; texto: string }> = {
+  I: { C: "1,0", texto: "roca compacta, suelo cementado o granular muy denso (vs > 750 m/s)" },
+  II: { C: "1,3", texto: "roca muy fracturada, suelo granular denso o cohesivo duro (400–750 m/s)" },
+  III: { C: "1,6", texto: "suelo granular de compacidad media o cohesivo firme (200–400 m/s)" },
+  IV: { C: "2,0", texto: "suelo granular suelto o cohesivo blando (vs ≤ 200 m/s)" },
 };
+const DUCTILIDAD: Record<number, string> = { 1: "sin ductilidad", 2: "baja", 3: "alta", 4: "muy alta" };
+
+/** Lo que dice el «?» de cada campo. */
+const AYUDA = {
+  provincia:
+    "Decide la zona eólica del viento: la de su capital en la figura D.1 del DB SE-AE. La figura es un mapa y sus líneas cruzan provincias: si la obra cae al otro lado, se fuerza la zona en la pestaña Viento.",
+  municipio:
+    "De él salen la aceleración sísmica básica ab y el coeficiente de contribución K del sismo (Anejo 1 de la NCSE-02). El Anejo 1 sólo lista los municipios con ab ≥ 0,04 g: si el suyo no figura puede estar exento (art. 1.2.3), pero también ser una errata o un municipio segregado después de 2002. Compruébelo: puede guardarlo sólo con su nombre y escribir ab y K en Sismo.",
+  altitud: "Altitud topográfica de la obra sobre el nivel del mar, en m. El DB SE-AE no es aplicable al viento por encima de 2 000 m (art. 3.3.1-2).",
+  zona: "Zona de la figura D.1 del DB SE-AE: A (vb = 26 m/s, qb = 0,42 kN/m²), B (27 m/s, 0,45) o C (29 m/s, 0,52). Por defecto, la de la provincia del emplazamiento; fuércela si la obra está al otro lado de una línea del mapa.",
+  qb: "Presión dinámica del viento, qb = 0,5·δ·vb². La de la zona es el valor preciso del Anejo D; el DB admite 0,5 kN/m² en cualquier punto (art. 3.3.2-1), del lado de la seguridad en las zonas A y B y por debajo en la C. Escrita, para un estudio de viento o un dato empírico.",
+  aspereza:
+    "El entorno del edificio en la dirección del viento (tabla 3.4 del DB SE-AE). Decide el coeficiente de exposición ce de cada planta (fórmula D.2): a más obstáculos, menos viento. Lo habitual en edificación es el IV, zona urbana.",
+  rasante:
+    "Cota del terreno en la fachada a barlovento, en m (art. 3.3.3-1): desde ella se mide la altura z de cada planta para su ce. Por defecto, la ±0,00. Las plantas por debajo de la rasante no reciben viento.",
+  ab: "Aceleración sísmica básica, en g (art. 2.1): 0,11 es 0,11·g. Por defecto, la del municipio del emplazamiento. Escríbala sólo con un estudio de peligrosidad del emplazamiento o si el municipio no figura en el Anejo 1.",
+  K: "Coeficiente de contribución, de 1,0 a 1,3 (Anejo 1): tiene en cuenta la influencia de los terremotos lejanos (la falla Azores-Gibraltar) y alarga los periodos TA y TB. Por defecto, el del municipio.",
+  terreno:
+    "Terreno de cimentación (art. 2.4), del estudio geotécnico: el de los 30 primeros metros bajo la superficie. Su coeficiente C (I 1,0; II 1,3; III 1,6; IV 2,0) amplifica la aceleración (S) y alarga los periodos TA = K·C/10 y TB = K·C/2,5. Con varios estratos, el C ponderado por sus espesores.",
+  mu: "Coeficiente de comportamiento por ductilidad (art. 3.7.3.1): 1 sin ductilidad, 2 baja, 3 alta, 4 muy alta. Divide las fuerzas del sismo (β = ν/μ), así que a más ductilidad, menos fuerza; pero el proyecto tiene que cumplir los detalles del capítulo 4 de la norma para esa ductilidad. Si la estructura es distinta en cada dirección, uno según X y otro según Y.",
+  importancia:
+    "Art. 1.2.2. Normal: su destrucción puede ocasionar víctimas o interrumpir un servicio, sin efectos catastróficos (viviendas, oficinas, comercios). Especial: tiene que seguir en servicio tras el terremoto o su destrucción tendría efectos catastróficos (hospitales, bomberos, centros de comunicaciones o de protección civil). Da el coeficiente de riesgo ρ: 1,0 o 1,3.",
+  sistema:
+    "Sólo para el periodo fundamental aproximado del art. 3.7.2.2, con el que se contrasta el cortante en la base del método simplificado. No cambia el cálculo por espectros.",
+  omega: "Amortiguamiento de la estructura, en % del crítico (tabla 3.1 de la norma). Corrige el espectro con ν = (5/Ω)^0,4 (art. 2.5) y entra en la combinación cuadrática completa. Por defecto, 5 %.",
+  regla:
+    "Cómo se suman las respuestas de los modos. La del art. 3.6.2.4: raíz de la suma de los cuadrados, con los modos de periodos a menos del 10 % sumados en valor absoluto. La cuadrática completa (comentario C.3.6.2.4) usa la correlación entre modos con el amortiguamiento Ω.",
+  excentricidad:
+    "Excentricidad accidental de las masas, como fracción de la dimensión de cada planta perpendicular al sismo (art. 3.2: no menos de 1/20 = 0,05). Da los casos EX+e, EX−e, EY+e y EY−e. Con 0, sin ella.",
+  nieve: "Art. 3.2: la masa de la nieve cuenta la mitad si permanece más de 30 días al año; si no, no cuenta. Por defecto, sí por encima de 1 000 m.",
+} as const;
 
 /** Un número escrito con coma, o nada; un texto que no es un número, con su error. */
 const numeroOpcional = (t: string): number | undefined | string => (t.trim() === "" ? undefined : leerNumero(t));
 const texto = (v: number | undefined): string => (v === undefined ? "" : String(v).replace(".", ","));
 
 type Pestana = "viento" | "sismo";
+type ModoQb = "zona" | "simplificado" | "escrita";
+
+/** Etiqueta de una fila del formulario, con su «?». */
+function Etiqueta({ htmlFor, children, ayuda }: { htmlFor: string; children: ReactNode; ayuda?: string }) {
+  return (
+    <span className="acc-etq">
+      <label htmlFor={htmlFor}>{children}</label>
+      {ayuda && <Ayuda texto={ayuda} />}
+    </span>
+  );
+}
 
 export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCerrar: (hecho?: string) => void; pestana?: Pestana }) {
   const { proyecto } = useVisor();
@@ -54,51 +101,84 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
   const [pestana, setPestana] = useState<Pestana>(inicial);
   const [error, setError] = useState<string | null>(null);
 
+  // Emplazamiento: el de las acciones o, en un fichero de antes, el municipio del sismo y la altitud del viento
+  const e0 = a.emplazamiento;
+  const ine0 = e0?.ine ?? a.sismo?.ine ?? "";
+  const [ine, setIne] = useState(ine0);
+  const [provincia, setProvincia] = useState(e0?.provincia ?? (ine0 ? ine0.slice(0, 2) : ""));
+  const [nombreLibre, setNombreLibre] = useState(!e0?.ine && e0?.municipio ? e0.municipio : "");
+  const [busqueda, setBusqueda] = useState("");
+  const [altitud, setAltitud] = useState(texto(e0?.altitud ?? a.viento?.altitud));
+
+  const municipio = useMemo(() => (/^\d{5}$/.test(ine) ? municipioPorIne(ine) : null), [ine]);
+  const prov = provincia ? provinciaPorIne(provincia) : undefined;
+  // Los de la provincia elegida primero; los de otras, detrás (si la provincia está mal, que se vea)
+  const { candidatos, deOtras } = useMemo(() => {
+    if (busqueda.trim().length < 2) return { candidatos: [], deOtras: [] };
+    const todos = buscarMunicipios(busqueda, 400);
+    if (!provincia) return { candidatos: todos.slice(0, 12), deOtras: [] };
+    const aqui = todos.filter((m) => m.ine.startsWith(provincia)).slice(0, 12);
+    return { candidatos: aqui, deOtras: todos.filter((m) => !m.ine.startsWith(provincia)).slice(0, Math.max(4, 12 - aqui.length)) };
+  }, [busqueda, provincia]);
+
   // Viento: con el interruptor apagado no hay viento del programa
   const [conViento, setConViento] = useState(a.viento !== undefined);
-  const [zona, setZona] = useState<ZonaEolica>(a.viento?.zona ?? "A");
-  const [qb, setQb] = useState(texto(a.viento?.qb));
+  const zonaInicial = a.viento?.zona && a.viento.zona !== (provinciaPorIne(e0?.provincia ?? ine0)?.zonaEolica ?? "") ? a.viento.zona : "";
+  const [zonaForzada, setZonaForzada] = useState<ZonaEolica | "">(zonaInicial);
+  const qb0 = a.viento?.qb;
+  const [modoQb, setModoQb] = useState<ModoQb>(qb0 === undefined ? "zona" : qb0 === 0.5 ? "simplificado" : "escrita");
+  const [qb, setQb] = useState(qb0 !== undefined && qb0 !== 0.5 ? texto(qb0) : "");
   const [aspereza, setAspereza] = useState<GradoAspereza>(a.viento?.aspereza ?? "IV");
-  const [altitud, setAltitud] = useState(texto(a.viento?.altitud));
   const [rasante, setRasante] = useState(texto(a.viento?.rasante));
+  const zona: ZonaEolica | undefined = zonaForzada || prov?.zonaEolica;
 
   // Sismo
   const [conSismo, setConSismo] = useState(a.sismo !== undefined);
-  const [ine, setIne] = useState(a.sismo?.ine ?? "");
-  const [busqueda, setBusqueda] = useState("");
   const [ab, setAb] = useState(texto(a.sismo?.ab));
   const [K, setK] = useState(texto(a.sismo?.K));
   const t0 = a.sismo?.terreno;
   const [terreno, setTerreno] = useState<string>(typeof t0 === "string" ? t0 : typeof t0 === "number" ? "C" : Array.isArray(t0) ? "estratos" : "II");
   const [C, setC] = useState(texto(typeof t0 === "number" ? t0 : undefined));
   const mu0 = a.sismo?.mu;
-  const [muX, setMuX] = useState(texto(typeof mu0 === "number" ? mu0 : mu0?.x));
-  const [muY, setMuY] = useState(texto(typeof mu0 === "number" ? undefined : mu0?.y));
+  const [muX, setMuX] = useState(String(typeof mu0 === "number" ? mu0 : (mu0?.x ?? 2)));
+  const [muY, setMuY] = useState(typeof mu0 === "object" && mu0.y !== mu0.x ? String(mu0.y) : "");
   const [importancia, setImportancia] = useState<"normal" | "especial">(a.sismo?.importancia ?? "normal");
   const [omega, setOmega] = useState(texto(a.sismo?.omega));
   const [regla, setRegla] = useState<"srss" | "cqc">(a.sismo?.regla ?? "srss");
   const [excentricidad, setExcentricidad] = useState(texto(a.sismo?.excentricidad));
   const [sistema, setSistema] = useState<SistemaEstructural | "">(a.sismo?.sistema ?? "");
   const [nieve, setNieve] = useState(a.sismo?.nievePermanente ?? false);
-
-  const municipio = useMemo(() => (ine.length === 5 ? municipioPorIne(ine) : null), [ine]);
-  const candidatos = useMemo(() => (busqueda.trim().length >= 2 ? buscarMunicipios(busqueda, 12) : []), [busqueda]);
-  const provincia = municipio ? provinciaPorIne(municipio.ine) : null;
+  const opcionesMu = [...new Set([1, 2, 3, 4, ...[muX, muY].filter(Boolean).map(Number)])].sort((x, y) => x - y);
 
   /** Lo que se escribirá, o por qué no. */
   const acciones = useMemo((): { valor: AccionesEdificio | null } | { error: string } => {
     const r: AccionesEdificio = {};
+    const emp: EmplazamientoEdificio = {};
+    if (municipio) {
+      emp.ine = municipio.ine;
+      emp.municipio = municipio.nombre;
+    } else {
+      if (provincia) emp.provincia = provincia;
+      if (nombreLibre.trim()) emp.municipio = nombreLibre.trim();
+    }
+    const nAlt = numeroOpcional(altitud);
+    if (typeof nAlt === "string") return { error: `La altitud: ${nAlt}.` };
+    if (nAlt !== undefined) emp.altitud = nAlt;
+    if (Object.keys(emp).length) r.emplazamiento = emp;
+
     if (conViento) {
-      const v: VientoEdificio = { zona, aspereza };
-      for (const [nombre, t, poner] of [
-        ["qb", qb, (x: number) => (v.qb = x)],
-        ["La altitud", altitud, (x: number) => (v.altitud = x)],
-        ["La rasante", rasante, (x: number) => (v.rasante = x)],
-      ] as const) {
-        const n = numeroOpcional(t);
-        if (typeof n === "string") return { error: `${nombre}: ${n}.` };
-        if (n !== undefined) poner(n);
+      const v: VientoEdificio = { aspereza };
+      if (zonaForzada) v.zona = zonaForzada;
+      else if (!prov) return { error: "El viento necesita la provincia del emplazamiento (de ella sale la zona eólica) o la zona eólica forzada." };
+      if (modoQb === "simplificado") v.qb = 0.5;
+      else if (modoQb === "escrita") {
+        const n = numeroOpcional(qb);
+        if (typeof n !== "number") return { error: "Escriba qb en kN/m² (o elija la de la zona)." };
+        v.qb = n;
       }
+      const nR = numeroOpcional(rasante);
+      if (typeof nR === "string") return { error: `La rasante: ${nR}.` };
+      if (nR !== undefined) v.rasante = nR;
       // Las fachadas escritas a mano se conservan
       if (a.viento?.fachadas) v.fachadas = a.viento.fachadas;
       r.viento = v;
@@ -107,18 +187,14 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
       const s: SismoEdificio = {};
       if (a.sismo?.masas) s.masas = a.sismo.masas;
       if (nieve) s.nievePermanente = true;
-      if (ine) {
-        if (!/^\d{5}$/.test(ine)) return { error: "El código INE del municipio tiene 5 cifras." };
-        s.ine = ine;
-        if (municipio) s.municipio = municipio.nombre;
-      }
       const nAb = numeroOpcional(ab);
       if (typeof nAb === "string") return { error: `ab: ${nAb}.` };
       if (nAb !== undefined) s.ab = nAb;
       const nK = numeroOpcional(K);
       if (typeof nK === "string") return { error: `K: ${nK}.` };
       if (nK !== undefined) s.K = nK;
-      const conEspectro = s.ine !== undefined || s.ab !== undefined;
+      if (s.ab !== undefined && s.K === undefined && !municipio) return { error: "Con ab escrita y sin un municipio del Anejo 1 hace falta también K." };
+      const conEspectro = municipio !== null || s.ab !== undefined;
       if (conEspectro) {
         if (terreno === "C") {
           const n = numeroOpcional(C);
@@ -128,12 +204,9 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
           if (!Array.isArray(t0)) return { error: "Los estratos del terreno se escriben en el fichero (acciones.sismo.terreno)." };
           s.terreno = t0;
         } else s.terreno = terreno as "I" | "II" | "III" | "IV";
-        const x = numeroOpcional(muX);
-        const y = numeroOpcional(muY);
-        if (typeof x === "string") return { error: `μ: ${x}.` };
-        if (typeof y === "string") return { error: `μ según Y: ${y}.` };
-        if (x === undefined) return { error: "Con espectro hace falta la ductilidad μ (1, 2, 3 o 4)." };
-        s.mu = y === undefined || y === x ? x : { x, y };
+        const x = Number(muX);
+        const y = muY === "" ? x : Number(muY);
+        s.mu = y === x ? x : { x, y };
         if (importancia !== "normal") s.importancia = importancia;
         for (const [nombre, t, poner] of [
           ["Ω", omega, (n: number) => (s.omega = n)],
@@ -148,11 +221,10 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
       }
       r.sismo = s;
     }
-    return { valor: r.viento || r.sismo ? r : null };
-  }, [conViento, zona, qb, aspereza, altitud, rasante, a, conSismo, ine, municipio, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, nieve]);
+    return { valor: r.viento || r.sismo || r.emplazamiento ? r : null };
+  }, [municipio, provincia, nombreLibre, altitud, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema]);
 
-  // Lo que sale de los datos escritos, en el modelo de ahora: se aplica a una copia del proyecto en el worker no, aquí: la sesión
-  // del worker tiene el proyecto guardado; lo escrito se ve al aplicar. Hasta entonces, lo de la sesión.
+  // Lo que sale en el modelo aplicado (la sesión del worker tiene el proyecto guardado): lo escrito se ve al aplicar
   const viento = usePedido(proyecto.cliente, { tipo: "viento" });
   const sismo = usePedido(proyecto.cliente, { tipo: "sismo" });
   const cambiado = JSON.stringify("valor" in acciones ? (acciones.valor ?? {}) : null) !== JSON.stringify(a);
@@ -161,10 +233,25 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
     if ("error" in acciones) return setError(acciones.error);
     const r = ed.editar({ op: "acciones", acciones: acciones.valor }, "Viento y sismo");
     if (!r.ok) return setError(r.errores.map((e) => textoApp(e.mensaje)).join(" "));
-    onCerrar(acciones.valor ? "Viento y sismo del programa aplicados: los casos salen en el selector." : "Sin acciones del programa.");
+    onCerrar(r.ok && (acciones.valor?.viento || acciones.valor?.sismo) ? "Viento y sismo del programa aplicados: los casos salen en el selector." : "Sin acciones del programa.");
   };
 
   useEffect(() => setError(null), [acciones]);
+
+  const elegirMunicipio = (m: Municipio) => {
+    setIne(m.ine);
+    setProvincia(m.ine.slice(0, 2));
+    setNombreLibre("");
+    setBusqueda("");
+  };
+  const cambiarProvincia = (p: string) => {
+    setProvincia(p);
+    if (ine && ine.slice(0, 2) !== p) setIne("");
+  };
+  const quitarMunicipio = () => {
+    setIne("");
+    setNombreLibre("");
+  };
 
   return (
     <Dialogo
@@ -186,7 +273,96 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
         </>
       }
     >
-      <div role="tablist" className="mb-3 flex gap-1 border-b border-border-main">
+      <fieldset className="acc-grupo">
+        <legend>Emplazamiento · común al viento y al sismo</legend>
+        <div className="acc-form">
+          <Etiqueta htmlFor="e-prov" ayuda={AYUDA.provincia}>
+            Provincia
+          </Etiqueta>
+          <select id="e-prov" className="sel" value={provincia} onChange={(e) => cambiarProvincia(e.target.value)}>
+            <option value="">Elija la provincia</option>
+            {[...PROVINCIAS]
+              .sort((x, y) => x.nombre.localeCompare(y.nombre, "es"))
+              .map((p) => (
+                <option key={p.ine} value={p.ine}>
+                  {p.nombre}
+                </option>
+              ))}
+          </select>
+          <Etiqueta htmlFor="e-mun" ayuda={AYUDA.municipio}>
+            Municipio
+          </Etiqueta>
+          <div>
+            {municipio || nombreLibre ? (
+              <p className="acc-elegido">
+                {municipio ? (
+                  <>
+                    <b>{municipio.nombre}</b> <span className="text-text-secondary">({municipio.provincia}, INE {municipio.ine})</span>
+                  </>
+                ) : (
+                  <>
+                    <b>{nombreLibre}</b> <span className="text-text-secondary">· no figura en el Anejo 1</span>
+                  </>
+                )}
+                <button type="button" className="enlace ml-auto" onClick={quitarMunicipio}>
+                  Cambiar
+                </button>
+              </p>
+            ) : (
+              <>
+                <input id="e-mun" className="sel w-full" value={busqueda} autoComplete="off" placeholder={prov ? `Escriba el nombre de un municipio de ${prov.nombre}` : "Escriba el nombre y elija uno de la lista"} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar municipio" />
+                {candidatos.length + deOtras.length > 0 && (
+                  <ul className="lista-candidatos" role="listbox" aria-label="Municipios del Anejo 1">
+                    {[...candidatos, ...deOtras].map((m, i) => (
+                      <li key={m.ine}>
+                        {provincia && i === candidatos.length && <p className="acc-separador">En otras provincias</p>}
+                        <button type="button" role="option" aria-selected={false} className="w-full text-left" onClick={() => elegirMunicipio(m)}>
+                          {m.nombre} <span className="text-text-secondary">({m.provincia}, INE {m.ine})</span> · ab = {fmt(m.ab, 2)} g, K = {fmt(m.K, 1)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {busqueda.trim().length >= 2 && !candidatos.length && (
+                  <div className="nota acc-nota">
+                    <p>
+                      «{busqueda.trim()}» no figura en el Anejo 1{prov ? ` en ${prov.nombre}` : ""}. Puede estar por debajo de 0,04 g (exento, art. 1.2.3), ser una errata del nombre o un municipio creado después de 2002. Compruébelo antes de darlo por exento.
+                    </p>
+                    {prov ? (
+                      <button type="button" className="enlace" onClick={() => (setNombreLibre(busqueda.trim()), setBusqueda(""))}>
+                        Guardarlo sólo con su nombre (el sismo necesitará ab y K escritos)
+                      </button>
+                    ) : (
+                      <p>Elija antes la provincia para guardarlo sólo con su nombre.</p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <Etiqueta htmlFor="e-alt" ayuda={AYUDA.altitud}>
+            Altitud
+          </Etiqueta>
+          <span className="flex items-center gap-2">
+            <input id="e-alt" className="sel mono w-[7rem]" value={altitud} inputMode="decimal" placeholder="—" onChange={(e) => setAltitud(e.target.value)} />
+            <span className="text-text-secondary">m sobre el nivel del mar</span>
+          </span>
+        </div>
+        <dl className="acc-derivados">
+          <div>
+            <dt>Zona eólica</dt>
+            <dd>{prov ? `${prov.zonaEolica} · qb = ${fmt(ZONAS_EOLICAS[prov.zonaEolica].qb, 2)} kN/m²` : "— (falta la provincia)"}</dd>
+          </div>
+          <div>
+            <dt>Sismo</dt>
+            <dd>{municipio ? `ab = ${fmt(municipio.ab, 2)} g · K = ${fmt(municipio.K, 1)}` : nombreLibre ? "fuera del Anejo 1: ab y K escritos" : "— (falta el municipio)"}</dd>
+          </div>
+          {municipio && <p className="acc-fuente">ab y K: {textoProcedencia(municipio.procedencia)}.</p>}
+          {prov?.frontera && <p className="acc-fuente text-state-warn">Zona eólica: {prov.frontera.eolica}</p>}
+        </dl>
+      </fieldset>
+
+      <div role="tablist" className="mb-3 mt-4 flex gap-1 border-b border-border-main">
         {(["viento", "sismo"] as const).map((p) => (
           <button key={p} type="button" role="tab" aria-selected={pestana === p} className="dock-tab" data-on={pestana === p} onClick={() => setPestana(p)}>
             {p === "viento" ? "Viento" : "Sismo"}
@@ -195,42 +371,63 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
       </div>
       {pestana === "viento" ? (
         <div className="grid gap-3">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={conViento} onChange={(e) => setConViento(e.target.checked)} /> Viento del programa (DB SE-AE 3.3 y Anejo D): 8 casos, según X e Y en los dos sentidos, con la excentricidad del 5 % a cada lado
+          <label className="flex items-start gap-2">
+            <input type="checkbox" className="mt-[3px]" checked={conViento} onChange={(e) => setConViento(e.target.checked)} />
+            <span>
+              Viento del programa (DB SE-AE 3.3 y Anejo D)
+              <span className="block text-[12px] text-text-secondary">8 casos: según X y según Y en los dos sentidos, cada uno con la excentricidad del 5 % a un lado y al otro. Una fuerza por planta, en su diafragma.</span>
+            </span>
           </label>
           {conViento && (
             <>
-              <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2">
-                <label htmlFor="v-zona">Zona eólica</label>
-                <span className="flex items-center gap-2">
-                  <select id="v-zona" className="sel" value={zona} onChange={(e) => setZona(e.target.value as ZonaEolica)}>
+              <div className="acc-form">
+                <Etiqueta htmlFor="v-zona" ayuda={AYUDA.zona}>
+                  Zona eólica
+                </Etiqueta>
+                <span className="flex flex-wrap items-center gap-2">
+                  <select id="v-zona" className="sel" value={zonaForzada} onChange={(e) => setZonaForzada(e.target.value as ZonaEolica | "")}>
+                    <option value="">{prov ? `La de la provincia: ${prov.zonaEolica} · vb ${ZONAS_EOLICAS[prov.zonaEolica].vb} m/s` : "La de la provincia (elíjala arriba)"}</option>
                     {(Object.keys(ZONAS_EOLICAS) as ZonaEolica[]).map((z) => (
                       <option key={z} value={z}>
-                        {z} · vb = {ZONAS_EOLICAS[z].vb} m/s, qb = {fmt(ZONAS_EOLICAS[z].qb, 2)} kN/m²
+                        {z} · vb = {ZONAS_EOLICAS[z].vb} m/s, qb = {fmt(ZONAS_EOLICAS[z].qb, 2)} kN/m² (forzada)
                       </option>
                     ))}
                   </select>
-                  {provincia && (
-                    <span className="text-[12px] text-text-secondary" title={provincia.frontera?.eolica}>
-                      En {provincia.nombre} (capital), zona {provincia.zonaEolica}
-                      {provincia.frontera?.eolica ? " · " + provincia.frontera.eolica : ""}
-                    </span>
+                  {zonaForzada && prov && zonaForzada !== prov.zonaEolica && <span className="text-[12px] text-state-warn">la de {prov.nombre} es {prov.zonaEolica}</span>}
+                </span>
+                <Etiqueta htmlFor="v-qb" ayuda={AYUDA.qb}>
+                  Presión dinámica qb
+                </Etiqueta>
+                <span className="flex flex-wrap items-center gap-2">
+                  <select id="v-qb" className="sel" value={modoQb} onChange={(e) => setModoQb(e.target.value as ModoQb)}>
+                    <option value="zona">La de la zona{zona ? `: ${fmt(ZONAS_EOLICAS[zona].qb, 2)} kN/m²` : ""}</option>
+                    <option value="simplificado">Simplificada del art. 3.3.2-1: 0,50 kN/m²</option>
+                    <option value="escrita">Escrita</option>
+                  </select>
+                  {modoQb === "escrita" && (
+                    <>
+                      <input className="sel mono w-[6rem]" aria-label="qb escrita" value={qb} inputMode="decimal" onChange={(e) => setQb(e.target.value)} />
+                      <span className="text-text-secondary">kN/m²</span>
+                    </>
                   )}
                 </span>
-                <label htmlFor="v-qb">qb escrita (kN/m²)</label>
-                <input id="v-qb" className="sel mono w-[8rem]" value={qb} inputMode="decimal" placeholder="la de la zona" onChange={(e) => setQb(e.target.value)} />
-                <label htmlFor="v-asp">Aspereza del entorno</label>
-                <select id="v-asp" className="sel" value={aspereza} onChange={(e) => setAspereza(e.target.value as GradoAspereza)}>
+                <Etiqueta htmlFor="v-asp" ayuda={AYUDA.aspereza}>
+                  Entorno (aspereza)
+                </Etiqueta>
+                <select id="v-asp" className="sel" value={aspereza} onChange={(e) => setAspereza(e.target.value as GradoAspereza)} title={ASPEREZAS[aspereza].descripcion}>
                   {ORDEN_ASPEREZAS.map((g) => (
                     <option key={g} value={g}>
                       {g} · {ASPEREZAS[g].descripcion}
                     </option>
                   ))}
                 </select>
-                <label htmlFor="v-alt">Altitud (m)</label>
-                <input id="v-alt" className="sel mono w-[8rem]" value={altitud} inputMode="decimal" placeholder="—" onChange={(e) => setAltitud(e.target.value)} />
-                <label htmlFor="v-ras">Rasante (cota, m)</label>
-                <input id="v-ras" className="sel mono w-[8rem]" value={rasante} inputMode="decimal" placeholder="la ±0,00" onChange={(e) => setRasante(e.target.value)} />
+                <Etiqueta htmlFor="v-ras" ayuda={AYUDA.rasante}>
+                  Rasante
+                </Etiqueta>
+                <span className="flex items-center gap-2">
+                  <input id="v-ras" className="sel mono w-[7rem]" value={rasante} inputMode="decimal" placeholder="±0,00" onChange={(e) => setRasante(e.target.value)} />
+                  <span className="text-text-secondary">m, cota del terreno a barlovento</span>
+                </span>
               </div>
               <ResumenViento d={viento.datos ?? null} aplicado={!cambiado} />
             </>
@@ -238,47 +435,38 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
         </div>
       ) : (
         <div className="grid gap-3">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={conSismo} onChange={(e) => setConSismo(e.target.checked)} /> Sismo (NCSE-02): las masas de las cargas y los modos de vibración; con el emplazamiento, el análisis por espectros de respuesta (art. 3.6.2)
+          <label className="flex items-start gap-2">
+            <input type="checkbox" className="mt-[3px]" checked={conSismo} onChange={(e) => setConSismo(e.target.checked)} />
+            <span>
+              Sismo (NCSE-02)
+              <span className="block text-[12px] text-text-secondary">Las masas salen de las cargas y se calculan los modos de vibración. Con el emplazamiento, el análisis por espectros de respuesta (art. 3.6.2): 4 casos, EX±e y EY±e.</span>
+            </span>
           </label>
           {conSismo && (
             <>
-              <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2">
-                <label htmlFor="s-mun">Municipio</label>
-                <div>
-                  <input id="s-mun" className="sel w-full" value={busqueda} placeholder={municipio ? `${municipio.nombre} (${provincia?.nombre ?? ""}), INE ${municipio.ine}` : "Escriba el nombre y elija uno de la lista"} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar municipio" />
-                  {candidatos.length > 0 && (
-                    <ul className="lista-candidatos" role="listbox">
-                      {candidatos.map((m) => (
-                        <li key={m.ine}>
-                          <button type="button" role="option" aria-selected={m.ine === ine} className="w-full text-left" onClick={() => elegirMunicipio(m)}>
-                            {m.nombre} <span className="text-text-secondary">({provinciaPorIne(m.ine)?.nombre}, INE {m.ine})</span> · ab = {fmt(m.ab, 2)} g, K = {fmt(m.K, 1)}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {busqueda.trim().length >= 2 && !candidatos.length && <p className="nota">No figura en el Anejo 1. Puede estar por debajo de 0,04 g (exento, art. 1.2.3), ser una errata del nombre, o ser un municipio creado después de 2002. Compruébelo antes de darlo por exento; si procede, escriba ab y K.</p>}
-                  {municipio && (
-                    <p className="nota">
-                      {municipio.nombre}: ab = {fmt(municipio.ab, 2)} g, K = {fmt(municipio.K, 1)} · {textoProcedencia(municipio.procedencia)}.{" "}
-                      <button type="button" className="enlace" onClick={() => setIne("")}>
-                        Quitar
-                      </button>
-                    </p>
-                  )}
-                  {ine && !municipio && <p className="nota text-state-fail">El código INE {ine} no está en la tabla del Anejo 1.</p>}
-                </div>
-                <label htmlFor="s-ab">ab escrita (g)</label>
-                <input id="s-ab" className="sel mono w-[8rem]" value={ab} inputMode="decimal" placeholder={municipio ? `la del municipio, ${fmt(municipio.ab, 2)}` : "—"} onChange={(e) => setAb(e.target.value)} />
-                <label htmlFor="s-k">K escrito</label>
-                <input id="s-k" className="sel mono w-[8rem]" value={K} inputMode="decimal" placeholder={municipio ? `el del municipio, ${fmt(municipio.K, 1)}` : "—"} onChange={(e) => setK(e.target.value)} />
-                <label htmlFor="s-terr">Terreno (art. 2.4)</label>
+              <div className="acc-form">
+                <Etiqueta htmlFor="s-ab" ayuda={AYUDA.ab}>
+                  ab escrita
+                </Etiqueta>
                 <span className="flex items-center gap-2">
-                  <select id="s-terr" className="sel" value={terreno} onChange={(e) => setTerreno(e.target.value)}>
+                  <input id="s-ab" className="sel mono w-[7rem]" value={ab} inputMode="decimal" placeholder={municipio ? fmt(municipio.ab, 2) : "—"} onChange={(e) => setAb(e.target.value)} />
+                  <span className="text-text-secondary">g{municipio && !ab.trim() ? ", la del municipio" : ""}</span>
+                </span>
+                <Etiqueta htmlFor="s-k" ayuda={AYUDA.K}>
+                  K escrito
+                </Etiqueta>
+                <span className="flex items-center gap-2">
+                  <input id="s-k" className="sel mono w-[7rem]" value={K} inputMode="decimal" placeholder={municipio ? fmt(municipio.K, 1) : "—"} onChange={(e) => setK(e.target.value)} />
+                  {municipio && !K.trim() && <span className="text-text-secondary">el del municipio</span>}
+                </span>
+                <Etiqueta htmlFor="s-terr" ayuda={AYUDA.terreno}>
+                  Terreno (art. 2.4)
+                </Etiqueta>
+                <span className="flex items-center gap-2">
+                  <select id="s-terr" className="sel min-w-0 flex-1" value={terreno} onChange={(e) => setTerreno(e.target.value)} title={terreno in TERRENO ? TERRENO[terreno as keyof typeof TERRENO].texto : undefined}>
                     {TERRENOS.map((t) => (
                       <option key={t} value={t}>
-                        Tipo {t} · {DESCRIPCION_TERRENO[t]}
+                        Tipo {t} · C = {TERRENO[t].C} · {TERRENO[t].texto}
                       </option>
                     ))}
                     <option value="C">Coeficiente C escrito</option>
@@ -286,39 +474,75 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
                   </select>
                   {terreno === "C" && <input className="sel mono w-[6rem]" aria-label="Coeficiente C" value={C} inputMode="decimal" onChange={(e) => setC(e.target.value)} />}
                 </span>
-                <label htmlFor="s-mu">Ductilidad μ</label>
-                <span className="flex items-center gap-2">
-                  <input id="s-mu" className="sel mono w-[6rem]" value={muX} inputMode="decimal" placeholder="1, 2, 3 o 4" onChange={(e) => setMuX(e.target.value)} />
-                  <span className="text-text-secondary">según Y, si es otra</span>
-                  <input className="sel mono w-[6rem]" aria-label="μ según Y" value={muY} inputMode="decimal" placeholder="la misma" onChange={(e) => setMuY(e.target.value)} />
+                <Etiqueta htmlFor="s-mu" ayuda={AYUDA.mu}>
+                  Ductilidad μ
+                </Etiqueta>
+                <span className="flex flex-wrap items-center gap-2">
+                  <select id="s-mu" className="sel" value={muX} onChange={(e) => setMuX(e.target.value)}>
+                    {opcionesMu.map((m) => (
+                      <option key={m} value={String(m)}>
+                        {fmt(m, m % 1 ? 1 : 0)}
+                        {DUCTILIDAD[m] ? ` · ${DUCTILIDAD[m]}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-text-secondary">según Y</span>
+                  <select className="sel" aria-label="μ según Y" value={muY} onChange={(e) => setMuY(e.target.value)}>
+                    <option value="">la misma</option>
+                    {opcionesMu.map((m) => (
+                      <option key={m} value={String(m)}>
+                        {fmt(m, m % 1 ? 1 : 0)}
+                        {DUCTILIDAD[m] ? ` · ${DUCTILIDAD[m]}` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </span>
-                <label htmlFor="s-imp">Importancia</label>
+                <Etiqueta htmlFor="s-imp" ayuda={AYUDA.importancia}>
+                  Importancia
+                </Etiqueta>
                 <select id="s-imp" className="sel" value={importancia} onChange={(e) => setImportancia(e.target.value as "normal" | "especial")}>
                   <option value="normal">Normal · ρ = 1,0</option>
                   <option value="especial">Especial · ρ = 1,3</option>
                 </select>
-                <label htmlFor="s-sis">Sistema estructural</label>
-                <select id="s-sis" className="sel" value={sistema} onChange={(e) => setSistema(e.target.value as SistemaEstructural | "")} title="Sólo para el periodo aproximado del art. 3.7.2.2 con el que se contrasta el cortante en la base: no cambia el cálculo">
-                  <option value="">—</option>
+                <Etiqueta htmlFor="s-sis" ayuda={AYUDA.sistema}>
+                  Sistema estructural
+                </Etiqueta>
+                <select id="s-sis" className="sel" value={sistema} onChange={(e) => setSistema(e.target.value as SistemaEstructural | "")}>
+                  <option value="">— (sin contrastar con el método simplificado)</option>
                   {SISTEMAS_ESTRUCTURALES.map((s) => (
                     <option key={s} value={s}>
                       {NOMBRE_SISTEMA[s]}
                     </option>
                   ))}
                 </select>
-                <label htmlFor="s-om">Amortiguamiento Ω (%)</label>
-                <input id="s-om" className="sel mono w-[6rem]" value={omega} inputMode="decimal" placeholder="5" onChange={(e) => setOmega(e.target.value)} />
-                <label htmlFor="s-reg">Regla de combinación</label>
+                <Etiqueta htmlFor="s-om" ayuda={AYUDA.omega}>
+                  Amortiguamiento Ω
+                </Etiqueta>
+                <span className="flex items-center gap-2">
+                  <input id="s-om" className="sel mono w-[7rem]" value={omega} inputMode="decimal" placeholder="5" onChange={(e) => setOmega(e.target.value)} />
+                  <span className="text-text-secondary">% del crítico</span>
+                </span>
+                <Etiqueta htmlFor="s-reg" ayuda={AYUDA.regla}>
+                  Combinación de modos
+                </Etiqueta>
                 <select id="s-reg" className="sel" value={regla} onChange={(e) => setRegla(e.target.value as "srss" | "cqc")}>
-                  <option value="srss">La del art. 3.6.2.4: raíz de la suma de los cuadrados, con los modos a menos del 10 % sumados en valor absoluto</option>
-                  <option value="cqc">Cuadrática completa (comentario C.3.6.2.4), con Ω</option>
+                  <option value="srss">La del art. 3.6.2.4 (raíz de la suma de los cuadrados)</option>
+                  <option value="cqc">Cuadrática completa (comentario C.3.6.2.4)</option>
                 </select>
-                <label htmlFor="s-exc">Excentricidad accidental</label>
-                <input id="s-exc" className="sel mono w-[6rem]" value={excentricidad} inputMode="decimal" placeholder="0,05" onChange={(e) => setExcentricidad(e.target.value)} title="Fracción de la dimensión de la planta perpendicular al sismo (art. 3.2: no menos de 1/20); 0, sin ella" />
+                <Etiqueta htmlFor="s-exc" ayuda={AYUDA.excentricidad}>
+                  Excentricidad accidental
+                </Etiqueta>
+                <span className="flex items-center gap-2">
+                  <input id="s-exc" className="sel mono w-[7rem]" value={excentricidad} inputMode="decimal" placeholder="0,05" onChange={(e) => setExcentricidad(e.target.value)} />
+                  <span className="text-text-secondary">de la dimensión de la planta (1/20)</span>
+                </span>
                 <span />
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={nieve} onChange={(e) => setNieve(e.target.checked)} /> La nieve permanece más de 30 días al año (su masa cuenta la mitad, art. 3.2)
-                </label>
+                <span className="flex items-center gap-2">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={nieve} onChange={(e) => setNieve(e.target.checked)} /> La nieve permanece más de 30 días al año
+                  </label>
+                  <Ayuda texto={AYUDA.nieve} />
+                </span>
               </div>
               <ResumenSismo d={sismo.datos ?? null} aplicado={!cambiado} />
             </>
@@ -327,51 +551,84 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
       )}
     </Dialogo>
   );
+}
 
-  function elegirMunicipio(m: Municipio) {
-    setIne(m.ine);
-    setBusqueda("");
-  }
+/** Una cifra con su nombre y, al pasar el ratón, lo que es. */
+function Cifra({ n, v, t }: { n: string; v: string; t?: string }) {
+  return (
+    <div title={t}>
+      <dt>{n}</dt>
+      <dd>{v}</dd>
+    </div>
+  );
 }
 
 /** Lo que el viento del programa da en el modelo de la sesión. */
 function ResumenViento({ d, aplicado }: { d: DatosViento | null; aplicado: boolean }) {
   if (!d) return <p className="nota">…</p>;
-  if (!d.definido) return <p className="nota">Lo que sale de estos datos se ve al aplicarlos.</p>;
+  if (!d.definido) return <p className="nota acc-nota">Lo que sale de estos datos se ve al aplicarlos.</p>;
+  const v = d.viento;
   return (
     <div className="grid gap-2">
-      {!aplicado && <p className="nota text-state-warn">Lo de abajo es lo aplicado: pulse «Aplicar» para ver lo de estos datos.</p>}
+      <h4 className="acc-titulo">Lo que da en el modelo{!aplicado && <span className="text-state-warn"> · lo aplicado: pulse «Aplicar» para ver lo de estos datos</span>}</h4>
       {d.errores.map((p) => (
-        <p key={p.codigo + p.mensaje} className="nota text-state-fail">
+        <p key={p.codigo + p.mensaje} className="nota acc-nota text-state-fail">
           {textoApp(p.mensaje)}
         </p>
       ))}
       {d.avisos.map((p) => (
-        <p key={p.codigo + p.mensaje} className="nota text-state-warn">
+        <p key={p.codigo + p.mensaje} className="nota acc-nota text-state-warn">
           {textoApp(p.mensaje)}
         </p>
       ))}
-      {d.viento && (
+      {v && (
         <>
-          <p className="nota">
-            qb = {fmt(d.viento.qb, 3)} kN/m² ({d.viento.qbOrigen === "zona" ? `zona ${d.viento.zona}` : d.viento.qbOrigen === "dada" ? "escrita" : "simplificada"}), aspereza {d.viento.aspereza}, rasante a {fmt(d.viento.rasante, 2)} m, altura {fmt(d.viento.altura, 2)} m. Según X: esbeltez {fmt(d.viento.x.esbeltez, 2)}, cp = {fmt(d.viento.x.cp, 2)}, cs = {fmt(d.viento.x.cs, 2)}, e = {fmt(d.viento.x.e, 2)} m; según Y: {fmt(d.viento.y.esbeltez, 2)}, {fmt(d.viento.y.cp, 2)}, {fmt(d.viento.y.cs, 2)}, {fmt(d.viento.y.e, 2)} m.
-          </p>
+          <dl className="acc-cifras">
+            <Cifra n="qb" v={`${fmt(v.qb, 3)} kN/m²`} t={v.qbOrigen === "zona" ? `De la zona ${v.zona}${v.zonaOrigen === "provincia" && v.provincia ? `, la de ${v.provincia.nombre}` : ""}` : v.qbOrigen === "dada" ? "Escrita" : "Simplificada (art. 3.3.2-1)"} />
+            <Cifra n="Zona" v={`${v.zona}${v.zonaOrigen === "provincia" ? " (provincia)" : " (escrita)"}`} />
+            <Cifra n="Aspereza" v={v.aspereza} t={ASPEREZAS[v.aspereza].descripcion} />
+            <Cifra n="Altura" v={`${fmt(v.altura, 2)} m`} t="De la rasante a la planta más alta con viento" />
+          </dl>
+          <table className="tb">
+            <thead>
+              <tr>
+                <th>Viento</th>
+                <th title="Dimensión del edificio en la dirección del viento">Fondo m</th>
+                <th title="Altura entre fondo: decide cp y cs (tabla 3.5 del DB SE-AE)">Esbeltez</th>
+                <th title="Coeficiente eólico de presión, en la fachada a barlovento">cp</th>
+                <th title="Coeficiente eólico de succión, en la fachada a sotavento">cs</th>
+                <th title="Excentricidad: el 5 % del ancho de la fachada">±e m</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[v.x, v.y].map((dir) => (
+                <tr key={dir.eje}>
+                  <td>según {dir.eje}</td>
+                  <td>{fmt(dir.profundidad, 2)}</td>
+                  <td>{fmt(dir.esbeltez, 2)}</td>
+                  <td>{fmt(dir.cp, 2)}</td>
+                  <td>{fmt(dir.cs, 2)}</td>
+                  <td>{fmt(dir.e, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           <table className="tb">
             <thead>
               <tr>
                 <th>Planta</th>
-                <th>z m</th>
-                <th>ce</th>
-                <th>qe kN/m²</th>
-                <th>Área X m²</th>
-                <th>F según X kN</th>
-                <th>Área Y m²</th>
-                <th>F según Y kN</th>
+                <th title="Altura sobre la rasante">z m</th>
+                <th title="Coeficiente de exposición a esa altura (fórmula D.2)">ce</th>
+                <th title="Presión estática qe = qb·ce">qe kN/m²</th>
+                <th title="Fachada de la banda de la planta perpendicular a X">Área X m²</th>
+                <th title="F = (cp − cs)·qe·A">F según X kN</th>
+                <th title="Fachada de la banda de la planta perpendicular a Y">Área Y m²</th>
+                <th title="F = (cp − cs)·qe·A">F según Y kN</th>
               </tr>
             </thead>
             <tbody>
-              {d.viento.x.plantas.map((p, i) => {
-                const py = d.viento!.y.plantas[i];
+              {v.x.plantas.map((p, i) => {
+                const py = v.y.plantas[i];
                 return (
                   <tr key={p.planta}>
                     <td>{p.planta}</td>
@@ -380,7 +637,7 @@ function ResumenViento({ d, aplicado }: { d: DatosViento | null; aplicado: boole
                     <td>{fmt(p.qe, 3)}</td>
                     <td>
                       {fmt(p.area, 1)}
-                      {p.dada && <small>escrita</small>}
+                      {p.dada && <small> escrita</small>}
                     </td>
                     <td>{fmt(p.F, 2)}</td>
                     <td>{py ? fmt(py.area, 1) : "—"}</td>
@@ -388,9 +645,16 @@ function ResumenViento({ d, aplicado }: { d: DatosViento | null; aplicado: boole
                   </tr>
                 );
               })}
+              <tr className="acc-total">
+                <td>Σ</td>
+                <td colSpan={4} />
+                <td>{fmt(v.x.plantas.reduce((t, p) => t + p.F, 0), 2)}</td>
+                <td />
+                <td>{fmt(v.y.plantas.reduce((t, p) => t + p.F, 0), 2)}</td>
+              </tr>
             </tbody>
           </table>
-          <p className="nota">Cada caso lleva una puntual por planta en el centro de su banda, desplazada ±e, al diafragma de la planta. Σ F según X = {fmt(d.viento.x.plantas.reduce((t, p) => t + p.F, 0), 2)} kN; según Y, {fmt(d.viento.y.plantas.reduce((t, p) => t + p.F, 0), 2)} kN.</p>
+          <p className="nota acc-nota">Cada caso lleva una puntual por planta en el centro de su banda, desplazada ±e, al diafragma de la planta.</p>
         </>
       )}
     </div>
@@ -400,73 +664,39 @@ function ResumenViento({ d, aplicado }: { d: DatosViento | null; aplicado: boole
 /** El espectro del emplazamiento y, con resultados, el cortante en la base. */
 function ResumenSismo({ d, aplicado }: { d: DatosSismo | null; aplicado: boolean }) {
   if (!d) return <p className="nota">…</p>;
-  if (!d.definido) return <p className="nota">Sin emplazamiento (municipio o ab) sólo se calculan las masas y los modos. Lo que sale de estos datos se ve al aplicarlos.</p>;
+  if (!d.definido) return <p className="nota acc-nota">Sin emplazamiento (un municipio del Anejo 1 o ab escrita) sólo se calculan las masas y los modos. Lo que sale de estos datos se ve al aplicarlos.</p>;
   const e = d.espectro;
+  const mu = e ? `${fmt(e.mu[0], 0)}${e.mu[1] !== e.mu[0] ? ` / ${fmt(e.mu[1], 0)}` : ""}` : "";
+  const beta = e ? `${fmt(e.beta[0], 3)}${e.beta[1] !== e.beta[0] ? ` / ${fmt(e.beta[1], 3)}` : ""}` : "";
   return (
     <div className="grid gap-2">
-      {!aplicado && <p className="nota text-state-warn">Lo de abajo es lo aplicado: pulse «Aplicar» para ver lo de estos datos.</p>}
+      <h4 className="acc-titulo">Lo que da en el modelo{!aplicado && <span className="text-state-warn"> · lo aplicado: pulse «Aplicar» para ver lo de estos datos</span>}</h4>
       {d.problemas.map((p) => (
-        <p key={p.codigo + p.mensaje} className={`nota ${p.severidad === "error" ? "text-state-fail" : "text-state-warn"}`}>
+        <p key={p.codigo + p.mensaje} className={`nota acc-nota ${p.severidad === "error" ? "text-state-fail" : "text-state-warn"}`}>
           {textoApp(p.mensaje)}
         </p>
       ))}
       {e && (
-        <p className="nota">
-          ab = {fmt(e.emplazamiento.ab, 2)} g, K = {fmt(e.emplazamiento.K, 1)}
-          {e.municipio ? ` (${e.municipio.nombre}, ${e.municipio.provincia})` : ""}; terreno {e.terreno}, C = {fmt(e.emplazamiento.C, 2)}, S = {fmt(e.emplazamiento.S, 3)}, ρ = {fmt(e.emplazamiento.rho, 1)}: ac = {fmt(e.emplazamiento.ac, 3)} g, TA = {fmt(e.emplazamiento.TA, 3)} s, TB = {fmt(e.emplazamiento.TB, 3)} s. Ω = {fmt(e.omega, 0)} %, ν = {fmt(e.nu, 3)}; μ = {fmt(e.mu[0], 0)}
-          {e.mu[1] !== e.mu[0] ? ` / ${fmt(e.mu[1], 0)}` : ""}, β = {fmt(e.beta[0], 3)}
-          {e.beta[1] !== e.beta[0] ? ` / ${fmt(e.beta[1], 3)}` : ""}.
-        </p>
+        <dl className="acc-cifras">
+          <Cifra n="ab" v={`${fmt(e.emplazamiento.ab, 2)} g`} t={e.municipio ? `${e.municipio.nombre} (${e.municipio.provincia})` : "Escrita"} />
+          <Cifra n="K" v={fmt(e.emplazamiento.K, 1)} t="Coeficiente de contribución" />
+          <Cifra n="C" v={`${fmt(e.emplazamiento.C, 2)} (${e.terreno})`} t="Coeficiente del terreno" />
+          <Cifra n="S" v={fmt(e.emplazamiento.S, 3)} t="Coeficiente de amplificación del terreno (art. 2.2)" />
+          <Cifra n="ρ" v={fmt(e.emplazamiento.rho, 1)} t="Coeficiente de riesgo, por la importancia" />
+          <Cifra n="ac" v={`${fmt(e.emplazamiento.ac, 3)} g`} t="Aceleración sísmica de cálculo, ac = S·ρ·ab (art. 2.2)" />
+          <Cifra n="TA · TB" v={`${fmt(e.emplazamiento.TA, 3)} · ${fmt(e.emplazamiento.TB, 3)} s`} t="Periodos característicos del espectro: TA = K·C/10, TB = K·C/2,5" />
+          <Cifra n="ν" v={fmt(e.nu, 3)} t={`Factor de amortiguamiento, (5/Ω)^0,4 con Ω = ${fmt(e.omega, 0)} %`} />
+          <Cifra n="μ" v={mu} t="Ductilidad según X / según Y" />
+          <Cifra n="β" v={beta} t="Coeficiente de respuesta β = ν/μ" />
+        </dl>
       )}
-      {d.curva && e && <Espectro curva={d.curva} periodos={d.periodos} TA={e.emplazamiento.TA} TB={e.emplazamiento.TB} />}
+      {d.curva && e && <Espectro curva={d.curva} periodos={d.periodos} TA={e.emplazamiento.TA} TB={e.emplazamiento.TB} ac={e.emplazamiento.ac} />}
       {d.resultado && (
-        <p className="nota">
+        <p className="nota acc-nota">
           Con el cálculo: cortante en la base según X {fmt(d.resultado.direcciones[0]!.cortanteBasal, 1)} kN ({fmt(100 * d.resultado.direcciones[0]!.coeficienteSismico, 1)} % del peso sísmico, {fmt(d.resultado.peso, 0)} kN), según Y {fmt(d.resultado.direcciones[1]!.cortanteBasal, 1)} kN ({fmt(100 * d.resultado.direcciones[1]!.coeficienteSismico, 1)} %). El detalle, en Resultados · Modal.
         </p>
       )}
-      {d.motivo && <p className="nota">{textoApp(d.motivo)}</p>}
+      {d.motivo && <p className="nota acc-nota">{textoApp(d.motivo)}</p>}
     </div>
-  );
-}
-
-/** La curva del espectro: α(T) elástico y αᵢ(T) según X y según Y, con los periodos de los modos. */
-export function Espectro({ curva, periodos, TA, TB }: { curva: DatosSismo["curva"] & object; periodos: number[]; TA: number; TB: number }) {
-  const [W, H, ml, mb] = [420, 170, 34, 22];
-  const Tmax = curva.T[curva.T.length - 1]!;
-  const amax = Math.max(...curva.elastico);
-  const X = (T: number) => ml + (T / Tmax) * (W - ml - 8);
-  const Y = (a: number) => H - mb - (a / amax) * (H - mb - 10);
-  const linea = (ys: number[]) => curva.T.map((T, i) => `${i ? "L" : "M"}${X(T).toFixed(1)} ${Y(ys[i]!).toFixed(1)}`).join("");
-  return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Espectro de respuesta">
-      <line x1={ml} x2={W - 4} y1={H - mb} y2={H - mb} stroke="var(--color-border-main)" />
-      <line x1={ml} x2={ml} y1={6} y2={H - mb} stroke="var(--color-border-main)" />
-      {[TA, TB].map((T, i) => (
-        <g key={i}>
-          <line x1={X(T)} x2={X(T)} y1={10} y2={H - mb} stroke="var(--color-border-main)" strokeDasharray="3 3" />
-          <text x={X(T)} y={H - 8} fontSize={10} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
-            {i ? "TB" : "TA"} {fmt(T, 2)}
-          </text>
-        </g>
-      ))}
-      <path d={linea(curva.elastico)} fill="none" stroke="var(--color-text-muted)" strokeWidth={1.2} strokeDasharray="4 3" />
-      <path d={linea(curva.x)} fill="none" stroke="var(--color-accent)" strokeWidth={1.6} />
-      <path d={linea(curva.y)} fill="none" stroke="var(--color-uy)" strokeWidth={1.6} strokeDasharray="6 3" />
-      {periodos.map((T, i) => (
-        <circle key={i} cx={X(Math.min(T, Tmax))} cy={Y(curva.x[Math.min(curva.T.length - 1, Math.round((T / Tmax) * (curva.T.length - 1)))]!)} r={2.5} fill="var(--color-accent)" />
-      ))}
-      <text x={ml - 4} y={Y(amax) + 4} fontSize={10} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
-        {fmt(amax, 1)}
-      </text>
-      <text x={ml - 4} y={Y(1) + 4} fontSize={10} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
-        1
-      </text>
-      <text x={W - 4} y={H - 8} fontSize={10} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
-        T {fmt(Tmax, 0)} s
-      </text>
-      <text x={ml + 6} y={16} fontSize={10} fill="var(--color-text-muted)">
-        α(T) elástico — — · αᵢ según X ── · según Y – –
-      </text>
-    </svg>
   );
 }

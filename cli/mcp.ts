@@ -133,7 +133,7 @@ export const HERRAMIENTAS: Herramienta[] = [
   {
     name: "emplazamiento",
     description:
-      "El municipio de la obra para el sismo y el viento: su código INE (el «ine» de acciones.sismo), ab y K del Anejo 1 de la NCSE-02 y la zona eólica de la capital de su provincia, con el aviso si la provincia tiene más de una. Estos datos salen de aquí, nunca de memoria. Un municipio que no figura no se da por exento.",
+      "El municipio de la obra para el sismo y el viento: su código INE (el «ine» de acciones.emplazamiento, común al viento y al sismo), ab y K del Anejo 1 de la NCSE-02 y la zona eólica de la capital de su provincia, con el aviso si la provincia tiene más de una. Estos datos salen de aquí, nunca de memoria. Un municipio que no figura no se da por exento.",
     inputSchema: obj({ municipio: { type: "string", description: "El nombre del municipio (o parte), su código INE de 5 cifras, o una provincia." }, top: { type: "integer", minimum: 1, description: "Cuántos municipios dar (por defecto, 20)." } }, ["municipio"]),
   },
   {
