@@ -72,8 +72,9 @@ export function PlantaForjado({ c, activo, onCampo }: Props) {
       </div>
     );
   }
-  // La caja con los ábacos, que pueden salirse del contorno
-  const todos = [c.contorno, ...c.abacos].flat();
+  // La caja del contorno: los ábacos se dibujan sólo en lo que cae en la losa (el recorte de abajo),
+  // que es lo que cuenta el compilador y lo que dibujan la planta y el 3D
+  const todos = c.contorno;
   const [x0, y0, x1, y1] = [Math.min(...todos.map((p) => p[0])), Math.min(...todos.map((p) => p[1])), Math.max(...todos.map((p) => p[0])), Math.max(...todos.map((p) => p[1]))];
   const [ax0, ay0, ax1, ay1] = c.caja;
   const k = Math.min((W - 2 * M) / Math.max(x1 - x0, 1e-9), (H - 2 * M) / Math.max(y1 - y0, 1e-9));
@@ -100,13 +101,20 @@ export function PlantaForjado({ c, activo, onCampo }: Props) {
               {c.tipo === "reticular" && <line x1={0} y1={0} x2={0} y2={paso} className="cq-trama" />}
             </pattern>
           )}
+          <clipPath id={`r${id}`}>
+            <path d={d(c.contorno) + c.huecos.map(d).join("")} clipRule="evenodd" />
+          </clipPath>
         </defs>
         <path d={d(c.contorno) + c.huecos.map(d).join("")} fillRule="evenodd" className="cq-losa" />
         {trama && <path d={d(c.contorno) + c.huecos.map(d).join("")} fillRule="evenodd" fill={`url(#t${id})`} className="cq-sin-eventos" />}
+        {c.abacos.length > 0 && (
+          <g clipPath={`url(#r${id})`} data-recorte="losa">
+            {c.abacos.map((p, i) => (
+              <path key={`a${i}`} d={d(p)} className="cq-abaco" {...parte("abacos", prop)} />
+            ))}
+          </g>
+        )}
         <path d={d(c.contorno)} className="cq-borde" {...parte("contorno", prop)} />
-        {c.abacos.map((p, i) => (
-          <path key={`a${i}`} d={d(p)} className="cq-abaco" {...parte("abacos", prop)} />
-        ))}
         {c.huecos.map((p, i) => {
           const n = p.length;
           const [a0, a1, b0, b1] = [P(p[0]!), P(p[Math.floor(n / 2)]!), P(p[1]!), P(p[(Math.floor(n / 2) + 1) % n]!)];

@@ -128,3 +128,30 @@ describe("Propiedades de un forjado: el peso propio (revisión del 2026-11-05)",
     expect(op2.op === "cambiar" && (op2.objeto as { ppProcedencia?: unknown }).ppProcedencia).toEqual({ origen: "fabricante", fuente: "Ficha X, 2025" });
   });
 });
+
+describe("el croquis en planta de un reticular con ábacos que se salen", () => {
+  it("dibuja los ábacos sólo en lo que cae en el forjado y encuadra el contorno (prueba de uso «31», 2026-11-07)", async () => {
+    const { PlantaForjado } = await import("../editor/CroquisForjado.tsx");
+    const contorno: [number, number][] = [[0, 0], [10, 0], [10, 6], [0, 6]];
+    const { container } = render(
+      <PlantaForjado
+        c={{ tipo: "reticular", contorno, huecos: [], abacos: [[[-1.5, -1.5], [1.5, -1.5], [1.5, 1.5], [-1.5, 1.5]]], area: 60, caja: [0, 0, 10, 6], direccion: 0, intereje: 0.8, caseton: "perdido" }}
+        activo={null}
+        onCampo={() => {}}
+      />,
+    );
+    const ab = container.querySelector(".cq-abaco")!;
+    const g = ab.closest("g[clip-path]")!;
+    expect(g).not.toBeNull();
+    const id = /url\(#(.+)\)/.exec(g.getAttribute("clip-path")!)![1]!;
+    const recorte = container.querySelector(`clipPath[id="${id}"] path`)!;
+    expect(recorte.getAttribute("d")).toBe(container.querySelector(".cq-losa")!.getAttribute("d"));
+    // El encuadre, el del contorno: su primer vértice no se aparta del margen por el ábaco
+    const borde = container.querySelector(".cq-borde")!.getAttribute("d")!;
+    const xs = [...borde.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
+    const svg = container.querySelector("svg")!;
+    const W = Number(svg.getAttribute("width"));
+    expect(Math.min(...xs) + Math.max(...xs)).toBeCloseTo(W, 0);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(W * 0.75);
+  });
+});
