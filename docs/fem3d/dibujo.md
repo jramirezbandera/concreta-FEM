@@ -188,7 +188,7 @@ Cómo se comporta cada herramienta:
 
 - **Ejes:** dos clics. Se llama con la letra o el número siguiente según vaya como los ejes con letra o como los numerados de `compilador/ejes.ts`. **El primero que se dibuja sin ejes en el modelo guarda también los propuestos** (V2c1-3); «Proponer ejes» los guarda sin dibujar.
 - **Pilar:** un clic pone su punto fijo donde se hace clic; una ventana, uno en cada cruce de ejes de dentro, por filas de arriba abajo y de izquierda a derecha. Plantilla: desde (por defecto, la planta más baja), hasta (por defecto, la de la vista), sección, giro y punto fijo. Donde ya hay un pilar que comparte plantas, no pone otro (el doble clic no duplica).
-- **Viga:** polilínea; doble clic o Intro termina, Retroceso quita el último punto, Esc anula. Plantilla: sección y alinear (V2c-b): eje a eje (por defecto) o con la cara izquierda o derecha, según el sentido del dibujo, en la de los pilares de sus extremos.
+- **Viga:** polilínea; doble clic o Intro termina, Retroceso quita el último punto, Esc anula. Plantilla: sección y alinear (V2c-b): eje a eje (por defecto) o con la cara izquierda o derecha, según el sentido del dibujo, en la de los pilares de sus extremos; en un tramo sin pilar, esa cara va en la línea dibujada, como en el Muro (de la prueba de uso, 2026-11-07: calcar una viga perimetral por la línea de un DXF la dejaba centrada).
 - **Sección nueva** desde la plantilla, rectangular b × h en cm («P30x30», «V30x50»), sin ir a la tabla. La de por defecto es la más usada por su tipo de objeto.
 
 ### 7.2 Criterios

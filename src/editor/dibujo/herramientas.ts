@@ -16,7 +16,7 @@
  * - **Viga:** polilínea a clics; doble clic o Intro termina, Retroceso quita el último punto. Eje a eje
  *   por defecto (el punto enganchado, el punto fijo de un pilar); con `alinear`, cada tramo que nace o
  *   acaba en un pilar se desplaza hasta que su cara izquierda o derecha (según el sentido del dibujo)
- *   queda en la de la huella del pilar (V2c-b).
+ *   queda en la de la huella del pilar (V2c-b); en los demás, esa cara es lo dibujado.
  *
  * Esc anula lo que está en curso y, sin nada en curso, sale a Elegir.
  *
@@ -266,7 +266,8 @@ function salida(pl: PlantaFisica, id: string, n: Vec2): number | null {
  * El eje de una viga alineada a la cara de sus pilares (V2c-b): cada tramo con un pilar en un extremo
  * se desplaza en perpendicular hasta que la cara de la viga del lado `lado` (según el sentido del
  * dibujo) queda en la de la huella del pilar; los vértices son los cruces de los tramos desplazados.
- * Un tramo sin pilar no se mueve.
+ * En un tramo sin pilar, lo dibujado es esa cara (el eje va b/2 más allá, como en el Muro): así se
+ * calca una viga perimetral por la línea de un DXF. Antes no se movía, y la viga salía centrada.
  */
 export function alinearACara(m: ModeloFisico, planta: string, puntos: readonly PuntoDibujo[], lado: "izquierda" | "derecha", ancho: number): Vec2[] {
   const pl = new PlantaFisica(m, planta);
@@ -279,7 +280,8 @@ export function alinearACara(m: ModeloFisico, planta: string, puntos: readonly P
     const n: Vec2 = [-s * t[1] + 0, s * t[0] + 0];
     const [id, ref] = x.pilar ? [x.pilar, a] : puntos[k + 1]!.pilar ? [puntos[k + 1]!.pilar!, b] : [null, a];
     const e = id ? salida(pl, id, n) : null;
-    const delta = e === null ? 0 : e - ancho / 2 - (ref[0] * n[0] + ref[1] * n[1]);
+    // Con pilar, la cara de la viga en la suya; sin pilar, en lo dibujado
+    const delta = e === null ? -ancho / 2 : e - ancho / 2 - (ref[0] * n[0] + ref[1] * n[1]);
     const mover = (p: Vec2): Vec2 => (delta === 0 ? p : [p[0] + delta * n[0], p[1] + delta * n[1]]);
     return { a: mover(a), b: mover(b), t };
   });

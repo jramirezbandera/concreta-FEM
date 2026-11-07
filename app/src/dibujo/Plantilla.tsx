@@ -159,8 +159,8 @@ const FIJO: Record<PuntoFijo, string> = {
 
 const ALINEAR: { v: Alinear; texto: string; ayuda: string }[] = [
   { v: "eje", texto: "Eje", ayuda: "Eje a eje, por el punto fijo de los pilares." },
-  { v: "izquierda", texto: "Cara izq.", ayuda: "Cada tramo que nace o acaba en un pilar va con su cara izquierda (según el sentido del dibujo) en la del pilar." },
-  { v: "derecha", texto: "Cara der.", ayuda: "Cada tramo que nace o acaba en un pilar va con su cara derecha (según el sentido del dibujo) en la del pilar." },
+  { v: "izquierda", texto: "Cara izq.", ayuda: "La cara izquierda de la viga (según el sentido del dibujo) va en la del pilar en los tramos que nacen o acaban en uno, y en la línea dibujada en los demás." },
+  { v: "derecha", texto: "Cara der.", ayuda: "La cara derecha de la viga (según el sentido del dibujo) va en la del pilar en los tramos que nacen o acaban en uno, y en la línea dibujada en los demás." },
 ];
 
 interface Props {
