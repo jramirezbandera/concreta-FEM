@@ -183,6 +183,25 @@ export function prepararEscena(e: Escena): EscenaPreparada {
   };
 }
 
+const ESTILOS_EJES: ReadonlySet<Estilo> = new Set(["eje", "eje-burbuja", "cota"]);
+
+/**
+ * La escena sin los ejes de replanteo (rectas, burbujas y sus nombres) ni las cotas entre ellos: el
+ * botón «Ejes» de la barra de la vista. Los demás rótulos de clase `eje` (las cotas de las plantas en
+ * un alzado) se quedan: sólo se quitan los de un objeto con burbuja.
+ */
+export function sinEjes(e: EscenaPreparada): EscenaPreparada {
+  const ejes = new Set<string>();
+  for (const g of e.glifos) if (g.estilo === "eje-burbuja" && g.objeto) ejes.add(g.objeto);
+  return {
+    ...e,
+    capas: e.capas.filter((c) => !ESTILOS_EJES.has(c.estilo)),
+    glifos: e.glifos.filter((g) => g.estilo !== "eje-burbuja"),
+    textos: e.textos.filter((t) => t.clase !== "cota" && !(t.clase === "eje" && t.objeto !== undefined && ejes.has(t.objeto))),
+    leyenda: e.leyenda.filter((l) => !l.estilo || !ESTILOS_EJES.has(l.estilo)),
+  };
+}
+
 // ─── Elegir con el ratón ────────────────────────────────────────────────────────────────────────
 
 function distanciaSegmento(q: Vec2, a: Vec2, b: Vec2): number {

@@ -35,6 +35,8 @@ export interface EstadoVista {
   malla?: boolean;
   /** La rejilla y los ejes del origen (`fondo.ts`); por defecto, sí. F7 la quita y la pone. */
   rejilla?: boolean;
+  /** Los ejes de replanteo y sus cotas en planta y en alzado; por defecto, sí. */
+  ejes?: boolean;
   /** V2c-4: la plantilla DXF de la planta (y sus enganches); por defecto, sí. */
   plantilla?: boolean;
   modo3d: Modo3D;

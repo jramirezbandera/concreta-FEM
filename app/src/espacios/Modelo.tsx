@@ -524,7 +524,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         planta: (v) => {
           if (!v.planta) return null;
           const geo = v.plantilla !== false ? dxf.porPlanta(v.planta).geometria : null;
-          return <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta, { cotas: !cargas && plantaVista(v, e.calculado).vista === "modelo", plantilla: !!geo }) : null} dibujando={dibujando} plantilla={geo} />;
+          return <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta, { cotas: !cargas && v.ejes !== false && plantaVista(v, e.calculado).vista === "modelo", plantilla: !!geo }) : null} dibujando={dibujando} plantilla={geo} />;
         },
         plantilla: (pl) => !!listaDxf?.some((t) => t.plantas.includes(pl)),
         ...(ed

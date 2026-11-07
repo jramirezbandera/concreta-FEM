@@ -22,7 +22,8 @@ import type { Cargas3D } from "../../../src/visor/cargas3d.ts";
 import type { Solido } from "../../../src/visor/solido.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
-import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
+import { sinEjes, type Eleccion, type EscenaPreparada } from "../../../src/visor/escena.ts";
+import { IcEjes } from "../armazon/iconos.tsx";
 import type { FuenteEscena, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, SelectorEje, SelectorPlanta, useEstrecha } from "../armazon/Disposicion.tsx";
 import { Aviso, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -343,6 +344,11 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         <button type="button" className="ib" data-on={rejilla} aria-pressed={rejilla} title="Rejilla y ejes del origen (F7)" aria-label="Rejilla" onClick={() => poner(i, { rejilla: !rejilla })}>
           <Grid3x3 size={15} />
         </button>
+        {tipo !== "3d" && (
+          <button type="button" className="ib" data-on={v.ejes !== false} aria-pressed={v.ejes !== false} title="Ejes de replanteo y sus cotas" aria-label="Ver los ejes" onClick={() => poner(i, { ejes: v.ejes === false })}>
+            <IcEjes size={15} />
+          </button>
+        )}
         {tipo === "planta" && planta && fuentes.plantilla?.(planta) && (
           <button type="button" className="ib" data-on={v.plantilla !== false} aria-pressed={v.plantilla !== false} title="Plantilla DXF: verla y enganchar a ella" aria-label="Ver la plantilla DXF" onClick={() => poner(i, { plantilla: v.plantilla === false })}>
             <FileImage size={15} />
@@ -660,9 +666,12 @@ interface PropsFuente2D {
 }
 
 /** Una escena 2D en la vista de la celda. */
-export function Fuente2D({ escena, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor, dibujo = null, plantilla = null }: PropsFuente2D) {
-  const { vista, varias } = useCelda();
+export function Fuente2D({ escena: escenaEntera, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor, dibujo = null, plantilla = null }: PropsFuente2D) {
+  const { vista, varias, v: estado } = useCelda();
   const v = vista instanceof Vista2D ? vista : null;
+  // El botón «Ejes» de la barra de la vista
+  const conEjes = estado.ejes !== false;
+  const escena = useMemo(() => (escenaEntera && !conEjes ? sinEjes(escenaEntera) : escenaEntera), [escenaEntera, conEjes]);
   useEffect(() => v?.ponerEscena(escena), [v, escena]);
   useEffect(() => v?.ponerPlantilla(plantilla), [v, plantilla]);
   useEffect(() => v?.ponerResaltado(resaltado), [v, resaltado]);
