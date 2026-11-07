@@ -925,14 +925,14 @@ function PlantillaCargaPanel({ h, t, modelo: m, poner }: { h: NombreCargaH; t: P
   // El caso del peso propio es del programa: lo dibujado en él se mezcla con lo que calcula
   const casoPP = m?.casos.find((c) => c.id === t.caso)?.pesoPropio ? t.caso : null;
   const cm = casoPP && m ? casoCargasMuertas(m) : null;
+  // En un caso de nieve, la de la obra: q = μ·sk con μ = 1 (cubierta plana), del emplazamiento. Se propone, no se pone
+  const casoNieve = m?.casos.find((c) => c.id === t.caso)?.accion?.tipo === "S";
+  const nieve = useMemo(() => (casoNieve && m ? nieveObra(m) : null), [casoNieve, m]);
   return (
     <Seccion titulo="Plantilla" valor={t.caso ? `caso ${t.caso}` : "sin caso"}>
       <div className="py-1">
         {!t.caso && <p className="nota text-state-fail">Elija el caso activo en la barra (o cree uno con Casos).</p>}
         {casoPP && (
-  // En un caso de nieve, la de la obra: q = μ·sk con μ = 1 (cubierta plana), del emplazamiento. Se propone, no se pone
-  const casoNieve = m?.casos.find((c) => c.id === t.caso)?.accion?.tipo === "S";
-  const nieve = useMemo(() => (casoNieve && m ? nieveObra(m) : null), [casoNieve, m]);
           <p className="nota text-state-warn" data-aviso-peso-propio>
             {casoPP} es el caso del peso propio, que calcula el programa: lo que dibuje aquí se mezcla con él.{" "}
             {cm && !cm.crear.length ? `Elija ${cm.id} en «Caso activo».` : "Cree un caso de cargas muertas (Casos, «Cargas muertas») y elíjalo en «Caso activo»."}
@@ -969,11 +969,6 @@ function PlantillaCargaPanel({ h, t, modelo: m, poner }: { h: NombreCargaH; t: P
               ayuda={(t.superficie?.modo ?? "forjado") === "forjado" ? "Un clic dentro de un forjado: todo él, sin sus huecos." : "Un polígono; si cae entero en un forjado, la parte de él en la zona."}
             />
             <CampoCarga etiqueta="q" unidad="kN/m²" valor={t.superficie?.q} onCambio={(q) => poner({ superficie: { ...t.superficie, q } })} ayuda="Por m² de forjado: p. ej., 1,5 de solado o 2 de uso." />
-          </>
-        )}
-        {h === "barra" && (
-          <>
-            <Segmentado
             {casoNieve && nieve && (
               <p className="nota" data-nieve-obra>
                 {nieve.nieve?.qnPlana != null ? (
@@ -989,6 +984,11 @@ function PlantillaCargaPanel({ h, t, modelo: m, poner }: { h: NombreCargaH; t: P
                 )}
               </p>
             )}
+          </>
+        )}
+        {h === "barra" && (
+          <>
+            <Segmentado
               etiqueta="dónde"
               valor={t.barra?.modo ?? "entera"}
               opciones={[
