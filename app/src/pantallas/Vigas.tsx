@@ -16,9 +16,10 @@
  * de su altura y, en Propiedades, su cuadro por tramos.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GraficaEnvolvente } from "./GraficaEnvolvente.tsx";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { EsfuerzoPlano } from "../../../src/agente/render/index.ts";
-import type { DatosEstacion, DatosViga, Esfuerzo, FilaPilar } from "../../../src/visor/datos.ts";
+import type { DatosEstacion, Esfuerzo, FilaPilar } from "../../../src/visor/datos.ts";
 import type { PiezasDiagrama } from "../../../src/visor/diagramas3d.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
@@ -105,133 +106,6 @@ export function lineasEstacion(pieza: string, d: DatosEstacion, esfuerzo: Esfuer
   return [...r, ...(iguales ? lado("", d.derecha) : [...lado("izq. ", d.izquierda), ...lado("der. ", d.derecha)])];
 }
 
-function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => void }) {
-  const caja = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(800);
-  useEffect(() => {
-    const el = caja.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setW(Math.max(200, Math.round(e!.contentRect.width))));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const H = 190;
-  const [ml, mr, mt, mb] = [44, 20, 18, 26];
-  const L = Math.max(v.longitud, 1e-6);
-  const abajo = ESFUERZOS.find((x) => x.id === v.esfuerzo)!.abajo;
-  const vmax = Math.max(1e-9, ...v.envolvente.flatMap((p) => [Math.abs(p.max), Math.abs(p.min)]));
-  const X = (x: number) => ml + (x / L) * (w - ml - mr);
-  const y0 = mt + (H - mt - mb) / 2;
-  const Y = (val: number) => y0 + ((abajo ? 1 : -1) * val * (H - mt - mb)) / 2 / vmax;
-  const camino = (k: "max" | "min") => {
-    if (!v.envolvente.length) return "";
-    let d = "";
-    let previo: number | null = null;
-    for (const p of v.envolvente) {
-      // Una zona rígida corta el diagrama
-      const corte = previo !== null && !v.flexibles.some(([a, b]) => previo! >= a - 1e-9 && p.s <= b + 1e-9);
-      d += `${d && !corte ? "L" : "M"}${X(p.s).toFixed(1)} ${Y(p[k]).toFixed(1)}`;
-      previo = p.s;
-    }
-    return d;
-  };
-  const area = (k: "max" | "min") => {
-    const segs: string[] = [];
-    for (const [a, b] of v.flexibles) {
-      const ps = v.envolvente.filter((p) => p.s >= a - 1e-9 && p.s <= b + 1e-9);
-      if (ps.length < 2) continue;
-      segs.push(`M${X(ps[0]!.s).toFixed(1)} ${y0}${ps.map((p) => `L${X(p.s).toFixed(1)} ${Y(p[k]).toFixed(1)}`).join("")}L${X(ps[ps.length - 1]!.s).toFixed(1)} ${y0}Z`);
-    }
-    return segs.join("");
-  };
-  const todos = v.vanos.flatMap((va) => {
-    const r: { s: number; v: number; comb: string }[] = [];
-    const ex = va.extremos;
-    if (v.esfuerzo === "My") for (const k of ["My+", "My-"]) if (ex[k]) r.push({ s: ex[k].s!, v: ex[k].v, comb: ex[k].comb });
-    if (v.esfuerzo === "Vz" && ex.Vz) r.push({ s: ex.Vz.s!, v: ex.Vz.v, comb: ex.Vz.comb });
-    return r;
-  });
-  // En un pilar o en una barra no hay vanos: su máximo y su mínimo
-  if ((v.tipo === "pilar" || v.tipo === "barra") && v.envolvente.length) {
-    const mx = v.envolvente.reduce((a, b) => (b.max > a.max ? b : a));
-    const mn = v.envolvente.reduce((a, b) => (b.min < a.min ? b : a));
-    if (mx.max > 0) todos.push({ s: mx.s, v: mx.max, comb: "" });
-    if (mn.min < 0) todos.push({ s: mn.s, v: mn.min, comb: "" });
-  }
-  // Dos picos juntos (los de los vanos a cada lado de un apoyo) en el mismo lado: sólo el mayor
-  const picos: typeof todos = [];
-  for (const p of [...todos].sort((a, b) => Math.abs(b.v) - Math.abs(a.v))) if (!picos.some((q) => Math.abs(X(q.s) - X(p.s)) < 40 && Math.sign(q.v) === Math.sign(p.v))) picos.push(p);
-  return (
-    <div ref={caja} className="relative shrink-0 bg-bg-canvas" style={{ height: H + 34 }}>
-      <div className="flex h-[30px] items-center gap-4 border-b border-border-sub px-3 text-[11px] text-text-secondary">
-        <span className="font-mono text-text-primary">
-          {v.id} · {v.esfuerzo} · envolvente de {v.combinaciones.nombres.length}
-        </span>
-        <span className="flex items-center gap-1">
-          <i className="inline-block h-[3px] w-4 bg-[var(--color-env-max)]" /> máximo
-        </span>
-        <span className="flex items-center gap-1">
-          <i className="inline-block h-[3px] w-4 bg-[var(--color-env-min)]" /> mínimo
-        </span>
-        <span className="flex items-center gap-1">
-          <i className="inline-block h-[10px] w-4 bg-bg-elevated" /> {v.tipo === "pilar" ? "planta (zona rígida)" : v.tipo === "barra" ? "zona rígida" : "apoyo (zona rígida)"}
-        </span>
-        {v.tipo === "pilar" && <span>desde la base, hacia arriba a la derecha</span>}
-        {v.tipo === "barra" && <span>desde su inicio</span>}
-        {v.esfuerzo === "My" && <span>positivo hacia abajo (tracciones)</span>}
-      </div>
-      {/* C-19: el clic es un atajo; con el teclado, la estación es el deslizador de debajo («s =») */}
-      <svg width={w} height={H} role="img" aria-label={`Envolvente de ${v.esfuerzo} de ${v.id}`}
-        onClick={(e) => {
-          const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          onS(Math.min(L, Math.max(0, ((e.clientX - r.left - ml) / (w - ml - mr)) * L)));
-        }}
-      >
-        {v.apoyos.map((a, i) => (
-          <g key={i}>
-            <rect x={X(a.caras[0])} y={mt - 6} width={Math.max(1, X(a.caras[1]) - X(a.caras[0]))} height={H - mt - mb + 12} fill="var(--color-bg-elevated)" />
-            <text x={X(a.s)} y={H - 6} fontSize={11} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
-              {a.objeto}
-            </text>
-          </g>
-        ))}
-        {(v.plantas ?? []).map((p) => (
-          <g key={p.planta}>
-            <line x1={X(p.s)} x2={X(p.s)} y1={mt - 6} y2={H - mb + 4} stroke="var(--color-border-main)" strokeDasharray="3 3" />
-            <text x={X(p.s)} y={H - 6} fontSize={11} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
-              {p.planta}
-            </text>
-          </g>
-        ))}
-        <path d={area("max")} fill="var(--color-env-max-f)" opacity={0.9} />
-        <path d={area("min")} fill="var(--color-env-min-f)" opacity={0.9} />
-        <line x1={ml} x2={w - mr} y1={y0} y2={y0} stroke="var(--color-text-muted)" strokeWidth={1} />
-        <path d={camino("max")} fill="none" stroke="var(--color-env-max)" strokeWidth={1.4} />
-        <path d={camino("min")} fill="none" stroke="var(--color-env-min)" strokeWidth={1.4} />
-        {picos.map((p, i) => {
-          // UI-21: con un fondo, no sólo el halo de las letras: el salto vertical del diagrama en la
-          // cara de un apoyo pasaba entre ellas y tachaba el signo
-          const t = fmt(p.v, 1);
-          const y = Y(p.v) + (Y(p.v) > y0 ? 13 : -5);
-          const ancho = t.length * 6.4 + 6;
-          return (
-            <g key={i}>
-              <rect x={X(p.s) - ancho / 2} y={y - 10} width={ancho} height={13} rx={2} fill="var(--color-bg-primary)" opacity={0.92} />
-              <text x={X(p.s)} y={y} fontSize={11} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
-                {t}
-              </text>
-            </g>
-          );
-        })}
-        <line x1={X(s)} x2={X(s)} y1={mt - 8} y2={H - mb + 4} stroke="var(--color-accent)" strokeDasharray="4 3" />
-        <text x={ml - 6} y={y0 + 4} fontSize={11} textAnchor="end" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
-          0
-        </text>
-      </svg>
-    </div>
-  );
-}
-
 function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
   if (d.rigida) return <p className="nota">s = {fmt(d.s, 2)} m cae dentro de un apoyo (zona rígida): no hay esfuerzos de la barra.</p>;
   const lado = (t: string, x: DatosEstacion["izquierda"]) =>
@@ -269,7 +143,12 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
         </tr>
       </thead>
       <tbody>
-        {iguales ? lado("", d.derecha) : [lado("Izq.", d.izquierda), lado("Der.", d.derecha)]}
+        {iguales ? lado("", d.derecha) : (
+          <>
+            {lado("Izq.", d.izquierda)}
+            {lado("Der.", d.derecha)}
+          </>
+        )}
       </tbody>
     </table>
   );
@@ -419,7 +298,7 @@ export function ModoDiagramas() {
 
   const alzado = v ? (
     <>
-      <Alzado v={v} s={sValida} onS={setS} />
+      <GraficaEnvolvente v={v} s={sValida} onS={setS} estacion={est.datos ?? null} unidad={unidad} abajo={ESFUERZOS.find((x) => x.id === v.esfuerzo)!.abajo} />
       <div className="flex h-9 shrink-0 items-center gap-3 border-t border-border-sub bg-bg-surface px-3">
         <label htmlFor="estacion" className="text-[12px] text-text-secondary">
           Estación
