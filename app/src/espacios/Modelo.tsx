@@ -36,6 +36,7 @@ import { FichaAcciones } from "../editor/FichaAcciones.tsx";
 import { IcSismo, IcViento } from "../armazon/iconos.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
+import { eleccionLista } from "../armazon/eleccionLista.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { PasarACargasMuertas } from "../pantallas/PesoPropio.tsx";
 import { useVisor } from "../contexto.ts";
@@ -717,9 +718,11 @@ function Proyecto() {
 
 /** Los objetos por tipo; desplegando un tipo, los de la planta activa (o todos, si no van por plantas). */
 function Objetos({ tablas }: { tablas: NombreTabla[] }) {
-  const { proyecto, planta, elegidos, setSeleccion, setElegidos } = useVisor();
+  const { proyecto, planta, elegidos, setElegidos } = useVisor();
   const e = proyecto.estado!;
   const ed = proyecto.edicion;
+  // El último elegido con un clic sin Mayús: el otro extremo del rango de Mayús+clic
+  const ancla = useRef<string | null>(null);
   const [abiertos, setAbiertos] = useState<Set<NombreTabla>>(() => new Set());
   const m = ed?.proyecto.modelo;
   const porTabla = useMemo(() => {
@@ -775,8 +778,26 @@ function Objetos({ tablas }: { tablas: NombreTabla[] }) {
               <span className="n">{aqui.length === total ? total : `${aqui.length} de ${total}`}</span>
             </button>
             {abierto &&
-              aqui.slice(0, 300).map((o) => (
-                <button key={o.id} type="button" className="arbol-fila sub" data-on={elegidos.includes(o.id)} onClick={(x) => (x.ctrlKey || x.metaKey ? setElegidos(elegidos.includes(o.id) ? elegidos.filter((y) => y !== o.id) : [...elegidos, o.id]) : setSeleccion(o.id))}>
+              aqui.slice(0, 300).map((o, _, vistos) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  className="arbol-fila sub"
+                  data-on={elegidos.includes(o.id)}
+                  // Mayús+clic no selecciona el texto de la lista
+                  onMouseDown={(x) => x.shiftKey && x.preventDefault()}
+                  onClick={(x) => {
+                    const r = eleccionLista(
+                      vistos.map((v) => v.id),
+                      elegidos,
+                      ancla.current,
+                      o.id,
+                      { ctrl: x.ctrlKey || x.metaKey, mayus: x.shiftKey },
+                    );
+                    ancla.current = r.ancla;
+                    setElegidos(r.elegidos);
+                  }}
+                >
                   <span className="truncate">{o.id}</span>
                   {"seccion" in o && typeof o.seccion === "string" && <span className="n">{o.seccion}</span>}
                   {"caso" in o && typeof o.caso === "string" && <span className="n">{o.caso}</span>}
