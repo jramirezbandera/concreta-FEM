@@ -289,9 +289,9 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
             </div>
             <label className="chk">
               <input type="checkbox" checked={t.viga.porVanos !== false} onChange={(x) => setPlantillas({ ...t, viga: { ...t.viga, porVanos: x.target.checked ? undefined : false } })} />
-              <span>Una viga por vano (se corta en cada pilar)</span>
+              <span>Una viga por tramo (se corta en cada clic y en cada pilar)</span>
             </label>
-            <p className="nota">{t.viga.porVanos !== false ? "Cada tramo entre pilares es una viga, con sus esfuerzos y su nombre; los pilares que atraviesa la línea también la cortan." : "Todo lo dibujado es una sola viga de varios tramos. Para el cálculo da lo mismo: la viga se parte igual en cada pilar."}</p>
+            <p className="nota">{t.viga.porVanos !== false ? "Cada tramo entre dos clics es una viga, con sus esfuerzos y su nombre; los pilares que atraviesa la línea también la cortan." : "Todo lo dibujado es una sola viga de varios tramos. Para el cálculo da lo mismo: la viga se parte igual en cada pilar."}</p>
           </div>
         </Seccion>
       )}

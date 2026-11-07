@@ -248,9 +248,9 @@ describe("herramientas (criterio 1: lo mismo que la tabla)", () => {
     expect(r.etiquetas).toEqual(["Viga V1"]);
     const t = conTabla(p, "vigas", { planta: "N1", puntos: "0 6,3; 5 6,3; 10 6,3", seccion: "V30x50" });
     expect(serializar(r.proyecto)).toBe(serializar(t));
-    // Por defecto, una viga por vano: lo mismo que dos filas de la tabla, en un paso
+    // Por defecto, una viga por tramo: lo mismo que dos filas de la tabla, en un paso
     const v = dibujar(p, "viga", [clic(p, a), clic(p, [5.02, 6.3]), clic(p, [10, 6.29]), { tipo: "terminar" }]);
-    expect(v.etiquetas).toEqual(["2 vigas, una por vano (V1…V2)"]);
+    expect(v.etiquetas).toEqual(["2 vigas, una por tramo (V1…V2)"]);
     const dos = conTabla(conTabla(p, "vigas", { planta: "N1", puntos: "0 6,3; 5 6,3", seccion: "V30x50" }), "vigas", { planta: "N1", puntos: "5 6,3; 10 6,3", seccion: "V30x50" });
     expect(serializar(v.proyecto)).toBe(serializar(dos));
     // Sin pinchar el pilar de en medio: se corta igual en el que atraviesa, con su punto exacto
@@ -262,6 +262,22 @@ describe("herramientas (criterio 1: lo mismo que la tabla)", () => {
       [[-0.15, 6.3], [0, 6.3], [5, 6.3]],
       [[5, 6.3], [10, 6.3]],
     ]);
+    // Cada clic corta también fuera de los pilares (de la prueba de uso: una viga larga da unos
+    // resultados ilegibles), y los pilares que atraviesa, como antes
+    const tramos = (ev: Evento[]) => dibujar(p, "viga", [...ev, { tipo: "terminar" }]).proyecto.modelo.vigas!.map((x) => x.puntos);
+    expect(tramos([clic(p, a), { tipo: "punto", p: [2.5, 6.3] }, { tipo: "punto", p: [7.5, 6.3] }, clic(p, [10, 6.29])])).toEqual([
+      [[0, 6.3], [2.5, 6.3]],
+      [[2.5, 6.3], [5, 6.3]],
+      [[5, 6.3], [7.5, 6.3]],
+      [[7.5, 6.3], [10, 6.3]],
+    ]);
+    // Una L sin pilares: dos vigas
+    expect(tramos([{ tipo: "punto", p: [-1, 3] }, { tipo: "punto", p: [-1, 7] }, { tipo: "punto", p: [3, 7] }])).toEqual([
+      [[-1, 3], [-1, 7]],
+      [[-1, 7], [3, 7]],
+    ]);
+    // Un clic dentro de la huella junto al punto fijo del pilar no deja un tramo rígido suelto
+    expect(tramos([clic(p, a), { tipo: "punto", p: [0.1, 6.3] }, clic(p, [5.02, 6.3])])).toEqual([[[0, 6.3], [0.1, 6.3], [5, 6.3]]]);
     // Esc con puntos anula; sin puntos, sale
     const e = dibujar(p, "viga", [clic(p, a), { tipo: "anular" }]);
     expect(e.estado.puntos.length).toBe(0);

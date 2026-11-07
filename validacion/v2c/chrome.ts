@@ -172,8 +172,8 @@ const cdp = (method: string, params: Record<string, unknown> = {}) =>
     pendientes.set(id, (m) => (m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result)));
     ws.send(JSON.stringify({ id, method, params }));
   });
-/** Desmarca «Una viga por vano»: la referencia tiene vigas de varios vanos. */
-const UNA_VIGA = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim().startsWith("Una viga por vano"))?.querySelector("input"); if (z?.checked) z.click(); }`;
+/** Desmarca «Una viga por tramo»: la referencia tiene vigas de varios vanos. */
+const UNA_VIGA = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim().startsWith("Una viga por tramo"))?.querySelector("input"); if (z?.checked) z.click(); }`;
 /** Desmarca «Con zunchos» en la plantilla de la herramienta activa: la referencia no los lleva. */
 const SIN_ZUNCHOS = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim() === "Con zunchos")?.querySelector("input"); if (z?.checked) z.click(); }`;
 

@@ -191,8 +191,8 @@ describe("Clic derecho", () => {
     clic([6, 0]);
     clic([11.4, 0]);
     expect(vista.derecho!()).toBe(true);
-    // Una viga por vano (por defecto): se corta en el pilar de (6, 0)
-    expect(hechos).toEqual(["2 vigas, una por vano (V1…V2)"]);
+    // Una viga por tramo (por defecto): se corta en el clic del pilar de (6, 0)
+    expect(hechos).toEqual(["2 vigas, una por tramo (V1…V2)"]);
     expect(viga(proyecto(), "V1")).toEqual([[0, 0], [6, 0]]);
     expect(viga(proyecto(), "V2")).toEqual([[6, 0], [11.4, 0]]);
     // Sigue en Viga, sin puntos: el siguiente clic derecho no hace nada
