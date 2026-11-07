@@ -21,6 +21,7 @@ import type { ArmadoProyecto } from "../armaduraBase.ts";
 import { baseDe, hayBase } from "../armaduraBase.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import type { Vec2 } from "../../compilador/fisico.ts";
+import { areaConSigno, momentosPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "../../compilador/poligonos.ts";
 import { ARMADURAS, caraDe, franjasTramos, losasDe, picos, PROMINENCIA_PICOS, zonasRefuerzo, type Armadura, type FranjaTramos, type TramoArmado, type ZonaRefuerzo } from "../refuerzos.ts";
 import { cajaDe, rayado, rotulo, type EntradaLeyenda, type EscalaDibujada, type Escena, type ExtremoRotulado, type Primitiva } from "./escena.ts";
 import { AVISO_PICOS, coloresSecuencia, limitesMapa, RAMPA_INFERIOR, RAMPA_SUPERIOR, rangoSinPicos, type EscalaMapa, type LimitesMapa } from "./isovalores.ts";
@@ -45,6 +46,52 @@ export const UNIDAD_ARMADO = "kN·m/m";
 export const SEPARACION_PICOS = 1.5;
 /** El exceso sobre la base de un rótulo, con un decimal: «+4,5». */
 export const textoExceso = (x: number): string => `+${(Math.round(x * 10) / 10).toFixed(1).replace(".", ",")}`;
+
+/**
+ * La región de cada losa (su contorno menos sus huecos). Una franja va de borde a borde con el s de
+ * la losa en toda su banda, así que, con un borde que no es perpendicular a ella, el rectángulo de
+ * sus tramos extremos se sale de la losa: el dibujo se recorta con esto (los valores no cambian).
+ */
+export function regionesLosas(losas: readonly { id: string; contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[] }[] | undefined): Map<string, Region> {
+  return new Map((losas ?? []).map((l) => [l.id, { contorno: l.contorno, huecos: l.huecos ?? [] }]));
+}
+
+/**
+ * Lo que cae dentro de la losa de un rectángulo de tramos (convexo): anillos con el del contorno
+ * antihorario y los de los huecos horarios, así que valen con la regla «nonzero» (las regiones) y con
+ * la par-impar (los polígonos y el rayado). Sin región, el rectángulo.
+ */
+export function recorteTramos(region: Region | undefined, rect: readonly Vec2[]): Vec2[][] {
+  if (!region) return [rect as Vec2[]];
+  const orientado = (p: Vec2[], ccw: boolean) => (areaConSigno(p) > 0 === ccw ? p : [...p].reverse());
+  const fuera = recorteRegionConvexo({ contorno: region.contorno, huecos: [] }, rect);
+  if (fuera === null) return [rect as Vec2[]];
+  if (!fuera.length) return [];
+  const r = fuera.map((p) => orientado(p, true));
+  for (const h of region.huecos) for (const p of recorteRegionConvexo({ contorno: h, huecos: [] }, rect) ?? []) r.push(orientado(p, false));
+  return r;
+}
+
+/** El centro de lo recortado de un tramo (su centroide; sin área, el del rectángulo), para rotularlo. */
+export function centroTramo(region: Region | undefined, t: TramoArmado): Vec2 {
+  const R = t.rectangulo;
+  const medio: Vec2 = [R.reduce((a, p) => a + p[0], 0) / R.length, R.reduce((a, p) => a + p[1], 0) / R.length];
+  if (!region) return medio;
+  let [A, Sx, Sy] = [0, 0, 0];
+  for (const p of recorteTramos(region, R)) {
+    const m = momentosPoligono(p);
+    A += m.A;
+    Sx += m.Sx;
+    Sy += m.Sy;
+  }
+  return A > 1e-12 ? [Sx / A, Sy / A] : medio;
+}
+
+/** Los trozos de un segmento del contorno de una zona de refuerzo que caen en la losa. */
+export function trozosEnLosa(region: Region | undefined, a: Vec2, b: Vec2): [Vec2, Vec2][] {
+  if (!region) return [[a, b]];
+  return trozosSegmento(a, b, [region.contorno, ...region.huecos], (q) => puntoEnRegion(q, region));
+}
 
 /** El título de la leyenda de una armadura (AB, §2.1). */
 export const tituloArmado = (a: Armadura): string => `${NOMBRE_CORTO[a]} · M_Ed (Wood–Armer) · ${UNIDAD_ARMADO}`;
@@ -204,6 +251,7 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
   const superior = caraDe(armadura) === "superior";
   const notas: string[] = [...m.notas];
   const u = UNIDAD_ARMADO;
+  const regiones = regionesLosas(pl.f.losas);
   // Los tramos seguidos de una franja en la misma banda, en un solo rectángulo, y los de cada banda
   // en una sola región con un anillo por rectángulo (no se solapan): el mismo dibujo con una región
   // por banda, como los mapas, en vez de miles
@@ -215,8 +263,8 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     while (j < cs.length && cs[j]!.t.franja === t.franja && cs[j]!.banda === b && cs[j]!.t.a === cs[j - 1]!.t.b) j++;
     const w = cs[j - 1]!.t;
     const anillos = porBanda.get(b) ?? [];
-    anillos.push([t.rectangulo[0]!, w.rectangulo[1]!, w.rectangulo[2]!, t.rectangulo[3]!]);
-    porBanda.set(b, anillos);
+    anillos.push(...recorteTramos(regiones.get(t.losa), [t.rectangulo[0]!, w.rectangulo[1]!, w.rectangulo[2]!, t.rectangulo[3]!]));
+    if (anillos.length) porBanda.set(b, anillos);
     i = j;
   }
   // Lo cubierto, por corridas de tramos seguidos de cada franja, un polígono de un anillo por corrida
@@ -226,7 +274,8 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     let j = i + 1;
     while (j < cu.length && cu[j]!.franja === cu[i]!.franja && cu[j]!.a === cu[j - 1]!.b) j++;
     const [a, b] = [cu[i]!, cu[j - 1]!];
-    P.push({ tipo: "poligono", anillos: [[a.rectangulo[0]!, b.rectangulo[1]!, b.rectangulo[2]!, a.rectangulo[3]!]], estilo: "armado-cubierto" });
+    const anillos = recorteTramos(regiones.get(a.losa), [a.rectangulo[0]!, b.rectangulo[1]!, b.rectangulo[2]!, a.rectangulo[3]!]);
+    if (anillos.length) P.push({ tipo: "poligono", anillos, estilo: "armado-cubierto" });
     i = j;
   }
   // Las de fuera de la escala, rayadas (como los mapas de las losas)
@@ -238,7 +287,7 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     if (lm && ((lm.fueraAbajo && b === 0) || (lm.fueraArriba && b === lm.L.length - 2))) for (const [p, q] of rayado(anillos, [Math.SQRT1_2, Math.SQRT1_2], pasoRayado)) P.push({ tipo: "linea", puntos: [p, q], estilo: "fuera-escala" });
   }
   P.push(...trazoModelo(pl));
-  for (const z of m.zonas) for (const [a, b] of z.contorno) P.push({ tipo: "linea", puntos: [a, b], estilo: "zona-refuerzo", objeto: z.id });
+  for (const z of m.zonas) for (const [a0, b0] of z.contorno) for (const [a, b] of trozosEnLosa(regiones.get(z.losa), a0, b0)) P.push({ tipo: "linea", puntos: [a, b], estilo: "zona-refuerzo", objeto: z.id });
   const ejes = capaEjes(pl.f, { cotas: false });
   P.push(...ejes.primitivas);
   notas.push(...ejes.notas);
@@ -247,7 +296,7 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
   // Rótulos: con base, el máximo de cada zona con su exceso; sin ella, los picos de cada franja
   const extremos: ExtremoRotulado[] = [];
   const color = superior ? "#1d4ed8" : "#b91c1c";
-  const centro = (t: TramoArmado): Vec2 => [t.rectangulo.reduce((a, p) => a + p[0], 0) / 4, t.rectangulo.reduce((a, p) => a + p[1], 0) / 4];
+  const centro = (t: TramoArmado): Vec2 => centroTramo(regiones.get(t.losa), t);
   const vmax = m.vmax || 1;
   if (m.conBase) {
     for (const z of m.zonas) {

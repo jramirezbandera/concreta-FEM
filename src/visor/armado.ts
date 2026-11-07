@@ -13,13 +13,16 @@
 import { baseDe, type ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { franja as consultaFranja, type EstacionFranjaEnvolvente } from "../agente/consultas.ts";
-import { escalaArmado, mapaArmado, tituloArmado, UNIDAD_ARMADO, type OpcionesArmado } from "../agente/render/armado.ts";
+import { centroTramo, escalaArmado, mapaArmado, recorteTramos, regionesLosas, tituloArmado, trozosEnLosa, UNIDAD_ARMADO, type OpcionesArmado } from "../agente/render/armado.ts";
 import type { EntradaLeyenda, EscalaDibujada } from "../agente/render/escena.ts";
 import type { ResultadosRender } from "../agente/render/resultados.ts";
 import { franjasTramos, losasDe, type Armadura, type FranjaTramos, type TramoArmado } from "../agente/refuerzos.ts";
 import type { ExtremoIsovalores } from "./isovalores3d.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
+import type { Vec2 } from "../compilador/fisico.ts";
+import { areaConSigno, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
+import { descomponer } from "./solido.ts";
 
 type Resp<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
@@ -61,7 +64,11 @@ export interface ValorArmado {
 export function valorArmado(q: Consultas, planta: string, armadura: Armadura, conjunto: ConjuntoCombinaciones, x: number, y: number, armado?: ArmadoProyecto): Resp<ValorArmado | null> {
   const fs = tramosPlanta(q, planta, armadura, conjunto);
   if (!fs.valido) return fs;
+  const regiones = regionesLosas(q.fisico.losas);
   for (const { franja: f, tramos } of fs.valor) {
+    // El rectángulo de un tramo extremo se sale de la losa si su borde no es perpendicular a la franja
+    const region = regiones.get(f.losa);
+    if (region && !puntoEnRegion([x, y], region)) continue;
     const t = x * f.n[0] + y * f.n[1];
     if (t < f.t0 - 1e-9 || t > f.t1 + 1e-9) continue;
     const s = x * f.d[0] + y * f.d[1];
@@ -103,6 +110,30 @@ export interface Armado3D {
   notas: string[];
 }
 
+/** Los triángulos de lo que cae en la losa de un rectángulo de tramos (`recorteTramos`). */
+function triangulosRecorte(region: Region | undefined, rect: readonly Vec2[]): Vec2[] {
+  const anillos = recorteTramos(region, rect);
+  const r: Vec2[] = [];
+  const convexo = (p: Vec2[]) => p.every((a, i) => {
+    const b = p[(i + 1) % p.length]!;
+    const c = p[(i + 2) % p.length]!;
+    return (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) >= -1e-12;
+  });
+  if (anillos.length === 1 && convexo(anillos[0]!)) {
+    const p = anillos[0]!;
+    for (let i = 1; i + 1 < p.length; i++) if (areaConSigno([p[0]!, p[i]!, p[i + 1]!]) > 1e-14) r.push(p[0]!, p[i]!, p[i + 1]!);
+    return r;
+  }
+  for (const col of descomponer(anillos, [], [1, 0]))
+    for (const fr of col.franjas) {
+      if (!fr.enP) continue;
+      const [a, b, c, d]: Vec2[] = [[col.xa, fr.a0], [col.xb, fr.b0], [col.xb, fr.b1], [col.xa, fr.a1]];
+      if (areaConSigno([a, b, c]) > 1e-14) r.push(a, b, c);
+      if (areaConSigno([a, c, d]) > 1e-14) r.push(a, c, d);
+    }
+  return r;
+}
+
 export function armado3D(r: ResultadosRender, origen: [number, number, number], armadura: Armadura, conjunto: ConjuntoCombinaciones, op: OpcionesArmado & { planta: string | null }): Resp<Armado3D> {
   const fs = tramosPlanta(r.q, op.planta, armadura, conjunto);
   if (!fs.valido) return fs;
@@ -122,22 +153,23 @@ export function armado3D(r: ResultadosRender, origen: [number, number, number], 
   const lamina: number[] = [];
   const sin: number[] = [];
   const rel = (p: readonly number[], zz: number, a: number[]) => a.push(p[0]! - origen[0], p[1]! - origen[1], zz - origen[2]);
+  // Lo de cada tramo que cae en su losa (con un borde oblicuo, su rectángulo se sale)
+  const regiones = regionesLosas(r.q.fisico.losas);
   for (const { t, banda: b } of m.coloreados) {
     const zz = z.get(t.losa) ?? 0;
-    const R = t.rectangulo;
-    for (const k of [0, 1, 2, 0, 2, 3]) rel(R[k]!, zz, tri);
-    banda.push(b, b);
+    const T = triangulosRecorte(regiones.get(t.losa), t.rectangulo);
+    for (const p of T) rel(p, zz, tri);
     const i = idx.get(plantaDe.get(t.losa)!)!;
-    lamina.push(i, i);
+    for (let k = 0; k < T.length; k += 3) banda.push(b), lamina.push(i);
   }
-  for (const t of m.cubiertos) for (const k of [0, 1, 2, 0, 2, 3]) rel(t.rectangulo[k]!, z.get(t.losa) ?? 0, sin);
+  for (const t of m.cubiertos) for (const p of triangulosRecorte(regiones.get(t.losa), t.rectangulo)) rel(p, z.get(t.losa) ?? 0, sin);
   const iso: number[] = [];
   for (const zn of m.zonas) {
     const zz = z.get(zn.losa) ?? 0;
-    for (const [a, b] of zn.contorno) rel(a, zz, iso), rel(b, zz, iso);
+    for (const [a0, b0] of zn.contorno) for (const [a, b] of trozosEnLosa(regiones.get(zn.losa), a0, b0)) rel(a, zz, iso), rel(b, zz, iso);
   }
   const extremos: ExtremoIsovalores[] = [];
-  const centro = (t: TramoArmado): [number, number, number] => [(t.rectangulo[0]![0] + t.rectangulo[2]![0]) / 2, (t.rectangulo[0]![1] + t.rectangulo[2]![1]) / 2, z.get(t.losa) ?? 0];
+  const centro = (t: TramoArmado): [number, number, number] => [...centroTramo(regiones.get(t.losa), t), z.get(t.losa) ?? 0];
   // El mayor de cada planta (con base, de lo que no cubre: el máximo de su mayor zona); rotular todas
   // las zonas de todas las plantas taparía el dibujo
   for (const p of plantas) {
