@@ -62,6 +62,11 @@ export interface Edicion {
   editar: (o: Operacion, etiqueta: string) => Aplicacion;
   deshacer: () => void;
   rehacer: () => void;
+  /**
+   * El último deshacer o rehacer, con la etiqueta de lo que se deshizo o rehízo; `n` cambia en cada
+   * uno. Para decirlo en la vista: lo que mueve centímetros (Alinear) no se ve al deshacerlo.
+   */
+  movimiento?: { tipo: "deshacer" | "rehacer"; etiqueta: string; n: number } | null;
   /** Guarda en el fichero (o lo descarga, sin carpeta); con `forzar`, aunque haya cambiado en el disco. */
   guardar: (o?: { forzar?: boolean }) => Promise<void>;
   /** Descarga el proyecto.json tal como está aquí (AL). */
@@ -195,6 +200,7 @@ export function useProyecto(): ProyectoAbierto {
   const [tiempos, setTiempos] = useState<Tiempos>({});
   const [version, setVersion] = useState(0);
   const [hist, setHist] = useState<Historial | null>(null);
+  const [movimiento, setMovimiento] = useState<NonNullable<Edicion["movimiento"]> | null>(null);
   /** El proyecto tal como está en el disco (el leído o el último guardado). */
   const [enDisco, setEnDisco] = useState<Proyecto | null>(null);
   const [guardado, setGuardado] = useState<EstadoGuardado>({ tipo: "nada" });
@@ -479,8 +485,12 @@ export function useProyecto(): ProyectoAbierto {
       if (!h) return;
       const n = f(h);
       if (n === h) return;
+      // Lo que se deshace es lo último del pasado; lo que se rehace, lo primero del futuro
+      const tipo = n.pasado.length < h.pasado.length ? "deshacer" : "rehacer";
+      const etiqueta = (tipo === "deshacer" ? h.pasado.at(-1) : h.futuro[0])?.etiqueta ?? "";
       histRef.current = n;
       setHist(n);
+      setMovimiento((m) => ({ tipo, etiqueta, n: (m?.n ?? 0) + 1 }));
       programar(n.actual);
     },
     [programar],
@@ -764,6 +774,7 @@ export function useProyecto(): ProyectoAbierto {
         editar,
         deshacer: () => mover(deshacerH),
         rehacer: () => mover(rehacerH),
+        movimiento,
         guardar,
         guardado,
         conflicto,

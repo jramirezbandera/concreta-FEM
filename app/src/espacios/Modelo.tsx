@@ -337,6 +337,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     if (!dibujando && foto.hecho) setHecho(foto.hecho);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando el controlador dice algo nuevo
   }, [foto.hecho]);
+  // Deshacer y rehacer lo dicen, y quitan lo que decía lo de antes: lo que mueve centímetros (Alinear)
+  // no se ve al deshacerlo, y con «N puntos alineados» aún en la vista parecía que no se deshacía
+  const mov = ed?.movimiento;
+  useEffect(() => {
+    if (mov) setHecho(`${mov.tipo === "deshacer" ? "Deshecho" : "Rehecho"}: ${mov.etiqueta}.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo en cada deshacer o rehacer
+  }, [mov?.n]);
   useEffect(() => {
     if (!hecho) return;
     const t = window.setTimeout(() => setHecho(null), 6000);
@@ -651,7 +658,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               {!dibujando && !eligiendo && hecho && !(foto.asa || foto.estirado || foto.aviso || foto.pilar) && (
                 <span className="chip aviso-herr" data-acento="true" role="status">
                   <Check size={14} className="mr-1 inline align-[-2px] text-state-ok" />
-                  {hecho} <span className="dib-tecla">Ctrl+Z</span>
+                  {hecho} <span className="dib-tecla">{/^Deshecho/.test(hecho) ? "Ctrl+Y" : "Ctrl+Z"}</span>
                 </span>
               )}
               {eligiendo && (

@@ -523,7 +523,10 @@ export function DialogoAlinear({ onCerrar }: { onCerrar: (hecho?: string) => voi
     if (!p?.operacion) return;
     const r = ed.editar(p.operacion, "Alinear");
     if (!r.ok) return setError(r.errores.map((e) => textoApp(e.mensaje)).join(" "));
-    onCerrar(`${plural(p.movimientos.length, "punto alineado", "puntos alineados")} en ${plural(piezas, "pieza")}.`);
+    // Cuánto, como mucho: son centímetros y en la planta no se ven
+    // (a la décima de mm: 6,01 − 6 es 0,00999…, que saldría «10 mm»)
+    const max = Math.round(Math.max(...p.grupos.map((g) => g.falta)) * 1e4) / 1e4;
+    onCerrar(`${plural(p.movimientos.length, "punto alineado", "puntos alineados")} en ${plural(piezas, "pieza")} (movidos ${distancia(max)} como mucho).`);
   };
 
   return (
