@@ -171,6 +171,9 @@ interface AristaL {
   capa: number;
 }
 
+/** Pendiente (|Δx|/|Δy| en los ejes de la descomposición) por debajo de la cual un lado se dibuja perpendicular a d. */
+const VERTICAL = 1e-6;
+
 const yEn = (e: AristaL, x: number): number => (x <= e.xl ? e.yl : x >= e.xr ? e.yr : e.yl + ((x - e.xl) * (e.yr - e.yl)) / (e.xr - e.xl));
 
 /**
@@ -187,6 +190,19 @@ export function descomponer(P: readonly (readonly Vec2[])[], capas: readonly (re
   const poner = (anillos: readonly (readonly Vec2[])[], capa: number) => {
     for (const r of anillos) {
       const q = r.map(loc);
+      // Un lado casi perpendicular a d (a menos de VERTICAL rad: un ábaco redondeado al µm, un borde
+      // perpendicular a la dirección tomada de una viga) se endereza moviendo su segundo vértice. Si no,
+      // cruza en un nanómetro de x medio metro de y, su cruce con el borde se pierde al fundir las
+      // abscisas a EPS y la franja torcida deja una pared fuera de la losa
+      // Desde un vértice al que no llega un lado casi perpendicular, para no mover uno ya usado
+      const N = q.length;
+      const casi = (a: Vec2, b: Vec2) => b[0] !== a[0] && Math.abs(b[0] - a[0]) <= VERTICAL * Math.abs(b[1] - a[1]);
+      const s = q.findIndex((b, i) => !casi(q[(i + N - 1) % N]!, b));
+      if (s >= 0)
+        for (let k = 0; k < N - 1; k++) {
+          const [a, j] = [q[(s + k) % N]!, (s + k + 1) % N];
+          if (casi(a, q[j]!)) q[j] = [a[0], q[j]![1]];
+        }
       for (let i = 0; i < q.length; i++) {
         const [a, b] = [q[i]!, q[(i + 1) % q.length]!];
         if (Math.abs(a[0] - b[0]) <= EPS && Math.abs(a[1] - b[1]) <= EPS) continue;

@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { areaRegion, gammaMaterial, pesoPropioEsperado, Plantas } from "../agente/sensatez.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
-import type { ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
+import type { ModeloFisico, Pilar, Seccion, Vec2 } from "../compilador/fisico.ts";
 import { areaConSigno, distanciaABorde, fraccionEnRegiones, momentosInterseccion, puntoEnPoligono, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
 import { edificioGeometria, FAMILIAS } from "../pruebas/geometrias.ts";
 import { edificioObjetivoMuros, reticulaConNucleo } from "../../validacion/c3/modelos.ts";
@@ -521,5 +521,68 @@ describe("I3: vigas que se encuentran en sus extremos", () => {
     const vs = ps.filter((p) => p.id === "Z-CUB-1" || p.id === "Z-CUB-2");
     const xs = vs.flatMap((p) => p.caras.flatMap((c) => c.p.filter((v) => v[2] < z - 1e-9).map((v) => [v[0], v[1]] as Vec2)));
     expect(xs.some((v) => Math.abs(v[0] - 4.41) < 1e-9 && Math.abs(v[1] + 0.15) < 1e-9)).toBe(true);
+  });
+});
+
+describe("I3: lados casi perpendiculares a la dirección del forjado", () => {
+  /**
+   * Reticular en una dirección cualquiera con un ábaco en cada pilar de borde que se sale de la losa y
+   * zunchos. Los ábacos van redondeados al µm, como los de `resolverAbacos`: sus lados quedan a < 1e-6 rad
+   * de la perpendicular a la dirección y, sin enderezarlos, la descomposición perdía su cruce con el
+   * borde y dejaba una pared vertical fuera de la losa (el «pico» de la prueba de uso «31», 2026-11-07).
+   * Las semillas son las que fallaban.
+   */
+  const modelo = (semilla: number): ModeloFisico => {
+    let s = semilla;
+    const rnd = () => ((s = (s * 1103515245 + 12345) % 2147483648), s / 2147483648);
+    const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
+    const n = 4 + Math.floor(rnd() * 4);
+    const R = 5 + rnd() * 5;
+    const cont: Vec2[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (2 * Math.PI * (i + rnd() * 0.6)) / n;
+      const r = R * (0.7 + rnd() * 0.3);
+      cont.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    const eje1 = rnd() * 360;
+    const d: Vec2 = [Math.cos((eje1 * Math.PI) / 180), Math.sin((eje1 * Math.PI) / 180)];
+    const abacos: Vec2[][] = [];
+    const pilares: Pilar[] = [];
+    for (let i = 0; i < n; i++) {
+      const [a, b] = [cont[i]!, cont[(i + 1) % n]!];
+      const k = 0.3 + rnd() * 0.4;
+      const [x, y] = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+      pilares.push({ id: `P${i}`, x, y, desde: "N0", hasta: "N1", seccion: "p", giro: rnd() * 90 });
+      const L = 0.8 + rnd() * 2;
+      const g = (u: number, v: number): Vec2 => [r6(x + u * d[0] - v * d[1]), r6(y + u * d[1] + v * d[0])];
+      abacos.push([g(-L, -L), g(L, -L), g(L, L), g(-L, L)]);
+    }
+    return {
+      plantas: [
+        { id: "N1", altura: null },
+        { id: "N0", altura: 3 },
+      ],
+      materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+      secciones: [{ id: "p", material: "HA", forma: "rectangular", b: 0.3, h: 0.3 }],
+      pilares,
+      losas: [{ id: "L1", planta: "N1", contorno: cont, espesor: 0.3, material: "HA", eje1, reticular: { intereje: 0.8, nervio: 0.12, capa: 0.05, abacos } }],
+      vigas: cont.map((p, i) => ({ id: `V${i}`, planta: "N1", puntos: [p, cont[(i + 1) % n]!], seccion: "p" })),
+      casos: [{ id: "G", pesoPropio: true }],
+    };
+  };
+
+  it.each([1429199360, 800890368, 1226581760, 72458752, 581840384])("semilla %i: ninguna cara de la losa se sale de su contorno", (semilla) => {
+    const f = modelo(semilla);
+    const l = f.losas![0]!;
+    const R: Region = { contorno: l.contorno, huecos: [] };
+    const losa = piezasSolido(f).piezas.find((p) => p.id === "L1")!;
+    let peor = 0;
+    for (const c of losa.caras)
+      for (const v of c.p) {
+        const q: Vec2 = [v[0], v[1]];
+        if (!puntoEnRegion(q, R)) peor = Math.max(peor, distanciaABorde(q, l.contorno));
+      }
+    expect(peor).toBeLessThan(1e-6);
+    expect(volumen(losa.caras)).toBeGreaterThan(0);
   });
 });
