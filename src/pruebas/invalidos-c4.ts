@@ -47,7 +47,8 @@ export function base(): ModeloFisico {
         contorno: rect(0, 0, 10, 6),
         espesor: 0.35,
         material: "HA",
-        reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, caseton: "recuperable", abacos: [rect(3.8, -1.2, 6.2, 1.2), rect(3.8, 4.8, 6.2, 7.2)] },
+        // Un ábaco en cada pilar (AC-d); los de las esquinas se salen de la losa: cuenta lo de dentro
+        reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, caseton: "recuperable", abacos: [-1.2, 3.8, 8.8].flatMap((x) => [-1.2, 4.8].map((y) => rect(x, y, x + 2.4, y + 2.4))) },
       },
     ],
     casos: [{ id: "G", pesoPropio: true }, { id: "Q" }],
@@ -132,6 +133,8 @@ export const CATALOGO: Caso[] = [
   ["ábacos que no son una lista", (f) => (ret(f).abacos = m({})), "fisico/valor-no-valido", "L2"],
   ["ábaco que no es un polígono simple", (f) => (ret(f).abacos = [[[4, 1], [6, 2], [6, 1], [4, 2]]]), "fisico/valor-no-valido", "L2"],
   ["ábaco fuera de la losa", (f) => (ret(f).abacos = [rect(20, 0, 22, 2)]), "fisico/valor-no-valido", "L2"],
+  // AC-d: un reticular lleva un ábaco en cada pilar (antes se calculaba sin él)
+  ["reticular con un pilar sin ábaco", (f) => (ret(f).abacos = (ret(f).abacos as Vec2[][]).slice(1)), "reticular/pilar-sin-abaco", "C0-0"],
   // Desde MA2, dos ábacos que se solapan se unen con un aviso: ya no es una entrada no válida
   ["ábacos en los pilares sin medidas", (f) => (ret(f).abacosPilares = m({ lado: 0 })), "fisico/valor-no-valido", "L2"],
   ["ábacos en los pilares con tres medidas", (f) => (ret(f).abacosPilares = m({ lados: [2, 2, 2] })), "fisico/valor-no-valido", "L2"],

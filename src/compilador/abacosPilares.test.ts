@@ -74,12 +74,14 @@ describe("MA2: ábacos en los pilares y unidos", () => {
   });
 
   it("los ábacos dados que se solapan se unen en su envolvente, con el aviso; el modelo es el de la envolvente dada", () => {
-    const a = compilar(reticular({ abacos: [rect(3, -1, 5, 1), rect(4.5, 0.5, 6, 2)] }));
+    // Los de los demás pilares (AC-d), lejos de los que se unen
+    const otros = [rect(-1, -1, 1, 1), rect(9, -1, 11, 1), rect(-1, 5, 1, 7), rect(3, 5, 5, 7), rect(9, 5, 11, 7)];
+    const a = compilar(reticular({ abacos: [rect(3, -1, 5, 1), rect(4.5, 0.5, 6, 2), ...otros] }));
     expect(a.valido).toBe(true);
     const aviso = a.diagnosticos.find((d) => d.codigo === "reticular/abacos-unidos")!;
     expect(aviso.severidad).toBe("aviso");
     expect(aviso.mensaje).toContain("3 × 3 m");
-    const b = compilar(reticular({ abacos: [rect(3, -1, 6, 2)] }));
+    const b = compilar(reticular({ abacos: [rect(3, -1, 6, 2), ...otros] }));
     expect(JSON.stringify(valido(a).modelo)).toBe(JSON.stringify(valido(b).modelo));
   });
 

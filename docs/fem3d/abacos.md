@@ -14,6 +14,7 @@ A petición del usuario (2026-11-06): «ahora mismo no se pueden editar y si se 
 - **AC-a, la forma de la unión: el rectángulo envolvente** según los nervios, la regla del compilador (MA-c). Ningún cálculo de hoy cambia.
 - **AC-b, al solapar: se unen en el acto.** Al crear, mover, copiar o estirar un ábaco que solapa con otro (o queda a menos de h/2), en el mismo paso de deshacer queda uno solo en el fichero, y se dice con cuál se unió. Lo que se ve es lo que hay.
 - **AC-c, en el fichero: dentro de la losa, como hasta ahora** (`reticular.abacos`). La app los trata como objetos, sin cambiar el formato ni la huella.
+- **AC-d (2026-11-07): un reticular lleva siempre un ábaco en cada pilar.** Antes nada impedía calcular un reticular sin ellos. Ahora un pilar que llega a un reticular (el eje del tramo que lo atraviesa, en la losa; la regla de `abacosPilares`) sin un ábaco en el que caiga su eje (dentro o en su borde) es el error `reticular/pilar-sin-abaco`, con la losa y los pilares, y no se calcula (§6).
 
 ## 3. Lo que se hace
 
@@ -59,3 +60,10 @@ Pasan los criterios 1 a 3; el 4 (puerta de uso) es del usuario.
   - `app/src/test/fichaAbaco.test.tsx` y `editor.test.tsx`;
   - la batería de `src/editor`, `src/agente/render` y `src/visor` (811 pruebas) y la de la app (122);
   - a mano en la app con el muestrario: un clic en el ábaco de P6 lo elige con sus ocho asas, y ensancharlo a 9,5 m lo une con los de P5 y P7 en uno de 14,4 × 2,4 m.
+
+## 6. AC-d, el ábaco obligatorio (2026-11-07)
+
+- **`pilaresSinAbaco` y `errorPilaresSinAbaco`** (`src/compilador/abacos.ts`): por cada reticular, los pilares de `pilaresEnLosa` cuyo eje no cae en ninguno de los ábacos resueltos (los dados, los de `abacosPilares` y los unidos). El compilador da el error detrás de la validación, para que los errores de datos vayan antes. Un pilar en un hueco o fuera de la losa no lo necesita; una maciza, tampoco.
+- **No cambia ningún modelo válido:** los edificios objetivo, la vivienda, el muestrario, los generadores de `src/pruebas` y las referencias congeladas ya llevaban un ábaco en cada pilar (sus pruebas pasan igual). Sólo cambian modelos hechos a mano en las pruebas: el de las entradas no válidas de C4 (ábacos también en los pilares de esquina, y una entrada nueva sin el de C0-0), el recuadro de `pesoAncho.test.ts` (`abacosPilares` de 1 × 1, que no llegan a la viga plana) y uno de `abacosPilares.test.ts`.
+- **Prueba:** `src/compilador/pilarSinAbaco.test.ts`.
+- **Sin hacer:** que la herramienta Forjado ponga los ábacos al dibujar un reticular (como «Con zunchos»); hoy el error aparece en Diagnósticos hasta que se ponen con la herramienta Ábaco.

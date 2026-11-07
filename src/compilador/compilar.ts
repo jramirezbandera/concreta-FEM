@@ -19,7 +19,7 @@
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
-import { avisarAbacosUnidos, resolverAbacos } from "./abacos.ts";
+import { avisarAbacosUnidos, errorPilaresSinAbaco, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
 import { resolverBordes } from "./bordes.ts";
 import { calcularSismo, hipotesisEspectro, hipotesisSismo } from "./sismo.ts";
@@ -196,6 +196,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   for (const a of viento.calculo?.avisos ?? []) diag.aviso(a.codigo, a.mensaje, a.ids);
   const delViento = new Set(viento.calculo?.viento ? (viento.modelo.cargas ?? []).filter((c) => viento.calculo!.viento!.casos.includes(c.caso)).map((c) => c.id) : []);
   const ctx = validar(viento.modelo, op, diag);
+  // AC-d: un reticular lleva un ábaco en cada pilar (detrás de la validación, para que sus errores vayan antes)
+  if (ctx) errorPilaresSinAbaco(abacos.modelo, abacos.porLosa, diag);
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
   // VS2: las masas del sismo, de los casos (con los del viento); sus errores ya los ha dado `validar`

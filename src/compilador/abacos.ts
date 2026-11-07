@@ -219,6 +219,42 @@ export function abacosDe(m: ModeloFisico, l: Losa, tolerancia = TOLERANCIA_ABACO
   return abacosLosa(m, l, tolerancia)?.abacos ?? (Array.isArray(l.reticular?.abacos) ? l.reticular!.abacos : []);
 }
 
+/**
+ * Los pilares que llegan a cada reticular sin un ábaco (AC-d, decisión del usuario del 2026-11-07:
+ * un reticular lleva siempre un ábaco macizo en cada pilar). Llega a la losa lo que da
+ * `pilaresEnLosa`; tiene ábaco si su eje cae en uno de los resueltos (dentro o en su borde), la regla
+ * con la que `abacosPilares` se salta un pilar que ya lo tiene. Por losa, en el orden del modelo.
+ */
+export function pilaresSinAbaco(m: ModeloFisico, porLosa: ReadonlyMap<string, AbacosResueltos>): { losa: string; pilares: string[] }[] {
+  const r: { losa: string; pilares: string[] }[] = [];
+  if (typeof m !== "object" || m === null || !Array.isArray(m.losas)) return r;
+  for (const l of m.losas) {
+    const res = typeof l === "object" && l !== null ? porLosa.get(l.id) : undefined;
+    if (!res) continue;
+    let sin: string[];
+    try {
+      sin = pilaresEnLosa(m, l)
+        .filter(({ eje }) => !res.abacos.some((a) => puntoEnPoligono(eje, a) || distanciaABorde(eje, a) < 1e-6))
+        .map((x) => x.pilar);
+    } catch {
+      // Pilares mal formados de otra manera: lo dice el validador
+      continue;
+    }
+    if (sin.length) r.push({ losa: l.id, pilares: sin });
+  }
+  return r;
+}
+
+/** El error `reticular/pilar-sin-abaco` de cada reticular con pilares sin ábaco (`pilaresSinAbaco`). */
+export function errorPilaresSinAbaco(m: ModeloFisico, porLosa: ReadonlyMap<string, AbacosResueltos>, diag: Diagnosticos): void {
+  for (const { losa, pilares } of pilaresSinAbaco(m, porLosa))
+    diag.error(
+      "reticular/pilar-sin-abaco",
+      `${losa}: ${pilares.length > 1 ? `los pilares ${lista(pilares)} llegan` : `el pilar ${pilares[0]} llega`} al forjado reticular sin ábaco. Un reticular lleva un ábaco macizo en cada pilar: póngaselo con la herramienta Ábaco (un clic en el pilar, o «En todos los pilares…» de su plantilla), o en el proyecto con reticular.abacos o reticular.abacosPilares.`,
+      [losa, ...pilares],
+    );
+}
+
 const lista = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}` : (xs[0] ?? ""));
 const coma = (x: number) => String(Number(x.toFixed(3))).replace(".", ",");
 

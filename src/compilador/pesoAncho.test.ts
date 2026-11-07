@@ -50,7 +50,8 @@ function recuadro(forjado: { losa?: Omit<Losa, "id" | "planta" | "contorno" | "m
       { id: "VD", planta: "P1", puntos: [[0, 6], [6, 6]], seccion: "v" },
       ...(plana ? [{ id: "VP", planta: "P1", puntos: [[0, 3], [6, 3]] as Vec2[], seccion: "vp" }] : []),
     ],
-    ...(forjado.losa ? { losas: [{ id: "L", planta: "P1", contorno: rect(0, 0, 6, 6), material: "HA", ...forjado.losa }] } : {}),
+    // Un reticular lleva un ábaco en cada pilar (AC-d): los de 1 × 1 de las esquinas no llegan a la viga plana
+    ...(forjado.losa ? { losas: [{ id: "L", planta: "P1", contorno: rect(0, 0, 6, 6), material: "HA", ...forjado.losa, ...(forjado.losa.reticular ? { reticular: { ...forjado.losa.reticular, abacosPilares: { lado: 1 } } } : {}) }] } : {}),
     ...(forjado.pano ? { panos: [{ id: "F", planta: "P1", contorno: rect(0, 0, 6, 6), seccion: "T", ...forjado.pano }] } : {}),
     casos: [{ id: "G", pesoPropio: true }],
     cargas: [],
