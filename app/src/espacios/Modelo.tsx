@@ -48,6 +48,7 @@ import { Inspector } from "../pantallas/Inspector.tsx";
 import { PropiedadesCargas, ResumenCaso, SobrePieza } from "../pantallas/CargasPieza.tsx";
 import { tipoPieza } from "../../../src/editor/cargasPieza.ts";
 import { NavVistas } from "../armazon/VistasGuardadas.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, type DibujoPlanta, type EstadoVista } from "../vistas/estado.ts";
 import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
@@ -817,6 +818,7 @@ function NavModelo({ plantillas }: { plantillas: ReactNode }) {
   return (
     <>
       <Proyecto />
+      <Situacion />
       <Objetos tablas={["pilares", "vigas", "barras", "forjados", "muros", "apoyos", "apoyosLineales", "ejes"]} />
       {plantillas}
       <NavVistas />
@@ -842,6 +844,7 @@ function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => vo
   return (
     <>
       <Proyecto />
+      <Situacion />
       <Seccion titulo="Casos" valor={e.casos.length}>
         {e.casos.map((c) => (
           <button key={c.id} type="button" className="arbol-fila" data-on={c.id === caso} onClick={() => setCaso(c.id)}>

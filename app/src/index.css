@@ -1034,6 +1034,40 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .gp-nivel[data-nueva] .gp-nivel-linea { stroke: color-mix(in srgb, var(--color-accent) 50%, transparent); }
 .gp-total { margin: 0; font-size: 12px; color: var(--color-text-tertiary); }
 .gp-total span { color: var(--color-accent); }
+/* «Situación», en el navegador: el alzado y la planta esquemáticos, con lo que enseña la vista activa */
+.situacion { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; padding: 4px 10px 2px; }
+.sit-alzado, .sit-planta { flex-shrink: 0; overflow: visible; }
+.sit-nivel, .sit-eje { cursor: pointer; outline: none; }
+.sit-banda { fill: transparent; transition: fill .12s; }
+.sit-nivel:hover .sit-banda { fill: var(--color-bg-elevated); }
+.sit-nivel:focus-visible .sit-banda { stroke: var(--color-accent); stroke-width: 1.2; }
+.sit-nivel[data-activa] .sit-banda { fill: color-mix(in srgb, var(--color-accent) 13%, transparent); }
+.sit-nivel[data-otra] .sit-banda { fill: color-mix(in srgb, var(--color-accent) 5%, transparent); }
+.sit-forjado { fill: var(--color-text-tertiary); }
+.sit-cim { fill: var(--color-text-secondary); }
+.sit-pilar { fill: var(--color-border-strong); }
+.sit-id { font: 10px var(--font-mono); fill: var(--color-text-tertiary); }
+.sit-nivel:hover .sit-id { fill: var(--color-text-primary); }
+.sit-nivel[data-activa] .sit-forjado { fill: var(--color-accent); }
+.sit-nivel[data-activa] .sit-id { font-weight: 600; fill: var(--color-accent); }
+.sit-nivel[data-otra] .sit-forjado:not(.sit-cim) { fill: color-mix(in srgb, var(--color-accent) 45%, var(--color-text-tertiary)); }
+.sit-losa { fill: color-mix(in srgb, var(--color-text-tertiary) 9%, transparent); stroke: var(--color-border-strong); stroke-width: .8; }
+.sit-losa[data-activa] { fill: color-mix(in srgb, var(--color-accent) 14%, transparent); stroke: var(--color-accent); stroke-width: 1.1; }
+.sit-pil { fill: var(--color-text-secondary); }
+.sit-eje-toque { stroke: transparent; stroke-width: 9; }
+.sit-eje-linea { stroke: var(--color-text-tertiary); stroke-width: .8; stroke-dasharray: 3 2; }
+.sit-burbuja { fill: var(--color-bg-primary); stroke: var(--color-text-tertiary); stroke-width: .8; }
+.sit-burbuja-txt { font: 600 7px var(--font-mono); fill: var(--color-text-secondary); text-anchor: middle; pointer-events: none; }
+.sit-eje:hover .sit-eje-linea, .sit-eje:focus-visible .sit-eje-linea { stroke: var(--color-text-primary); stroke-dasharray: none; }
+.sit-eje:hover .sit-burbuja, .sit-eje:focus-visible .sit-burbuja { stroke: var(--color-text-primary); }
+.sit-eje[data-otro] .sit-eje-linea { stroke: color-mix(in srgb, var(--color-accent) 55%, transparent); }
+.sit-eje[data-otro] .sit-burbuja { stroke: color-mix(in srgb, var(--color-accent) 55%, transparent); }
+.sit-eje[data-activo] .sit-eje-linea { stroke: var(--color-accent); stroke-width: 1.6; stroke-dasharray: none; }
+.sit-eje[data-activo] .sit-burbuja { fill: var(--color-accent); stroke: var(--color-accent); }
+.sit-eje[data-activo] .sit-burbuja-txt { fill: var(--color-bg-primary); }
+.sit-corte { fill: var(--color-accent); stroke: var(--color-accent); stroke-width: 1.3; stroke-linejoin: round; }
+.sit-nota { margin: 2px 0 8px; padding: 0 14px; font-size: 11px; color: var(--color-text-tertiary); }
+.sit-vacia { flex: 1; margin: 6px 0; font-size: 11px; line-height: 1.4; color: var(--color-text-tertiary); }
 /* La ficha del gestor de plantas: secciones con su título y los campos en fila */
 .gp-form { display: flex; flex-direction: column; gap: 4px; }
 .gp-sec { padding: 12px 0 14px; border-bottom: 1px solid var(--color-border-sub); }
