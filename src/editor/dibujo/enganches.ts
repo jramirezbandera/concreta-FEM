@@ -35,7 +35,7 @@
 import { direccionEjes, ejesDe } from "../../compilador/ejes.ts";
 import type { ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
 import { conPuntoFijo } from "../../compilador/puntoFijo.ts";
-import { RADIO_BURBUJA } from "../../agente/render/ejes.ts";
+import { ejesVistos, RADIO_BURBUJA } from "../../agente/render/ejes.ts";
 import { anchoViga, ejeSeccion, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica } from "../../agente/render/modelo.ts";
 import { cerca, redondear, tipoPunto, type IndicePlantilla } from "./plantilla.ts";
 
@@ -294,14 +294,17 @@ export function indiceEnganches(m: ModeloFisico, planta: string): IndiceEnganche
   }
 
   // Ejes de replanteo: extremos, rectas y cruces (entre sí, con vigas y con muros)
-  const ejes = ejesDe(m).ejes;
+  const { ejes, propuestos } = ejesDe(m);
+  // Las burbujas van en los extremos del eje dibujado (la directriz alargada, `ejesVistos`)
+  const dibujados = ejesVistos(m, ejes, propuestos);
   const siluetasEjes: IndiceEnganches["siluetas"] = [];
-  for (const e of ejes) {
+  ejes.forEach((e, i) => {
+    const v = dibujados[i]!;
     punto(e.desde, "extremo", e.id);
     punto(e.hasta, "extremo", e.id);
     if (e.desde[0] !== e.hasta[0] || e.desde[1] !== e.hasta[1]) rectas.push({ a: e.desde, b: e.hasta, objeto: e.id });
-    siluetasEjes.push({ id: e.id, tipo: "eje", cerrados: [], abiertos: [[e.desde, e.hasta]], distancia: (q, r) => Math.max(0, Math.min(dist(q, e.desde), dist(q, e.hasta)) - r * (RADIO_BURBUJA / RADIO_ENGANCHE - 1)) });
-  }
+    siluetasEjes.push({ id: e.id, tipo: "eje", cerrados: [], abiertos: [[v.desde, v.hasta]], distancia: (q, r) => Math.max(0, Math.min(dist(q, v.desde), dist(q, v.hasta)) - r * (RADIO_BURBUJA / RADIO_ENGANCHE - 1)) });
+  });
   const crucesEjes: Vec2[] = [];
   const vistos = new Set<string>();
   // M-22: el rótulo nombra los dos («Cruce A-1», «Cruce V2 · eje A»); antes decía «Cruce (A)»

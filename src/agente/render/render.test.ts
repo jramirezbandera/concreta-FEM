@@ -20,6 +20,7 @@ import { calcular } from "../../motor/calcular.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { pieza, resumen, type VanoEnvolvente } from "../consultas.ts";
 import { anchoTexto, area, dentro, numeroFijo, rotulo, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
+import { ejesVistos } from "./ejes.ts";
 import { bandaDe, bandas, coloresBandas, escalaDeTexto, isolineas, limitesMapa, limitesRedondos, PRIORIDAD_ISOLINEA, rangoSinPicos, rotulosLineas, SEPARACION_ROTULOS, triangulosCuadrilatero, trozosTriangulo, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { envolventeCampo, envolventePieza, valoresCampo, type Envolvente } from "./resultados.ts";
 import {
@@ -111,7 +112,8 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
         const ejes = ejesDe(f).ejes;
         const esperados = new Set([...enPlanta(f.losas), ...enPlanta(f.panos), ...enPlanta(f.vigas), ...enPlanta(f.apoyos), ...enPlanta(f.apoyosLineales), ...enPlanta(f.bandas), ...pilares, ...muros, ...ejes.map((x) => x.id)]);
         expect(objetos(e), `${nombre}, ${pl.id}`).toEqual(esperados);
-        for (const x of ejes) {
+        // Dibujados, alargados (`ejesVistos`)
+        for (const x of ejesVistos(f, ejes, ejesDe(f).propuestos)) {
           const p = e.primitivas.find((q) => q.tipo === "linea" && q.objeto === x.id && q.estilo === "eje");
           expect(p && p.tipo === "linea" ? p.puntos : null).toEqual([x.desde, x.hasta]);
         }
@@ -657,8 +659,9 @@ describe("A4, criterio 2: determinismo", () => {
   });
 });
 
-const SVG_CONGELADO = "de23c62d1dbe6fbf5a0f47cb2ea18e166ce65ea37435a6b6b285341a51c466ce";
-const PNG_CONGELADO = "3fe954bbf7091efff8e93d1c988c5b0069c28befd1eb5730d97d82d90ec85f74";
+// Regenerados el 2026-11-07: los ejes se dibujan alargados más allá del borde de la losa (`ejesVistos`)
+const SVG_CONGELADO = "7fe11f2a410f8a1987cad8d5bd0a66b26cc742050552ff018d0b8a08ddda9c50";
+const PNG_CONGELADO = "852005876d7778dc23a425405ca52a2748ab3e1ae2f237184fbdd7148f8012b0";
 
 describe("A4, criterio 3: tamaño de la imagen y del texto", () => {
   it(`el lado mayor no pasa de ${LADO_MAXIMO} px y ningún texto baja de 11 px, en todas las vistas`, () => {

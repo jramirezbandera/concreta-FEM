@@ -10,10 +10,14 @@
  * - Los rótulos no engañan (CT1, `docs/fem3d/cotas.md` §2.4): una distancia que no es un número
  *   entero de centímetros (a más de 0,5 mm) va en milímetros, y la cota junto a un eje propuesto
  *   cuyos pilares no están en su recta (a más de 1 mm) lleva «≈», con una nota.
+ * - Lo guardado es la directriz; el dibujo la alarga (`ejesVistos`) para que las burbujas no tapen
+ *   lo que se clicó: MARGEN_EJES más allá de sus extremos y de lo que la recta atraviesa (contornos
+ *   y huecos de losas y paños, vigas, muros, apoyos lineales y pilares a menos de BANDA_PILAR). Los
+ *   propuestos ya llevan su margen en sus extremos: sólo se alargan si la recta atraviesa algo más allá.
  *
  * Puro: sin IO.
  */
-import { ejesDe } from "../../compilador/ejes.ts";
+import { ejesDe, MARGEN_EJES } from "../../compilador/ejes.ts";
 import type { EjeReplanteo, ModeloFisico } from "../../compilador/fisico.ts";
 import type { EntradaLeyenda, Primitiva, Vec2 } from "./escena.ts";
 import { giroTexto } from "./modelo.ts";
@@ -34,9 +38,69 @@ export function rotuloCota(d: number): string {
   return d.toFixed(Math.abs(cm - Math.round(cm)) > 0.05 ? 3 : 2).replace(".", ",");
 }
 
-/** Los ejes que se dibujan, ordenados por id y sin los degenerados, y los de pilares desalineados con su dispersión. */
+/** Un pilar cuenta en el alargamiento de un eje si su punto está a menos de esto de la recta, m. */
+export const BANDA_PILAR = 0.5;
+
+/** Los tramos que un eje puede atravesar: contornos y huecos de losas y paños, vigas, muros y apoyos lineales. */
+function tramosModelo(f: ModeloFisico): [Vec2, Vec2][] {
+  const T: [Vec2, Vec2][] = [];
+  const abierta = (ps: readonly Vec2[]) => {
+    for (let i = 1; i < ps.length; i++) T.push([ps[i - 1]!, ps[i]!]);
+  };
+  const cerrada = (ps: readonly Vec2[]) => {
+    abierta(ps);
+    if (ps.length > 2) T.push([ps[ps.length - 1]!, ps[0]!]);
+  };
+  for (const l of f.losas ?? []) for (const r of [l.contorno, ...(l.huecos ?? [])]) cerrada(r);
+  for (const p of f.panos ?? []) cerrada(p.contorno);
+  for (const x of [...(f.vigas ?? []), ...(f.muros ?? []), ...(f.apoyosLineales ?? [])]) abierta(x.puntos);
+  return T.filter(([a, b]) => Number.isFinite(a[0] + a[1] + b[0] + b[1]));
+}
+
+/**
+ * Los ejes como se dibujan: la directriz alargada (ver la cabecera). Con la dirección de la directriz,
+ * así que un eje según X o Y conserva su coordenada fija tal cual.
+ */
+export function ejesVistos(f: ModeloFisico, ejes: readonly EjeReplanteo[], propuestos: boolean): EjeReplanteo[] {
+  const tramos = tramosModelo(f);
+  const pilares = (f.pilares ?? []).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  return ejes.map((e) => {
+    if (degenerado(e)) return e;
+    const [ax, ay] = e.desde;
+    const L = Math.hypot(e.hasta[0] - ax, e.hasta[1] - ay);
+    const d: Vec2 = [(e.hasta[0] - ax) / L, (e.hasta[1] - ay) / L];
+    let gmin = Infinity;
+    let gmax = -Infinity;
+    const ver = (t: number) => {
+      if (t < gmin) gmin = t;
+      if (t > gmax) gmax = t;
+    };
+    for (const [a, b] of tramos) {
+      // La recta del eje, p = desde + t·d, contra el tramo a + s·(b − a), s en [0, 1]
+      const [ux, uy] = [b[0] - a[0], b[1] - a[1]];
+      const den = d[0] * uy - d[1] * ux;
+      if (Math.abs(den) < 1e-12) continue;
+      const [wx, wy] = [a[0] - ax, a[1] - ay];
+      const sv = (wx * d[1] - wy * d[0]) / den;
+      if (sv < -1e-9 || sv > 1 + 1e-9) continue;
+      ver((wx * uy - wy * ux) / den);
+    }
+    for (const p of pilares) {
+      const [wx, wy] = [p.x - ax, p.y - ay];
+      if (Math.abs(wx * d[1] - wy * d[0]) <= BANDA_PILAR) ver(wx * d[0] + wy * d[1]);
+    }
+    const propio = propuestos ? 0 : MARGEN_EJES;
+    const t0 = Math.min(-propio, gmin - MARGEN_EJES);
+    const t1 = Math.max(L + propio, gmax + MARGEN_EJES);
+    const punto = (t: number): Vec2 => (t === 0 ? e.desde : t === L ? e.hasta : [ax + t * d[0], ay + t * d[1]]);
+    return t0 === 0 && t1 === L ? e : { ...e, desde: punto(t0), hasta: punto(t1) };
+  });
+}
+
+/** Los ejes que se dibujan (alargados), ordenados por id y sin los degenerados, y los de pilares desalineados con su dispersión. */
 function ejesDibujados(f: ModeloFisico): { validos: EjeReplanteo[]; degenerados: string[]; propuestos: boolean; disperso: Map<string, number> } {
-  const { ejes, propuestos, dispersion } = ejesDe(f);
+  const { ejes: directrices, propuestos, dispersion } = ejesDe(f);
+  const ejes = ejesVistos(f, directrices, propuestos);
   const disperso = new Map<string, number>();
   ejes.forEach((e, i) => {
     const x = dispersion?.[i] ?? 0;
@@ -183,7 +247,8 @@ function cotas(cadenas: readonly CadenaCotas[]): Primitiva[] {
  */
 export function capaEjesAlzado(f: ModeloFisico, plano: { eje?: string }, c: { u: (p: Vec2) => number; w: (p: Vec2) => number }, u: [number, number], z: [number, number]): Primitiva[] {
   const P: Primitiva[] = [];
-  const ejes = [...ejesDe(f).ejes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const { ejes: directrices, propuestos } = ejesDe(f);
+  const ejes = ejesVistos(f, directrices, propuestos).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   for (const e of ejes) {
     if (e.id === plano.eje || degenerado(e)) continue;
     const [wa, wb] = [c.w(e.desde), c.w(e.hasta)];
