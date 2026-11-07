@@ -150,10 +150,44 @@ describe("Forjado (criterio 1)", () => {
     p = conTabla(p, "vigas", { planta: "N1", puntos: "0 0; 10 0; 10 5; 0 5; 0 0", seccion: "V30x50" });
     p = conTabla(p, "forjados", { planta: "N1", tipo: "maciza", contorno: "0 0; 4 0; 4 5; 0 5", espesor: "0,25", material: "HA-30" });
     const plantillas: Plantillas = { ...PLANTILLAS, forjado: { tipo: "unidireccional", direccion: 90, intereje: 0.7, seccion: "T70", pp: 3.5 } };
-    const r = dibujar(p, "forjado", [clic(p, [9.5, 0.3])], plantillas);
+    // Un unidireccional pide siempre su dirección: Intro deja la de Propiedades
+    const r = dibujar(p, "forjado", [clic(p, [9.5, 0.3]), { tipo: "terminar" }], plantillas);
     expect(r.errores).toEqual([]);
     const t = conTabla(p, "forjados", { planta: "N1", tipo: "unidireccional", contorno: "10 0; 10 5; 4 5; 4 0", direccion: "90", intereje: "0,7", seccion: "T70", pp: "3,5" });
     expect(serializar(r.proyecto)).toBe(serializar(t));
+    // Y un clic en la viga de abajo (según X) pone las viguetas paralelas a ella
+    const x = dibujar(p, "forjado", [clic(p, [9.5, 0.3]), clic(p, [7, 0])], plantillas);
+    expect(serializar(x.proyecto)).toBe(serializar(conTabla(p, "forjados", { planta: "N1", tipo: "unidireccional", contorno: "10 0; 10 5; 4 5; 4 0", direccion: "0", intereje: "0,7", seccion: "T70", pp: "3,5" })));
+  });
+
+  it("un recuadro que no va según la dirección de Propiedades la pide: un clic en una viga la toma de ella", () => {
+    const p0 = proyectoNuevo("dibujo");
+    let p: Proyecto = { ...p0, modelo: { ...p0.modelo, secciones: SECCIONES as unknown as ModeloFisico["secciones"] } };
+    p = conTabla(p, "vigas", { planta: "N1", puntos: "0 0; 6 0; 8 4; 2 4; 0 0", seccion: "V30x50" });
+    const sinZunchos: Plantillas = { ...PLANTILLAS, forjado: { ...PLANTILLAS.forjado, zunchos: false } };
+    // El primer clic sólo elige el recuadro
+    const a = dibujar(p, "forjado", [clic(p, [4, 2])], sinZunchos);
+    expect(a.etiquetas).toEqual([]);
+    expect(a.estado.orientar).toBe(true);
+    // En la viga inclinada: el eje 1 según ella
+    const b = dibujar(p, "forjado", [clic(p, [4, 2]), clic(p, [1, 2])], sinZunchos);
+    expect(b.etiquetas).toEqual(["Forjado L1 (maciza)"]);
+    expect(b.proyecto.modelo.losas![0]!.eje1).toBe(Math.round(((Math.atan2(4, 2) * 180) / Math.PI) * 1e6) / 1e6);
+    // En la de abajo, o con Intro: 0° (sin eje1 escrito)
+    expect(dibujar(p, "forjado", [clic(p, [4, 2]), clic(p, [3, 0])], sinZunchos).proyecto.modelo.losas![0]!.eje1).toBeUndefined();
+    expect(dibujar(p, "forjado", [clic(p, [4, 2]), { tipo: "terminar" }], sinZunchos).proyecto.modelo.losas![0]!.eje1).toBeUndefined();
+    // Un clic en medio de la nada no hace nada; Esc lo anula
+    const c = dibujar(p, "forjado", [clic(p, [4, 2]), clic(p, [4, 2])], sinZunchos);
+    expect(c.errores[0]).toMatch(/ninguna viga/);
+    expect(c.estado.orientar).toBe(true);
+    const d = dibujar(p, "forjado", [clic(p, [4, 2]), { tipo: "anular" }], sinZunchos);
+    expect(d.etiquetas).toEqual([]);
+    expect(d.estado).toEqual(ESTADO_INICIAL);
+    // El borrador: el contorno y, con el cursor en la viga, su tramo y la dirección por el centro
+    const ctx: ContextoHerramienta = { modelo: p.modelo, planta: "N1", indice: indiceEnganches(p.modelo, "N1"), plantillas: sinZunchos, radio: RADIO_ENGANCHE / 50 };
+    const bo = borrador("forjado", a.estado, [1, 2], ctx, [1, 2]);
+    expect(bo.anillos.length).toBe(1);
+    expect(bo.lineas[0]).toEqual([[2, 4], [0, 0]]);
   });
 
   it("reticular con su plantilla, y lo que falta en ella se dice", () => {

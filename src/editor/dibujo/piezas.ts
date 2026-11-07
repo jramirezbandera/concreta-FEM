@@ -9,6 +9,10 @@
  *   de forjado da su contorno por los ejes (`recuadros.ts`, V2c-c), desde el vértice más cercano al
  *   clic (el lado donde empiezan las viguetas de un unidireccional). Con «polígono», clic a clic;
  *   Intro, doble clic o un clic en el primer punto lo cierra.
+ *   **La dirección** (como CYPECAD): si el contorno no va según la de Propiedades (un edificio que no
+ *   es ortogonal), y siempre en un unidireccional, un segundo clic en una viga, un muro, un apoyo
+ *   lineal, un eje o un lado del forjado la toma de él (el eje 1 o las viguetas, paralelos); Intro o
+ *   el clic derecho dejan la de Propiedades, y Esc anula.
  * - **Con zunchos** (por defecto, en una losa maciza o reticular y en un hueco de una losa): en el
  *   mismo paso, las vigas de borde de «Vigas de borde» (`vigasBorde.ts`) en los lados que no van sobre
  *   una viga, un muro, un apoyo lineal u otro forjado; en un hueco, sólo en los suyos. Un forjado
@@ -260,10 +264,10 @@ function conZunchos(ctx: ContextoHerramienta, op: Operacion, etiqueta: string, l
 
 // ─── Forjado ────────────────────────────────────────────────────────────────────────────────────
 
-/** El forjado de la plantilla con ese contorno, o por qué no. */
-function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[]): Paso | string {
+/** El forjado de la plantilla con ese contorno (y la dirección `direccion`, si se da), o por qué no. */
+function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: number): Paso | string {
   const m = ctx.modelo;
-  const t = ctx.plantillas.forjado ?? {};
+  const t = { ...(ctx.plantillas.forjado ?? {}), ...(direccion !== undefined ? { direccion } : {}) };
   const tipo = t.tipo ?? "maciza";
   // Que no pise otro forjado: ningún vértice de uno dentro del otro
   for (const q of contorno) {
@@ -318,15 +322,90 @@ function recuadroPara(ctx: ContextoHerramienta, q: Vec2): Vec2[] | string {
   return contornoDesde(r.anillo, q);
 }
 
+/** La dirección de ab, ° desde +X en [0, 180), a 1e-6° (exacta en los tramos según X o Y). */
+export function anguloTramo(a: Vec2, b: Vec2): number {
+  const g = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+  const r = Math.round((((g % 180) + 180) % 180) * 1e6) / 1e6;
+  return r === 180 ? 0 : r + 0;
+}
+
+/** ¿Todos los lados del contorno van según `direccion` o a 90° de ella? */
+function contornoAlineado(contorno: readonly Vec2[], direccion: number): boolean {
+  for (let i = 0, j = contorno.length - 1; i < contorno.length; j = i++) {
+    const d = (((anguloTramo(contorno[j]!, contorno[i]!) - direccion) % 90) + 90) % 90;
+    if (Math.min(d, 90 - d) > 1e-6) return false;
+  }
+  return true;
+}
+
+/**
+ * ¿Pide el forjado su dirección con un clic? Cuando el contorno no va según la de Propiedades (un
+ * edificio que no es ortogonal) y siempre en un unidireccional (las viguetas, según X o según Y).
+ */
+function pideDireccion(ctx: ContextoHerramienta, contorno: readonly Vec2[]): boolean {
+  const t = ctx.plantillas.forjado ?? {};
+  return (t.tipo ?? "maciza") === "unidireccional" || !contornoAlineado(contorno, t.direccion ?? 0);
+}
+
+/**
+ * El tramo que da la dirección del forjado con un clic en q: el de la viga, el muro, el apoyo lineal o
+ * el eje de replanteo bajo el cursor (a ≤ radio), o el lado más cercano del propio contorno.
+ */
+export function tramoDireccion(ctx: ContextoHerramienta, contorno: readonly Vec2[], q: Vec2, radio: number): [Vec2, Vec2] | null {
+  let mejor: { s: [Vec2, Vec2]; d: number } | null = null;
+  const probar = (a: Vec2, b: Vec2, d: number) => {
+    if ((a[0] !== b[0] || a[1] !== b[1]) && d <= radio && (!mejor || d < mejor.d)) mejor = { s: [a, b], d };
+  };
+  for (const s of ctx.indice.siluetas) {
+    if (s.tipo !== "viga" && s.tipo !== "muro" && s.tipo !== "apoyoLineal" && s.tipo !== "eje") continue;
+    // Las vigas y los muros, por su ancho (su distancia); los ejes, por su línea (la suya es a las burbujas)
+    const dObjeto = s.tipo === "eje" ? 0 : s.distancia(q, radio);
+    if (dObjeto > radio) continue;
+    for (const ps of s.abiertos) {
+      // El tramo de ese objeto más cercano a q, con la distancia del objeto
+      let k = -1;
+      let dk = Infinity;
+      for (let i = 0; i + 1 < ps.length; i++) {
+        const d = distTramo(q, ps[i]!, ps[i + 1]!).d;
+        if (d < dk) [k, dk] = [i, d];
+      }
+      if (k >= 0) probar(ps[k]!, ps[k + 1]!, s.tipo === "eje" ? dk : dObjeto);
+    }
+  }
+  for (let i = 0, j = contorno.length - 1; i < contorno.length; j = i++) probar(contorno[j]!, contorno[i]!, distTramo(q, contorno[j]!, contorno[i]!).d);
+  return (mejor as { s: [Vec2, Vec2] } | null)?.s ?? null;
+}
+
+/** El contorno ya está: el forjado, o el paso que pide su dirección. */
+function conContorno(e: EstadoHerramienta, ctx: ContextoHerramienta, contorno: Vec2[]): Paso {
+  // Lo que falte en Propiedades se dice ya, no tras el segundo clic
+  const r = forjadoCon(ctx, contorno);
+  if (typeof r === "string" || !pideDireccion(ctx, contorno)) return comoPaso(e, r);
+  return { estado: { puntos: contorno.map((p) => ({ p })), orientar: true } };
+}
+
 function pasoForjado(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
   const t = ctx.plantillas.forjado ?? {};
+  if (e.orientar) {
+    const contorno = e.puntos.map((x) => x.p);
+    if (ev.tipo === "retroceso") return { estado: ESTADO_INICIAL };
+    // Intro o el clic derecho: la de Propiedades
+    if (ev.tipo === "terminar") return comoPaso(e, forjadoCon(ctx, contorno));
+    if (ev.tipo !== "punto") return { estado: e };
+    const s = tramoDireccion(ctx, contorno, ev.cursor ?? ev.p, ev.radio ?? 0);
+    if (!s) return { estado: e, error: `Ahí no hay ninguna viga, muro, eje ni lado del forjado: haga clic encima de uno (o Intro para dejar ${num(t.direccion ?? 0)}°).` };
+    return comoPaso(e, forjadoCon(ctx, contorno, anguloTramo(s[0], s[1])));
+  }
   if ((t.modo ?? "recuadro") === "recuadro") {
     if (ev.tipo !== "punto") return { estado: e };
     const c = recuadroPara(ctx, ev.cursor ?? ev.p);
-    return comoPaso(e, typeof c === "string" ? c : forjadoCon(ctx, c));
+    return typeof c === "string" ? { estado: e, error: c } : conContorno(e, ctx, c);
   }
-  return pasoPolilinea(e, ev, { min: 3, cerrable: true, que: "Un forjado", terminar: (ps) => comoPaso(e, forjadoCon(ctx, ps)) });
+  return pasoPolilinea(e, ev, { min: 3, cerrable: true, que: "Un forjado", terminar: (ps) => conContorno(e, ctx, ps) });
 }
+
+/** Un número con coma decimal y hasta 2 decimales, para los textos. */
+const num = (v: number) => String(Math.round(v * 100) / 100).replace(".", ",");
 
 // ─── Hueco ──────────────────────────────────────────────────────────────────────────────────────
 
@@ -506,7 +585,24 @@ export function borradorPolilinea(e: EstadoHerramienta, cursor: Vec2 | null, r: 
 export function borradorPieza(h: NombrePieza, e: EstadoHerramienta, cursor: Vec2 | null, ctx: ContextoHerramienta, r: Borrador, crudo: Vec2 | null): void {
   const m = ctx.modelo;
   if (h === "forjado") {
-    if ((ctx.plantillas.forjado?.modo ?? "recuadro") === "recuadro") {
+    if (e.orientar) {
+      // El contorno, el tramo bajo el cursor y la dirección que tomaría, por el centro del forjado
+      const contorno = e.puntos.map((x) => x.p);
+      r.puntos.length = 0;
+      r.anillos.push(contorno);
+      const q = crudo ?? cursor;
+      const s = q ? tramoDireccion(ctx, contorno, q, ctx.radio ?? 0) : null;
+      if (s) {
+        r.lineas.push([s[0], s[1]]);
+        const d = unitario(anguloTramo(s[0], s[1]));
+        const c: Vec2 = [contorno.reduce((a, p) => a + p[0], 0) / contorno.length, contorno.reduce((a, p) => a + p[1], 0) / contorno.length];
+        const l = Math.max(...contorno.map((p) => Math.abs((p[0] - c[0]) * d[0] + (p[1] - c[1]) * d[1]))) * 0.8;
+        r.lineas.push([
+          [c[0] - l * d[0], c[1] - l * d[1]],
+          [c[0] + l * d[0], c[1] + l * d[1]],
+        ]);
+      }
+    } else if ((ctx.plantillas.forjado?.modo ?? "recuadro") === "recuadro") {
       const q = crudo ?? cursor;
       const c = q ? recuadroPara(ctx, q) : null;
       if (c && typeof c !== "string") r.anillos.push(c);
@@ -534,6 +630,8 @@ export function ayudaPieza(h: NombrePieza, e: EstadoHerramienta, t: Plantillas):
   const n = e.puntos.length;
   switch (h) {
     case "forjado":
+      if (e.orientar)
+        return `Forjado: un clic en una viga, un muro, un eje o un lado del forjado para su dirección (${(t.forjado?.tipo ?? "maciza") === "unidireccional" ? "las viguetas, paralelas a él" : (t.forjado?.tipo ?? "maciza") === "reticular" ? "los nervios, paralelos y perpendiculares a él" : "el eje 1, paralelo a él"}). Intro o clic derecho deja ${num(t.forjado?.direccion ?? 0)}°; Esc anula.`;
       if ((t.forjado?.modo ?? "recuadro") === "recuadro") return "Forjado: un clic dentro de un recuadro cerrado por vigas, muros o bordes (o polígono, en Propiedades). Esc vuelve a Elegir.";
       return n ? `Forjado: el vértice siguiente (${nPuntos(e)}). Intro, doble clic o un clic en el primero lo cierra; Retroceso quita el último; Esc anula.` : "Forjado: el primer vértice. Esc vuelve a Elegir.";
     case "hueco":

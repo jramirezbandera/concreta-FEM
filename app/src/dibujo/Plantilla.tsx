@@ -896,7 +896,7 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
               ? "Vacío, sale solo: el hormigón de nervios y capa más el casetón (los ábacos, γ·canto). Lo escrito manda: es el de la zona aligerada (los ábacos, γ·canto)."
               : "Vacío, sale solo con una vigueta en T: vigueta y capa más la bovedilla. Lo escrito manda.",
         )}
-        {num("direccion", "dirección", "°", tipo === "unidireccional" ? "La de las viguetas, desde +X." : tipo === "reticular" ? "La de los nervios, desde +X." : "La del eje 1 de las láminas, desde +X.")}
+        {num("direccion", "dirección", "°", (tipo === "unidireccional" ? "La de las viguetas, desde +X." : tipo === "reticular" ? "La de los nervios, desde +X." : "La del eje 1 de las láminas, desde +X.") + (tipo === "unidireccional" ? " Tras el contorno, un clic en una viga la toma de ella (Intro deja ésta)." : " Si el contorno no va según ella, tras el contorno un clic en una viga la toma de ella (Intro deja ésta)."))}
       </div>
     </Seccion>
   );

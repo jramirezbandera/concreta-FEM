@@ -114,6 +114,8 @@ export interface EstadoHerramienta {
   elegidos?: readonly string[];
   /** BN3, Barra: el primer extremo, en el modelo (sigue al pasar a otra vista). */
   extremo?: PuntoModelo;
+  /** Forjado: el contorno ya está (en `puntos`) y falta su dirección (un clic en una viga, un muro o un eje). */
+  orientar?: boolean;
 }
 
 export const ESTADO_INICIAL: EstadoHerramienta = { puntos: [] };
@@ -128,6 +130,8 @@ export interface ContextoHerramienta {
   elegidos?: readonly string[];
   /** AC: la distancia por debajo de la cual dos ábacos se unen (la mitad del tamaño de malla del proyecto). */
   toleranciaAbacos?: number;
+  /** El radio de enganche, m, para el borrador (lo que se cogería con un clic encima: la viga que da la dirección de un forjado). */
+  radio?: number;
 }
 
 export type Evento =

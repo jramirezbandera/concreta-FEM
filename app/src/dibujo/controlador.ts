@@ -1227,7 +1227,7 @@ export class ControladorDibujo {
     }
     if (this.herramienta === "elegir" || !ix) return;
     // El borrador
-    const b = borrador(this.herramienta, this.estado, this.cursorQ ? (this.apunte?.p ?? this.cursorQ) : null, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas, toleranciaAbacos: this.toleranciaAbacos }, this.cursorQ);
+    const b = borrador(this.herramienta, this.estado, this.cursorQ ? (this.apunte?.p ?? this.cursorQ) : null, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas, toleranciaAbacos: this.toleranciaAbacos, radio: this.radio }, this.cursorQ);
     ctx.strokeStyle = c.acento;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
