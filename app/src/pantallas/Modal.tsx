@@ -12,6 +12,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcModal } from "../armazon/iconos.tsx";
 import { Cabecera, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -325,6 +326,7 @@ export function ModoModal() {
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
       vista={vista}
+      nav={{ titulo: "Navegador", contenido: <Situacion /> }}
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 340 }}
       dock={[
         { id: "modos", titulo: "Modos", insignia: md?.numeroDeModos, contenido: tablaModos },

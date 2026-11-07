@@ -19,6 +19,7 @@ import type { MagnitudPilares, Pilares3D } from "../../../src/visor/pilares3d.ts
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcPilares } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -256,6 +257,7 @@ export function ModoPilares() {
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
       vista={vistaPlanta}
+      nav={{ titulo: "Navegador", contenido: <Situacion /> }}
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
       dock={[
         { id: "cuadro", titulo: `Cuadro bajo ${planta ?? ""}`, insignia: filas.length, contenido: cuadro },

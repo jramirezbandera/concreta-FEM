@@ -23,6 +23,7 @@ import type { PiezasDiagrama } from "../../../src/visor/diagramas3d.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDiagramas, IcPilar, IcViga } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, filaElegible, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -501,7 +502,12 @@ export function ModoDiagramas() {
       paneles={pan}
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
-      nav={{ titulo: "Piezas", contenido: navegador }}
+      nav={{ titulo: "Navegador", contenido: (
+        <>
+          <Situacion />
+          {navegador}
+        </>
+      ) }}
       vista={vistaPlanta}
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
       dock={[

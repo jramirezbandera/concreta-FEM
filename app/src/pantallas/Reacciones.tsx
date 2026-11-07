@@ -21,6 +21,7 @@ import type { Reacciones3D, ReaccionObjeto } from "../../../src/visor/reacciones
 import type { ReaccionesCasos } from "../../../src/visor/datos.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
 import { CampoLista, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcReacciones } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, filaElegible, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -355,6 +356,7 @@ export function ModoReacciones() {
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
       vista={vista}
+      nav={{ titulo: "Navegador", contenido: <Situacion /> }}
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 380 }}
       dock={[
         { id: "reacciones", titulo: "Por caso", insignia: porCaso?.objetos.length, contenido: tablaCasos },

@@ -25,6 +25,7 @@ import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { ValorPunto } from "../../../src/visor/datos.ts";
 import type { SuperficiesMapa } from "../../../src/visor/isovalores3d.ts";
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcLosas } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -374,6 +375,7 @@ export function ModoLosas() {
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
       vista={vista}
+      nav={{ titulo: "Navegador", contenido: <Situacion /> }}
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 340 }}
       dock={[{ id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: x?.combinaciones.nombres.length, contenido: x ? <TablaCombinaciones c={x.combinaciones} resaltar={x.dibujada?.nombre} /> : <p className="nota">…</p> }]}
     />

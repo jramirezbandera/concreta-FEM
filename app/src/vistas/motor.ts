@@ -48,6 +48,7 @@ export interface Entorno {
    * Pinta la escena sin dibujar nada (viewport de 0 × 0): la primera pasada de sus materiales nuevos
    * (`getProgram`, que `compile` no ahorra: Three.js la repite al pintar si el material no se ha
    * pintado nunca) y la subida de sus búferes. Así, en la tarea que la monta y no en el fotograma.
+   * Si el fotograma ya pasó, no hace nada.
    */
   preparar(escena: Scene, camara: Camera): void;
 }
@@ -247,7 +248,11 @@ export class Motor {
       medir: (t, tam, negrita) => this.anchoTexto(t, tam, negrita),
       preparar: (escena, camara) => {
         const r = this.renderer;
-        if (!r) return;
+        // Sólo antes del fotograma que la pinta. Si ese fotograma ya pasó, ya hizo este trabajo, y la
+        // pasada borraría el búfer (`render` lo limpia entero, el viewport no lo recorta) sin otro
+        // fotograma detrás: Chrome presentaba el lienzo vacío hasta el siguiente cambio (en Losas
+        // con el navegador abierto, el mapa no salía hasta mover algo)
+        if (!r || !this.pendiente) return;
         r.setScissorTest(false);
         r.setViewport(0, 0, 0, 0);
         r.render(escena, camara);

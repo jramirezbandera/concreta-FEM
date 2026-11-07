@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { DatosDesplomes } from "../../../src/visor/datos.ts";
 import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDeformada } from "../armazon/iconos.tsx";
 import { Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -246,6 +247,7 @@ export function ModoDeformada() {
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
       vista={vista}
+      nav={{ titulo: "Navegador", contenido: <Situacion /> }}
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 320 }}
       dock={[
         { id: "desplomes", titulo: "Desplomes por planta", contenido: tabla },

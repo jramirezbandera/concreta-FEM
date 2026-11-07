@@ -23,6 +23,7 @@ import type { ValorArmado } from "../../../src/visor/armado.ts";
 import type { DatosFranja } from "../../../src/visor/franjas.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
 import { CampoLista, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcBanda } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, filaElegible, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -797,6 +798,7 @@ export function ModoArmado() {
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
       vista={vista}
+      nav={{ titulo: "Navegador", contenido: <Situacion /> }}
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 360 }}
       dock={[
         { id: "franjas", titulo: "Franjas", insignia: d?.filas.length, contenido: tabla },
