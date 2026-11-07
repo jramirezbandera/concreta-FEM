@@ -1035,8 +1035,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .gp-total { margin: 0; font-size: 12px; color: var(--color-text-tertiary); }
 .gp-total span { color: var(--color-accent); }
 /* «Situación», en el navegador: el alzado y la planta esquemáticos, con lo que enseña la vista activa */
-.situacion { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; padding: 4px 10px 2px; }
-.sit-alzado, .sit-planta { flex-shrink: 0; overflow: visible; }
+.situacion { display: flex; justify-content: center; padding: 4px 10px 2px; }
+.sit-alzado, .sit-planta { max-width: 100%; height: auto; overflow: visible; }
 .sit-nivel, .sit-eje { cursor: pointer; outline: none; }
 .sit-banda { fill: transparent; transition: fill .12s; }
 .sit-nivel:hover .sit-banda { fill: var(--color-bg-elevated); }
@@ -1052,7 +1052,6 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .sit-nivel[data-activa] .sit-id { font-weight: 600; fill: var(--color-accent); }
 .sit-nivel[data-otra] .sit-forjado:not(.sit-cim) { fill: color-mix(in srgb, var(--color-accent) 45%, var(--color-text-tertiary)); }
 .sit-losa { fill: color-mix(in srgb, var(--color-text-tertiary) 9%, transparent); stroke: var(--color-border-strong); stroke-width: .8; }
-.sit-losa[data-activa] { fill: color-mix(in srgb, var(--color-accent) 14%, transparent); stroke: var(--color-accent); stroke-width: 1.1; }
 .sit-pil { fill: var(--color-text-secondary); }
 .sit-eje-toque { stroke: transparent; stroke-width: 9; }
 .sit-eje-linea { stroke: var(--color-text-tertiary); stroke-width: .8; stroke-dasharray: 3 2; }

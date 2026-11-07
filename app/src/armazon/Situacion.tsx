@@ -1,10 +1,9 @@
 /**
- * «Situación», en el navegador de Modelo y Cargas: dónde está lo que se ve. A la izquierda, el alzado
- * esquemático del edificio (las plantas a escala, como en el gestor de plantas); a la derecha, la
- * planta esquemática (los ejes de replanteo, los pilares y los contornos de los forjados). Lo que
- * enseña la vista activa va resaltado: su planta en el alzado (y sus forjados en la planta) o, en un
- * alzado, su eje en la planta, con las flechas de corte hacia donde se mira. Lo de las otras vistas
- * abiertas, más tenue.
+ * «Situación», en el navegador: dónde está lo que se ve, con un solo esquema según la vista activa
+ * (decisión del usuario). En una vista de planta (y en el 3D), el alzado esquemático del edificio (las
+ * plantas a escala, como en el gestor de plantas), con su planta resaltada; en un alzado, la planta
+ * esquemática (los ejes de replanteo, los pilares y los contornos de los forjados), con su eje
+ * resaltado y las flechas de corte hacia donde se mira. Lo de las otras vistas abiertas, más tenue.
  *
  * Es también un navegador: un clic en una planta la enseña en planta y uno en un eje enseña su
  * alzado, en la vista activa si es de ese tipo o, si no, en otra abierta que lo sea (como «Planta» y
@@ -70,22 +69,28 @@ export function Situacion() {
   const ejeActivo = act.tipo === "alzado" ? act.eje : null;
 
   if (!e.plantas.length) return null;
+  // Un esquema, el que sitúa lo que se ve: en un alzado, la planta con los ejes; en una planta (o en
+  // el 3D, que se filtra por plantas), el alzado con las plantas.
+  const enAlzado = act.tipo === "alzado";
   return (
     <Seccion titulo="Situación" valor={valor}>
       <div className="situacion">
-        <AlzadoEsquema plantas={e.plantas} activa={plantaActiva} otras={plantasOtras} onPlanta={(p) => ir("planta", { planta: p })} />
-        <PlantaEsquema ejes={e.ejes} modelo={m} plantaActiva={plantaActiva} enPlanta={act.tipo === "planta"} activo={ejeActivo} otros={ejesOtros} onEje={(x) => ir("alzado", { eje: x })} />
+        {enAlzado ? (
+          <PlantaEsquema ejes={e.ejes} modelo={m} activo={ejeActivo} otros={ejesOtros} onEje={(x) => ir("alzado", { eje: x })} />
+        ) : (
+          <AlzadoEsquema plantas={e.plantas} activa={plantaActiva} otras={plantasOtras} onPlanta={(p) => ir("planta", { planta: p })} />
+        )}
       </div>
-      <p className="sit-nota">Clic: ver esa planta o el alzado de ese eje.</p>
+      <p className="sit-nota">{enAlzado ? "Clic en un eje: ver su alzado." : "Clic en una planta: verla en planta."}</p>
     </Seccion>
   );
 }
 
 // ─── El alzado esquemático ──────────────────────────────────────────────────────────────────────
 
-const WA = 92;
-const X_FORJADO = [36, 88] as const;
-const X_PILARES = [44, 62, 80];
+const WA = 180;
+const X_FORJADO = [44, 172] as const;
+const X_PILARES = [60, 108, 156];
 const MIN_FILA = 15;
 const MAX_ALTO = 150;
 
@@ -125,8 +130,8 @@ function AlzadoEsquema({ plantas, activa, otras, onPlanta }: { plantas: readonly
 
 // ─── La planta esquemática ──────────────────────────────────────────────────────────────────────
 
-const WP = 132;
-const MAX_ALTO_PLANTA = 150;
+const WP = 200;
+const MAX_ALTO_PLANTA = 170;
 const PAD = 13;
 const R_BURBUJA = 5.5;
 
@@ -136,7 +141,7 @@ interface ModeloEsquema {
   panos?: readonly { planta: string; contorno: readonly Vec2[] }[];
 }
 
-function PlantaEsquema({ ejes, modelo, plantaActiva, enPlanta, activo, otros, onEje }: { ejes: readonly Eje[]; modelo: ModeloEsquema | undefined; plantaActiva: string | null; enPlanta: boolean; activo: string | null; otros: ReadonlySet<string>; onEje: (id: string) => void }) {
+function PlantaEsquema({ ejes, modelo, activo, otros, onEje }: { ejes: readonly Eje[]; modelo: ModeloEsquema | undefined; activo: string | null; otros: ReadonlySet<string>; onEje: (id: string) => void }) {
   const forjados = [...(modelo?.losas ?? []), ...(modelo?.panos ?? [])].filter((f) => f.contorno.length >= 3);
   const pilares = modelo?.pilares ?? [];
   const pts: Vec2[] = [...ejes.flatMap((x) => [x.desde, x.hasta]), ...pilares.map((p) => [p.x, p.y] as Vec2), ...forjados.flatMap((f) => f.contorno)];
@@ -174,7 +179,7 @@ function PlantaEsquema({ ejes, modelo, plantaActiva, enPlanta, activo, otros, on
   return (
     <svg className="sit-planta" viewBox={`0 0 ${WP} ${alto}`} width={WP} height={alto} role="group" aria-label="Planta esquemática: los ejes">
       {forjados.map((f, i) => (
-        <path key={i} className="sit-losa" data-activa={(enPlanta && f.planta === plantaActiva) || undefined} d={camino(f.contorno)} />
+        <path key={i} className="sit-losa" d={camino(f.contorno)} />
       ))}
       {pilares.map((p) => {
         const [x, y] = px([p.x, p.y]);

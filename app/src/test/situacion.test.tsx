@@ -1,6 +1,7 @@
 /**
- * «Situación» en el navegador (`armazon/Situacion.tsx`): el alzado y la planta esquemáticos dicen qué
- * enseña la vista activa, y un clic en una planta o en un eje lleva la vista a ella.
+ * «Situación» en el navegador (`armazon/Situacion.tsx`): en una vista de planta, el alzado esquemático;
+ * en un alzado, la planta esquemática con los ejes. Dicen qué enseña la vista activa, y un clic en una
+ * planta o en un eje lleva la vista a ella.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -69,28 +70,42 @@ describe("Situación", () => {
     await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(h), { timeout: 30_000 });
     const sit = () => screen.getByText("Situación", { selector: "h2 span" }).closest("section")!;
     const [p0, p1] = p.modelo.plantas;
-    // Por defecto, una vista de planta en la primera planta
+    const tipoVista = (t: "Planta" | "Alzado") => within(screen.getByRole("group", { name: "Tipo de la vista activa" })).getByRole("button", { name: t });
+    // Por defecto, una vista de planta en la primera planta: sólo el alzado esquemático, con ella marcada
     expect(within(sit()).getByRole("button", { name: `Ver la planta ${p0!.id}` }).getAttribute("aria-pressed")).toBe("true");
     expect(sit().querySelector("h2")!.textContent).toContain(`Planta ${p0!.id}`);
+    expect(sit().querySelector(".sit-alzado")).toBeTruthy();
+    expect(sit().querySelector(".sit-planta")).toBeNull();
+    expect(within(sit()).queryAllByRole("button", { name: /^Ver el alzado del eje / })).toHaveLength(0);
 
     fireEvent.click(within(sit()).getByRole("button", { name: `Ver la planta ${p1!.id}` }));
     expect(within(sit()).getByRole("button", { name: `Ver la planta ${p1!.id}` }).getAttribute("aria-pressed")).toBe("true");
     expect(within(sit()).getByRole("button", { name: `Ver la planta ${p0!.id}` }).getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByRole("img", { name: `Planta ${p1!.id}` })).toBeTruthy();
 
-    // Un eje: la vista pasa al alzado de ese eje, con su eje marcado en la planta esquemática
+    // En un alzado: sólo la planta esquemática, con su eje marcado y las flechas de corte
+    fireEvent.click(tipoVista("Alzado"));
+    await waitFor(() => expect(container.querySelector(".celda")?.getAttribute("data-tipo")).toBe("alzado"));
+    expect(sit().querySelector(".sit-planta")).toBeTruthy();
+    expect(sit().querySelector(".sit-alzado")).toBeNull();
+    expect(within(sit()).queryAllByRole("button", { name: /^Ver la planta/ })).toHaveLength(0);
+    expect(within(sit()).getAllByRole("button", { pressed: true, name: /^Ver el alzado del eje / })).toHaveLength(1);
+    expect(sit().querySelectorAll(".sit-corte").length).toBe(2);
+
+    // Un clic en otro eje enseña su alzado
     const ejes = within(sit()).getAllByRole("button", { name: /^Ver el alzado del eje / });
     expect(ejes.length).toBeGreaterThan(1);
-    const segundo = ejes[1]!.getAttribute("aria-label")!.replace("Ver el alzado del eje ", "");
-    fireEvent.click(ejes[1]!);
-    await waitFor(() => expect(container.querySelector(".celda")?.getAttribute("data-tipo")).toBe("alzado"));
-    expect(screen.getByRole("img", { name: `Alzado del eje ${segundo}` })).toBeTruthy();
-    expect(within(sit()).getByRole("button", { name: `Ver el alzado del eje ${segundo}` }).getAttribute("aria-pressed")).toBe("true");
+    const otro = ejes.find((b) => b.getAttribute("aria-pressed") === "false")!;
+    const nombre = otro.getAttribute("aria-label")!.replace("Ver el alzado del eje ", "");
+    fireEvent.click(otro);
+    await waitFor(() => expect(screen.getByRole("img", { name: `Alzado del eje ${nombre}` })).toBeTruthy());
+    expect(within(sit()).getByRole("button", { name: `Ver el alzado del eje ${nombre}` }).getAttribute("aria-pressed")).toBe("true");
     expect(sit().querySelectorAll(".sit-corte").length).toBe(2);
-    // En un alzado, ninguna planta marcada; un clic en una vuelve a la planta
-    expect(within(sit()).queryAllByRole("button", { pressed: true, name: /^Ver la planta/ })).toHaveLength(0);
-    fireEvent.click(within(sit()).getByRole("button", { name: `Ver la planta ${p0!.id}` }));
+
+    // De vuelta a la planta, otra vez el alzado esquemático
+    fireEvent.click(tipoVista("Planta"));
     await waitFor(() => expect(container.querySelector(".celda")?.getAttribute("data-tipo")).toBe("planta"));
-    expect(screen.getByRole("img", { name: `Planta ${p0!.id}` })).toBeTruthy();
+    expect(sit().querySelector(".sit-alzado")).toBeTruthy();
+    expect(sit().querySelector(".sit-planta")).toBeNull();
   }, 120_000);
 });
