@@ -373,11 +373,14 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   }, [elegidos]);
   // Supr borra lo elegido: si nada más lo usa, en el acto (se deshace con Ctrl+Z); si no, el diálogo
   // de Borrar dice qué lo usa. La hoja tiene su Supr (vaciar celdas) y un diálogo abierto, el suyo.
+  // También con una herramienta activa (ninguna usa Supr): lo elegido en el navegador se borra igual,
+  // salvo con un punto en curso de Mover, Copiar, Girar o Simetría, que trabajan sobre lo elegido.
   const hayEnTablas = enTablas.length > 0 || abacosElegidos.length > 0;
   useEffect(() => {
-    if (dibujando || estirando || conAsa || dialogo || !ed || !hayEnTablas) return;
+    if (estirando || conAsa || dialogo || !ed || !hayEnTablas) return;
     const tecla = (x: KeyboardEvent) => {
       if (x.key !== "Delete" || x.ctrlKey || x.metaKey || x.altKey || x.shiftKey || enCampo(x.target)) return;
+      if (ctrl.editando) return;
       const { enTablas, seleccion, abacosElegidos } = ultimo.current;
       x.preventDefault();
       // AC: los ábacos elegidos (no los de una losa que también se borra), en el mismo paso
@@ -396,7 +399,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [dibujando, estirando, conAsa, dialogo, ed, hayEnTablas, setSeleccion]);
+  }, [ctrl, estirando, conAsa, dialogo, ed, hayEnTablas, setSeleccion]);
 
   const abrirTabla = (t: NombreTabla, filaNueva = false, celdas?: Record<string, string>) => {
     setTabla(t);

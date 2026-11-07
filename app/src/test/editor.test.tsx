@@ -385,6 +385,16 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     await waitFor(() => expect(within(objetos()).queryByRole("button", { name: /^V1/ })).toBeNull());
     fireEvent.click(screen.getByTitle("Deshacer: Borrar V1 (Ctrl+Z)"));
     await waitFor(() => expect(within(objetos()).getByRole("button", { name: /^V1/ })).toBeTruthy());
+    // También con una herramienta de dibujo activa (de la prueba de uso: antes Supr no hacía nada)
+    const pilar = within(screen.getByRole("toolbar", { name: "Herramientas de Modelo" })).getByRole("button", { name: "Pilar" });
+    fireEvent.click(pilar);
+    expect(pilar.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^V1/ }));
+    fireEvent.keyDown(window, { key: "Delete" });
+    await waitFor(() => expect(within(objetos()).queryByRole("button", { name: /^V1/ })).toBeNull());
+    fireEvent.click(screen.getByTitle("Deshacer: Borrar V1 (Ctrl+Z)"));
+    await waitFor(() => expect(within(objetos()).getByRole("button", { name: /^V1/ })).toBeTruthy());
+    fireEvent.keyDown(window, { key: "Escape" });
     fireEvent.click(within(objetos()).getByRole("button", { name: /^Forjados/ }));
     fireEvent.click(within(objetos()).getByRole("button", { name: /^L1/ }));
     fireEvent.keyDown(window, { key: "Delete" });
