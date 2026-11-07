@@ -213,6 +213,81 @@ export function huellasSolapadas(p: readonly Vec2[], q: readonly Vec2[], tol: nu
 }
 
 /**
+ * Distancia (m) hasta la que una esquina de la huella sembrada va a la cara de un ancho que toca la
+ * huella sin pasar por el centro del pilar (LV2, `aLasCaras`). Es un descuadre de dibujo (un pilar
+ * girado que asoma milímetros de su viga), no una geometría pensada: a 1 cm la cara de la viga y la
+ * del pilar son la misma para la malla. Más lejos, lo que asoma lo malla la rejilla o la
+ * triangulación como siempre (un 40 junto a una viga de 30 que acaba en su cara deja 5 cm).
+ */
+export const CASI_EN_CARA = 0.01;
+
+/** Seno del ángulo máximo (15°) entre un lado de la huella y la cara de un ancho para que «corra por ella». */
+const SENO_CASI_PARALELOS = 0.26;
+
+/**
+ * El punto al que va el vértice q de una huella (entre los vértices `antes` y `despues`) casi en las
+ * caras `caras` (rectas por sus dos puntos). Sólo cuentan las caras a ≤ tol por las que corre uno de
+ * los dos lados de q (a ≤ 15°): un pilar descuadrado unos milímetros de su viga, no la esquina de un
+ * octógono (un pilar circular) junto a la cara de una viga que acaba en él. Va al cruce de las dos
+ * caras no paralelas que tiene más cerca (una esquina de viga), si está a ≤ 2·tol, o a su proyección
+ * sobre la cara más cercana. Null si no hay ninguna cara entre 10·ε_geom y tol, o si q ya está sobre
+ * una cara y la otra no la cruza cerca (no se aparta de la que ya está).
+ */
+export function casiEnCaras(q: Vec2, antes: Vec2, despues: Vec2, caras: readonly (readonly [Vec2, Vec2])[], tol: number, epsGeom: number): Vec2 | null {
+  const lados = [antes, despues].map((p) => {
+    const L = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    return L > 0 ? ([(p[0] - q[0]) / L, (p[1] - q[1]) / L] as Vec2) : null;
+  });
+  const cerca: { A: Vec2; u: Vec2; d: number }[] = [];
+  for (const [A, B] of caras) {
+    const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    if (!(L > 0)) continue;
+    const u: Vec2 = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+    const d = Math.abs((q[0] - A[0]) * u[1] - (q[1] - A[1]) * u[0]);
+    if (d > tol + 10 * epsGeom) continue;
+    if (!lados.some((s) => s && Math.abs(s[0] * u[1] - s[1] * u[0]) <= SENO_CASI_PARALELOS)) continue;
+    cerca.push({ A, u, d });
+  }
+  if (!cerca.some((c) => c.d > 10 * epsGeom)) return null;
+  let mejor: { X: Vec2; r: number } | null = null;
+  for (let i = 0; i < cerca.length; i++)
+    for (let j = i + 1; j < cerca.length; j++) {
+      const a = cerca[i]!;
+      const b = cerca[j]!;
+      const s = a.u[0] * b.u[1] - a.u[1] * b.u[0];
+      if (Math.abs(s) < 0.5) continue;
+      const t = ((b.A[0] - a.A[0]) * b.u[1] - (b.A[1] - a.A[1]) * b.u[0]) / s;
+      const X: Vec2 = [a.A[0] + t * a.u[0], a.A[1] + t * a.u[1]];
+      const r = Math.hypot(X[0] - q[0], X[1] - q[1]);
+      if (r <= 2 * tol && (!mejor || r < mejor.r)) mejor = { X, r };
+    }
+  if (mejor) return mejor.r > 10 * epsGeom ? mejor.X : null;
+  if (cerca.some((c) => c.d <= 10 * epsGeom)) return null;
+  let c = cerca[0]!;
+  for (const x of cerca) if (x.d < c.d) c = x;
+  const t = (q[0] - c.A[0]) * c.u[0] + (q[1] - c.A[1]) * c.u[1];
+  return [c.A[0] + t * c.u[0], c.A[1] + t * c.u[1]];
+}
+
+/** Polígono convexo (en cualquier sentido), sin vértices a ≤ 10·ε_geom ni ángulos llanos. */
+export function convexoEstricto(p: readonly Vec2[], epsGeom: number): boolean {
+  const n = p.length;
+  const area = areaConSigno(p);
+  if (n < 3 || !(Math.abs(area) > 0)) return false;
+  const s = Math.sign(area);
+  for (let i = 0; i < n; i++) {
+    const a = p[i]!;
+    const b = p[(i + 1) % n]!;
+    const c = p[(i + 2) % n]!;
+    const lab = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const lbc = Math.hypot(c[0] - b[0], c[1] - b[1]);
+    if (!(lab > 10 * epsGeom && lbc > 10 * epsGeom)) return false;
+    if (!(s * ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])) > 1e-9 * lab * lbc)) return false;
+  }
+  return true;
+}
+
+/**
  * Partes del segmento AB (en t ∈ [0, 1]) fuera de unos polígonos convexos (Cyrus–Beck): lo que de
  * un eje de viga queda fuera de las huellas de sus pilares.
  */
@@ -514,7 +589,8 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     });
     const aLasCaras = (poli: readonly Vec2[], centro: Vec2): Vec2[] => {
       const rectas = carasAnchoK.filter((x) => puntoEnPoligono(centro, x.poli) || distanciaABorde(centro, x.poli) <= epsSnap).flatMap((x) => x.caras);
-      return poli.map((q) => {
+      const movidos = new Array<boolean>(poli.length).fill(false);
+      const sembrada = poli.map((q, i) => {
         for (const [A, B] of rectas) {
           const [ux, uy] = [B[0] - A[0], B[1] - A[1]];
           const L2 = ux * ux + uy * uy;
@@ -522,10 +598,29 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
           const t = ((q[0] - A[0]) * ux + (q[1] - A[1]) * uy) / L2;
           const X: Vec2 = [A[0] + t * ux, A[1] + t * uy];
           const d = Math.hypot(q[0] - X[0], q[1] - X[1]);
-          if (d > 10 * epsGeom && d <= epsSnap + 10 * epsGeom) return X;
+          if (d > 10 * epsGeom && d <= epsSnap + 10 * epsGeom) {
+            movidos[i] = true;
+            return X;
+          }
         }
         return q;
       });
+      // Una esquina casi en la cara de un ancho que toca la huella sin pasar por el centro del pilar
+      // (`CASI_EN_CARA`): sin esto, P5 de «ejemplo 1», girado 10° en el quiebro de dos vigas que acaban
+      // en sus ejes, tenía el centro en la esquina sin ancho y una esquina a 1,3 mm de la cara de V3;
+      // la triangulación bajaba a láminas de 0,4 mm contra la esquina rígida y daba 920 kN·m/m con
+      // 2 kN/m² (372 en una lámina; ≤ 5 un poco más allá). Sólo cambia lo que la regla de arriba deja
+      const cercanas = carasAnchoK.filter((x) => huellasSolapadas(poli, x.poli, epsSnap)).flatMap((x) => x.caras);
+      if (!cercanas.length) return sembrada;
+      let cambia = false;
+      const casi = sembrada.map((q, i) => {
+        if (movidos[i]) return q;
+        const n = sembrada.length;
+        const X = casiEnCaras(q, sembrada[(i + n - 1) % n]!, sembrada[(i + 1) % n]!, cercanas, CASI_EN_CARA, epsGeom);
+        if (X) cambia = true;
+        return X ?? q;
+      });
+      return cambia && convexoEstricto(casi, epsGeom) ? casi : sembrada;
     };
     /** Huella que se siembra de cada pilar: la de verdad, o con lo que tiene a ≤ ε_snap de una cara de ancho sobre ella (LV2). */
     const huellasSembradas = new Map<number, Vec2[]>();

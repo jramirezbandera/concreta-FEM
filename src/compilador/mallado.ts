@@ -64,6 +64,14 @@ export const COBERTURA_MINIMA = 0.75;
 
 /** Jacobiano escalado por debajo del cual se avisa de un cuadrilátero de mala calidad. */
 export const JACOBIANO_BAJO = 0.2;
+/**
+ * Lado (m) por debajo del cual una lámina que toca la huella de un pilar es una astilla: con 2 kN/m²,
+ * las de 0,4–1,4 mm junto a la esquina de P5 en «ejemplo 1» daban hasta 372 kN·m/m (5 a 12 cm), y
+ * las de 1,2 mm junto a los pilares circulares de las retículas con muros, 300–370 frente a un
+ * percentil 99 de 40–100. En los edificios objetivo, la vivienda, el muestrario y las retículas sin
+ * muros no hay ninguna (2026-11-07).
+ */
+export const LADO_ASTILLA = 0.005;
 
 /** Pendiente con que crece el paso de la siembra desde un rasgo pequeño (m por m). */
 const CRECIMIENTO = 2;
@@ -1544,6 +1552,8 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   let peor: Vec2 = [0, 0];
   let bajos = 0;
   const malos = losas.map(() => 0);
+  /** Cuadriláteros con un lado de menos de LADO_ASTILLA que tocan cada huella (por su índice). */
+  const astillas = new Map<number, number>();
   let areaRejilla = 0;
   // Un cuadrilátero con sus cuatro nudos en la huella de un pilar es rígido con él (C2-d): su forma
   // no cambia el resultado, y no cuenta en la calidad (las astillas de milímetros donde el círculo de
@@ -1574,6 +1584,13 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     }
     if (j <= 0 || !convexo) malos[q.losa]!++;
     else if (j < JACOBIANO_BAJO && cuenta) bajos++;
+    // Astillas junto a una huella: un lado de milímetros con algún nudo en la huella rígida
+    let lado = Infinity;
+    for (let m = 0; m < 4; m++) lado = Math.min(lado, Math.hypot(X[(m + 1) % 4]![0] - X[m]![0], X[(m + 1) % 4]![1] - X[m]![1]));
+    if (lado < LADO_ASTILLA && !rigido(X))
+      huellas.forEach((p, i) => {
+        if (X.some((x) => nudoEnHuella(x, p, epsGeom))) astillas.set(i, (astillas.get(i) ?? 0) + 1);
+      });
   }
   // Con anchos, sus piezas cuentan en el área de la losa en la que caen
   for (const pa of piezasAncho) areas[pa.losa]! += pa.area;
@@ -1614,6 +1631,18 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       severidad: "aviso",
       codigo: "malla/calidad",
       mensaje: `${bajos} cuadriláteros tienen el jacobiano escalado por debajo de ${JACOBIANO_BAJO} (mínimo ${jacobianoMin.toFixed(3)}, en (${peor[0].toFixed(2)}, ${peor[1].toFixed(2)}), junto a ${cerca.join(", ") || "nada"}; sin contar los que caen enteros en la huella de un pilar, que es rígida): hay rasgos de la planta a menos de un elemento entre sí, como dos líneas casi paralelas a poco más de ε_snap.`,
+    });
+  }
+
+  if (astillas.size) {
+    const ids = [...new Set([...astillas.keys()].map((i) => refino?.idsHuellas?.[i] ?? `#${i}`))].sort();
+    const n = [...astillas.values()].reduce((s, v) => s + v, 0);
+    problemas.push({
+      objetos: ids,
+      losa: -1,
+      severidad: "aviso",
+      codigo: "malla/astillas-junto-a-pilar",
+      mensaje: `La malla tiene ${n} láminas de menos de ${LADO_ASTILLA * 1000} mm junto ${ids.length > 1 ? "a los pilares" : "al pilar"} ${ids.join(", ")}: algo de la planta (la cara o el extremo de una viga, un muro, un borde) pasa a milímetros de la esquina de su huella. Esas láminas resuelven la singularidad de la esquina rígida y dan momentos y cortantes locales muy altos que no son reales: en el mapa de la losa, un pico en ese punto. Los esfuerzos de las piezas y las reacciones no dependen de ellas, y en las franjas de armado, que integran un metro de ancho, su efecto es pequeño, pero revise las estaciones junto a ${ids.length > 1 ? "esos pilares" : "ese pilar"}. Si es un descuadre del dibujo, alinee el pilar con la viga.`,
     });
   }
 
