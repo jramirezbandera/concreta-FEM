@@ -31,10 +31,10 @@ describe("Viga con una cara en lo dibujado", () => {
     const cerca = (a: Vec2, b: Vec2) => expect(Math.hypot(a[0] - b[0], a[1] - b[1])).toBeLessThan(1e-12);
     // A izquierdas, la derecha es fuera: con esa cara en el contorno, el eje a 0,15 por dentro
     const d = alinearACara(m, "N1", esquinas.map((p) => ({ p })), "derecha", 0.3);
-    [[0, 0.15], [5.85, 0.15], [5.85, 3.85], [0.15, 3.85], [0.15, 0]].forEach((q, k) => cerca(d[k]!, q as Vec2));
+    ([[0, 0.15], [5.85, 0.15], [5.85, 3.85], [0.15, 3.85], [0.15, 0]] as Vec2[]).forEach((q, k) => cerca(d[k]!, q));
     // Con la izquierda, por fuera
     const i = alinearACara(m, "N1", esquinas.map((p) => ({ p })), "izquierda", 0.3);
-    [[0, -0.15], [6.15, -0.15], [6.15, 4.15], [-0.15, 4.15], [-0.15, 0]].forEach((q, k) => cerca(i[k]!, q as Vec2));
+    ([[0, -0.15], [6.15, -0.15], [6.15, 4.15], [-0.15, 4.15], [-0.15, 0]] as Vec2[]).forEach((q, k) => cerca(i[k]!, q));
   });
 
   it("con la herramienta: la viga creada lleva el eje desplazado", () => {
