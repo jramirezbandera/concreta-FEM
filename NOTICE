@@ -150,9 +150,13 @@ Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
     src/features/seismic-ncse02/hazard.ts (commit f6afb7d; síncrono, sin la carga perezosa ni el
     enlace con el municipio de la obra)
   src/normas/provincias.ts (las 52 provincias con la zona eólica de su capital, figura D.1 del
-    DB SE-AE, y el aviso de la parte de la provincia que cae en otra zona, fase VS4)  ←
-    src/lib/acciones/provincias.ts (commit f6afb7d; sin la zona de clima invernal, la capital de
-    la tabla 3.8 ni el reconocimiento de la capital por su nombre, que son de la nieve)
+    DB SE-AE, y el aviso de la parte de la provincia que cae en otra zona, fase VS4; desde el
+    2026-11-07, también la zona de clima invernal, la capital de la tabla 3.8 y el reconocimiento
+    de la capital por su nombre, para la nieve)  ←
+    src/lib/acciones/provincias.ts (commit f6afb7d)
+  src/normas/cteNieve.ts (las tablas E.2 y 3.8 del DB SE-AE, el factor de exposición, μ del
+    faldón y sk por zona y altitud; sin los faldones, las limahoyas, la acumulación ni el hielo)  ←
+    src/lib/acciones/tablasAE.ts, nieve.ts e interp.ts (commit f6afb7d)
   src/normas/datos/ncse02.hazard.json y ncse02.hazard.manifest.json (los datos, abajo)  ←
     src/features/seismic-ncse02/ (commit f6afb7d), byte a byte
 Copyright (c) Javier Ramírez Bandera. El lienzo 2D que se copió para V1 (transform.ts,

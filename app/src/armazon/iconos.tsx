@@ -212,6 +212,13 @@ export const IcViento = icono(
     <path d="M3 18h7" />
   </>,
 );
+export const IcNieve = icono(
+  <>
+    <path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9" />
+    <path d="M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5" />
+  </>,
+);
+
 export const IcSismo = icono(
   <>
     <path d="M7 20V8l10-2v14" />

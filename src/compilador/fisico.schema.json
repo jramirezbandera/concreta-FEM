@@ -115,6 +115,9 @@
         },
         "sismo": {
           "$ref": "#/$defs/SismoEdificio"
+        },
+        "nieve": {
+          "$ref": "#/$defs/NieveEdificio"
         }
       },
       "additionalProperties": false
@@ -1208,6 +1211,36 @@
         "espesor",
         "material"
       ],
+      "additionalProperties": false
+    },
+    "NieveEdificio": {
+      "type": "object",
+      "properties": {
+        "zonaInvernal": {
+          "enum": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        "capital": {
+          "type": "boolean"
+        },
+        "exposicion": {
+          "enum": [
+            "expuesta",
+            "normal",
+            "protegida"
+          ]
+        },
+        "sk": {
+          "type": "number"
+        }
+      },
       "additionalProperties": false
     },
     "OpcionesCompilacion": {

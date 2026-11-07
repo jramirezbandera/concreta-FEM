@@ -12,6 +12,7 @@ import { problemaBorde, resolverBordes } from "./bordes.ts";
 import { calcularSismo } from "./sismo.ts";
 import { calcularViento, resolverViento } from "./viento.ts";
 import { erroresEmplazamiento } from "./emplazamiento.ts";
+import { erroresNieve } from "./nieve.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type Barra, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
 import { BOVEDILLAS, CASETONES, desglosePano, pesoReticular, textoOrigenPp } from "./pesoForjado.ts";
@@ -298,6 +299,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   }
   // VS4: el emplazamiento común al viento y al sismo
   for (const e of erroresEmplazamiento(fisico)) diag.error(e.codigo, e.mensaje);
+  for (const e of erroresNieve(fisico)) diag.error(e.codigo, e.mensaje);
   // VS1: si el viento sigue sin resolver, es que no se puede calcular; por qué
   if (fisico.acciones?.viento) for (const e of calcularViento(fisico)?.errores ?? []) diag.error(e.codigo, e.mensaje, e.ids);
   // VS2: las fracciones de masa del sismo que no se pueden saber

@@ -599,6 +599,29 @@ export interface AccionesEdificio {
   emplazamiento?: EmplazamientoEdificio;
   viento?: VientoEdificio;
   sismo?: SismoEdificio;
+  /**
+   * La nieve del emplazamiento: lo que el usuario fuerza de ella. No genera casos ni cargas (dónde va
+   * la nieve lo decide el usuario: el caso S y sus cargas se escriben); de la provincia y la altitud
+   * del emplazamiento sale sk, que la app propone como q = μ·sk en las cargas del caso de nieve, y el
+   * compilador avisa si el ψ del caso no es el de la altitud. Basta `acciones.emplazamiento` para que
+   * salga sk: esto sólo hace falta para cambiar algo.
+   */
+  nieve?: NieveEdificio;
+}
+
+/** Lo que se fuerza de la nieve del emplazamiento (DB SE-AE art. 3.5 y Anejo E). */
+export interface NieveEdificio {
+  /** Zona de clima invernal de la figura E.2, de 1 a 7. Por defecto, la de la provincia (la de su capital). */
+  zonaInvernal?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  /**
+   * ¿La obra está en la capital de la provincia? Con true, sk sale de la tabla 3.8; con false, de la
+   * E.2 por la zona y la altitud. Por defecto, sí si el municipio del emplazamiento es la capital.
+   */
+  capital?: boolean;
+  /** Art. 3.5.1-3: "protegida" de la acción del viento (−20 %) o "expuesta" (+20 %). Por defecto, "normal". */
+  exposicion?: "normal" | "protegida" | "expuesta";
+  /** Sobrecarga de nieve sobre terreno horizontal escrita, kN/m² (ordenanza municipal, datos empíricos): manda sobre las tablas. */
+  sk?: number;
 }
 
 /**

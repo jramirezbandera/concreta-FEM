@@ -8,7 +8,7 @@
  * La ayuda de la herramienta y su error van en el aviso del lienzo, no aquí: el panel es la plantilla.
  */
 import { Check, Copy, FileImage, FlipHorizontal2, Move, Plus, RotateCw, Table2 } from "lucide-react";
-import { Fragment, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { comoUna, describirSeccion, type UsoSeccion } from "../../../src/editor/gestores.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
 import type { ModeloFisico, PuntoFijo, Seccion as SeccionFisica } from "../../../src/compilador/fisico.ts";
@@ -19,6 +19,7 @@ import { ANCHO_ZUNCHO, COARTADOS, HUECO_MURO, pesoPlantillaForjado, type Plantil
 import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, type Bovedilla, type Caseton } from "../../../src/compilador/pesoForjado.ts";
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import { casoCargasMuertas } from "../../../src/editor/casos.ts";
+import { nieveObra } from "../../../src/compilador/nieve.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { TEXTO_BOVEDILLA, TEXTO_CASETON, TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
 import { LONGITUD_MAXIMA } from "../../../src/editor/celdas.ts";
@@ -31,7 +32,7 @@ import { IcAbacos, IcApoyo, IcApoyoLineal, IcBarra, IcEjes, IcEmpuje, IcEnBarra,
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
-import { cota, plural } from "../fmt.ts";
+import { cota, fmt, plural } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
 import { Grupo } from "../componentes/Grupo.tsx";
 
@@ -924,6 +925,9 @@ function PlantillaCargaPanel({ h, t, modelo: m, poner }: { h: NombreCargaH; t: P
       <div className="py-1">
         {!t.caso && <p className="nota text-state-fail">Elija el caso activo en la barra (o cree uno con Casos).</p>}
         {casoPP && (
+  // En un caso de nieve, la de la obra: q = μ·sk con μ = 1 (cubierta plana), del emplazamiento. Se propone, no se pone
+  const casoNieve = m?.casos.find((c) => c.id === t.caso)?.accion?.tipo === "S";
+  const nieve = useMemo(() => (casoNieve && m ? nieveObra(m) : null), [casoNieve, m]);
           <p className="nota text-state-warn" data-aviso-peso-propio>
             {casoPP} es el caso del peso propio, que calcula el programa: lo que dibuje aquí se mezcla con él.{" "}
             {cm && !cm.crear.length ? `Elija ${cm.id} en «Caso activo».` : "Cree un caso de cargas muertas (Casos, «Cargas muertas») y elíjalo en «Caso activo»."}
@@ -965,6 +969,21 @@ function PlantillaCargaPanel({ h, t, modelo: m, poner }: { h: NombreCargaH; t: P
         {h === "barra" && (
           <>
             <Segmentado
+            {casoNieve && nieve && (
+              <p className="nota" data-nieve-obra>
+                {nieve.nieve?.qnPlana != null ? (
+                  <>
+                    Nieve de la obra: μ·sk = {fmt(nieve.nieve.qnPlana, 2)} kN/m² en cubierta plana o de hasta 30°.{" "}
+                    <button type="button" className="enlace" onClick={() => poner({ superficie: { ...t.superficie, q: [0, 0, -nieve.nieve!.qnPlana!] } })}>
+                      Usar
+                    </button>
+                    {" "}En faldones más inclinados μ baja (art. 3.5.3), y las acumulaciones van aparte (art. 3.5.4).
+                  </>
+                ) : (
+                  <>Nieve de la obra: {nieve.motivo ?? "la altitud no está en la tabla E.2: escriba sk"} (Cargas, «Nieve»).</>
+                )}
+              </p>
+            )}
               etiqueta="dónde"
               valor={t.barra?.modo ?? "entera"}
               opciones={[

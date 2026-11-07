@@ -23,6 +23,7 @@ import { avisarAbacosUnidos, errorPilaresSinAbaco, resolverAbacos } from "./abac
 import { anchoUnion } from "./anchosVigas.ts";
 import { resolverBordes } from "./bordes.ts";
 import { calcularSismo, hipotesisEspectro, hipotesisSismo } from "./sismo.ts";
+import { avisosNieve, hipotesisNieve } from "./nieve.ts";
 import { hipotesisViento, resolverViento } from "./viento.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
@@ -206,6 +207,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   // VS3: el espectro y los casos del sismo no cambian el modelo analítico (son casos lógicos sobre los modos)
   const espectro = calculoSismo?.espectro ?? null;
   for (const a of calculoSismo?.avisos ?? []) diag.aviso(a.codigo, a.mensaje, a.ids);
+  // La nieve: el ψ de sus casos frente a la altitud de la obra (sus cargas las pone el usuario)
+  for (const a of avisosNieve(viento.modelo)) diag.aviso(a.codigo, a.mensaje, a.ids);
   if (sismo) {
     // VS-h: una planta con forjado y sin diafragma rígido tiene masa que no va a ningún diafragma
     const sueltas = ctx.plantas
@@ -476,6 +479,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       ...(viento.calculo?.viento ? [hipotesisViento(viento.calculo.viento)] : []),
       ...(sismo ? [hipotesisSismo(sismo)] : []),
       ...(espectro ? [hipotesisEspectro(espectro)] : []),
+      ...[hipotesisNieve(viento.modelo)].filter((h): h is string => h !== null),
     ],
     huella,
     estadisticas: {

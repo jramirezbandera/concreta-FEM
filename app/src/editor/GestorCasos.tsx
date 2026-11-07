@@ -14,6 +14,7 @@ import { Table2 } from "lucide-react";
 import type { CategoriaUso } from "../../../src/combinaciones/psi.ts";
 import { CASOS_TIPICOS, casoIgual, casosDelJuego, crearCasos, describirCaso, JUEGO_DEFECTO, psiCaso, type JuegoCasos } from "../../../src/editor/casos.ts";
 import { comoUna, textoUsos, usosDe } from "../../../src/editor/gestores.ts";
+import { nieveObra } from "../../../src/compilador/nieve.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { useVisor } from "../contexto.ts";
 import { AyudaCaso, LetraAccion, useCampoActivo } from "./AyudaCaso.tsx";
@@ -41,7 +42,10 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
   // Por su posición: renombrarlo en la ficha no lo suelta
   const inicial = pedido.nueva ? -1 : Math.max(0, casos.findIndex((c) => c.id === pedido.id));
   const [elegido, setElegido] = useState<number>(casos.length ? inicial : -1);
-  const [juego, setJuego] = useState<JuegoCasos>(JUEGO_DEFECTO);
+  // La nieve de la obra, por la altitud del emplazamiento: el juego la marca y la propone
+  const psiObra = nieveObra(m).nieve?.psi ?? null;
+  const nieveObraJuego: JuegoCasos["nieve"] = psiObra === "nieve-mas-de-1000" ? "mas-de-1000" : psiObra === "nieve-hasta-1000" ? "hasta-1000" : null;
+  const [juego, setJuego] = useState<JuegoCasos>(() => ({ ...JUEGO_DEFECTO, nieve: nieveObraJuego }));
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [borrar, setBorrar] = useState<string | null>(null);
@@ -199,8 +203,8 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
                         <span>nieve</span>
                         <select className="sel" aria-label="Nieve de los casos típicos" value={juego.nieve ?? ""} onChange={(e) => poner({ nieve: (e.target.value || null) as JuegoCasos["nieve"] })}>
                           <option value="">(sin nieve)</option>
-                          <option value="hasta-1000">hasta 1000 m de altitud</option>
-                          <option value="mas-de-1000">más de 1000 m de altitud</option>
+                          <option value="hasta-1000">hasta 1000 m de altitud{nieveObraJuego === "hasta-1000" ? " · la de la obra" : ""}</option>
+                          <option value="mas-de-1000">más de 1000 m de altitud{nieveObraJuego === "mas-de-1000" ? " · la de la obra" : ""}</option>
                         </select>
                       </label>
                     </div>

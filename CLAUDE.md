@@ -898,6 +898,11 @@
   - **Ficha:** el emplazamiento arriba, común a las dos pestañas, con la zona eólica y el ab y el K al momento; un «?» en cada campo; qb y μ como desplegables; los resúmenes en cifras; «Aplicar» pasa al emplazamiento lo de un fichero de antes.
   - **La gráfica del espectro** (`app/src/editor/Espectro.tsx`, también en Modal): a su ancho en píxeles, con la leyenda fuera, ejes con marcas, ac·αᵢ a la derecha y los modos interpolados.
   - **Pruebas:** `emplazamiento.test.ts` y `app/src/test/fichaAcciones.test.tsx`.
+- **2026-11-07: la nieve del emplazamiento** (decisión del usuario: la carga la pone él, el programa da el valor y el caso; `viento-sismo.md` §13.3).
+  - `src/normas/cteNieve.ts` (tablas E.2 y 3.8 de Concreta) y la zona de clima invernal en `provincias.ts`; `acciones.nieve` sólo con lo que se fuerza (`zonaInvernal`, `capital`, `exposicion`, `sk`), sin casos ni cargas.
+  - `src/compilador/nieve.ts`: sk desde el emplazamiento (la 3.8 en la capital, si no la E.2), qn = μ·sk en cubierta plana, aviso `nieve/psi-altitud` y la hipótesis.
+  - App: pestaña «Nieve» (botón en Cargas) con «Crear el caso» o «Cambiarle el ψ»; en la plantilla de Superficie con un caso de nieve activo, «μ·sk · Usar».
+  - Pruebas: `nieve.test.ts` y `fichaAcciones.test.tsx`.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

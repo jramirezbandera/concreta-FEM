@@ -17,12 +17,17 @@
  * el sismo o en el viento pasan al emplazamiento. Los textos no nombran programas comerciales.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AccionesEdificio, EmplazamientoEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
+import type { AccionesEdificio, EmplazamientoEdificio, NieveEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
 import { leerNumero } from "../../../src/editor/celdas.ts";
 import { ASPEREZAS, ORDEN_ASPEREZAS, ZONAS_EOLICAS, type GradoAspereza, type ZonaEolica } from "../../../src/normas/cteViento.ts";
 import { buscarMunicipios, municipioPorIne, textoProcedencia, type Municipio } from "../../../src/normas/peligrosidad.ts";
 import { PROVINCIAS, provinciaPorIne } from "../../../src/normas/provincias.ts";
 import { SISTEMAS_ESTRUCTURALES, type SistemaEstructural } from "../../../src/normas/ncse02.ts";
+import { ZONAS_INVERNALES, type ExposicionNieve, type ZonaInvernal } from "../../../src/normas/cteNieve.ts";
+import { esCapitalDeProvincia } from "../../../src/normas/provincias.ts";
+import { nieveObra } from "../../../src/compilador/nieve.ts";
+import { propuestaCasoNieve } from "../../../src/editor/casos.ts";
+import { comoUna } from "../../../src/editor/gestores.ts";
 import type { DatosSismo, DatosViento } from "../../../src/visor/programa.ts";
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
@@ -74,6 +79,14 @@ const AYUDA = {
     "Cómo se suman las respuestas de los modos. La del art. 3.6.2.4: raíz de la suma de los cuadrados, con los modos de periodos a menos del 10 % sumados en valor absoluto. La cuadrática completa (comentario C.3.6.2.4) usa la correlación entre modos con el amortiguamiento Ω.",
   excentricidad:
     "Excentricidad accidental de las masas, como fracción de la dimensión de cada planta perpendicular al sismo (art. 3.2: no menos de 1/20 = 0,05). Da los casos EX+e, EX−e, EY+e y EY−e. Con 0, sin ella.",
+  zonaInvernal:
+    "Zona de clima invernal de la figura E.2 del DB SE-AE, de 1 a 7. Con la altitud, da sk en la tabla E.2. Por defecto, la de la provincia (la de su capital); la figura es un mapa y sus líneas cruzan provincias: fuércela si la obra cae al otro lado.",
+  origenSk:
+    "De dónde sale la sobrecarga de nieve sobre terreno horizontal sk. En la capital de la provincia, la tabla 3.8 (su sk a su altitud); en cualquier otro sitio, la tabla E.2 por la zona y la altitud, interpolando. Por defecto, la 3.8 si el municipio del emplazamiento es la capital. Escrita, por la ordenanza municipal o datos empíricos (obligatorio si la altitud no está en la tabla, art. 3.5.2-3).",
+  exposicion:
+    "Art. 3.5.1-3: la construcción protegida de la acción del viento (rodeada de edificios más altos o de arbolado) reduce la nieve un 20 %; el emplazamiento fuertemente expuesto (en un alto, en campo abierto) la aumenta un 20 %.",
+  casoNieve:
+    "La nieve va en un caso de acción S, con el ψ de la altitud de la obra (DB SE, tabla 4.2): hasta 1 000 m, ψ₀ 0,5, ψ₁ 0,2 y ψ₂ 0; por encima, 0,7, 0,5 y 0,2. Sus cargas las pone usted: el programa no sabe qué es cubierta ni dónde se acumula.",
   nieve: "Art. 3.2: la masa de la nieve cuenta la mitad si permanece más de 30 días al año; si no, no cuenta. Por defecto, sí por encima de 1 000 m.",
 } as const;
 
@@ -81,7 +94,8 @@ const AYUDA = {
 const numeroOpcional = (t: string): number | undefined | string => (t.trim() === "" ? undefined : leerNumero(t));
 const texto = (v: number | undefined): string => (v === undefined ? "" : String(v).replace(".", ","));
 
-type Pestana = "viento" | "sismo";
+type Pestana = "viento" | "nieve" | "sismo";
+type OrigenSk = "auto" | "capital" | "e2" | "escrita";
 type ModoQb = "zona" | "simplificado" | "escrita";
 
 /** Etiqueta de una fila del formulario, con su «?». */
@@ -148,6 +162,12 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
   const [excentricidad, setExcentricidad] = useState(texto(a.sismo?.excentricidad));
   const [sistema, setSistema] = useState<SistemaEstructural | "">(a.sismo?.sistema ?? "");
   const [nieve, setNieve] = useState(a.sismo?.nievePermanente ?? false);
+
+  // Nieve: lo que se fuerza; sk sale del emplazamiento
+  const [zonaInv, setZonaInv] = useState(a.nieve?.zonaInvernal !== undefined ? String(a.nieve.zonaInvernal) : "");
+  const [origenSk, setOrigenSk] = useState<OrigenSk>(a.nieve?.sk !== undefined ? "escrita" : a.nieve?.capital === true ? "capital" : a.nieve?.capital === false ? "e2" : "auto");
+  const [skEscrita, setSkEscrita] = useState(texto(a.nieve?.sk));
+  const [exposicion, setExposicion] = useState<ExposicionNieve>(a.nieve?.exposicion ?? "normal");
   const opcionesMu = [...new Set([1, 2, 3, 4, ...[muX, muY].filter(Boolean).map(Number)])].sort((x, y) => x - y);
 
   /** Lo que se escribirá, o por qué no. */
@@ -221,19 +241,44 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
       }
       r.sismo = s;
     }
-    return { valor: r.viento || r.sismo || r.emplazamiento ? r : null };
-  }, [municipio, provincia, nombreLibre, altitud, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema]);
+    const nv: NieveEdificio = {};
+    if (zonaInv) nv.zonaInvernal = Number(zonaInv) as ZonaInvernal;
+    if (origenSk === "capital") nv.capital = true;
+    else if (origenSk === "e2") nv.capital = false;
+    else if (origenSk === "escrita") {
+      const n = numeroOpcional(skEscrita);
+      if (typeof n !== "number" || !(n > 0)) return { error: "Escriba sk en kN/m² (o elija una tabla)." };
+      nv.sk = n;
+    }
+    if (exposicion !== "normal") nv.exposicion = exposicion;
+    if (Object.keys(nv).length) r.nieve = nv;
+    return { valor: r.viento || r.sismo || r.emplazamiento || r.nieve ? r : null };
+  }, [municipio, provincia, nombreLibre, altitud, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, zonaInv, origenSk, skEscrita, exposicion]);
 
   // Lo que sale en el modelo aplicado (la sesión del worker tiene el proyecto guardado): lo escrito se ve al aplicar
   const viento = usePedido(proyecto.cliente, { tipo: "viento" });
   const sismo = usePedido(proyecto.cliente, { tipo: "sismo" });
   const cambiado = JSON.stringify("valor" in acciones ? (acciones.valor ?? {}) : null) !== JSON.stringify(a);
 
+  // La nieve de lo escrito, al momento (no pide nada al worker), y el caso que pide su altitud
+  const modeloAhora = ed.proyecto.modelo;
+  const nieveCalc = useMemo(() => ("valor" in acciones ? nieveObra({ ...modeloAhora, acciones: acciones.valor ?? {} }) : null), [acciones, modeloAhora]);
+  const casoNieve = useMemo(() => propuestaCasoNieve(modeloAhora, nieveCalc?.nieve?.psi ?? null), [modeloAhora, nieveCalc]);
+  const [hechoCaso, setHechoCaso] = useState<string | null>(null);
+  const arreglarCasoNieve = () => {
+    if (!casoNieve || !casoNieve.operaciones.length) return;
+    const r = ed.editar(comoUna(casoNieve.operaciones), casoNieve.estado === "falta" ? `Caso de nieve ${casoNieve.casos.join(", ")}` : `ψ de la nieve en ${casoNieve.casos.join(", ")}`);
+    if (!r.ok) return setError(r.errores.map((x) => textoApp(x.mensaje)).join(" "));
+    setHechoCaso(casoNieve.estado === "falta" ? `Creado el caso ${casoNieve.casos.join(", ")}: elíjalo como caso activo para poner sus cargas.` : `Cambiado el ψ de ${casoNieve.casos.join(", ")}.`);
+  };
+  const nombreObra = municipio?.nombre ?? nombreLibre;
+  const esCapitalAuto = !!(prov && nombreObra && esCapitalDeProvincia(prov.ine, nombreObra));
+
   const aplicar = () => {
     if ("error" in acciones) return setError(acciones.error);
     const r = ed.editar({ op: "acciones", acciones: acciones.valor }, "Viento y sismo");
     if (!r.ok) return setError(r.errores.map((e) => textoApp(e.mensaje)).join(" "));
-    onCerrar(r.ok && (acciones.valor?.viento || acciones.valor?.sismo) ? "Viento y sismo del programa aplicados: los casos salen en el selector." : "Sin acciones del programa.");
+    onCerrar(acciones.valor?.viento || acciones.valor?.sismo ? "Viento y sismo del programa aplicados: los casos salen en el selector." : acciones.valor ? "Emplazamiento aplicado." : "Sin acciones del programa.");
   };
 
   useEffect(() => setError(null), [acciones]);
@@ -255,7 +300,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
 
   return (
     <Dialogo
-      titulo="Viento y sismo"
+      titulo="Viento, nieve y sismo"
       onCerrar={() => onCerrar()}
       alConfirmar={aplicar}
       clase="dialogo-ancho"
@@ -274,7 +319,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
       }
     >
       <fieldset className="acc-grupo">
-        <legend>Emplazamiento · común al viento y al sismo</legend>
+        <legend>Emplazamiento · común al viento, la nieve y el sismo</legend>
         <div className="acc-form">
           <Etiqueta htmlFor="e-prov" ayuda={AYUDA.provincia}>
             Provincia
@@ -363,9 +408,9 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
       </fieldset>
 
       <div role="tablist" className="mb-3 mt-4 flex gap-1 border-b border-border-main">
-        {(["viento", "sismo"] as const).map((p) => (
+        {(["viento", "nieve", "sismo"] as const).map((p) => (
           <button key={p} type="button" role="tab" aria-selected={pestana === p} className="dock-tab" data-on={pestana === p} onClick={() => setPestana(p)}>
-            {p === "viento" ? "Viento" : "Sismo"}
+            {p === "viento" ? "Viento" : p === "nieve" ? "Nieve" : "Sismo"}
           </button>
         ))}
       </div>
@@ -432,6 +477,101 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
               <ResumenViento d={viento.datos ?? null} aplicado={!cambiado} />
             </>
           )}
+        </div>
+      ) : pestana === "nieve" ? (
+        <div className="grid gap-3">
+          <p className="nota acc-nota">
+            La nieve no genera casos ni cargas: el programa da sk desde el emplazamiento y usted pone las cargas en el caso de nieve, en las cubiertas y donde se acumula. Al dibujar una carga de superficie en ese caso, su plantilla propone q = μ·sk.
+          </p>
+          <div className="acc-form">
+            <Etiqueta htmlFor="n-zona" ayuda={AYUDA.zonaInvernal}>
+              Zona de clima invernal
+            </Etiqueta>
+            <span className="flex flex-wrap items-center gap-2">
+              <select id="n-zona" className="sel" value={zonaInv} onChange={(e) => setZonaInv(e.target.value)}>
+                <option value="">{prov ? `La de la provincia: ${prov.zonaInvernal}` : "La de la provincia (elíjala arriba)"}</option>
+                {ZONAS_INVERNALES.map((z) => (
+                  <option key={z} value={String(z)}>
+                    Zona {z} (forzada)
+                  </option>
+                ))}
+              </select>
+              {zonaInv && prov && Number(zonaInv) !== prov.zonaInvernal && <span className="text-[12px] text-state-warn">la de {prov.nombre} es {prov.zonaInvernal}</span>}
+            </span>
+            <Etiqueta htmlFor="n-sk" ayuda={AYUDA.origenSk}>
+              sk, de dónde sale
+            </Etiqueta>
+            <span className="flex flex-wrap items-center gap-2">
+              <select id="n-sk" className="sel" value={origenSk} onChange={(e) => setOrigenSk(e.target.value as OrigenSk)}>
+                <option value="auto">{esCapitalAuto ? `Tabla 3.8: la obra está en la capital (${prov?.capital.capital})` : "Tabla E.2, por la zona y la altitud"}</option>
+                <option value="capital">Tabla 3.8, la capital{prov ? ` (${prov.capital.capital}, ${prov.capital.altitud} m)` : ""}</option>
+                <option value="e2">Tabla E.2, por la zona y la altitud</option>
+                <option value="escrita">Escrita</option>
+              </select>
+              {origenSk === "escrita" && (
+                <>
+                  <input className="sel mono w-[6rem]" aria-label="sk escrita" value={skEscrita} inputMode="decimal" onChange={(e) => setSkEscrita(e.target.value)} />
+                  <span className="text-text-secondary">kN/m²</span>
+                </>
+              )}
+            </span>
+            <Etiqueta htmlFor="n-exp" ayuda={AYUDA.exposicion}>
+              Exposición
+            </Etiqueta>
+            <select id="n-exp" className="sel" value={exposicion} onChange={(e) => setExposicion(e.target.value as ExposicionNieve)}>
+              <option value="normal">Normal</option>
+              <option value="protegida">Protegida del viento (−20 %)</option>
+              <option value="expuesta">Fuertemente expuesta (+20 %)</option>
+            </select>
+          </div>
+          {nieveCalc && !nieveCalc.nieve && <p className="nota acc-nota text-state-warn">{nieveCalc.motivo}</p>}
+          {nieveCalc?.nieve && (
+            <>
+              <h4 className="acc-titulo">Lo que sale</h4>
+              <dl className="acc-cifras">
+                <Cifra n="sk" v={nieveCalc.nieve.sk === null ? "fuera de tabla" : `${fmt(nieveCalc.nieve.sk, 2)} kN/m²`} t={nieveCalc.nieve.skOrigen === "escrita" ? "Escrita" : nieveCalc.nieve.skOrigen === "tabla3.8" ? `Tabla 3.8, ${nieveCalc.nieve.capital?.nombre}` : `Tabla E.2, zona ${nieveCalc.nieve.zona} a ${nieveCalc.nieve.altitud} m`} />
+                <Cifra n="Origen" v={nieveCalc.nieve.skOrigen === "escrita" ? "escrita" : nieveCalc.nieve.skOrigen === "tabla3.8" ? "tabla 3.8" : `E.2, zona ${nieveCalc.nieve.zona}`} />
+                <Cifra n="Exposición" v={`×${fmt(nieveCalc.nieve.factor, 1)}`} t="Art. 3.5.1-3" />
+                <Cifra n="qn plana" v={nieveCalc.nieve.qnPlana === null ? "—" : `${fmt(nieveCalc.nieve.qnPlana, 2)} kN/m²`} t="μ·sk con μ = 1: cubierta plana o de hasta 30° (art. 3.5.3); de 30° a 60°, μ baja hasta 0" />
+                <Cifra n="ψ del caso" v={nieveCalc.nieve.psi === null ? "—" : nieveCalc.nieve.psi === "nieve-mas-de-1000" ? "más de 1 000 m" : "hasta 1 000 m"} t="DB SE, tabla 4.2, por la altitud de la obra" />
+              </dl>
+              {nieveCalc.nieve.frontera && <p className="nota acc-nota text-state-warn">Zona de clima invernal: {nieveCalc.nieve.frontera}</p>}
+              {nieveCalc.nieve.notas.map((x) => (
+                <p key={x} className="nota acc-nota">
+                  {x}
+                </p>
+              ))}
+            </>
+          )}
+          <div className="acc-caso">
+            <span className="acc-etq">
+              <b>Caso de nieve</b>
+              <Ayuda texto={AYUDA.casoNieve} />
+            </span>
+            {!casoNieve ? (
+              <span className="text-text-secondary">Con la altitud del emplazamiento se sabe qué ψ lleva.</span>
+            ) : casoNieve.estado === "ok" ? (
+              <span>{casoNieve.casos.join(", ")}, con el ψ de su altitud. Póngale las cargas en Cargas, con él como caso activo.</span>
+            ) : casoNieve.estado === "falta" ? (
+              <>
+                <span>No hay ningún caso de nieve.</span>
+                <button type="button" className="btn" onClick={arreglarCasoNieve}>
+                  Crear «{casoNieve.tipico.caso.nombre}»
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-state-warn">{casoNieve.casos.join(", ")} lleva el ψ de la otra altitud.</span>
+                <button type="button" className="btn" onClick={arreglarCasoNieve}>
+                  Cambiarle el ψ
+                </button>
+              </>
+            )}
+          </div>
+          {hechoCaso && <p className="nota acc-nota text-state-pass">{hechoCaso}</p>}
+          <p className="nota acc-nota">
+            A mano, porque dependen de la cubierta: μ en faldones de más de 30° (μ = 1 hasta 30° y 0 desde 60°, art. 3.5.3), la distribución asimétrica (μ/2 donde la nieve es favorable), las acumulaciones junto a petos, limahoyas y cambios de nivel (art. 3.5.4) y, por encima de 1 000 m, el hielo en los voladizos.
+          </p>
         </div>
       ) : (
         <div className="grid gap-3">

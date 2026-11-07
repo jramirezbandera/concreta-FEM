@@ -362,7 +362,7 @@ describe("MA: vigas-borde", () => {
 });
 
 describe("VS4: emplazamiento", () => {
-  type Mun = { ine: string; nombre: string; provincia: string; ab: number; K: number; procedencia: string; viento: { zona: string; qb: number; frontera?: string } };
+  type Mun = { ine: string; nombre: string; provincia: string; ab: number; K: number; procedencia: string; viento: { zona: string; qb: number; frontera?: string }; nieve: unknown; capital: boolean };
   it("da el código INE, ab y K del municipio y la zona eólica de su provincia, con el aviso de frontera; no lleva proyecto", () => {
     const r = fem(["emplazamiento", "Alhaurín", "el", "Grande"]);
     expect(r.codigo).toBe(0);
@@ -375,8 +375,10 @@ describe("VS4: emplazamiento", () => {
       K: 1,
       procedencia: "Anejo 1 de la NCSE-02",
       viento: { zona: "A", qb: 0.42, frontera: "El oeste (Estepona, Campo de Gibraltar) está en zona C." },
+      nieve: { zonaInvernal: 6, capital: { nombre: "Málaga", altitud: 0, sk: 0.2 } },
+      capital: false,
     });
-    expect((r.json.notas as string[]).length).toBe(2);
+    expect((r.json.notas as string[]).length).toBe(3);
     // Por su código, el mismo; y con Bun, lo mismo que con Node
     const porIne = fem(["emplazamiento", "29008"]);
     expect(porIne.json.municipios).toEqual([(r.json.municipios as Mun[])[0]]);
@@ -396,7 +398,7 @@ describe("VS4: emplazamiento", () => {
     ]);
     expect(g.json.total).toBeGreaterThan(2);
     // «Granada» es también una provincia: su viento, aparte
-    expect(g.json.provincias).toEqual([{ ine: "18", nombre: "Granada", viento: { zona: "A", qb: 0.42 } }]);
+    expect(g.json.provincias).toEqual([{ ine: "18", nombre: "Granada", viento: { zona: "A", qb: 0.42 }, nieve: { zonaInvernal: 6, capital: { nombre: "Granada", altitud: 690, sk: 0.5 } } }]);
     // Uno creado después de 2002 dice de quién hereda
     expect((fem(["emplazamiento", "29902"]).json.municipios as Mun[])[0]!.procedencia).toBe("Heredado de Antequera · el municipio se creó en 2010 y el Anejo 1, de 2002, no lo nombra");
   });
@@ -410,7 +412,7 @@ describe("VS4: emplazamiento", () => {
     expect([d.codigo, d.severidad]).toEqual(["emplazamiento/no-encontrado", "error"]);
     expect(d.mensaje).toContain("«Madrid»: no figura en el Anejo 1 de la NCSE-02");
     expect(d.mensaje).toContain("Compruébalo antes de darlo por exento");
-    expect(m.json.provincias).toEqual([{ ine: "28", nombre: "Madrid", viento: { zona: "A", qb: 0.42 } }]);
+    expect(m.json.provincias).toEqual([{ ine: "28", nombre: "Madrid", viento: { zona: "A", qb: 0.42 }, nieve: { zonaInvernal: 4, capital: { nombre: "Madrid", altitud: 660, sk: 0.6 }, frontera: "La sierra (norte) está en zona 3." } }]);
     expect(fem(["emplazamiento", "28079"]).codigo).toBe(1);
     const nada = fem(["emplazamiento", "Villanada de Ninguna Parte"]);
     expect(nada.codigo).toBe(1);

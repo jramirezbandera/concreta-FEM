@@ -13,7 +13,7 @@
  */
 import { ZONAS_EOLICAS, type ZonaEolica } from "../normas/cteViento.ts";
 import { buscarMunicipios, MENSAJE_NO_ENCONTRADO, municipioPorIne, plegarConsulta, textoProcedencia, type Municipio } from "../normas/peligrosidad.ts";
-import { PROVINCIAS, provinciaPorIne, type Provincia } from "../normas/provincias.ts";
+import { esCapitalDeProvincia, PROVINCIAS, provinciaPorIne, type Provincia } from "../normas/provincias.ts";
 
 /** El viento de una provincia: la zona de su capital. */
 export interface VientoProvincia {
@@ -22,6 +22,16 @@ export interface VientoProvincia {
   /** Presión dinámica de esa zona, kN/m². */
   qb: number;
   /** Qué parte de la provincia cae en otra zona: hay que confirmar la del municipio. */
+  frontera?: string;
+}
+
+/** La nieve de una provincia: su zona de clima invernal y su capital en la tabla 3.8. */
+export interface NieveProvincia {
+  /** Zona de clima invernal de la capital (figura E.2); con la altitud, sk en la tabla E.2. */
+  zonaInvernal: number;
+  /** La capital en la tabla 3.8: si la obra está en ella, sk es éste. */
+  capital: { nombre: string; altitud: number; sk: number };
+  /** Qué parte de la provincia cae en otra zona de clima invernal. */
   frontera?: string;
 }
 
@@ -36,6 +46,9 @@ export interface MunicipioEmplazamiento {
   /** De dónde salen ab y K, en una frase. */
   procedencia: string;
   viento: VientoProvincia | null;
+  nieve: NieveProvincia | null;
+  /** ¿Es la capital de su provincia? Entonces sk sale de la tabla 3.8. */
+  capital: boolean;
 }
 
 export interface ProvinciaEmplazamiento {
@@ -43,6 +56,7 @@ export interface ProvinciaEmplazamiento {
   ine: string;
   nombre: string;
   viento: VientoProvincia;
+  nieve: NieveProvincia;
 }
 
 export interface Emplazamiento {
@@ -65,13 +79,20 @@ const NOTA_SISMO =
 const NOTA_VIENTO =
   "Viento: la zona es la de la capital de la provincia (la figura D.1 del DB SE-AE es un mapa, no una tabla por provincias), y el viento la toma sola del emplazamiento. Con «frontera», parte de la provincia cae en otra zona: se confirma con el ingeniero cuál es la del municipio y, si es otra, se escribe en acciones.viento.zona. Un municipio que no está en la tabla del sismo se escribe con su nombre y la provincia (acciones.emplazamiento.provincia, el código de 2 cifras).";
 
+const NOTA_NIEVE =
+  "Nieve: con la altitud de acciones.emplazamiento, el programa da sk (tabla 3.8 si la obra está en la capital; si no, la E.2 por la zona de clima invernal) en la hipótesis de fem compilar; lo que se fuerza (zonaInvernal, capital, exposicion, sk) va en acciones.nieve. No genera cargas: el caso S, con el ψ de la altitud, y sus cargas en las cubiertas se escriben preguntando al ingeniero.";
+
 function vientoDe(p: Provincia): VientoProvincia {
   return { zona: p.zonaEolica, qb: ZONAS_EOLICAS[p.zonaEolica].qb, ...(p.frontera ? { frontera: p.frontera.eolica } : {}) };
 }
 
+function nieveDe(p: Provincia): NieveProvincia {
+  return { zonaInvernal: p.zonaInvernal, capital: { nombre: p.capital.capital, altitud: p.capital.altitud, sk: p.capital.sk }, ...(p.fronteraInvernal ? { frontera: p.fronteraInvernal } : {}) };
+}
+
 function municipioDe(m: Municipio): MunicipioEmplazamiento {
   const p = provinciaPorIne(m.ine);
-  return { ine: m.ine, nombre: m.nombre, provincia: m.provincia, ab: m.ab, K: m.K, procedencia: textoProcedencia(m.procedencia), viento: p ? vientoDe(p) : null };
+  return { ine: m.ine, nombre: m.nombre, provincia: m.provincia, ab: m.ab, K: m.K, procedencia: textoProcedencia(m.procedencia), viento: p ? vientoDe(p) : null, nieve: p ? nieveDe(p) : null, capital: esCapitalDeProvincia(m.ine, m.nombre) };
 }
 
 /** El emplazamiento de un nombre de municipio (o parte), de su código INE de 5 cifras o de una provincia (nombre o código de 2 cifras). */
@@ -83,7 +104,7 @@ export function emplazamiento(consulta: string, limite = LIMITE_EMPLAZAMIENTO): 
     const m = municipioPorIne(texto);
     todos = m ? [m] : [];
   } else todos = /^\d+$/.test(texto) ? [] : buscarMunicipios(texto, Number.MAX_SAFE_INTEGER);
-  const provincias = PROVINCIAS.filter((p) => (/^\d{2}$/.test(texto) ? p.ine === texto : q !== "" && plegarConsulta(p.nombre) === q)).map((p) => ({ ine: p.ine, nombre: p.nombre, viento: vientoDe(p) }));
+  const provincias = PROVINCIAS.filter((p) => (/^\d{2}$/.test(texto) ? p.ine === texto : q !== "" && plegarConsulta(p.nombre) === q)).map((p) => ({ ine: p.ine, nombre: p.nombre, viento: vientoDe(p), nieve: nieveDe(p) }));
   const n = Math.max(1, Math.floor(limite));
   return {
     consulta: texto,
@@ -91,6 +112,6 @@ export function emplazamiento(consulta: string, limite = LIMITE_EMPLAZAMIENTO): 
     ...(todos.length > n ? { total: todos.length } : {}),
     provincias,
     ...(todos.length ? {} : { noEncontrado: MENSAJE_NO_ENCONTRADO }),
-    notas: [...(todos.length ? [NOTA_SISMO] : []), ...(todos.length || provincias.length ? [NOTA_VIENTO] : [])],
+    notas: [...(todos.length ? [NOTA_SISMO] : []), ...(todos.length || provincias.length ? [NOTA_VIENTO, NOTA_NIEVE] : [])],
   };
 }

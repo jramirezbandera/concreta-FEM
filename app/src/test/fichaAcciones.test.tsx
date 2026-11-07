@@ -19,7 +19,7 @@ const leido = leerProyecto(readFileSync(join(RAIZ, "ejemplos", "muestrario", "pr
 if (!leido.valido) throw new Error("muestrario no válido");
 const base = leido.proyecto;
 
-function montar(acciones: AccionesEdificio | undefined, pestana: "viento" | "sismo" = "viento") {
+function montar(acciones: AccionesEdificio | undefined, pestana: "viento" | "nieve" | "sismo" = "viento") {
   const proyecto: Proyecto = { ...base, modelo: { ...base.modelo, acciones } };
   const editar = vi.fn((_o: Operacion, _e: string) => ({ ok: true as const }));
   const onCerrar = vi.fn();
@@ -107,5 +107,37 @@ describe("VS4: el emplazamiento común en la ficha «Viento y sismo»", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Sismo" }));
     // Emplazamiento (3) y sismo (10, con la nieve)
     expect(screen.getAllByRole("button", { name: "Ayuda" })).toHaveLength(13);
+    fireEvent.click(screen.getByRole("tab", { name: "Nieve" }));
+    // Emplazamiento (3), nieve (3) y el caso de nieve
+    expect(screen.getAllByRole("button", { name: "Ayuda" })).toHaveLength(7);
+  });
+});
+
+describe("la pestaña «Nieve»: sk del emplazamiento y el caso de nieve", () => {
+  it("en la capital, la tabla 3.8; a más de 1 000 m, el caso con su ψ; la exposición se escribe", () => {
+    // Ávila no figura en el Anejo 1: va sólo con su nombre; es la capital (tabla 3.8: 1,0 a 1 130 m)
+    const { editar, escrito } = montar({ emplazamiento: { provincia: "05", municipio: "Ávila", altitud: 1130 } }, "nieve");
+    expect((screen.getByLabelText(/sk, de dónde sale/) as HTMLSelectElement).selectedOptions[0]!.textContent).toMatch(/Tabla 3\.8: la obra está en la capital/);
+    // sk y qn = μ·sk con μ = 1
+    expect(screen.getAllByText("1,00 kN/m²", { selector: "dd" })).toHaveLength(2);
+    expect(screen.getByText("más de 1 000 m", { selector: "dd" })).toBeTruthy();
+    expect(screen.getByText(/hielo pn = 3·μ²·sk/)).toBeTruthy();
+    // El muestrario tiene S con el ψ de hasta 1 000 m
+    expect(screen.getByText("S lleva el ψ de la otra altitud.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cambiarle el ψ" }));
+    expect(editar.mock.calls[0]![0]).toMatchObject({ op: "cambiar", coleccion: "casos", id: "S", objeto: { id: "S", accion: { tipo: "S", psi: "nieve-mas-de-1000", duracion: "media" } } });
+    fireEvent.change(screen.getByLabelText(/Exposición/), { target: { value: "expuesta" } });
+    expect(screen.getByText("1,20 kN/m²", { selector: "dd" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/sk, de dónde sale/), { target: { value: "e2" } });
+    // Ávila es zona 3: a 1 130 m, entre 1 000 (0,7) y 1 200 (1,1) → 0,96
+    expect(screen.getByText("0,96 kN/m²", { selector: "dd" })).toBeTruthy();
+    aplicar();
+    expect(escrito()).toEqual({ emplazamiento: { provincia: "05", municipio: "Ávila", altitud: 1130 }, nieve: { capital: false, exposicion: "expuesta" } });
+  });
+
+  it("sin altitud, dice qué falta", () => {
+    montar({ emplazamiento: { provincia: "29" } }, "nieve");
+    expect(screen.getByText(/Falta la altitud del emplazamiento/)).toBeTruthy();
+    expect(screen.getByText(/Con la altitud del emplazamiento se sabe qué ψ lleva/)).toBeTruthy();
   });
 });

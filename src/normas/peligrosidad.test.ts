@@ -375,7 +375,7 @@ describe("las provincias y su zona eólica", () => {
     expect(PROVINCIAS.map((p) => p.ine)).toEqual(Array.from({ length: 52 }, (_, i) => String(i + 1).padStart(2, "0")));
     for (const p of PROVINCIAS) expect(["A", "B", "C"]).toContain(p.zonaEolica);
     expect(provinciaPorIne("29008")).toMatchObject({ nombre: "Málaga", zonaEolica: "A", frontera: { eolica: "El oeste (Estepona, Campo de Gibraltar) está en zona C." } });
-    expect(provinciaPorIne("28")).toEqual({ ine: "28", nombre: "Madrid", zonaEolica: "A" });
+    expect(provinciaPorIne("28")).toEqual({ ine: "28", nombre: "Madrid", zonaEolica: "A", zonaInvernal: 4, capital: { capital: "Madrid", altitud: 660, sk: 0.6 }, fronteraInvernal: "La sierra (norte) está en zona 3." });
     expect(provinciaPorIne("15")!.zonaEolica).toBe("C");
     expect(provinciaDe("99001")).toBe("");
   });

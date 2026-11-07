@@ -253,3 +253,28 @@ export function psiCaso(c: CasoFisico): string | null {
   const v = psiDe(p);
   return `${coma(v.psi0)} / ${coma(v.psi1)} / ${coma(v.psi2)}`;
 }
+
+// ─── El caso de nieve de la obra ────────────────────────────────────────────────────────────────
+
+/**
+ * El caso de nieve que pide la altitud de la obra (2026-11-07): si falta, las operaciones que lo
+ * crean (el típico «S» o «S1000»); si los de nieve llevan el ψ de la otra altitud, las que se lo
+ * cambian (con la duración del típico). null sin altitud, que es la que decide el ψ.
+ */
+export function propuestaCasoNieve(m: ModeloFisico, psi: "nieve-hasta-1000" | "nieve-mas-de-1000" | null): { estado: "falta" | "ok" | "otro-psi"; casos: string[]; operaciones: Operacion[]; tipico: CasoTipico } | null {
+  if (!psi) return null;
+  const tipico = casoTipico(psi === "nieve-mas-de-1000" ? "S1000" : "S")!;
+  const deNieve = (m.casos ?? []).filter((c) => c.accion?.tipo === "S");
+  if (!deNieve.length) {
+    const c = crearCasos(m, [tipico.caso]);
+    return { estado: "falta", casos: c.ok ? c.nuevos : [], operaciones: c.ok ? c.operaciones : [], tipico };
+  }
+  const malos = deNieve.filter((c) => (c.accion!.psi === "nieve-hasta-1000" || c.accion!.psi === "nieve-mas-de-1000") && c.accion!.psi !== psi);
+  if (!malos.length) return { estado: "ok", casos: deNieve.map((c) => c.id), operaciones: [], tipico };
+  const operaciones: Operacion[] = malos.map((c) => {
+    const { duracion: _d, ...resto } = c.accion!;
+    const accion: AccionCaso = { ...resto, psi, ...(tipico.caso.accion!.duracion ? { duracion: tipico.caso.accion!.duracion } : {}) };
+    return { op: "cambiar", coleccion: "casos", id: c.id, objeto: { ...c, accion } as unknown as Objeto };
+  });
+  return { estado: "otro-psi", casos: malos.map((c) => c.id), operaciones, tipico };
+}

@@ -1284,6 +1284,7 @@ select.sel { font-family: var(--font-sans); }
 .acc-etq { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .acc-elegido { display: flex; align-items: baseline; gap: 6px; margin: 0; padding: 5px 10px; border: 1px solid var(--color-border-main); border-radius: 6px; background: var(--color-tint-accent); }
 .acc-nota { margin: 0; }
+.acc-caso { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; border: 1px solid var(--color-border-main); border-radius: 8px; }
 .acc-separador { margin: 4px 8px 2px; padding-top: 4px; border-top: 1px solid var(--color-border-sub); font-size: 11px; color: var(--color-text-tertiary); }
 .acc-nota p { margin: 0 0 4px; }
 .acc-derivados { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--color-border-sub); font-size: 12px; }
