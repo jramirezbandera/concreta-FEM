@@ -57,6 +57,18 @@ describe("ejes propuestos", () => {
     expect(ejes.map((e) => e.nombre ?? e.id)).toEqual(["1", "2", "3", "A"]);
   });
 
+  it("una planta irregular: todo pilar en un eje de cada dirección, los sueltos con el suyo", () => {
+    // Como la de la prueba de uso: sólo P6–P7 alineados según Y y P2–P7 casi según X (a 3 cm)
+    const pos: Record<string, Vec2> = { P1: [0.35, 4.6], P2: [5.4, 3.78], P3: [0, 2.2], P4: [2.8, 1.4], P5: [4.75, 0], P6: [8.85, 1.67], P7: [8.8, 3.75] };
+    const m: ModeloFisico = { ...portico.modelo, losas: [], pilares: Object.entries(pos).map(([id, [x, y]]) => ({ ...portico.modelo.pilares![0]!, id, x, y })) };
+    const { ejes, dispersion } = proponerEjes(m);
+    const numeros = ejes.filter((e) => /^\d+$/.test(e.nombre ?? e.id));
+    const letras = ejes.filter((e) => /^[A-Z]+$/.test(e.nombre ?? e.id));
+    expect(numeros.map((e) => e.desde[0])).toEqual([0, 0.35, 2.8, 4.75, 5.4, 8.825]);
+    expect(letras.map((e) => e.desde[1])).toEqual([0, 1.4, 1.67, 2.2, 3.765, 4.6]);
+    expect(Math.max(...dispersion)).toBeCloseTo(0.025, 9);
+  });
+
   it("no depende del orden de las listas", () => {
     const m = edificio.modelo;
     const r = { ...m, pilares: [...(m.pilares ?? [])].reverse(), losas: [...(m.losas ?? [])].reverse() };

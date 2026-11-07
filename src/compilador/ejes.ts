@@ -7,11 +7,12 @@
  *    el menor ángulo), o la de las viguetas de los paños si no hay losas, o X. d = (cos θ, sin θ) y
  *    n = (−sin θ, cos θ).
  * 2. Los pilares (una vez cada posición) se agrupan en alineaciones como las bandas (C5-b,
- *    `alineaciones`): dos consecutivos a ≤ τ son de la misma, y una alineación necesita ≥ 2.
+ *    `alineaciones`): dos consecutivos a ≤ τ son de la misma. Un pilar que no se alinea con ningún
+ *    otro da su propio eje: todo pilar queda en un eje de cada dirección (una planta irregular, con
+ *    los pilares sueltos, se quedaba sin ejes en ellos).
  *    - Las rectas paralelas a n, agrupadas por s = p·d, se numeran 1, 2… de menor a mayor s.
  *    - Las paralelas a d, agrupadas por t = p·n, se nombran A, B… de menor a mayor t.
- *    Cada recta pasa por la media de sus pilares. Si una dirección no tiene ninguna alineación (un
- *    pórtico: una sola fila de pilares), cada pilar da la suya.
+ *    Cada recta pasa por la media de sus pilares.
  * 3. Cada eje va de lado a lado de todos los pilares, con MARGEN_EJES de más por cada extremo, para
  *    que sus burbujas queden fuera de la estructura.
  * 4. Un id que ya usa otro objeto del modelo pasa a `eje-<id>`, con el nombre de siempre.
@@ -95,11 +96,9 @@ export function proponerEjes(f: ModeloFisico, opciones: OpcionesCompilacion = {}
   const ejes: EjeReplanteo[] = [];
   const dispersion: number[] = [];
   const separacion = (g: { t: number }[], m: number) => Math.max(...g.map((q) => Math.abs(q.t - m)));
-  // Paralelos a n, por s (en `alineaciones`, la coordenada transversal es la de su segundo vector)
-  const grupos = (a: Vec2, b: Vec2) => {
-    const g = alineaciones(pilares, a, b, eps);
-    return g.length ? g : alineaciones(pilares, a, b, eps, 1);
-  };
+  // Paralelos a n, por s (en `alineaciones`, la coordenada transversal es la de su segundo vector).
+  // Con mínimo 1: las alineaciones de siempre (τ no depende del mínimo) y los pilares sueltos
+  const grupos = (a: Vec2, b: Vec2) => alineaciones(pilares, a, b, eps, 1);
   grupos(n, d).forEach((g, i) => {
     const sm = media(g);
     ejes.push(eje(String(i + 1), punto(sm, t0), punto(sm, t1)));
