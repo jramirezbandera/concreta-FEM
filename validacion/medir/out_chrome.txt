@@ -1,0 +1,16 @@
+## Planta N3 de Modelo, con los enganches del modelo
+BIEN  «Medir distancias» queda pulsado en la barra de la vista
+BIEN  con el cursor en el segundo pilar, la barra de estado da la distancia viva: «x 6,000 · y 5,000 m · Centro (P-x6-y5) · 7,810 m · Δx 6,000 · Δy 5,000»
+BIEN  dos clics a unos cm de P-x0-y0 y P-x6-y5 enganchan a sus puntos fijos, e Intro termina: {"modo":"distancia","puntos":[[0,0],[6,5]],"terminada":true}
+BIEN  «Medir áreas» empieza sin puntos
+BIEN  cuatro pilares y un clic en el primero cierran el contorno: [[0,0],[12,0],[12,10],[0,10]], área 120 m², perímetro 44 m
+BIEN  el clic tras una medida terminada empieza otra, y Retroceso quita su último punto: [[24,0],[30,0]]
+BIEN  Esc borra lo medido y sigue en Medir (true); el segundo vuelve a Elegir (true)
+BIEN  60 movimientos del ratón con Medir por el edificio objetivo: sin tareas largas (0); fotograma p95 10.2 ms
+
+## Alzado del eje A
+  la vista ve u -2.28…70.70, z -15.83…33.16
+BIEN  Modelo: los dos clics enganchan ([[0.07000000000000028,9],[6.060000000000002,9]]), 5.9900 m
+BIEN  Cargas: los dos clics enganchan ([[0.07,9],[6.06,9]]), 5.9900 m
+
+Todo bien

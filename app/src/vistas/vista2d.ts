@@ -12,11 +12,21 @@
  * plantilla DXF (V2c-4): sus líneas en gris en WebGL (con el material de la rejilla), encima del
  * relleno de las losas, los ábacos y los paños y debajo de lo demás (V2c4-6, `Capas2D.ordenPlantilla`),
  * y sus textos en el lienzo 2D, si miden al menos `TEXTO_MINIMO` px.
+ *
+ * Con la herramienta «medir» de la barra de la vista (`ponerMedir`), los clics ponen los puntos de
+ * una distancia (polilínea) o de un área (polígono) y se pintan sus tramos, el total, el área y el
+ * perímetro (`src/visor/medir.ts`). El punto se engancha con el índice del modelo si la fuente da
+ * uno (`Dibujo2D.enganche`, con el editor) y, si no, a lo dibujado. Doble clic, clic derecho o Intro
+ * la terminan (en un área, también un clic en su primer punto); el clic siguiente empieza otra;
+ * Retroceso quita el último punto y Esc la borra. Arrastrar desplaza la vista, como siempre.
  */
 import { BufferAttribute, BufferGeometry, Color, Group, LineSegments, OrthographicCamera, Scene, type WebGLRenderer } from "three";
 import type { Texto, Vec2 } from "../../../src/agente/render/escena.ts";
 import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import { RADIO_CLIC, type Eleccion, type EscenaPreparada, type Glifo } from "../../../src/visor/escena.ts";
+import { engancharEscena, medir, type ModoMedir } from "../../../src/visor/medir.ts";
+import type { TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
+import { marcador } from "../dibujo/marcador.ts";
 import { fmt } from "../fmt.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, sinEsfera, trazo } from "./capas.ts";
@@ -56,7 +66,21 @@ export interface Dibujo2D {
   /** El punto que se usaría (enganchado) y lo que dice la barra de estado. */
   cursor(): { p: Vec2; texto: string } | null;
   pintar(ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores): void;
+  /**
+   * Para medir (la barra de la vista): el punto de p con los enganches del modelo, el ortogonal desde
+   * `ultimo` (F8 o Mayús) y lo que dice la barra de estado; null, sin índice (se engancha a lo dibujado).
+   */
+  enganche?(p: Vec2, radio: number, ultimo: Vec2 | null, mayus: boolean): PuntoMedido | null;
 }
+
+/** Un punto para medir: dónde, el enganche (su marcador) y lo que dice la barra de estado. */
+export interface PuntoMedido {
+  p: Vec2;
+  tipo: TipoEnganche | null;
+  texto: string | null;
+}
+
+const NOMBRE_ENGANCHE_ESCENA = { vertice: "Vértice", medio: "Punto medio", cercano: "Cercano" } as const;
 
 export interface Camara2D {
   cx: number;
@@ -111,6 +135,10 @@ export class Vista2D extends Vista {
   eventos: Eventos2D = {};
   /** V2c: lo que dibuja con el ratón (sólo en las plantas editables). */
   dibujo: Dibujo2D | null = null;
+  /** Medir: el modo (null, sin medir), los puntos puestos, si está terminada, y el punto del cursor. */
+  private medirModo: ModoMedir | null = null;
+  private medida: { puntos: Vec2[]; terminada: boolean } = { puntos: [], terminada: false };
+  private medirCursor: PuntoMedido | null = null;
   /** Texto del cursor para la barra de estado (planta: x, y; alzado: u, z). */
   // R-24: decimales fijos, al mm (lo enganchado puede no ser de cm redondos; con cifras significativas salían mezclados)
   formatoCursor: (q: Vec2) => string = (q) => `x ${fmt(q[0], 3)} · y ${fmt(q[1], 3)} m`;
@@ -315,6 +343,7 @@ export class Vista2D extends Vista {
 
   protected clic(x: number, y: number, ctrl: boolean, doble: boolean): void {
     if (this.s <= 0) return;
+    if (this.medirModo) return this.clicMedir(x, y, doble);
     const p = this.aModelo(x, y);
     if (this.dibujo?.clic(p, RADIO_ENGANCHE / this.s, ctrl, doble)) return;
     this.eventos.clic?.(p, RADIO_CLIC / this.s, ctrl, doble);
@@ -331,7 +360,7 @@ export class Vista2D extends Vista {
   private asa: { x0: number; y0: number; movido: boolean } | null = null;
 
   override pointerdown(e: PointerEvent, x: number, y: number): void {
-    if (e.button === 0 && this.s > 0 && this.dibujo?.agarrar?.(this.aModelo(x, y), RADIO_ENGANCHE / this.s)) {
+    if (e.button === 0 && this.s > 0 && !this.medirModo && this.dibujo?.agarrar?.(this.aModelo(x, y), RADIO_ENGANCHE / this.s)) {
       this.alActivar?.();
       this.asa = { x0: x, y0: y, movido: false };
       this.entorno.pintar();
@@ -356,16 +385,31 @@ export class Vista2D extends Vista {
   }
 
   protected override pasar(x: number, y: number, e?: PointerEvent): void {
+    if (this.medirModo) {
+      if (this.s <= 0 || !this.escena) return;
+      this.medirCursor = this.puntoMedir(x, y, !!e?.shiftKey);
+      this.entorno.pintar();
+      return;
+    }
     if (!this.dibujo || this.s <= 0 || !this.escena) return;
     this.dibujo.pasar(this.aModelo(x, y), RADIO_ENGANCHE / this.s, !!e?.shiftKey, [e?.clientX ?? 0, e?.clientY ?? 0]);
     this.entorno.pintar();
   }
 
   protected override clicDerecho(): void {
+    if (this.medirModo) {
+      if (this.terminarMedida()) this.entorno.pintar();
+      return;
+    }
     if (this.dibujo?.derecho?.()) this.entorno.pintar();
   }
 
   override salir(): void {
+    if (this.medirModo) {
+      this.medirCursor = null;
+      this.entorno.pintar();
+      return;
+    }
     if (!this.dibujo) return;
     this.dibujo.salir();
     this.entorno.pintar();
@@ -378,6 +422,7 @@ export class Vista2D extends Vista {
 
   cursor(x: number, y: number): string | null {
     if (this.s <= 0 || !this.escena) return null;
+    if (this.medirModo) return this.cursorMedir(x, y);
     const d = this.dibujo?.cursor();
     if (d) return `${this.formatoCursor(d.p)}${d.texto ? ` · ${d.texto}` : ""}`;
     return this.formatoCursor(this.aModelo(x, y));
@@ -518,7 +563,182 @@ export class Vista2D extends Vista {
       this.dibujo.pintar(ctx, px, col);
       ctx.restore();
     }
+    if (this.medirModo) {
+      ctx.save();
+      this.pintarMedida(ctx, col);
+      ctx.restore();
+    }
     this.dibujarVentana(ctx);
+  }
+
+  // ─── Medir ──────────────────────────────────────────────────────────────────────────────────
+
+  /** Empieza a medir distancias o áreas (null: deja de medir). Cambiar de modo borra lo medido. */
+  ponerMedir(modo: ModoMedir | null): void {
+    if (modo === this.medirModo) return;
+    this.medirModo = modo;
+    this.medida = { puntos: [], terminada: false };
+    this.medirCursor = null;
+    // Lo que la herramienta de dibujo tenía bajo el cursor (su marcador, su borrador) se quita
+    if (modo) this.dibujo?.salir();
+    this.entorno.pintar();
+  }
+
+  /** Los puntos puestos y si la medida está terminada (para las pruebas). */
+  get medicion(): { modo: ModoMedir | null; puntos: readonly Vec2[]; terminada: boolean } {
+    return { modo: this.medirModo, puntos: this.medida.puntos, terminada: this.medida.terminada };
+  }
+
+  /** Esc, Intro y Retroceso con Medir: true si la tecla fue suya (Esc sin nada medido, no: sale de Medir). */
+  teclaMedir(tecla: string): boolean {
+    if (!this.medirModo) return false;
+    const m = this.medida;
+    if (tecla === "Escape") {
+      if (!m.puntos.length) return false;
+      this.medida = { puntos: [], terminada: false };
+    } else if (tecla === "Enter") {
+      if (!this.terminarMedida()) return false;
+    } else if (tecla === "Backspace") {
+      if (m.terminada || !m.puntos.length) return false;
+      m.puntos.pop();
+    } else return false;
+    this.entorno.pintar();
+    return true;
+  }
+
+  /** El punto del cursor (px) para medir: con el índice del modelo, o con lo dibujado, o el cursor. */
+  private puntoMedir(x: number, y: number, mayus: boolean): PuntoMedido {
+    const q = this.aModelo(x, y);
+    const radio = RADIO_ENGANCHE / this.s;
+    const m = this.medida;
+    const ultimo = !m.terminada && m.puntos.length ? m.puntos[m.puntos.length - 1]! : null;
+    const d = this.dibujo?.enganche?.(q, radio, ultimo, mayus);
+    if (d) return d;
+    const e = engancharEscena(this.escena, q, radio, this.plantilla);
+    if (e) return { p: e.p, tipo: e.tipo, texto: NOMBRE_ENGANCHE_ESCENA[e.tipo] };
+    if (ultimo && mayus) {
+      // Ortogonal: en horizontal o en vertical, lo que más se aleja
+      const horizontal = Math.abs(q[0] - ultimo[0]) >= Math.abs(q[1] - ultimo[1]);
+      return { p: horizontal ? [q[0], ultimo[1]] : [ultimo[0], q[1]], tipo: null, texto: "ortogonal" };
+    }
+    return { p: q, tipo: null, texto: null };
+  }
+
+  private clicMedir(x: number, y: number, doble: boolean): void {
+    if (this.medida.terminada) {
+      // El doble clic que terminó llega tras sus dos clics: no empieza otra
+      if (doble) return;
+      this.medida = { puntos: [], terminada: false };
+    }
+    const ps = this.medida.puntos;
+    // El punto es el que se ve bajo el cursor (con el Mayús de cuando se movió), si sigue ahí (la
+    // vista se pudo desplazar arrastrando sin pasar)
+    const c = this.medirCursor;
+    const cp = c && this.aPx(c.p);
+    const q = (cp && Math.hypot(cp[0] - x, cp[1] - y) <= RADIO_ENGANCHE + 2 ? c! : (this.medirCursor = this.puntoMedir(x, y, false))).p;
+    const igual = (a: Vec2 | undefined) => !!a && Math.hypot(a[0] - q[0], a[1] - q[1]) * this.s < 3;
+    if (doble) this.terminarMedida();
+    else if (this.medirModo === "area" && ps.length >= 3 && igual(ps[0])) this.terminarMedida();
+    else if (!igual(ps[ps.length - 1])) ps.push(q);
+    this.entorno.pintar();
+  }
+
+  /** Termina la medida si tiene puntos bastantes (2 una distancia, 3 un área); true si la terminó. */
+  private terminarMedida(): boolean {
+    const m = this.medida;
+    if (m.terminada || m.puntos.length < (this.medirModo === "area" ? 3 : 2)) return false;
+    m.terminada = true;
+    return true;
+  }
+
+  /** Los puntos que se miden ahora: los puestos y, si sigue abierta, el del cursor. */
+  private puntosMedida(): Vec2[] {
+    const m = this.medida;
+    const c = this.medirCursor;
+    if (m.terminada || !c || !m.puntos.length) return m.puntos;
+    const u = m.puntos[m.puntos.length - 1]!;
+    return u[0] === c.p[0] && u[1] === c.p[1] ? m.puntos : [...m.puntos, c.p];
+  }
+
+  /** Lo que dice la barra de estado con Medir. */
+  private cursorMedir(x: number, y: number): string {
+    const c = this.medirCursor;
+    const base = this.formatoCursor(c?.p ?? this.aModelo(x, y)) + (c?.texto ? ` · ${c.texto}` : "");
+    const modo = this.medirModo!;
+    const ps = this.puntosMedida();
+    if (ps.length < 2) return `${base} · ${modo === "area" ? "Medir área: clic en cada vértice" : "Medir distancia: clic en cada punto"}`;
+    const r = medir(modo, ps);
+    const [nx, ny] = this.nombresEjes.map((n) => n.toLowerCase());
+    if (modo === "area") return `${base} · área ${r.area === null ? "—" : `${fmt(r.area, 3)} m²`} · perímetro ${fmt(r.total, 3)} m${r.seCruza ? " · el contorno se cruza" : ""}`;
+    return `${base} · ${r.tramos.length > 1 ? `total ${fmt(r.total, 3)} m · último tramo ${fmt(r.tramos[r.tramos.length - 1]!, 3)} m` : `${fmt(r.total, 3)} m · Δ${nx} ${fmt(r.dx, 3)} · Δ${ny} ${fmt(r.dy, 3)}`}`;
+  }
+
+  /** Lo medido: la polilínea o el polígono, sus tramos y el resumen, y el marcador del enganche. */
+  private pintarMedida(ctx: CanvasRenderingContext2D, col: Colores): void {
+    const modo = this.medirModo!;
+    const m = this.medida;
+    const ps = this.puntosMedida();
+    const px = ps.map((q) => this.aPx(q));
+    const acento = col.acento;
+    if (ps.length >= 2) {
+      const r = medir(modo, ps);
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      px.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      if (modo === "area" && ps.length >= 3) {
+        ctx.closePath();
+        ctx.globalAlpha = 0.14;
+        ctx.fillStyle = acento;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = col.fondo;
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = acento;
+      if (!m.terminada) ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Cada tramo con su longitud, si cabe (en una distancia de un tramo, ya lo dice el resumen)
+      const n = r.tramos.length;
+      if (n > 1 || modo === "area")
+        for (let i = 0; i < n; i++) {
+          const [a, b] = [px[i]!, px[(i + 1) % px.length]!];
+          const texto = fmt(r.tramos[i]!, 2);
+          if (Math.hypot(b[0] - a[0], b[1] - a[1]) < this.entorno.medir(texto, 11, false) + 16) continue;
+          etiqueta(ctx, texto, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, col, false);
+        }
+      // El resumen: en un área, en su centroide; en una distancia, junto al último punto
+      const [nx, ny] = this.nombresEjes.map((x) => x.toLowerCase());
+      if (modo === "area" && r.area !== null && r.centroide) {
+        const [x, y] = this.aPx(r.centroide);
+        etiqueta(ctx, `${fmt(r.area, 2)} m²`, x, y - 9, col, true);
+        etiqueta(ctx, `P ${fmt(r.total, 2)} m${r.seCruza ? " · se cruza" : ""}`, x, y + 10, col, false);
+      } else if (modo === "distancia") {
+        const [x, y] = px[px.length - 1]!;
+        const lineas = n > 1 ? [`Total ${fmt(r.total, 3)} m`] : [`${fmt(r.total, 3)} m`, `Δ${nx} ${fmt(r.dx, 3)} · Δ${ny} ${fmt(r.dy, 3)}`];
+        lineas.forEach((t, i) => etiqueta(ctx, t, x + 14, y - 22 + i * 19, col, i === 0, "inicio"));
+      }
+    }
+    // Los puntos puestos
+    ctx.fillStyle = acento;
+    for (const [x, y] of px.slice(0, m.puntos.length)) ctx.fillRect(x - 3, y - 3, 6, 6);
+    // El marcador del enganche, o una cruz pequeña en el cursor
+    const c = this.medirCursor;
+    if (!c) return;
+    const [x, y] = this.aPx(c.p);
+    if (c.tipo) marcador(ctx, c.tipo, [x, y], col);
+    else {
+      ctx.strokeStyle = acento;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x - 6, y);
+      ctx.lineTo(x + 6, y);
+      ctx.moveTo(x, y - 6);
+      ctx.lineTo(x, y + 6);
+      ctx.stroke();
+    }
   }
 
   /** El icono de los ejes en el origen o, si no se ve, en la esquina de abajo a la izquierda. */
@@ -627,4 +847,21 @@ export class Vista2D extends Vista {
     this.resaltado = null;
     this.reconstruirResaltado();
   }
+}
+
+/** Un número de medir en una etiqueta del fondo con el borde del acento (llena, la del resumen). */
+function etiqueta(ctx: CanvasRenderingContext2D, texto: string, x: number, y: number, col: Colores, lleno: boolean, ancla: "medio" | "inicio" = "medio"): void {
+  ctx.font = `${lleno ? 600 : 500} 11px "Geist Mono", ui-monospace, monospace`;
+  const w = ctx.measureText(texto).width + 10;
+  const h = 17;
+  const x0 = ancla === "medio" ? x - w / 2 : x;
+  ctx.fillStyle = lleno ? col.acento : col.fondo;
+  ctx.fillRect(x0, y - h / 2, w, h);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = col.acento;
+  ctx.strokeRect(x0 + 0.5, y - h / 2 + 0.5, w - 1, h - 1);
+  ctx.fillStyle = lleno ? col.fondo : col.acento;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(texto, x0 + w / 2, y + 0.5);
 }

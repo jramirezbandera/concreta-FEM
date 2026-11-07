@@ -55,6 +55,7 @@ import { asas, moverAsa, type Asa } from "../../../src/editor/transformar.ts";
 import { leerEntrada, resolverEntrada } from "../../../src/editor/dibujo/teclado.ts";
 import type { Colores } from "../vistas/motor.ts";
 import type { Dibujo2D } from "../vistas/vista2d.ts";
+import { marcador } from "./marcador.ts";
 
 /** Lo que React enseña de la herramienta. */
 export interface Instantanea {
@@ -475,6 +476,10 @@ export class ControladorDibujo {
       pintar: (ctx, aPx, c) => {
         if (barra()) this.pintar(clave, ctx, aPx, c, false);
       },
+      enganche: (p, radio, ultimo, mayus) => {
+        this.conPlantilla = false;
+        return this.engancheMedir(clave, p, radio, ultimo, mayus);
+      },
     };
     this.adaptadores.set(clave, a);
     return a;
@@ -509,9 +514,24 @@ export class ControladorDibujo {
       derecho: () => this.derecho(),
       cursor: () => this.cursor(planta),
       pintar: (ctx, aPx, c) => this.pintar(planta, ctx, aPx, c, cotas),
+      enganche: (p, radio, ultimo, mayus) => {
+        vista();
+        return this.engancheMedir(planta, p, radio, ultimo, mayus);
+      },
     };
     this.adaptadores.set(clave, a);
     return a;
+  }
+
+  /**
+   * La herramienta Medir de la barra de la vista (`vista2d.ts`): el punto de q con los enganches,
+   * el ortogonal y las fuentes de dibujar (el imán de la barra), sin tocar la herramienta de dibujo.
+   */
+  private engancheMedir(lugar: string, q: Vec2, radio: number, ultimo: Vec2 | null, mayus: boolean): { p: Vec2; tipo: TipoEnganche | null; texto: string | null } | null {
+    const ix = this.indice(lugar);
+    if (!ix) return null;
+    const a = apuntar(ix, q, radio, { ultimo, orto: this.foto.orto, mayus, activos: this.enganches, fuentes: this.foto.fuentes });
+    return { p: a.p, tipo: a.enganche?.tipo ?? null, texto: a.enganche ? rotuloEnganche(a.enganche) : a.orto ? "ortogonal" : null };
   }
 
   private pasar(planta: string, q: Vec2, radio: number, mayus: boolean, cliente: readonly [number, number]): void {
@@ -1304,65 +1324,4 @@ function cotaTemporal(ctx: CanvasRenderingContext2D, k: CotaTemporal, aPx: (q: V
   ctx.textBaseline = "middle";
   ctx.fillText(texto, mx, my + 0.5);
   ctx.restore();
-}
-
-/** Un símbolo por tipo de enganche, como el «referencia a objetos» de los CAD. */
-function marcador(ctx: CanvasRenderingContext2D, t: TipoEnganche, [x, y]: [number, number], c: Colores): void {
-  const r = 6;
-  ctx.beginPath();
-  switch (t) {
-    case "fijo":
-    case "extremo":
-      ctx.rect(x - r, y - r, 2 * r, 2 * r);
-      break;
-    case "centro":
-      ctx.arc(x, y, r, 0, 2 * Math.PI);
-      break;
-    case "esquina":
-    case "vertice":
-      ctx.moveTo(x, y - r);
-      ctx.lineTo(x + r, y);
-      ctx.lineTo(x, y + r);
-      ctx.lineTo(x - r, y);
-      ctx.closePath();
-      break;
-    case "cruce":
-      ctx.moveTo(x - r, y - r);
-      ctx.lineTo(x + r, y + r);
-      ctx.moveTo(x + r, y - r);
-      ctx.lineTo(x - r, y + r);
-      break;
-    case "medio":
-      ctx.moveTo(x, y - r);
-      ctx.lineTo(x + r, y + r * 0.8);
-      ctx.lineTo(x - r, y + r * 0.8);
-      ctx.closePath();
-      break;
-    case "cara":
-      ctx.rect(x - r, y - r, 2 * r, 2 * r);
-      ctx.moveTo(x - r, y);
-      ctx.lineTo(x + r, y);
-      break;
-    case "perpendicular":
-      ctx.moveTo(x - r, y - r);
-      ctx.lineTo(x - r, y + r);
-      ctx.lineTo(x + r, y + r);
-      ctx.moveTo(x - r, y);
-      ctx.lineTo(x, y);
-      ctx.lineTo(x, y + r);
-      break;
-    case "cercano":
-      ctx.moveTo(x - r, y - r);
-      ctx.lineTo(x + r, y - r);
-      ctx.lineTo(x - r, y + r);
-      ctx.lineTo(x + r, y + r);
-      ctx.closePath();
-      break;
-  }
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = c.fondo;
-  ctx.stroke();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = c.acento;
-  ctx.stroke();
 }

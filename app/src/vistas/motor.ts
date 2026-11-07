@@ -17,7 +17,8 @@ import { Vector2, type Camera, type Scene, type WebGLRenderer } from "three";
 import type { Theme } from "../tema/types.ts";
 import { rendererCompartido } from "./renderer.ts";
 
-export type Herramienta = "elegir" | "desplazar" | "orbitar";
+/** «medir», en planta y en alzado (`vista2d.ts`): sus clics ponen puntos y arrastrar desplaza. */
+export type Herramienta = "elegir" | "desplazar" | "orbitar" | "medir";
 
 export interface Rect {
   x: number;

@@ -1,7 +1,7 @@
 /**
  * La zona de vistas (I2, `docs/fem3d/interfaz.md` §5 y §14): 1, 2 o 4 celdas sobre un solo lienzo
  * WebGL (`motor.ts`). Cada celda tiene su cabecera de desplegables (tipo, planta o eje, modo), su
- * barra (encuadrar, desplazar, orbitar, proyección) y una fuente que le da lo que
+ * barra (encuadrar, desplazar, orbitar, proyección; en planta y alzado, medir distancias y áreas) y una fuente que le da lo que
  * dibuja: cada espacio de trabajo dice qué fuente va en cada tipo de vista (`FuentesVistas`); sin
  * ella, la del modelo.
  *
@@ -9,7 +9,8 @@
  * (`Fuente2D`, `Fuente3D`); también pintan lo que va en el DOM de la celda (la leyenda, un aviso).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BookmarkPlus, Box, BoxSelect, ChevronDown, FileImage, Grid3x3, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
+import { BookmarkPlus, Box, BoxSelect, ChevronDown, FileImage, Grid3x3, Hand, Maximize, Move3d, MousePointer2, Pentagon, Rotate3d, RulerDimensionLine, SlidersHorizontal, X } from "lucide-react";
+import type { ModoMedir } from "../../../src/visor/medir.ts";
 import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
 import type { ModoAlzado } from "../../../src/agente/render/alzado.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
@@ -192,6 +193,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   const superficie = useRef<HTMLDivElement>(null);
   const [vista, setVista] = useState<Vista | null>(null);
   const [herramienta, setHerramienta] = useState<Herramienta>("elegir");
+  const [modoMedir, setModoMedir] = useState<ModoMedir>("distancia");
   const [opciones, setOpciones] = useState(false);
   const [guardar, setGuardar] = useState(false);
   const botonOpciones = useRef<HTMLButtonElement>(null);
@@ -222,7 +224,38 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
 
   useEffect(() => {
     if (vista) vista.herramienta = herramienta;
-  }, [vista, herramienta]);
+    if (vista instanceof Vista2D) vista.ponerMedir(herramienta === "medir" ? modoMedir : null);
+  }, [vista, herramienta, modoMedir]);
+
+  // Medir es de las vistas planas: al pasar a 3D, se vuelve a Elegir
+  useEffect(() => {
+    if (tipo === "3d" && herramienta === "medir") setHerramienta("elegir");
+  }, [tipo, herramienta]);
+
+  // Medir: Intro termina, Retroceso quita el último punto, Esc borra lo medido o, sin nada, vuelve a
+  // Elegir. Antes que los atajos de la página (la fase de captura), sólo en la vista activa
+  const activaAqui = !varias || vistas.activa === i;
+  useEffect(() => {
+    if (herramienta !== "medir" || !activaAqui) return;
+    const f = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape" && ev.key !== "Enter" && ev.key !== "Backspace") return;
+      const t = ev.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (vista instanceof Vista2D && vista.teclaMedir(ev.key)) repintarVistas();
+      else if (ev.key === "Escape") setHerramienta("elegir");
+      else return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    };
+    window.addEventListener("keydown", f, true);
+    return () => window.removeEventListener("keydown", f, true);
+  }, [herramienta, activaAqui, vista]);
+
+  const alternarMedir = (m: ModoMedir) => {
+    if (herramienta === "medir" && modoMedir === m) return setHerramienta("elegir");
+    setModoMedir(m);
+    setHerramienta("medir");
+  };
 
   // El fondo: en Resultados (las fuentes con una cabecera de resultados o la malla), más tenue
   const rejilla = v.rejilla !== false;
@@ -252,7 +285,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
 
   return (
     <div className="celda" data-activa={activa} data-tipo={tipo} data-vista={i}>
-      <div ref={superficie} className="celda-superficie" style={{ cursor: herramienta === "elegir" ? "crosshair" : "grab" }} aria-label={tipo === "planta" ? `Planta ${planta ?? ""}` : tipo === "alzado" ? `Alzado del eje ${eje ?? ""}` : "Edificio en 3D"} role="img" />
+      <div ref={superficie} className="celda-superficie" style={{ cursor: herramienta === "elegir" || herramienta === "medir" ? "crosshair" : "grab" }} aria-label={tipo === "planta" ? `Planta ${planta ?? ""}` : tipo === "alzado" ? `Alzado del eje ${eje ?? ""}` : "Edificio en 3D"} role="img" />
       <div className="vista-cab">
         <Desplegable
           etiqueta="Tipo de vista"
@@ -348,6 +381,16 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           <button type="button" className="ib" data-on={v.ejes !== false} aria-pressed={v.ejes !== false} title="Ejes de replanteo y sus cotas" aria-label="Ver los ejes" onClick={() => poner(i, { ejes: v.ejes === false })}>
             <IcEjes size={15} />
           </button>
+        )}
+        {tipo !== "3d" && (
+          <>
+            <button type="button" className="ib" data-on={herramienta === "medir" && modoMedir === "distancia"} aria-pressed={herramienta === "medir" && modoMedir === "distancia"} title="Medir distancias: un clic en cada punto (engancha como al dibujar; Mayús, ortogonal). Doble clic, clic derecho o Intro termina; Retroceso quita el último punto; Esc borra" aria-label="Medir distancias" onClick={() => alternarMedir("distancia")}>
+              <RulerDimensionLine size={15} />
+            </button>
+            <button type="button" className="ib" data-on={herramienta === "medir" && modoMedir === "area"} aria-pressed={herramienta === "medir" && modoMedir === "area"} title="Medir áreas: un clic en cada vértice del contorno (engancha como al dibujar). Clic en el primero, doble clic, clic derecho o Intro lo cierra; Retroceso quita el último; Esc borra" aria-label="Medir áreas" onClick={() => alternarMedir("area")}>
+              <Pentagon size={15} />
+            </button>
+          </>
         )}
         {tipo === "planta" && planta && fuentes.plantilla?.(planta) && (
           <button type="button" className="ib" data-on={v.plantilla !== false} aria-pressed={v.plantilla !== false} title="Plantilla DXF: verla y enganchar a ella" aria-label="Ver la plantilla DXF" onClick={() => poner(i, { plantilla: v.plantilla === false })}>
