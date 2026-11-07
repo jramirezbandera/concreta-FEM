@@ -1,0 +1,17 @@
+# VS4: lo retenido en Node con viento y sismo (2026-11-07; edificio objetivo de losas, 7 plantas; 86796 nudos, 4 casos y 21 modos; Node v24.19.0)
+
+Tras cada paso, dos `gc()` y `process.memoryUsage()`: el montón de V8 (heap) y lo de fuera (external: los arrays tipados y el WASM), en MiB, con la diferencia con el paso anterior. El tiempo del paso, sólo como información (una pasada, máquina quizá cargada). El sha256 es el de la respuesta en JSON: tiene que ser el mismo que el de un árbol de trabajo en el commit anterior.
+
+Paso | s | heap | external | total | Δ | sha256
+---|---|---|---|---|---|---
+calculado (sin consultas) | 0.00 | 207 | 568 | 775 |  | 
+Consultas (25 casos base, 80 combinaciones) | 0.01 | 210 | 568 | 778 | +3 | 
+mapa M11 N7 | 1.59 | 330 | 614 | 943 | +165 | 90197077eb850633
+mapa V13 N7 | 0.04 | 330 | 614 | 944 | +0 | a037f267c2c6dd5d
+franjas N7 X | 4.37 | 631 | 797 | 1427 | +484 | 017b423dcc1f9325
+franjas N7 Y | 3.17 | 685 | 825 | 1510 | +82 | 4347b6f424db0603
+mapa M11 N6 | 1.29 | 630 | 831 | 1461 | −49 | f7af115bfe398b36
+franjas N6 X | 3.65 | 734 | 847 | 1582 | +121 | bed5c1f8257b5af5
+mapa V13 N7 (guardado) | 0.04 | 734 | 847 | 1582 | +0 | a037f267c2c6dd5d
+franjas N7 X (guardadas) | 0.11 | 734 | 847 | 1582 | +0 | 017b423dcc1f9325
+tras soltar lo de los modos | 0.00 | 679 | 840 | 1519 | −62 | 

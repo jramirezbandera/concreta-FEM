@@ -27,6 +27,7 @@
  */
 import { envolventeWoodArmer, woodArmer, type EnvolventeWoodArmer, type MomentosWoodArmer } from "../dimensionado/woodArmer.ts";
 import { CamposLaminas } from "../motor/campos.ts";
+import type { CasosEfimeros } from "../motor/casosEfimeros.ts";
 import { Cortes, type Corte } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso } from "../motor/modelo.ts";
@@ -94,9 +95,12 @@ export class EsfuerzosBandas {
    */
   /** VS3: cómo se combinan los valores por caso (`Consultas.combinar` con los casos del sismo; si no, la lineal). */
   private readonly combinar: Combinar;
+  /** VS4: los casos de los modos, que `campos` y `cortes` sueltan al cambiar de planta. */
+  private readonly efimeros: CasosEfimeros | null;
 
-  constructor(fisico: ModeloFisico, modelo: ModeloAnalitico, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; epsGeom?: number; combinar?: Combinar } = {}) {
+  constructor(fisico: ModeloFisico, modelo: ModeloAnalitico, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; epsGeom?: number; combinar?: Combinar; efimeros?: CasosEfimeros } = {}) {
     this.combinar = opciones.combinar ?? combinar;
+    this.efimeros = opciones.efimeros ?? null;
     this.fisico = fisico;
     this.modelo = modelo;
     this.casos = casos;
@@ -204,6 +208,7 @@ export class EsfuerzosBandas {
   }
 
   private calcularEstaciones(b: Banda): EstacionResultado[] {
+    this.efimeros?.trabajarEn(b.planta);
     const { L } = ejesBanda(b);
     const nc = this.casos.length;
     return estacionesBanda(b, this.eps).map((e) => {

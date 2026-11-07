@@ -311,7 +311,7 @@ export class Cortes {
    * o el enlace de su huella los piden varios cortes (sus dos caras, las muestras, las bandas de las
    * dos direcciones). Son los mismos valores que se calcularían de nuevo.
    */
-  private readonly guardados = new WeakMap<readonly ResultadoCaso[], { laminas: Map<number, Float64Array[]>; barras: Map<number, Float64Array[]>; restricciones: Map<string, Map<number, FuerzasRestriccion>[]> }>();
+  private readonly guardados = new WeakMap<readonly ResultadoCaso[], { laminas: Map<number, (Float64Array | undefined)[]>; barras: Map<number, (Float64Array | undefined)[]>; restricciones: Map<string, Map<number, FuerzasRestriccion>[]>; huecos: boolean }>();
 
   /** Lado de cada nudo del último corte preparado y su época (`preparar`). */
   private lados = new Int8Array(0);
@@ -327,18 +327,39 @@ export class Cortes {
 
   private guardado(casos: readonly ResultadoCaso[]) {
     let g = this.guardados.get(casos);
-    if (!g) this.guardados.set(casos, (g = { laminas: new Map(), barras: new Map(), restricciones: new Map() }));
+    if (!g) this.guardados.set(casos, (g = { laminas: new Map(), barras: new Map(), restricciones: new Map(), huecos: false }));
     const { laminas, barras, restricciones } = g;
     const pedir = <K, V>(m: Map<K, V>, k: K, f: () => V): V => {
       let v = m.get(k);
       if (v === undefined) m.set(k, (v = f()));
       return v;
     };
+    // Por elemento, un array con un valor por caso; tras `soltarCasos` puede tener huecos, que se
+    // rellenan al pedirlo (con la rigidez del elemento calculada una vez para todos los que faltan)
+    const completo = (v: (Float64Array | undefined)[], f: (en: (Float64Array | undefined)[]) => Float64Array[]): Float64Array[] => {
+      if (!g!.huecos) return v as Float64Array[];
+      for (let k = 0; k < v.length; k++) if (!v[k]) return f(v);
+      return v as Float64Array[];
+    };
     return {
-      lamina: (l: number) => pedir(laminas, l, () => this.fuerzas.laminaCasos(l, casos)),
-      barra: (b: number) => pedir(barras, b, () => this.fuerzas.barraCasos(b, casos)),
+      lamina: (l: number) => completo(pedir(laminas, l, () => this.fuerzas.laminaCasos(l, casos)), (en) => this.fuerzas.laminaCasos(l, casos, en)),
+      barra: (b: number) => completo(pedir(barras, b, () => this.fuerzas.barraCasos(b, casos)), (en) => this.fuerzas.barraCasos(b, casos, en)),
       restricciones: (cuales: readonly number[]) => pedir(restricciones, cuales.join(","), () => this.fuerzas.restricciones(casos, cuales)),
     };
+  }
+
+  /**
+   * Suelta lo guardado de los casos `cuales` (índices en `casos`) de las láminas y las barras que ya
+   * han pedido los cortes: el siguiente corte que las toque vuelve a calcularlos (los mismos valores).
+   * VS4: con los modos como casos base, lo guardado por lámina crece con ellos; quien combina por
+   * planta lo suelta al cambiar de planta (`CasosEfimeros`). Lo de las restricciones (unos nudos por
+   * pilar) se queda.
+   */
+  soltarCasos(casos: readonly ResultadoCaso[], cuales: readonly number[]): void {
+    const g = this.guardados.get(casos);
+    if (!g || !cuales.length) return;
+    for (const m of [g.laminas, g.barras]) for (const v of m.values()) for (const k of cuales) v[k] = undefined;
+    g.huecos = true;
   }
 
   /** Índices espaciales de elementos y restricciones (C5, criterio 8), la primera vez que se piden. */

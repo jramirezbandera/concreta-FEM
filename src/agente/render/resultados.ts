@@ -25,9 +25,10 @@ import type { Consultas } from "../../compilador/consultas.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados.ts";
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
+import { CasosEfimeros } from "../../motor/casosEfimeros.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { esfuerzoProyectado, type DiagramaLeible } from "../../motor/diagramaCompuesto.ts";
-import type { CasoEspectral, PartesCombinacion } from "../../motor/espectral.ts";
+import type { CasoEspectral, PartesCombinacion, Superposicion } from "../../motor/espectral.ts";
 import { area, cajaDe, numeroFijo, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
@@ -63,17 +64,40 @@ export const NOTA_MEMBRANA = "Fuerzas de membrana recuperadas por SPR (E5) en lo
 const ORDENADA = 0.035;
 /** Divisiones de cada tramo flexible que se añaden a sus estaciones para dibujar el diagrama. */
 const DIVISIONES = 12;
+/**
+ * VS4: láminas por bloque al evaluar los campos de los modos de un mapa. Cada bloque lleva un
+ * evaluador nuevo por modo que se suelta con él: lo retenido es el de un bloque y sus coronas, y lo
+ * que se rehace son las coronas (con 2 048 láminas, unas 45 × 45, ≈ +20 % de las plazas de los modos).
+ */
+const BLOQUE_MAPA = 2048;
 
 type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
+
+/**
+ * Lo que un mapa guarda de las láminas de una planta (o de sus muros): por caso base estático, los 8
+ * campos SPR en los 4 nudos de cada lámina (32 por lámina) y, por caso del sismo, los de sus modos
+ * combinados en cada nudo. Los campos de cada modo no se guardan (VS4): se combinan y se sueltan.
+ */
+interface CamposPlanta {
+  laminas: number[];
+  /** ¿Está la lámina en alguna región SPR (tiene mapa)? */
+  region: boolean[];
+  /** Por caso base; los de los modos, sin valor. */
+  valores?: (Float64Array | undefined)[];
+  /** Por caso del sismo (`Superposicion.espectrales`): sus modos combinados, componente a componente, sin su factor. */
+  espectrales?: Map<CasoEspectral, Float64Array>;
+  hechas?: Set<"flexion" | "membrana">;
+}
 
 /** Lo que comparten las vistas de resultados de un cálculo: lo que cuesta se calcula una vez. */
 export class ResultadosRender {
   readonly q: Consultas;
   readonly c: Compilado;
   private camposC?: CamposLaminas;
+  private efimerosC?: CasosEfimeros | null;
   private epC?: EsfuerzosPiezas;
   /** Por planta: láminas y, por caso, los 8 campos en sus 4 nudos (32 por lámina). */
-  private readonly porPlanta = new Map<string, { laminas: number[]; region: boolean[]; valores?: Float64Array[]; hechas?: Set<"flexion" | "membrana"> }>();
+  private readonly porPlanta = new Map<string, CamposPlanta>();
 
   constructor(q: Consultas, c: Compilado) {
     this.q = q;
@@ -83,6 +107,18 @@ export class ResultadosRender {
   get campos(): CamposLaminas {
     // Los de las consultas: los cortes de las bandas y los mapas comparten lo recuperado
     return (this.camposC ??= this.q.compilado === this.c.modelo ? this.q.campos : new CamposLaminas(this.c.modelo));
+  }
+
+  /** VS4: los casos de los modos, cuyos campos se sueltan al cambiar de planta (los de las consultas, si los campos son los suyos). */
+  private get efimeros(): CasosEfimeros | null {
+    if (this.efimerosC === undefined) {
+      if (this.q.compilado === this.c.modelo) this.efimerosC = this.q.efimeros;
+      else {
+        const modos = this.q.sup.basesEspectrales;
+        this.efimerosC = modos.length ? new CasosEfimeros(this.campos, () => null, this.q.casos, modos) : null;
+      }
+    }
+    return this.efimerosC;
   }
 
   get ep(): EsfuerzosPiezas {
@@ -95,7 +131,7 @@ export class ResultadosRender {
    * Láminas de las losas de la planta o, con «muros», las de los muros entre ella y la planta de
    * debajo (por la cota de su centro), en el orden del modelo.
    */
-  laminas(planta: string, de: SuperficieMapa = "losas"): { laminas: number[]; region: boolean[]; valores?: Float64Array[]; hechas?: Set<"flexion" | "membrana"> } {
+  laminas(planta: string, de: SuperficieMapa = "losas"): CamposPlanta {
     const clave = de === "losas" ? planta : `muros
 ${planta}`;
     let x = this.porPlanta.get(clave);
@@ -125,34 +161,87 @@ ${planta}`;
   }
 
   /**
-   * Campos SPR por caso en los nudos de las láminas de la planta (o de sus muros). Con `parte`, sólo
-   * se asegura la de esa partición (N, o M y Q): lo de la otra puede estar aún a 0.
+   * Campos SPR en los nudos de las láminas de la planta (o de sus muros): por caso base estático y,
+   * combinados, por caso del sismo. Con `parte`, sólo se asegura la de esa partición (N, o M y Q): lo
+   * de la otra puede estar aún a 0. Los campos de los modos se evalúan para combinarlos y no se
+   * guardan aquí (sí en sus evaluadores, mientras se trabaje en esta planta: `CasosEfimeros`).
    */
-  valores(planta: string, de: SuperficieMapa = "losas", parte?: "flexion" | "membrana"): { laminas: number[]; region: boolean[]; valores: Float64Array[] } {
+  valores(planta: string, de: SuperficieMapa = "losas", parte?: "flexion" | "membrana"): Required<CamposPlanta> {
     const x = this.laminas(planta, de);
+    const sup = this.q.sup;
     if (!x.valores) {
       x.region = x.laminas.map((l) => this.campos.region(l) >= 0);
-      x.valores = this.q.casos.map(() => new Float64Array(32 * x!.laminas.length));
+      x.valores = this.q.casos.map((_, k) => (sup.baseEspectral[k] ? undefined : new Float64Array(32 * x!.laminas.length)));
+      x.espectrales = new Map();
       x.hechas = new Set();
     }
     for (const p of parte ? [parte] : (["flexion", "membrana"] as const)) {
       if (x.hechas!.has(p)) continue;
-      const ls = x.laminas;
-      const XI = [-1, 1, 1, -1];
-      const ETA = [-1, -1, 1, 1];
-      const o = p === "flexion" ? 3 : 0;
-      const evs: EvaluadorCampos[] = this.q.casos.map((r) => this.campos.evaluadorCompartido(r.u));
-      // Lámina a lámina y, en cada una, todos los casos: el operador de resultantes de una lámina y de
-      // sus vecinas se calcula una vez, no una por caso (cada evaluador da lo mismo en otro orden)
-      ls.forEach((l, i) => {
-        if (!x!.region[i]) return;
-        evs.forEach((ev, k) => {
-          for (let a = 0; a < 4; a++) x!.valores![k]!.set(ev.enParte(l, XI[a]!, ETA[a]!, p), 32 * i + 8 * a + o);
-        });
-      });
+      this.efimeros?.trabajarEn(planta);
+      const nl = x.laminas.length;
+      // Los de los modos, sólo mientras se combinan
+      const temporales = this.q.casos.map((_, k) => (sup.baseEspectral[k] ? new Float64Array(32 * nl) : undefined));
+      const destino = (k: number) => (x!.valores![k] ?? temporales[k])!;
+      this.evaluarParte(x, p, destino);
+      // Los casos del sismo: sus modos combinados en cada nudo, componente a componente (las mismas
+      // cuentas que combinarlos al pedir el mapa de cada componente)
+      const N = 4 * nl;
+      for (const caso of sup.espectrales) {
+        let e = x.espectrales!.get(caso);
+        if (!e) x.espectrales!.set(caso, (e = new Float64Array(32 * nl)));
+        for (const comp of p === "flexion" ? [3, 4, 5, 6, 7] : [0, 1, 2]) {
+          const v = sup.espectralVector(caso, destino, N, false, comp, 8);
+          for (let j = 0; j < N; j++) e[8 * j + comp] = v[j]!;
+        }
+      }
       x.hechas!.add(p);
     }
-    return x as { laminas: number[]; region: boolean[]; valores: Float64Array[] };
+    return x as Required<CamposPlanta>;
+  }
+
+  /**
+   * Los 8 campos de la parte `p` en los 4 nudos de cada lámina de la planta, por caso base, en
+   * `destino(k)` (32 por lámina). Los casos estáticos, con sus evaluadores compartidos (lo recuperado
+   * lo reutilizan los cortes y los demás mapas); los de los modos, con un evaluador por bloque de
+   * láminas que se suelta con él (VS4): lo que guardan (las muestras, los parches y las plazas del
+   * bloque y de sus coronas) es el pico del mapa, y con 21 modos y la planta entera eran cientos de MB.
+   */
+  private evaluarParte(x: CamposPlanta, p: "flexion" | "membrana", destino: (k: number) => Float64Array, casos: readonly number[] = this.q.casos.map((_, k) => k)): void {
+    const XI = [-1, 1, 1, -1];
+    const ETA = [-1, -1, 1, 1];
+    const o = p === "flexion" ? 3 : 0;
+    const sup = this.q.sup;
+    const estaticos: [number, EvaluadorCampos][] = casos.filter((k) => !sup.baseEspectral[k]).map((k) => [k, this.campos.evaluadorCompartido(this.q.casos[k]!.u)]);
+    const modos = casos.filter((k) => sup.baseEspectral[k]);
+    const ls = x.laminas;
+    for (let b0 = 0; b0 < ls.length; b0 += BLOQUE_MAPA) {
+      const b1 = Math.min(ls.length, b0 + BLOQUE_MAPA);
+      const evs: [number, EvaluadorCampos][] = [...estaticos, ...modos.map((k): [number, EvaluadorCampos] => [k, this.campos.evaluador(this.q.casos[k]!.u)])];
+      // Lámina a lámina y, en cada una, todos los casos: el operador de resultantes de una lámina y de
+      // sus vecinas se calcula una vez, no una por caso (cada evaluador da lo mismo en otro orden)
+      for (let i = b0; i < b1; i++) {
+        if (!x.region[i]) continue;
+        const l = ls[i]!;
+        for (const [k, ev] of evs) {
+          const d = destino(k);
+          for (let a = 0; a < 4; a++) d.set(ev.enParte(l, XI[a]!, ETA[a]!, p), 32 * i + 8 * a + o);
+        }
+      }
+    }
+  }
+
+  /**
+   * Los campos de un solo caso base en los nudos de las láminas de la planta (32 por lámina): el
+   * guardado si es estático; el de un modo se evalúa (y no se guarda).
+   */
+  valoresCaso(planta: string, de: SuperficieMapa, parte: "flexion" | "membrana", k: number): Float64Array {
+    const x = this.valores(planta, de, parte);
+    const v = x.valores[k];
+    if (v) return v;
+    this.efimeros?.trabajarEn(planta);
+    const w = new Float64Array(32 * x.laminas.length);
+    this.evaluarParte(x, parte, () => w, [k]);
+    return w;
   }
 }
 
@@ -292,7 +381,16 @@ export function capaMalla(r: ResultadosRender, planta: string): { primitivas: Pr
 export interface CasoBase {
   readonly base: number;
 }
-const esCasoBase = (f: ArrayLike<number> | CasoBase): f is CasoBase => typeof (f as CasoBase).base === "number";
+/** Un caso del sismo suelto (VS4): el valor de sus modos combinados en cada nudo, sin su factor (uz, por μ). */
+export interface CasoSismo {
+  readonly espectral: CasoEspectral;
+}
+/** Un caso lógico suelto: un caso base (estático) o uno del sismo; lo que `valoresCampo` admite en vez de unos factores. */
+export type CasoSuelto = CasoBase | CasoSismo;
+/** Los casos lógicos de unas consultas, sueltos y en su orden: el valor de cada uno se combina con `Superposicion.combinarLogico`. */
+export const casosSueltos = (sup: Superposicion): CasoSuelto[] => sup.logicos.map((c) => (c.espectral ? { espectral: c.espectral } : { base: c.base }));
+const esCasoBase = (f: ArrayLike<number> | CasoSuelto): f is CasoBase => typeof (f as CasoBase).base === "number";
+const esCasoSismo = (f: ArrayLike<number> | CasoSuelto): f is CasoSismo => typeof (f as CasoSismo).espectral === "object" && (f as CasoSismo).espectral !== null;
 
 /**
  * Un campo en los nudos de las láminas de una planta (4 por lámina), para una o muchas combinaciones.
@@ -303,24 +401,33 @@ const esCasoBase = (f: ArrayLike<number> | CasoBase): f is CasoBase => typeof (f
  * así que se guardan (VS4): las 64 combinaciones de la situación sísmica son 2 partes estáticas (con
  * las variables o sin ellas) y 4 casos del sismo con su ± y su 30 %, y antes cada una volvía a
  * combinar los modos en cada nudo. Las cuentas son las mismas y en el mismo orden: los mismos números.
+ * Los valores de los casos del sismo los combina `ResultadosRender.valores` para toda la planta (y
+ * suelta los campos de los modos); aquí sólo se lee la componente.
  */
 class CampoPlanta {
   readonly laminas: number[];
   /** Valores por combinación: 4 por lámina. */
   readonly N: number;
   private readonly r: ResultadosRender;
+  private readonly planta: string;
+  private readonly superficie: SuperficieMapa;
   private readonly uz: boolean;
   private readonly comp: number;
-  /** uz: el nudo de cada valor. Los demás: los campos de cada caso base (32 por lámina) y si la lámina tiene. */
+  /** uz: el nudo de cada valor. Los demás: los campos de cada caso base estático (32 por lámina), los de cada caso del sismo y si la lámina tiene. */
   private readonly nudos: Int32Array | null = null;
-  private readonly valores: readonly Float64Array[] | null = null;
+  private readonly valores: readonly (Float64Array | undefined)[] | null = null;
+  private readonly espectralesPlanta: ReadonlyMap<CasoEspectral, Float64Array> | null = null;
   private readonly region: ArrayLike<unknown> | null = null;
   private readonly estaticas = new Map<string, Float64Array>();
   private readonly espectrales = new Map<CasoEspectral, Float64Array>();
   private readonly uzBase = new Map<number, Float64Array>();
+  /** Los campos de un modo pedido como caso base suelto (no se guardan en la planta). */
+  private readonly deModo = new Map<number, Float64Array>();
 
   constructor(r: ResultadosRender, planta: string, campo: Campo, de: SuperficieMapa) {
     this.r = r;
+    this.planta = planta;
+    this.superficie = de;
     this.uz = campo === "uz";
     this.comp = campo === "uz" ? 0 : COMPONENTE[campo];
     if (this.uz) {
@@ -329,12 +436,22 @@ class CampoPlanta {
       this.nudos = new Int32Array(4 * laminas.length);
       laminas.forEach((l, i) => r.c.modelo.laminas![l]!.nudos.forEach((n, a) => (this.nudos![4 * i + a] = n)));
     } else {
-      const { laminas, region, valores } = r.valores(planta, de, this.comp < 3 ? "membrana" : "flexion");
+      const { laminas, region, valores, espectrales } = r.valores(planta, de, this.comp < 3 ? "membrana" : "flexion");
       this.laminas = laminas;
       this.region = region;
       this.valores = valores;
+      this.espectralesPlanta = espectrales;
     }
     this.N = 4 * this.laminas.length;
+  }
+
+  /** Los campos del caso base k (32 por lámina): los guardados de la planta o, en un modo, evaluados para este mapa. */
+  private deBase(k: number): Float64Array {
+    const v = this.valores![k];
+    if (v) return v;
+    let w = this.deModo.get(k);
+    if (!w) this.deModo.set(k, (w = this.r.valoresCaso(this.planta, this.superficie, this.comp < 3 ? "membrana" : "flexion", k)));
+    return w;
   }
 
   /** La parte estática: Σ factor·valor de los casos base con factor (NaN donde la lámina no tiene campo). */
@@ -352,15 +469,16 @@ class CampoPlanta {
         v[j] = s;
       }
     } else {
-      const valores = this.valores!;
       const comp = this.comp;
+      const con: [number, Float64Array][] = [];
+      for (let k = 0; k < fl.length; k++) if (fl[k]) con.push([k, this.deBase(k)]);
       for (let j = 0; j < this.N; j++) {
         if (!this.region![j >> 2]) {
           v[j] = Number.NaN;
           continue;
         }
         let s = 0;
-        for (let k = 0; k < fl.length; k++) if (fl[k]) s += fl[k]! * valores[k]![8 * j + comp]!;
+        for (const [k, w] of con) s += fl[k]! * w[8 * j + comp]!;
         v[j] = s;
       }
     }
@@ -387,7 +505,13 @@ class CampoPlanta {
         return g;
       };
       v = sup.espectralVector(caso, base, this.N, true);
-    } else v = sup.espectralVector(caso, (k) => this.valores![k]!, this.N, false, this.comp, 8);
+    } else {
+      // Combinado ya para la planta (todas las componentes): su componente
+      const e = this.espectralesPlanta!.get(caso);
+      if (!e) throw new Error("CampoPlanta: el caso del sismo no es de estas consultas");
+      v = new Float64Array(this.N);
+      for (let j = 0; j < this.N; j++) v[j] = e[8 * j + this.comp]!;
+    }
     this.espectrales.set(caso, v);
     return v;
   }
@@ -413,13 +537,14 @@ class CampoPlanta {
  * Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación
  * (los factores de los casos lógicos) o en un caso base. El visor interpola con ellos el valor de un punto.
  */
-export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number> | CasoBase, de: SuperficieMapa = "losas"): { laminas: number[]; v: Float64Array } {
+export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number> | CasoSuelto, de: SuperficieMapa = "losas"): { laminas: number[]; v: Float64Array } {
   // VS3: los factores son los de los casos lógicos; la parte lineal, como siempre, y la de los casos del sismo, combinada en cada nudo
   let partes: PartesCombinacion;
   if (esCasoBase(f)) {
     partes = { lineal: new Float64Array(r.q.nb), espectrales: [] };
     partes.lineal[f.base] = 1;
-  } else partes = r.q.sup.partes(f);
+  } else if (esCasoSismo(f)) partes = { lineal: new Float64Array(r.q.nb), espectrales: [{ factor: 1, caso: f.espectral }] };
+  else partes = r.q.sup.partes(f);
   const c = new CampoPlanta(r, planta, campo, de);
   const v = new Float64Array(c.N);
   c.de(partes, v);

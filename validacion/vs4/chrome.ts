@@ -14,9 +14,12 @@
  *   la página y el de los demás workers (`Runtime.getHeapUsage` en cada destino);
  * - la memoria privada de los procesos de este Chrome (el renderer entre ellos), por el sistema.
  *
- * En cuatro pasos: tras calcular; en Resultados · Modal (la forma de un modo); en Losas con la
- * envolvente de M11 (los campos de los 25 casos base); en Armado (las franjas). El tiempo de cada
- * paso, sólo como información.
+ * En siete pasos: tras calcular; en Resultados · Modal (la forma de un modo); en Losas con la
+ * envolvente de M11 de la planta activa, en una vista de planta (los campos SPR de los casos base de
+ * la planta; Modal deja la vista en 3D, y el 3D de Losas pinta todas las plantas: así se medía hasta
+ * el 2026-11-07); en Armado (las franjas); el mapa y las franjas de la planta de debajo (VS4: lo de
+ * los modos de la planta de antes se suelta); y en Pilares. El tiempo de cada paso, sólo como
+ * información.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -197,10 +200,17 @@ try {
     // Resultados · Modal (con sismo, la forma del modo 1 animada; sin él, la pantalla lo dice)
     const irA = (modo: string) => `__v1.boton("Resultados", document.querySelector("nav")).click(); await __v1.esperar(() => __v1.boton("${modo}", document.querySelector("[role=toolbar]"))); __v1.boton("${modo}", document.querySelector("[role=toolbar]")).click()`;
     await medir("Resultados · Modal", await accion(irA("Modal"), `document.querySelector('.celda[data-tipo="3d"]')`));
-    // Losas: la envolvente de M11 en la planta activa (los campos SPR de los 25 casos base)
-    await medir("Resultados · Losas, M11", await accion(`${irA("Losas")}; await __v1.esperar(() => __v1.boton("M11")); __v1.boton("M11").click()`));
+    // Losas: la envolvente de M11 en la planta activa, en una vista de planta (Modal deja la vista en
+    // 3D, y el 3D de Losas pinta todas las plantas con una escala común: no es el mapa de una planta).
+    // El desplegable es un <select> de React: el valor por el setter nativo y el evento «change»
+    const vistaPlanta = `{ const s = document.querySelector('.celda[data-activa="true"] select[aria-label="Tipo de vista"]') ?? document.querySelector('select[aria-label="Tipo de vista"]'); if (s && s.value !== "planta") { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, "planta"); s.dispatchEvent(new Event("change", { bubbles: true })); await __v1.esperar(() => document.querySelector('.celda[data-tipo="planta"]')); } }`;
+    await medir("Resultados · Losas, M11", await accion(`${irA("Losas")}; ${vistaPlanta}; await __v1.esperar(() => __v1.boton("M11")); __v1.boton("M11").click()`));
     // Armado: las franjas de la planta activa
     await medir("Resultados · Armado", await accion(irA("Armado")));
+    // Otra planta (VS4: lo de los modos de la planta de antes se suelta): su mapa de M11 y sus franjas
+    // (AvPág cambia la planta de la app, sea cual sea la vista; se comprueba que cambia)
+    const bajar = `const sel = () => document.querySelector('select[aria-label="Planta"]')?.value ?? null; const antes = sel(); document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown", bubbles: true })); await __v1.esperar(() => sel() !== antes, 5000); await new Promise((r) => setTimeout(r, 500))`;
+    await medir("Resultados · Losas, M11, planta de debajo", await accion(`${irA("Losas")}; await __v1.esperar(() => __v1.boton("M11")); __v1.boton("M11").click(); await __v1.esperar(() => __v1.quietos()); ${bajar}`));    await medir("Resultados · Armado, planta de debajo", await accion(irA("Armado")));
     // Pilares: las envolventes de los tramos de la planta
     await medir("Resultados · Pilares", await accion(irA("Pilares")));
   }

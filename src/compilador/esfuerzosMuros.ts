@@ -23,6 +23,7 @@
  * vértices y los bordes de sus huecos hasta ε_snap para unirlos a lo cercano, C3-b).
  */
 import { CamposLaminas } from "../motor/campos.ts";
+import type { CasosEfimeros } from "../motor/casosEfimeros.ts";
 import { Cortes, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
@@ -95,14 +96,18 @@ export class EsfuerzosMuros {
   private readonly mapeo: Mapeo;
   private readonly cortes: Cortes;
   private readonly campos: CamposLaminas;
+  /** VS4: los casos de los modos, que `campos` y `cortes` sueltan al cambiar de muro. */
+  private readonly efimeros: CasosEfimeros | null;
 
-  constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion & { campos?: CamposLaminas; cortes?: Cortes } = {}) {
+  constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion & { campos?: CamposLaminas; cortes?: Cortes; efimeros?: CasosEfimeros } = {}) {
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
     this.casos = casos;
-    this.ctx = validar(fisico, resolverOpciones(opciones), new Diagnosticos());
-    this.cortes = opciones.cortes ?? new Cortes(this.modelo);
-    this.campos = opciones.campos ?? new CamposLaminas(this.modelo);
+    const { campos, cortes, efimeros, ...op } = opciones;
+    this.ctx = validar(fisico, resolverOpciones(op), new Diagnosticos());
+    this.cortes = cortes ?? new Cortes(this.modelo);
+    this.campos = campos ?? new CamposLaminas(this.modelo);
+    this.efimeros = efimeros ?? null;
   }
 
   /** Tramos del muro con sus nudos reales. */
@@ -157,6 +162,7 @@ export class EsfuerzosMuros {
   machones(id: string): Machon[] | null {
     const m = this.ctx?.muroDe.get(id);
     if (!m) return null;
+    this.efimeros?.trabajarEn(`muro ${id}`);
     const { cotas, plantas, op } = this.ctx!;
     const eps = op.epsGeom;
     const base = cotas[m.kb]!;
@@ -192,6 +198,7 @@ export class EsfuerzosMuros {
   dinteles(id: string): Dintel[] | null {
     const m = this.ctx?.muroDe.get(id);
     if (!m) return null;
+    this.efimeros?.trabajarEn(`muro ${id}`);
     const { cotas, plantas, op } = this.ctx!;
     const eps = op.epsGeom;
     const base = cotas[m.kb]!;

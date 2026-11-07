@@ -98,6 +98,7 @@
  */
 import { woodArmer } from "../dimensionado/woodArmer.ts";
 import { CamposLaminas } from "../motor/campos.ts";
+import type { CasosEfimeros } from "../motor/casosEfimeros.ts";
 import { Cortes, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/modelo.ts";
@@ -168,6 +169,18 @@ export interface EnvolventeEstacionFranja {
   combMin: number;
 }
 
+/**
+ * VS4: en el barrido por campos de un grupo de franjas, cada cuántas rectas se suelta lo guardado de
+ * los casos efímeros (los modos). Las rectas van en orden a lo largo de la losa, así que lo que el
+ * evaluador SPR de un modo recupera para una recta (las plazas y los parches de su fila de láminas
+ * y de sus dos coronas) sólo lo reutilizan las rectas vecinas: con 48 rectas (12 m, unas 16 filas
+ * con h = 0,75) se rehacen las dos coronas del borde y lo retenido de los modos en una planta es el
+ * de unas 20 filas (del orden de 100 MiB en el edificio objetivo), no el de la planta entera (~600).
+ * Medido con 24 y con 48: el tiempo del grupo es el mismo (lo que cuesta es rehacer el SPR de los
+ * modos en cada dirección, ~1,7 s en el edificio objetivo, no las coronas), así que 48.
+ */
+const RECTAS_POR_SUELTA = 48;
+
 /** Lo que una recta da a cada franja de un grupo: Σ peso·[Mx, My, Mxy] por caso, el peso (ancho) y el de los ábacos. */
 interface PorFranja {
   m: Float64Array;
@@ -219,15 +232,18 @@ export class EsfuerzosFranjas {
   private readonly combinar: Combinar;
   /** VS4: lo mismo en dos pasos, para las envolventes (los casos del sismo, combinados una vez por estación). */
   private readonly logicos: CombinarEnDosPasos | null;
+  /** VS4: los casos de los modos, que `campos` y `cortes` sueltan al cambiar de planta. */
+  private readonly efimeros: CasosEfimeros | null;
 
   constructor(
     ctx: Contexto,
     compilado: { modelo: ModeloAnalitico; mapeo: Mapeo },
     casos: readonly ResultadoCaso[],
-    opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number; combinar?: Combinar; logicos?: CombinarEnDosPasos } = {},
+    opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number; combinar?: Combinar; logicos?: CombinarEnDosPasos; efimeros?: CasosEfimeros } = {},
   ) {
     this.combinar = opciones.combinar ?? combinar;
     this.logicos = opciones.logicos ?? null;
+    this.efimeros = opciones.efimeros ?? null;
     this.ctx = ctx;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
@@ -293,6 +309,7 @@ export class EsfuerzosFranjas {
 
   /** Las estaciones de todas las franjas de una losa en una dirección. */
   private calcularGrupo(l: LosaCompilada, k: 1 | 2): void {
+    this.efimeros?.trabajarEn(l.losa.planta);
     const fr = this.franjas(l.losa.id).filter((f) => f.direccion === k);
     const { d, n } = ejesArmado(l.losa)[k];
     const nc = this.casos.length;
@@ -841,14 +858,17 @@ export class EsfuerzosFranjas {
       for (let i = 0; i < fr.length; i++) if (est[i]!.some((e) => e.tipo === "apoyo" && e.s === ln.s)) exactas[i]!.push(ln.s);
     }
 
-    // Paso: una recta por campos cada PASO_ESTACIONES
+    // Paso: una recta por campos cada PASO_ESTACIONES. Lo de los modos (VS4), soltado al empezar (lo
+    // de las caras y los apoyos está repartido por toda la losa) y cada RECTAS_POR_SUELTA rectas
     const S0 = Math.min(...fr.map((f) => f.s0));
     const S1 = Math.max(...fr.map((f) => f.s1));
     const nPasos = Math.floor((S1 - S0) / PASO_ESTACIONES - 1e-9);
+    let rectas = 0;
     for (let j = 1; j <= nPasos; j++) {
       const s = S0 + j * PASO_ESTACIONES;
       const quien = fr.map((f, i) => s > f.s0 + EPS && s < f.s1 - EPS && !enApoyo(i, s) && !cercaDeExacta(i, s));
       if (!quien.some(Boolean)) continue;
+      if (rectas++ % RECTAS_POR_SUELTA === 0) this.efimeros?.soltar();
       const cam = porCampos(s);
       fr.forEach((_, i) => {
         if (!quien[i] || !(cam.r[i]!.w > EPS)) return;

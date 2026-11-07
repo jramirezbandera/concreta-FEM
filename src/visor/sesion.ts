@@ -26,7 +26,7 @@ import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
-import { UNIDADES_CAMPO, type Envolvente } from "../agente/render/resultados.ts";
+import { casosSueltos, UNIDADES_CAMPO, type Envolvente } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
@@ -828,13 +828,14 @@ export class Sesion {
       // La de ese punto: cada combinación en él (lineal en los casos) y, de ellas, la mayor o la menor
       const conj = this.conjunto(p.combinaciones, proposito);
       if (!conj.valido) return conj;
-      // (VS3: el valor de cada caso base en el punto; el de una combinación con casos del sismo, el de los modos, combinado)
-      const porCaso = rr.q.casos.map((_, base) => valorEnLamina(rr, p.campo, { base }, p.lamina, p.punto));
-      const h = porCaso[0];
+      // (VS4: el valor de cada caso lógico en el punto; el de un caso del sismo, el de sus modos combinados en los nudos, interpolado)
+      const porLogico = casosSueltos(rr.q.sup).map((c) => valorEnLamina(rr, p.campo, c, p.lamina, p.punto));
+      const h = porLogico[0];
       if (!h) return { valido: true, valor: null };
+      const valores = Float64Array.from(porLogico, (x) => x!.valor);
       let mejor = { valor: p.envolvente === "max" ? -Infinity : Infinity, comb: "" };
       conj.valor.factores.forEach((f, kc) => {
-        const v = rr.q.sup.valor(f, (k) => porCaso[k]!.valor, p.campo === "uz");
+        const v = rr.q.sup.combinarLogico(valores, 1, f)[0]!;
         if (p.envolvente === "max" ? v > mejor.valor : v < mejor.valor) mejor = { valor: v, comb: conj.valor.nombres[kc]! };
       });
       return { valido: true, valor: { valor: mejor.valor, objeto: h.objeto, planta: h.planta, unidad: UNIDADES_CAMPO[p.campo], lamina: p.lamina, comb: mejor.comb } };

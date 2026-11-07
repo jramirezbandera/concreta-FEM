@@ -686,3 +686,96 @@ describe("VS4: las envolventes de la situación sísmica no rehacen en cada comb
     });
   });
 });
+
+describe("VS4: los campos de los modos se combinan por planta y se sueltan al cambiar de planta", () => {
+  const SIS = () => {
+    const x = conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: ["ELU-SIS"] });
+    if (!x.valido) throw new Error("sin combinaciones");
+    return x.valor;
+  };
+
+  it("los casos efímeros son los de los modos, y los mapas y las franjas sólo guardan lo de la planta en la que se trabaja", () => {
+    // (unas Consultas nuevas: nada guardado)
+    const q2 = new Consultas(f, c, r.casos, {}, r.modal);
+    const ns = c.modelo.casos.length;
+    const ef = q2.efimeros!;
+    expect(ef).not.toBeNull();
+    expect(ef.cuales).toEqual(r.modal!.modos.map((_, i) => ns + i));
+    expect(q2.sup.espectrales.length).toBe(4);
+    const rr = new ResultadosRender(q2, c);
+    const [arriba, abajo] = [f.plantas[0]!.id, f.plantas[1]!.id];
+    const modos = r.modal!.modos.map((_, i) => q2.casos[ns + i]!.u);
+    const estatico = q2.casos[0]!.u;
+    // El mapa de una planta: los casos estáticos dejan su evaluador compartido; los modos, ninguno
+    // (se evalúan por bloques y se sueltan con ellos)
+    valoresCampo(rr, arriba, "m11", F);
+    const evEstatico = q2.campos.evaluadorCompartido(estatico);
+    expect(q2.campos.tieneEvaluador(estatico)).toBe(true);
+    for (const u of modos) expect(q2.campos.tieneEvaluador(u)).toBe(false);
+    expect(ef.soltados).toBe(0);
+    // Otro mapa de la misma planta: guardado
+    valoresCampo(rr, arriba, "v13", F);
+    expect(ef.soltados).toBe(0);
+    // Las franjas de la planta: los cortes comparten los evaluadores de los modos mientras barren la
+    // losa, y los sueltan cada tantas rectas; al acabar quedan los del último tramo
+    const losaArriba = f.losas!.find((l) => l.planta === arriba)!.id;
+    const frArriba = q2.franjas(losaArriba);
+    if (!frArriba.valido) throw new Error("sin franjas");
+    q2.franja(frArriba.valor[0]!.id);
+    const n1 = ef.soltados;
+    expect(n1).toBeGreaterThanOrEqual(1);
+    expect(q2.campos.tieneEvaluador(modos[0]!)).toBe(true);
+    expect(q2.campos.evaluadorCompartido(estatico)).toBe(evEstatico);
+    // Un mapa de otra planta: lo de los modos se suelta; los estáticos siguen
+    valoresCampo(rr, abajo, "m11", F);
+    expect(ef.soltados).toBe(n1 + 1);
+    for (const u of modos) expect(q2.campos.tieneEvaluador(u)).toBe(false);
+    expect(q2.campos.evaluadorCompartido(estatico)).toBe(evEstatico);
+    // Las franjas de la planta de arriba en la otra dirección: se cambia de planta (y lo de los modos
+    // se vuelve a evaluar: los mismos valores, abajo)
+    const otra = frArriba.valor.find((x) => x.direccion !== frArriba.valor[0]!.direccion)!;
+    q2.franja(otra.id);
+    expect(ef.soltados).toBeGreaterThanOrEqual(n1 + 2);
+  });
+
+  it("lo que se vuelve a calcular tras soltar da los mismos bits: mapas, franjas y el valor de un modo suelto", () => {
+    const [arriba, abajo] = [f.plantas[0]!.id, f.plantas[1]!.id];
+    const losaArriba = f.losas!.find((l) => l.planta === arriba)!.id;
+    const sis = SIS();
+    // Referencia: unas Consultas que sólo trabajan en la planta de arriba
+    const qa = new Consultas(f, c, r.casos, {}, r.modal);
+    const rra = new ResultadosRender(qa, c);
+    const mapaA = envolventeCampo(rra, arriba, "m11", sis, "max");
+    const frA = qa.franjas(losaArriba);
+    if (!frA.valido) throw new Error("sin franjas");
+    const ids = [frA.valor[0]!.id, frA.valor.find((x) => x.direccion !== frA.valor[0]!.direccion)!.id];
+    const estA = ids.map((id) => qa.franja(id));
+    const modoA = valoresCampo(rra, arriba, "m22", { base: c.modelo.casos.length + 2 }).v;
+    // Lo mismo, pasando por la planta de abajo entre medias (se suelta lo de los modos dos veces)
+    const qb = new Consultas(f, c, r.casos, {}, r.modal);
+    const rrb = new ResultadosRender(qb, c);
+    qb.franja(ids[0]!);
+    const n1 = qb.efimeros!.soltados;
+    envolventeCampo(rrb, abajo, "m11", sis, "max");
+    expect(qb.efimeros!.soltados).toBe(n1 + 1);
+    const mapaB = envolventeCampo(rrb, arriba, "m11", sis, "max");
+    expect(qb.efimeros!.soltados).toBe(n1 + 2);
+    // (las franjas de la otra dirección cortan las mismas láminas: las fuerzas nodales de los modos, con huecos, se rellenan)
+    const estB = ids.map((id) => qb.franja(id));
+    const modoB = valoresCampo(rrb, arriba, "m22", { base: c.modelo.casos.length + 2 }).v;
+    expect(mapaB.v).toEqual(mapaA.v);
+    expect(mapaB.comb).toEqual(mapaA.comb);
+    estA.forEach((ea, i) => {
+      const eb = estB[i]!;
+      if (!ea.valido || !eb.valido) throw new Error("sin estaciones");
+      expect(eb.valor.estaciones.length).toBe(ea.valor.estaciones.length);
+      eb.valor.estaciones.forEach((e, j) => expect(e.medios).toEqual(ea.valor.estaciones[j]!.medios));
+    });
+    expect(modoB).toEqual(modoA);
+    // Y un mapa de un caso del sismo suelto es lo que suma a una combinación que sólo lo lleva
+    const caso = qa.sup.logicos.find((l) => l.id === "EX+e")!.espectral!;
+    const solo = new Float64Array(qa.nl);
+    solo[qa.sup.logicos.findIndex((l) => l.id === "EX+e")] = 1;
+    expect(valoresCampo(rra, arriba, "m11", { espectral: caso }).v).toEqual(valoresCampo(rra, arriba, "m11", solo).v);
+  });
+});

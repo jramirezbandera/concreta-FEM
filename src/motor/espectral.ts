@@ -342,24 +342,42 @@ export class Superposicion {
   readonly logicos: readonly CasoLogico[];
   /** ¿Hay algún caso espectral? */
   readonly conEspectrales: boolean;
+  /** Los casos espectrales distintos, en el orden de los casos lógicos (VS4: lo que se guarda por caso del sismo). */
+  readonly espectrales: readonly CasoEspectral[];
+  /** Por caso base, 1 si es el de un modo de algún caso espectral (VS4: sus campos no se guardan: se combinan y se sueltan). */
+  readonly baseEspectral: Uint8Array;
   private readonly x: Float64Array;
   private readonly v: Float64Array;
 
   constructor(nb: number, logicos: readonly CasoLogico[]) {
     this.nb = nb;
     this.logicos = logicos;
+    this.baseEspectral = new Uint8Array(nb);
+    const espectrales: CasoEspectral[] = [];
     let maxModos = 0;
     for (const c of logicos) {
       if (c.espectral) {
         const e = c.espectral;
         maxModos = Math.max(maxModos, e.modos.length);
         if (e.coeficientes.length !== e.modos.length || (e.lineal && e.lineal.length !== e.modos.length) || !(e.dominante >= 0 && e.dominante < e.modos.length)) throw new Error(`Superposicion: el caso espectral ${c.id} no es coherente`);
-        for (const b of e.modos) if (!(b >= 0 && b < nb)) throw new Error(`Superposicion: el caso espectral ${c.id} nombra el caso base ${b} y hay ${nb}`);
+        for (const b of e.modos) {
+          if (!(b >= 0 && b < nb)) throw new Error(`Superposicion: el caso espectral ${c.id} nombra el caso base ${b} y hay ${nb}`);
+          this.baseEspectral[b] = 1;
+        }
+        if (!espectrales.includes(e)) espectrales.push(e);
       } else if (!(Number.isInteger(c.base) && c.base >= 0 && c.base < nb)) throw new Error(`Superposicion: el caso ${c.id} nombra el caso base ${c.base} y hay ${nb}`);
     }
+    this.espectrales = espectrales;
     this.conEspectrales = maxModos > 0;
     this.x = new Float64Array(maxModos);
     this.v = new Float64Array(maxModos);
+  }
+
+  /** Los casos base de los modos (los de `baseEspectral`), en orden. */
+  get basesEspectrales(): number[] {
+    const r: number[] = [];
+    for (let b = 0; b < this.nb; b++) if (this.baseEspectral[b]) r.push(b);
+    return r;
   }
 
   /** Sin casos espectrales: cada caso lógico es su caso base. */

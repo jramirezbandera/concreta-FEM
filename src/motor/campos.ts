@@ -741,6 +741,22 @@ export class CamposLaminas implements IntegradorCampos {
     return ev;
   }
 
+  /**
+   * Suelta el evaluador compartido de `u`: el siguiente `evaluadorCompartido(u)` empieza de cero (y
+   * da los mismos valores). VS4: lo que un evaluador guarda (las muestras de cada lámina, los
+   * coeficientes de cada parche y el valor de cada plaza) es del orden de los resultados del caso,
+   * y con los modos como casos base son muchos; quien los combina por planta los suelta al cambiar
+   * de planta (`CasosEfimeros`).
+   */
+  soltarEvaluador(u: ArrayLike<number>): boolean {
+    return this.deCortes.delete(u as object);
+  }
+
+  /** ¿Hay un evaluador compartido de `u` (para las pruebas de lo que se retiene)? */
+  tieneEvaluador(u: ArrayLike<number>): boolean {
+    return this.deCortes.has(u as object);
+  }
+
   /** Valores nodales (8 por plaza de flexión, en el triedro de su región) de todas las plazas. */
   nodales(u: ArrayLike<number>): Float64Array {
     const ev = this.evaluador(u);

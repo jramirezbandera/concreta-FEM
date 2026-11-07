@@ -14,7 +14,7 @@ import { deriva, flechas, pieza, reacciones, type DerivaPlanta, type FlechasLosa
 import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
-import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type CasoBase, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
+import { casosSueltos, envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type CasoSuelto, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { componerRevision, prepararRevision, type RevisionPreparada } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion, type PesoCalculado } from "../agente/sensatez.ts";
@@ -177,14 +177,15 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
   if (!conj.valido) return conj;
   const env = d.valor.envolvente;
   if (env) {
-    // El valor de cada caso en el punto; cada combinación, su suma con sus factores
-    // (VS3: el de cada caso base; el de una combinación con casos del sismo, el de los modos, combinado)
-    const porCaso = s.q!.casos.map((_, base) => valorEnPuntoCon(s, planta, campo, { base }, x, y));
-    const h = porCaso[0];
+    // El valor de cada caso lógico en el punto; cada combinación, su suma con sus factores (VS4: el de
+    // un caso del sismo es el de sus modos combinados en los nudos, interpolado: lo que pinta el mapa)
+    const porLogico = casosSueltos(s.q!.sup).map((c) => valorEnPuntoCon(s, planta, campo, c, x, y));
+    const h = porLogico[0];
     if (!h) return { valido: true, valor: null };
+    const valores = Float64Array.from(porLogico, (p) => p!.valor);
     let [max, min] = [{ valor: -Infinity, comb: "" }, { valor: Infinity, comb: "" }];
     conj.valor.factores.forEach((f, kc) => {
-      const v = s.q!.sup.valor(f, (k) => porCaso[k]!.valor, campo === "uz");
+      const v = s.q!.sup.combinarLogico(valores, 1, f)[0]!;
       if (v > max.valor) max = { valor: v, comb: conj.valor.nombres[kc]! };
       if (v < min.valor) min = { valor: v, comb: conj.valor.nombres[kc]! };
     });
@@ -198,8 +199,8 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
   return { valido: true, valor: r ? { ...r, comb: dib.nombre } : null };
 }
 
-/** El valor de un campo en un punto de la planta con unos factores de los casos, o en un caso base (`valorEnPunto`). */
-function valorEnPuntoCon(s: Sesion, planta: string, campo: Campo, f: ArrayLike<number> | CasoBase, x: number, y: number): Omit<ValorPunto, "comb"> | null {
+/** El valor de un campo en un punto de la planta con unos factores de los casos, o en un caso suelto (`valorEnPunto`). */
+function valorEnPuntoCon(s: Sesion, planta: string, campo: Campo, f: ArrayLike<number> | CasoSuelto, x: number, y: number): Omit<ValorPunto, "comb"> | null {
   const rr = s.rr!;
   const c = s.compilado!;
   const { laminas, v } = valoresCampo(rr, planta, campo, f);

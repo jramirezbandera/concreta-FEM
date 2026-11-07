@@ -38,6 +38,7 @@ import { generarCombinaciones, type CasoCarga, type Combinacion, type OpcionesCo
 import { psiDe } from "../combinaciones/psi.ts";
 import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { CamposLaminas } from "../motor/campos.ts";
+import { CasosEfimeros } from "../motor/casosEfimeros.ts";
 import { Cortes } from "../motor/cortes.ts";
 import { DiagramaCompuesto, EspectralBarra, type DiagramaLeible } from "../motor/diagramaCompuesto.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
@@ -302,6 +303,7 @@ export class Consultas {
   private franjasC?: EsfuerzosFranjas;
   private camposC?: CamposLaminas;
   private cortesC?: Cortes;
+  private efimerosC?: CasosEfimeros | null;
   private murosC?: EsfuerzosMuros;
   private readonly flechasGeo = new Map<string, GeometriaFlechas>();
   /** VS3: de las últimas barras con diagramas de combinaciones con sismo, lo que no depende de la combinación (`diagramaBarra`). */
@@ -689,9 +691,22 @@ export class Consultas {
     return (this.cortesC ??= new Cortes(this.modelo, { diagramas: this.piezas().diagramas }));
   }
 
+  /**
+   * VS4: los casos de los modos como casos base efímeros de `campos` y `cortes`: lo que guardan de
+   * ellos se suelta al cambiar de planta (sólo hace falta su combinación, los casos del sismo, y ésa
+   * es por planta). null sin modos.
+   */
+  get efimeros(): CasosEfimeros | null {
+    if (this.efimerosC === undefined) {
+      const modos = this.sup.basesEspectrales;
+      this.efimerosC = modos.length ? new CasosEfimeros(this.campos, () => this.cortesC ?? null, this.casos, modos) : null;
+    }
+    return this.efimerosC;
+  }
+
   /** Estaciones de una banda con sus esfuerzos por caso (C5.2). */
   banda(id: string): Respuesta<EstacionResultado[]> {
-    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom, campos: this.campos, cortes: this.cortes, combinar: this.combinarBase });
+    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom, campos: this.campos, cortes: this.cortes, combinar: this.combinarBase, efimeros: this.efimeros ?? undefined });
     const r = this.bandasC.estaciones(id);
     return r ? { valido: true, valor: r, diagnosticos: r.flatMap((e) => e.diagnosticos) } : this.noExiste("La banda", id);
   }
@@ -705,7 +720,7 @@ export class Consultas {
     if (!this.ctx.losaDe.has(losa)) return this.noExiste("La losa", losa);
     const mal = this.factoresMal<LineaReparto[]>(factores, losa);
     if (mal) return mal;
-    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom, campos: this.campos, cortes: this.cortes, combinar: this.combinarBase });
+    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom, campos: this.campos, cortes: this.cortes, combinar: this.combinarBase, efimeros: this.efimeros ?? undefined });
     const r = this.bandasC.reparto(losa, direccion, factores);
     return { valido: true, valor: r.lineas, diagnosticos: r.diagnosticos };
   }
@@ -716,7 +731,7 @@ export class Consultas {
   readonly combinarBase = (porBase: ArrayLike<number>, n: number, factores: ArrayLike<number>): Float64Array => this.sup.combinar(porBase, n, factores);
 
   private esfuerzosFranjas(): EsfuerzosFranjas {
-    return (this.franjasC ??= new EsfuerzosFranjas(this.ctx, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { campos: this.campos, cortes: this.cortes, combinar: this.combinarBase, logicos: this.sup }));
+    return (this.franjasC ??= new EsfuerzosFranjas(this.ctx, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { campos: this.campos, cortes: this.cortes, combinar: this.combinarBase, logicos: this.sup, efimeros: this.efimeros ?? undefined }));
   }
 
   /** Las franjas de armado de una losa maciza o reticular, o de todas (fase F). */
@@ -746,7 +761,7 @@ export class Consultas {
   }
 
   private muros(): EsfuerzosMuros {
-    return (this.murosC ??= new EsfuerzosMuros(this.fisico, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { ...this.opciones, campos: this.campos, cortes: this.cortes }));
+    return (this.murosC ??= new EsfuerzosMuros(this.fisico, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { ...this.opciones, campos: this.campos, cortes: this.cortes, efimeros: this.efimeros ?? undefined }));
   }
 
   /** Machones del muro (C5.3). */

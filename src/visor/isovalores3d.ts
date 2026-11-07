@@ -25,7 +25,7 @@
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { area, rotulo, type EntradaLeyenda, type EscalaDibujada, type Vec2 } from "../agente/render/escena.ts";
 import { AVISO_PICOS, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, trozosTriangulo, valorEnTriangulo, type EscalaMapa, type LimitesMapa, type Triangulo } from "../agente/render/isovalores.ts";
-import { envolventeCampo, extremosMapa, NOTA_MEMBRANA, UNIDADES_CAMPO, valoresCampo, type Campo, type CasoBase, type Envolvente, type ResultadosRender, type SuperficieMapa } from "../agente/render/resultados.ts";
+import { envolventeCampo, extremosMapa, NOTA_MEMBRANA, UNIDADES_CAMPO, valoresCampo, type Campo, type CasoSuelto, type Envolvente, type ResultadosRender, type SuperficieMapa } from "../agente/render/resultados.ts";
 
 type V3 = [number, number, number];
 
@@ -309,7 +309,7 @@ export function grupoDeLamina(r: ResultadosRender, l: number): Grupo | null {
  * `valoresCampo`). null si la lámina no tiene mapa o el punto no cae en ella. En una losa es lo que
  * da `valorEnPunto` en ese (x, y).
  */
-export function valorEnLamina(r: ResultadosRender, campo: Campo, f: ArrayLike<number> | CasoBase, l: number, p: readonly number[]): { valor: number; objeto: string; planta: string } | null {
+export function valorEnLamina(r: ResultadosRender, campo: Campo, f: ArrayLike<number> | CasoSuelto, l: number, p: readonly number[]): { valor: number; objeto: string; planta: string } | null {
   const g = grupoDeLamina(r, l);
   if (!g) return null;
   const { laminas, v } = valoresCampo(r, g.planta, campo, f, g.de);

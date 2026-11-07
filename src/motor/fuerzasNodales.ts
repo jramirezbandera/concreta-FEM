@@ -69,6 +69,8 @@ export class FuerzasNodales {
   private readonly porBarra: (ElementoMotor | undefined)[] = [];
   private readonly porLamina: (ElementoMotor | undefined)[] = [];
   private readonly cargas: (CargasCaso | undefined)[];
+  /** El vector de cargas nodales de los casos que no tienen (compartido, nulo). */
+  private sinNodales?: Float64Array;
   private incidencia: { ptr: Uint32Array; idx: Uint32Array } | null = null;
 
   constructor(modelo: ModeloAnalitico) {
@@ -170,8 +172,13 @@ export class FuerzasNodales {
       hechas.set(l, r);
       return r;
     };
-    const nodales = new Float64Array(6 * this.modelo.nudos.length);
-    for (const cn of caso.nodales ?? []) for (let g = 0; g < 6; g++) nodales[6 * cn.nudo + g]! += cn.f[g]!;
+    // Sin cargas nodales (los casos de los modos, VS3), el vector nulo compartido: 6·n ceros por caso
+    // eran 4 MB por modo en el edificio objetivo
+    let nodales: Float64Array;
+    if (caso.nodales?.length) {
+      nodales = new Float64Array(6 * this.modelo.nudos.length);
+      for (const cn of caso.nodales) for (let g = 0; g < 6; g++) nodales[6 * cn.nudo + g]! += cn.f[g]!;
+    } else nodales = this.sinNodales ??= new Float64Array(6 * this.modelo.nudos.length);
     c = { barra, lamina, nodales };
     this.cargas[k] = c;
     return c;
@@ -218,25 +225,39 @@ export class FuerzasNodales {
     return this.deElemento(e, k, r.u, rigidezLamina(e.lamina!));
   }
 
-  /** g de un elemento en todos los casos (`casos[k]`, el caso k del modelo), con su rigidez calculada una vez. */
-  private deElementoCasos(e: ElementoMotor, casos: readonly ResultadoCaso[]): Float64Array[] {
+  /**
+   * g de un elemento en todos los casos (`casos[k]`, el caso k del modelo), con su rigidez calculada
+   * una vez. Con `en` (un array con un hueco por caso que falta), sólo los que faltan, en él: los
+   * mismos valores que de nuevo (VS4: lo que los cortes sueltan de los casos de los modos).
+   */
+  private deElementoCasos(e: ElementoMotor, casos: readonly ResultadoCaso[], en?: (Float64Array | undefined)[]): Float64Array[] {
     this.comprobar(casos);
+    if (en) {
+      if (en.length !== casos.length) throw new Error(`FuerzasNodales: ${en.length} huecos para ${casos.length} casos`);
+      let K: Float64Array | null = null;
+      casos.forEach((r, k) => {
+        if (en[k]) return;
+        K ??= rigidezGlobal(this.modelo, e);
+        en[k] = this.deElemento(e, k, r.u, K);
+      });
+      return en as Float64Array[];
+    }
     const K = rigidezGlobal(this.modelo, e);
     return casos.map((r, k) => this.deElemento(e, k, r.u, K));
   }
 
-  /** `barra` en todos los casos. */
-  barraCasos(b: number, casos: readonly ResultadoCaso[]): Float64Array[] {
+  /** `barra` en todos los casos (o, con `en`, en los que le faltan). */
+  barraCasos(b: number, casos: readonly ResultadoCaso[], en?: (Float64Array | undefined)[]): Float64Array[] {
     const e = this.porBarra[b];
     if (!e) throw new Error(`FuerzasNodales: no hay barra ${b}`);
-    return this.deElementoCasos(e, casos);
+    return this.deElementoCasos(e, casos, en);
   }
 
-  /** `lamina` en todos los casos. */
-  laminaCasos(l: number, casos: readonly ResultadoCaso[]): Float64Array[] {
+  /** `lamina` en todos los casos (o, con `en`, en los que le faltan). */
+  laminaCasos(l: number, casos: readonly ResultadoCaso[], en?: (Float64Array | undefined)[]): Float64Array[] {
     const e = this.porLamina[l];
     if (!e) throw new Error(`FuerzasNodales: no hay lámina ${l}`);
-    return this.deElementoCasos(e, casos);
+    return this.deElementoCasos(e, casos, en);
   }
 
   /** Elementos (índices en `elementos`) que tocan cada nudo, sin los muelles a tierra (CSR). */
