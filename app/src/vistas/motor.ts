@@ -249,9 +249,12 @@ export class Motor {
       preparar: (escena, camara) => {
         const r = this.renderer;
         // Sólo antes del fotograma que la pinta. Si ese fotograma ya pasó, ya hizo este trabajo, y la
-        // pasada borraría el búfer (`render` lo limpia entero, el viewport no lo recorta) sin otro
-        // fotograma detrás: Chrome presentaba el lienzo vacío hasta el siguiente cambio (en Losas
-        // con el navegador abierto, el mapa no salía hasta mover algo)
+        // pasada dibujaría en el lienzo después de presentarlo: sin preserveDrawingBuffer, Chrome
+        // descarta el búfer al presentarlo, y una llamada de dibujo (aunque el viewport sea 0 × 0) lo
+        // da por cambiado y presenta el búfer descartado, vacío, hasta el siguiente fotograma. En
+        // Losas con el navegador abierto el mapa no salía hasta mover algo; al apagar o encender los
+        // ejes de una planta, el dibujo se quedaba en gris (sólo con los rótulos del lienzo 2D) hasta
+        // mover el ratón
         if (!r || !this.pendiente) return;
         r.setScissorTest(false);
         r.setViewport(0, 0, 0, 0);
