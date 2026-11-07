@@ -896,6 +896,13 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
               ? "Vacío, sale solo: el hormigón de nervios y capa más el casetón (los ábacos, γ·canto). Lo escrito manda: es el de la zona aligerada (los ábacos, γ·canto)."
               : "Vacío, sale solo con una vigueta en T: vigueta y capa más la bovedilla. Lo escrito manda.",
         )}
+        <label className="campo">
+          <span>
+            <span className="campo-nombre">nombre</span>
+            <Ayuda texto="Lo que se rotula en la planta (por ejemplo «Reticular 25+5/72»). Vacío: el id con el canto+capa/intereje (cm), o «maciza» y el canto. Se cambia luego en Propiedades." />
+          </span>
+          <input className="sel" value={t.nombre ?? ""} placeholder="el id y el tipo" aria-label="nombre del forjado" onChange={(x) => poner({ nombre: x.target.value || undefined })} />
+        </label>
         {num("direccion", "dirección", "°", (tipo === "unidireccional" ? "La de las viguetas, desde +X." : tipo === "reticular" ? "La de los nervios, desde +X." : "La del eje 1 de las láminas, desde +X.") + (tipo === "unidireccional" ? " Tras el contorno, un clic en una viga la toma de ella (Intro deja ésta)." : " Si el contorno no va según ella, tras el contorno un clic en una viga la toma de ella (Intro deja ésta)."))}
       </div>
     </Seccion>

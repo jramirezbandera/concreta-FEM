@@ -38,6 +38,7 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "abaco-borde": { stroke: "#58745a", sw: 1 },
   pano: { fill: "#f3ead9", stroke: "#97835c", sw: 1 },
   "pano-viguetas": { stroke: "#b49a68", sw: 1 },
+  "forjado-direccion": { stroke: "#3f5a40", sw: 1.6 },
   viga: { fill: "#c3cbd4", stroke: "#4c5560", sw: 0.8 },
   vigueta: { stroke: "#7a6a4a", sw: 1.4 },
   barra: { stroke: "#0369a1", sw: 2, dash: "8 4" },

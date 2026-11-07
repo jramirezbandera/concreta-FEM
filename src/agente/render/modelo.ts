@@ -269,7 +269,16 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     }
     // Los huecos, con aspa (los de cuatro vértices: sus diagonales)
     for (const h of l.huecos ?? []) if (h.length === 4) for (const [a, b] of [[0, 2], [1, 3]] as const) P.push({ tipo: "linea", puntos: [h[a]!, h[b]!], estilo: est("hueco-aspa") });
-    texto(rotuloForjado(anillos, ejesVigas), etiquetaLosa(l), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
+    // El rótulo y el símbolo de su dirección (el eje 1; en un reticular, sus dos familias de nervios),
+    // en el sitio más despejado: lejos de los bordes, las vigas, los ábacos y el rótulo
+    const g = rotuloForjado(anillos, ejesVigas);
+    if (!o.atenuado) {
+      const r = 1.2; // medio rótulo, m, aproximado: sólo para no ponerse debajo
+      const obstaculos = [...anillos.map((a) => [...a, a[0]!]), ...ejesVigas, ...((l.reticular?.abacos ?? []) as Vec2[][]).map((a) => [...a, a[0]!]), [[g[0] - r, g[1]], [g[0] + r, g[1]]] as Vec2[]];
+      const sitio = sitioDespejado(anillos, obstaculos);
+      if (sitio) for (const t of simboloDireccion(sitio.p, l.eje1 ?? 0, !!l.reticular, l.contorno, sitio.d)) P.push({ tipo: "linea", puntos: t, estilo: est("forjado-direccion"), objeto: l.id });
+    }
+    texto(g, etiquetaLosa(l), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
   }
   for (const p of pl.enPlanta(f.panos)) {
     const anillos = [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])];
@@ -279,7 +288,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     const [x0, y0, x1, y1] = cajaDe(p.contorno);
     const paso = Math.max(p.intereje, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 12 / p.intereje) * p.intereje);
     for (const [a, b] of rayado(anillos, d, paso)) P.push({ tipo: "linea", puntos: [a, b], estilo: est("pano-viguetas"), objeto: p.id });
-    texto(rotuloForjado(anillos, ejesVigas), etiquetaPano(p), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
+    texto(rotuloForjado(anillos, ejesVigas), etiquetaPano(p, f.secciones?.find((x) => x.id === p.seccion)), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
   }
 
   // Vigas, con su ancho
@@ -379,8 +388,9 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   const entrada = (e: Estilo, t: string) => {
     if (usados.has(e)) leyenda.push({ estilo: e, texto: t });
   };
-  entrada("losa", "Losa maciza (id y espesor)");
-  entrada("losa-reticular", "Forjado reticular (zona aligerada)");
+  entrada("losa", "Losa maciza (su nombre o el id y el canto, cm)");
+  entrada("losa-reticular", "Forjado reticular, zona aligerada (su nombre o el id y canto+capa/intereje, cm)");
+  entrada("forjado-direccion", "Dirección de la losa (eje 1) o, en cruz, de los nervios del reticular");
   entrada("abaco", "Ábaco macizo");
   entrada("hueco-aspa", "Hueco de losa (con aspa)");
   entrada("pano", "Paño unidireccional; las rayas, en la dirección de sus viguetas");
@@ -505,14 +515,73 @@ function rotuloForjado(anillos: readonly (readonly Vec2[])[], vigas: readonly (r
   return cerca ? cerca.q : mejor && mejor.d > dg ? mejor.q : g;
 }
 
-function etiquetaLosa(l: Losa): string {
-  const e = `${rotulo(l.espesor * 100)} cm`;
-  if (l.reticular) return `${l.id} · reticular ${e}, nervios a ${rotulo(l.reticular.intereje * 100)} cm`;
-  return `${l.id} · ${e}${l.pp !== undefined ? `, pp ${rotulo(l.pp)} kN/m²` : ""}`;
+/**
+ * El rótulo de un forjado en planta: su `nombre`, si lo tiene (lo que el usuario quiera: «Reticular
+ * 25+5/72»), o uno corto con el id y su tipo como se dice en obra: «L1 · 25+5/80» (reticular: canto
+ * sin la capa + capa / intereje, en cm), «L2 · maciza 25», «F1 · 25+5/70» (unidireccional con vigueta
+ * en T; con otra sección, «F1 · viguetas/70»). La dirección se ve en su símbolo, y el pp, en Propiedades.
+ */
+export function etiquetaLosa(l: Losa): string {
+  if (l.nombre) return l.nombre;
+  const cm = (x: number) => rotulo(x * 100);
+  if (l.reticular) return `${l.id} · ${cm(l.espesor - l.reticular.capa)}+${cm(l.reticular.capa)}/${cm(l.reticular.intereje)}`;
+  return `${l.id} · maciza ${cm(l.espesor)}`;
 }
 
-function etiquetaPano(p: PanoUnidireccional): string {
-  return `${p.id} · viguetas a ${rotulo(p.intereje * 100)} cm, ${rotulo(p.direccion)}°${p.pp !== undefined ? `, pp ${rotulo(p.pp)} kN/m²` : ""}`;
+export function etiquetaPano(p: PanoUnidireccional, s: Seccion | undefined): string {
+  if (p.nombre) return p.nombre;
+  const cm = (x: number) => rotulo(x * 100);
+  return s?.forma === "T" ? `${p.id} · ${cm(s.h - s.hf)}+${cm(s.hf)}/${cm(p.intereje)}` : `${p.id} · viguetas/${cm(p.intereje)}`;
+}
+
+/**
+ * El símbolo de la dirección de una losa en su rótulo: una flecha doble según el eje 1 (maciza) y, en
+ * un reticular, también según su perpendicular (las dos familias de nervios). Largo: un cuarto del
+ * lado menor de la caja del forjado, entre 0,6 y 2,5 m.
+ */
+/**
+ * El punto de una rejilla de 21 × 21 en la caja del forjado, dentro de él (no en un hueco), más alejado
+ * de las polilíneas `obstaculos`, con esa distancia; los empates, el primero de la rejilla (no depende
+ * del orden de las listas). null si ninguno cae dentro.
+ */
+function sitioDespejado(anillos: readonly (readonly Vec2[])[], obstaculos: readonly (readonly Vec2[])[]): { p: Vec2; d: number } | null {
+  const [x0, y0, x1, y1] = cajaDe(anillos[0]!);
+  const seg = (q: Vec2, a: Vec2, b: Vec2) => {
+    const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2)) : 0;
+    return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy);
+  };
+  let mejor: { p: Vec2; d: number } | null = null;
+  const N = 21;
+  for (let i = 1; i < N; i++)
+    for (let j = 1; j < N; j++) {
+      const q: Vec2 = [x0 + ((x1 - x0) * i) / N, y0 + ((y1 - y0) * j) / N];
+      if (!dentro(q, anillos[0]!) || anillos.slice(1).some((h) => dentro(q, h))) continue;
+      let d = Infinity;
+      for (const o of obstaculos) for (let k = 1; k < o.length; k++) d = Math.min(d, seg(q, o[k - 1]!, o[k]!));
+      if (!mejor || d > mejor.d + 1e-9) mejor = { p: q, d };
+    }
+  return mejor;
+}
+
+function simboloDireccion(c: Vec2, grados: number, cruz: boolean, contorno: readonly Vec2[], holgura: number): Vec2[][] {
+  const [x0, y0, x1, y1] = cajaDe(contorno);
+  const l = Math.min(Math.max(0.6, Math.min(2.5, Math.min(x1 - x0, y1 - y0) / 4)) / 2, Math.max(0.3, 0.85 * holgura));
+  const flecha = (g: number): Vec2[][] => {
+    const d: Vec2 = [Math.cos((g * Math.PI) / 180), Math.sin((g * Math.PI) / 180)];
+    const n: Vec2 = [-d[1], d[0]];
+    const a: Vec2 = [c[0] - l * d[0], c[1] - l * d[1]];
+    const b: Vec2 = [c[0] + l * d[0], c[1] + l * d[1]];
+    const p = l * 0.25;
+    const punta = (q: Vec2, s: number): Vec2[] => [
+      [q[0] - s * p * d[0] + p * 0.5 * n[0], q[1] - s * p * d[1] + p * 0.5 * n[1]],
+      q,
+      [q[0] - s * p * d[0] - p * 0.5 * n[0], q[1] - s * p * d[1] - p * 0.5 * n[1]],
+    ];
+    return [[a, b], punta(b, 1), punta(a, -1)];
+  };
+  return cruz ? [...flecha(grados), ...flecha(grados + 90)] : flecha(grados);
 }
 
 /** Tramos del eje de un muro (en planta) que ocupan sus huecos en el piso de debajo de la planta. */

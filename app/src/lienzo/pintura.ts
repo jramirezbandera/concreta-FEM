@@ -15,6 +15,7 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "abaco-relleno": { fill: "#2e4532" },
   "abaco-borde": { stroke: "#7da682", sw: 1 },
   pano: { fill: "#2b2518", stroke: "#a08a5e", sw: 1 },
+  "forjado-direccion": { stroke: "#9cc3a0", sw: 1.6 },
   viga: { fill: "#3a4350", stroke: "#a3adba", sw: 0.8 },
   "hueco-aspa": { stroke: "#6b7686", sw: 0.8 },
   eje: { stroke: "#6b7686", sw: 0.8, dash: "14 3 2 3" },

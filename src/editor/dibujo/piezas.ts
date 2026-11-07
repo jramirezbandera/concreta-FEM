@@ -53,6 +53,8 @@ export interface PlantillaForjado {
   /** Un clic dentro de un recuadro cerrado (por defecto) o un polígono a clics. */
   modo?: "recuadro" | "poligono";
   tipo?: TipoForjado;
+  /** El nombre de los forjados nuevos, lo que se rotula en planta («Reticular 25+5/72»); sin él, el id y el tipo. */
+  nombre?: string;
   /** Canto total (maciza y reticular). */
   espesor?: number;
   material?: string;
@@ -277,12 +279,14 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: numb
   for (const f of [...(m.losas ?? []), ...(m.panos ?? [])])
     if (f.planta === ctx.planta && f.contorno.some((q) => puntoEnPoligono(q, contorno) && distBorde(q, contorno) > 1e-9)) return `Se solaparía con el forjado ${f.id}.`;
   const positivo = (v: number | undefined) => v !== undefined && v > 0;
+  const nombre = t.nombre?.trim();
   if (tipo === "unidireccional") {
     if (!positivo(t.intereje)) return "Escriba en Propiedades el intereje de las viguetas.";
     if (!seccionValida(m, t.seccion)) return "Elija en Propiedades la sección de la vigueta (o cree una).";
     const id = idNuevo(m, "F");
     const pano: PanoUnidireccional = {
       id,
+      ...(nombre ? { nombre } : {}),
       planta: ctx.planta,
       contorno,
       direccion: t.direccion ?? 0,
@@ -305,7 +309,7 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: numb
     reticular = { intereje: t.intereje!, nervio: t.nervio!, capa: t.capa!, ...(t.caseton && t.caseton !== CASETON_POR_DEFECTO ? { caseton: t.caseton } : {}) };
   }
   const id = idNuevo(m, "L");
-  const losa: Losa = { id, planta: ctx.planta, contorno, espesor: t.espesor!, material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
+  const losa: Losa = { id, ...(nombre ? { nombre } : {}), planta: ctx.planta, contorno, espesor: t.espesor!, material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
   const etiqueta = `Forjado ${id} (${tipo})`;
   return t.zunchos === false ? hecho(crear("losas", losa), etiqueta) : conZunchos(ctx, crear("losas", losa), etiqueta, losa, t.anchoZuncho);
 }
