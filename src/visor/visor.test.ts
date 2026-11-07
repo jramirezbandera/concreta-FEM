@@ -225,6 +225,7 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
         [{ vista: "campo", campo: "uz", combinaciones: D }, vistaCampo(rr, planta, "uz", desp, d)],
         [{ vista: "campo", campo: "m11", combinaciones: D }, vistaCampo(rr, planta, "m11", esf, d)],
         [{ vista: "vigas", esfuerzo: "My", combinaciones: D }, vistaDiagramas(rr, planta, "My", esf, d)],
+        [{ vista: "vigas", esfuerzo: "T", combinaciones: D }, vistaDiagramas(rr, planta, "T", esf, d)],
         [{ vista: "pilares-n", combinaciones: D }, vistaAxiles(rr, planta, esf, d)],
       ];
       for (const [v, directa] of pares) {

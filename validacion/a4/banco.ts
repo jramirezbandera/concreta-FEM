@@ -6,7 +6,7 @@
  *   bun validacion/a4/banco.ts > validacion/a4/out_banco.txt
  */
 import { cpus } from "node:os";
-import { conjuntoPorDefecto, escenaASvg, ResultadosRender, VISTAS, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type Vista } from "../../src/agente/render/index.ts";
+import { conjuntoPorDefecto, escenaASvg, esfuerzoDeVista, ResultadosRender, VISTAS, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type Vista } from "../../src/agente/render/index.ts";
 import { resumen } from "../../src/agente/consultas.ts";
 import { compilar } from "../../src/compilador/compilar.ts";
 import { Consultas } from "../../src/compilador/consultas.ts";
@@ -53,8 +53,12 @@ for (const [nombre, f] of MODELOS) {
       case "malla":
         return [vistaMalla(r, planta, d)];
       case "vigas-my":
+      case "vigas-mz":
       case "vigas-vz":
-        return [vistaDiagramas(r, planta, v === "vigas-my" ? "My" : "Vz", cj.esfuerzos, d)];
+      case "vigas-vy":
+      case "vigas-n":
+      case "vigas-t":
+        return [vistaDiagramas(r, planta, esfuerzoDeVista(v)!, cj.esfuerzos, d)];
       case "pilares-n":
         return [vistaAxiles(r, planta, cj.esfuerzos, d)];
       default:

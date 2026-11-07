@@ -26,7 +26,7 @@ import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
-import { casosSueltos, UNIDADES_CAMPO, type Envolvente } from "../agente/render/resultados.ts";
+import { casosSueltos, UNIDADES_CAMPO, type Envolvente, type EsfuerzoPlanta } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
@@ -81,7 +81,7 @@ export type VistaResultadosPlanta = (
   /** `escala`: la del mapa (`EscalaMapa`); sin ella, la completa. */
   /** `envolvente`: con varias combinaciones, el mapa de su envolvente en cada nudo (UI-1); sin ella, la que gobierna en la planta. */
   | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa; envolvente?: Envolvente }
-  | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
+  | { vista: "vigas"; esfuerzo: EsfuerzoPlanta; combinaciones: EleccionCombinaciones }
   | { vista: "pilares-n"; combinaciones: EleccionCombinaciones }
   /** Fase F: la demanda de Wood–Armer de una armadura de las franjas de la planta. */
   /** AB: la armadura base va en el pedido (la del proyecto que se edita), así que cambiarla no reabre la sesión. */

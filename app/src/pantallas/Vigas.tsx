@@ -204,7 +204,7 @@ export function ModoDiagramas() {
     abiertaPor.current = elegida;
     ponerPaneles({ dock: true, pestana: "alzado" });
   }, [elegida, ponerPaneles]);
-  const vista: VistaPlanta = esfuerzo === "My" || esfuerzo === "Vz" ? { vista: "vigas", esfuerzo, combinaciones: eleccion } : { vista: "modelo" };
+  const vista = { vista: "vigas", esfuerzo, combinaciones: eleccion } satisfies VistaPlanta;
   const viga = usePedido(proyecto.cliente, id ? { tipo: "viga", id, esfuerzo, combinaciones: eleccion } : null);
   const v = viga.datos && viga.datos.id === id ? viga.datos : null;
   // Otra pieza: el cursor, en el centro de su primer vano (no en un apoyo)
@@ -270,9 +270,13 @@ export function ModoDiagramas() {
   const vistaPlanta = (
     <ZonaVistas
       fuentes={{
-        planta: (x) => (x.planta ? <PlantaDiagramas planta={x.planta} vista={vista.vista === "vigas" ? conMalla(vista, x) : vista} id={id} cargando={x.planta === planta && viga.cargando} /> : null),
-        malla: vista.vista === "vigas",
-        cabeceraPlanta: () => <Chip acento>{vista.vista === "vigas" ? `Diagramas de ${esfuerzo}` : `${esfuerzo}: en el 3D, el alzado y el de la pieza`}</Chip>,
+        planta: (x) => (x.planta ? <PlantaDiagramas planta={x.planta} vista={conMalla(vista, x)} id={id} cargando={x.planta === planta && viga.cargando} /> : null),
+        malla: true,
+        cabeceraPlanta: () => (
+          <Chip acento title={esfuerzo === "My" || esfuerzo === "Vz" || esfuerzo === "T" || esfuerzo === "N" ? "Abatido sobre la planta, como en el alzado" : "En el plano de la planta, donde está"}>
+            Diagramas de {esfuerzo}
+          </Chip>
+        ),
         tresD: (x) => <TresDDiagramas planta={x.planta} esfuerzo={esfuerzo} eleccion={eleccion} piezas={piezas3D} escala={Number(escala)} />,
         alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: planoAlzado(x.eje, x), diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} />,
         cabecera3D: () => (

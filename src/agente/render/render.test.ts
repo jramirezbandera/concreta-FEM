@@ -568,6 +568,84 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
     }
   });
 
+  it("diagramas de Mz, Vy, N y T: los extremos rotulados de cada vano son los de la envolvente de la pieza, con la combinación que los da", () => {
+    let rotulados = 0;
+    for (const [nombre, f] of MODELOS) {
+      const { q, r, cj } = calculados.get(nombre)!;
+      for (const pl of f.plantas)
+        for (const esf of ["Mz", "Vy", "N", "T"] as const) {
+          const comp = { N: 0, Vy: 1, T: 3, Mz: 5 }[esf];
+          const e = vistaDiagramas(r, pl.id, esf, cj.esfuerzos, d);
+          for (const x of e.extremos) {
+            const id = x.objeto!;
+            const i = Number(x.que.match(/del vano (\d+)$/)![1]) - 1;
+            const vano = (q.viga(id) as { valido: true; valor: { vanos: { desde: number; hasta: number }[] } }).valor.vanos[i]!;
+            const dentro = envolventePieza(r, id, cj.esfuerzos, comp).filter((p) => p.s >= vano.desde - 1e-9 && p.s <= vano.hasta + 1e-9);
+            expect(x.valor, `${nombre} ${pl.id} ${x.que} ${id}`).toBe(x.que.includes("máximo") ? Math.max(...dentro.map((p) => p.max)) : Math.min(...dentro.map((p) => p.min)));
+            // La combinación que lo da: sola, su curva llega a ese valor en el vano
+            const kc = cj.esfuerzos.nombres.indexOf(x.comb!);
+            expect(kc, `${id} ${x.comb}`).toBeGreaterThanOrEqual(0);
+            const una: ConjuntoCombinaciones = { descripcion: "una", nombres: [x.comb!], etiquetas: [cj.esfuerzos.etiquetas[kc]!], factores: [cj.esfuerzos.factores[kc]!] };
+            const suya = envolventePieza(r, id, una, comp).filter((p) => p.s >= vano.desde - 1e-9 && p.s <= vano.hasta + 1e-9);
+            expect(Math.min(...suya.map((p) => Math.abs(p.max - x.valor))), `${id} ${x.que} ${x.comb}`).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(x.valor)));
+            rotulados++;
+          }
+        }
+    }
+    expect(rotulados).toBeGreaterThan(0);
+  });
+
+  it("diagramas en un diafragma rígido: Mz y Vy son ruido y no se dibujan; N no tiene valor", () => {
+    const { f, r, cj } = calculados.get("edificio con losas (2 plantas, con acciones)")!;
+    const pl = f.plantas[0]!.id;
+    for (const esf of ["Mz", "Vy", "N"] as const) {
+      const e = vistaDiagramas(r, pl, esf, cj.esfuerzos, d);
+      expect(e.primitivas.some((p) => p.tipo === "poligono" && p.estilo.startsWith("diagrama-")), esf).toBe(false);
+      expect(e.extremos, esf).toEqual([]);
+      expect(e.notas.some((x) => (esf === "N" ? x.includes("sin N") : x.includes(`${esf} nulo en toda la planta (`))), `${esf}: ${e.notas.join(" | ")}`).toBe(true);
+    }
+    // My, Vz y T sí
+    for (const esf of ["My", "Vz", "T"] as const) expect(vistaDiagramas(r, pl, esf, cj.esfuerzos, d).extremos.length, esf).toBeGreaterThan(0);
+  });
+
+  it("diagramas sin diafragma: Mz del lado de las tracciones (−y local) y Vy hacia +y con la pieza leída en X o Y crecientes, en su plano (como en el 3D)", async () => {
+    const f0 = conAcciones(edificioObjetivoLosas(2, 3, 2));
+    const f: ModeloFisico = { ...f0, plantas: f0.plantas.map((p) => ({ ...p, diafragma: "ninguno" as const })) };
+    const c = compilar(f);
+    if (!c.valido) throw new Error(c.diagnosticos[0]?.mensaje);
+    const k = calcular(c.modelo);
+    if (!k.valido) throw new Error("no calcula");
+    const q = new Consultas(f, c, k.casos);
+    const res = resumen(proyectoDe(f), c);
+    if (!res.valido) throw new Error("resumen");
+    const r = new ResultadosRender(q, c);
+    const cj = conjuntoPorDefecto(q, res.valor, "esfuerzos");
+    let vistas = 0;
+    for (const pl of f.plantas)
+      for (const esf of ["Mz", "Vy"] as const) {
+        const e = vistaDiagramas(r, pl.id, esf, cj, d);
+        for (const v of (f.vigas ?? []).filter((x) => x.planta === pl.id && x.puntos.length === 2)) {
+          const [A, B] = v.puntos as [Vec2, Vec2];
+          const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+          const lado = (p: Vec2) => ((B[0] - A[0]) * (p[1] - A[1]) - (B[1] - A[1]) * (p[0] - A[0])) / L;
+          // El eje x local de la barra, respecto a A→B (+1 si va igual), y el sentido de lectura (X o Y crecientes)
+          const b0 = c.modelo.barras![c.mapeo.piezas[v.id]![0]!]!;
+          const [ni, nj] = b0.nudos.map((n) => c.modelo.nudos[n]!);
+          const x = Math.sign((nj!.x - ni!.x) * (B[0] - A[0]) + (nj!.y - ni!.y) * (B[1] - A[1]));
+          const lectura = Math.abs(B[0] - A[0]) >= Math.abs(B[1] - A[1]) ? Math.sign(B[0] - A[0]) : Math.sign(B[1] - A[1]);
+          // +y local = z × x, a la izquierda del eje x (con z hacia arriba)
+          const esperado = esf === "Mz" ? -x : lectura;
+          for (const [estilo, signo] of [["diagrama-positivo", 1], ["diagrama-negativo", -1]] as const) {
+            const ls = e.primitivas.filter((p) => p.tipo === "poligono" && p.estilo === estilo && p.objeto === v.id).flatMap((p) => (p.tipo === "poligono" ? p.anillos[0]!.map(lado) : [])).filter((y) => Math.abs(y) > 1e-9);
+            if (!ls.length) continue;
+            expect(new Set(ls.map(Math.sign)), `${pl.id} ${esf} ${v.id} ${estilo}`).toEqual(new Set([signo * esperado]));
+            vistas++;
+          }
+        }
+      }
+    expect(vistas).toBeGreaterThan(0);
+  }, 120_000);
+
   it("axiles: los rotulados son los de Consultas.pilar combinados", () => {
     for (const [nombre, f] of MODELOS) {
       const { q, r, cj } = calculados.get(nombre)!;
@@ -673,8 +751,7 @@ describe("A4, criterio 3: tamaño de la imagen y del texto", () => {
           vistaDiagnosticos(f, pl.id, c.diagnosticos, d),
           vistaMalla(r, pl.id, d),
           ...(["uz", "m11", "m22", "m12", "v13", "v23"] as Campo[]).map((x) => vistaCampo(r, pl.id, x, x === "uz" ? cj.desplazamientos : cj.esfuerzos, d)),
-          vistaDiagramas(r, pl.id, "My", cj.esfuerzos, d),
-          vistaDiagramas(r, pl.id, "Vz", cj.esfuerzos, d),
+          ...(["My", "Mz", "Vz", "Vy", "N", "T"] as const).map((x) => vistaDiagramas(r, pl.id, x, cj.esfuerzos, d)),
           vistaAxiles(r, pl.id, cj.esfuerzos, d),
           ...f.casos.map((x) => vistaCargas(f, pl.id, x.id, d)),
         ];

@@ -1,6 +1,7 @@
 /**
  * Vistas de la malla y de los resultados de una planta (A4): `malla`, isovalores (`uz`, `m11`,
- * `m22`, `m12`, `v13`, `v23`), diagramas de vigas (`vigas-my`, `vigas-vz`) y axiles de pilares
+ * `m22`, `m12`, `v13`, `v23`), diagramas de vigas (`vigas-my`, `vigas-mz`, `vigas-vz`, `vigas-vy`,
+ * `vigas-n`, `vigas-t`) y axiles de pilares
  * (`pilares-n`). Necesitan el modelo compilado y, salvo la malla, calculado.
  *
  * De dónde sale cada número (criterio 1 de A4):
@@ -9,7 +10,8 @@
  *   nudos de cada lámina, en sus ejes (los de su losa: 1 = `eje1`, X por defecto; en un muro, 1 a lo
  *   largo de su eje, 2 hacia arriba). Son lineales en los casos: se evalúan por caso y se combinan;
  * - los diagramas, de `diagramaCombinado` (A1) en las estaciones de cada tramo flexible; sus extremos
- *   rotulados, de `Consultas.vano` en cada combinación;
+ *   rotulados, de `Consultas.vano` en cada combinación (My y Vz) o, en los demás esfuerzos, de la
+ *   envolvente de la pieza en cada vano (las estaciones de `fem consultar pieza` y del 3D);
  * - los axiles, de `Consultas.pilar`.
  *
  * Un mapa es de una combinación: con varias, la que da el mayor |valor| en la planta o, con
@@ -37,7 +39,20 @@ import { capaApoyos, ejeSeccion, fondoModelo, huellaMuro, huellaSeccion, huellas
 export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
 export type Campo = (typeof CAMPOS)[number];
 /** `reacciones` (I4) está en `reacciones.ts`. */
-export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-vz", "pilares-n", "reacciones", "bandas"] as const;
+export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-mz", "vigas-vz", "vigas-vy", "vigas-n", "vigas-t", "pilares-n", "reacciones", "bandas"] as const;
+
+/** Los esfuerzos de los diagramas de vigas en planta: los seis de las barras. */
+export const ESFUERZOS_PLANTA = ["My", "Mz", "Vz", "Vy", "N", "T"] as const;
+export type EsfuerzoPlanta = (typeof ESFUERZOS_PLANTA)[number];
+/** La vista `vigas-…` de cada esfuerzo, y al revés. */
+export const vistaVigas = (e: EsfuerzoPlanta): string => `vigas-${e.toLowerCase()}`;
+export const esfuerzoDeVista = (v: string): EsfuerzoPlanta | null => ESFUERZOS_PLANTA.find((e) => vistaVigas(e) === v) ?? null;
+/**
+ * Un diagrama de la planta con el mayor |valor| por debajo de esto (kN o kN·m) es nulo y no se dibuja:
+ * Mz y Vy de las vigas en un diafragma rígido salen del orden del redondeo, y con la escala del mayor
+ * |valor| se dibujarían como si fueran grandes.
+ */
+export const DIAGRAMA_NULO = 1e-6;
 
 /** Componente de los campos SPR ([Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy]) de cada campo de láminas. */
 const COMPONENTE: Record<Exclude<Campo, "uz">, number> = { f11: 0, f22: 1, f12: 2, m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };
@@ -816,16 +831,74 @@ export function envolventeTramo(r: ResultadosRender, t: TramoFlexible, conjunto:
   return curva;
 }
 
-export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "My" | "Vz", conjunto: ConjuntoCombinaciones, d: DatosVista): Escena {
+/**
+ * La combinación que da `objetivo` en la componente `comp` de la estación s de una pieza: la de valor
+ * más cercano por uno de los dos lados de la estación (la primera en el orden del conjunto si empatan).
+ * No se exige el mismo double: s − s0 no devuelve siempre la x de la envolvente, con un redondeo.
+ */
+function combinacionDe(r: ResultadosRender, pieza: string, conjunto: ConjuntoCombinaciones, comp: number, s: number, objetivo: number): string {
+  let mejor = { d: Infinity, comb: "" };
+  for (const t of r.ep.tramos(pieza)) {
+    if (s < t.s0 - 1e-9 || s > t.s1 + 1e-9) continue;
+    const x = Math.min(t.s1 - t.s0, Math.max(0, s - t.s0));
+    for (let k = 0; k < conjunto.factores.length; k++) {
+      const dg = r.q.diagramaBarra(t.barra, conjunto.factores[k]!);
+      for (const lado of [-1, 1] as const) {
+        const dif = Math.abs(dg.esfuerzosEn(x, lado)[comp]! - objetivo);
+        if (dif < mejor.d) mejor = { d: dif, comb: conjunto.nombres[k]! };
+      }
+    }
+  }
+  return mejor.comb;
+}
+
+/** Componente de [N, Vy, Vz, T, My, Mz] de cada esfuerzo. */
+const COMPONENTE_ESFUERZO: Record<EsfuerzoPlanta, number> = { N: 0, Vy: 1, Vz: 2, T: 3, My: 4, Mz: 5 };
+
+/**
+ * Dónde va lo positivo en planta, con la pieza leída en X creciente (o en Y creciente si va más en Y).
+ * - My y Vz (el plano vertical) se abaten, como en el alzado: My > 0 a la derecha (abajo en las
+ *   piezas en X), del lado de las tracciones, y Vz > 0 a la izquierda (arriba).
+ * - Mz y Vy están en el plano de la planta y se dibujan donde están: Mz del lado de las tracciones
+ *   (Mz > 0 tracciona la cara −y, a la derecha del eje x local) y Vy > 0 hacia +y (y = z × x, a la
+ *   izquierda), como en el 3D.
+ * - N y T no tienen plano: lo positivo a la izquierda, como Vz (en el 3D, hacia +z).
+ */
+const LEYENDA_PLANTA: Record<EsfuerzoPlanta, [string, string]> = {
+  My: ["abajo en las piezas en X y a la derecha en las piezas en Y", "al otro lado (como en el alzado)"],
+  Vz: ["arriba en las piezas en X y a la izquierda en las piezas en Y", "al otro lado (como en el alzado)"],
+  Mz: ["del lado de las tracciones (Mz > 0 tracciona la cara −y, a la derecha del eje x de la barra), en su plano", "del lado de las tracciones"],
+  Vy: ["hacia +y (a la izquierda de la pieza leída en X o en Y crecientes), en su plano", "hacia −y"],
+  N: ["tracción, arriba en las piezas en X y a la izquierda en las piezas en Y", "compresión, al otro lado"],
+  T: ["arriba en las piezas en X y a la izquierda en las piezas en Y", "al otro lado"],
+};
+const NOTA_PLANTA: Record<EsfuerzoPlanta, string> = {
+  My: "My > 0 tracciona la cara inferior (momento de vano).",
+  Vz: "Vz: cortante vertical de la pieza, con el convenio de las barras.",
+  Mz: "Mz: flexión en el plano de la planta (en el plano x-y de la barra), dibujada en su plano. En el plano de un diafragma rígido es nula o casi.",
+  Vy: "Vy: cortante horizontal de la pieza (según su y), dibujado en su plano. En el plano de un diafragma rígido es nulo o casi.",
+  N: "N > 0, tracción.",
+  T: "T: torsor de la pieza, con el convenio de las barras; abatido, como Vz.",
+};
+
+export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: EsfuerzoPlanta, conjunto: ConjuntoCombinaciones, d: DatosVista): Escena {
   const pl = new PlantaFisica(r.q.fisico, planta);
   const c = r.c;
   const q = r.q;
-  const comp = esfuerzo === "My" ? 4 : 2;
+  const comp = COMPONENTE_ESFUERZO[esfuerzo];
   const fondo = fondoModelo(pl, { atenuado: true });
   const P: Primitiva[] = [...fondo.primitivas];
-  const piezas = [...pl.enPlanta(pl.f.vigas).map((v) => v.id), ...pl.enPlanta(pl.f.panos).flatMap((p) => c.mapeo.panos?.[p.id] ?? [])];
+  const todas = [...pl.enPlanta(pl.f.vigas).map((v) => v.id), ...pl.enPlanta(pl.f.panos).flatMap((p) => c.mapeo.panos?.[p.id] ?? [])];
+  // N de una viga en el plano de un diafragma rígido: sin valor (C1-d), no se dibuja
+  const sinAxil = esfuerzo === "N" ? todas.filter((id) => {
+    const v = q.viga(id);
+    return v.valido && v.valor.axilSinValor;
+  }) : [];
+  const piezas = sinAxil.length ? todas.filter((id) => !sinAxil.includes(id)) : todas;
   const curvas = piezas.map((id) => ({ pieza: id, curva: envolventePieza(r, id, conjunto, comp) }));
-  const maxAbs = Math.max(0, ...curvas.flatMap((x) => x.curva.map((e) => Math.max(Math.abs(e.max), Math.abs(e.min)))));
+  const maxReal = Math.max(0, ...curvas.flatMap((x) => x.curva.map((e) => Math.max(Math.abs(e.max), Math.abs(e.min)))));
+  const nulo = esfuerzo !== "My" && esfuerzo !== "Vz" && maxReal < DIAGRAMA_NULO;
+  const maxAbs = nulo ? 0 : maxReal;
   const [x0, y0, x1, y1] = caja(pl);
   const k = maxAbs > 0 ? (ORDENADA * Math.hypot(x1 - x0, y1 - y0)) / maxAbs : 0;
   const geo = new Map<string, ReturnType<typeof geometriaPieza>>();
@@ -844,7 +917,8 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
         if (Math.hypot(dx, dy) < 1e-9) [dx, dy] = g(id)(ts[0]!.s0).d;
       }
       const directa = Math.abs(dx) >= Math.abs(dy) ? dx > 0 : dy > 0;
-      l = (directa ? 1 : -1) * (esfuerzo === "My" ? -1 : 1);
+      // Mz, del lado de las tracciones: siempre a la derecha del eje x de la barra (−y)
+      l = esfuerzo === "Mz" ? -1 : (directa ? 1 : -1) * (esfuerzo === "My" ? -1 : 1);
       lados.set(id, l);
     }
     return l;
@@ -867,7 +941,7 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
     });
     return r;
   };
-  for (const { pieza, curva } of curvas) {
+  for (const { pieza, curva } of nulo ? [] : curvas) {
     if (curva.length < 2) continue;
     const eje = [g(pieza)(curva[0]!.s).p, g(pieza)(curva[curva.length - 1]!.s).p];
     for (const [cual, estilo] of [
@@ -881,22 +955,33 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
     }
     P.push({ tipo: "linea", puntos: eje as Vec2[], estilo: "diagrama-eje", objeto: pieza });
   }
-  // Extremos de cada vano, de Consultas.vano en cada combinación
+  // Extremos de cada vano: de Consultas.vano en cada combinación (My y Vz) o de la envolvente de la pieza
   const extremos: ExtremoRotulado[] = [];
-  const unidad = esfuerzo === "My" ? "kN·m" : "kN";
-  for (const id of piezas) {
+  const unidad = esfuerzo === "My" || esfuerzo === "Mz" || esfuerzo === "T" ? "kN·m" : "kN";
+  const deVano = esfuerzo === "My" || esfuerzo === "Vz";
+  for (const { pieza: id, curva } of nulo ? [] : curvas) {
     const v = q.viga(id);
     if (!v.valido) continue;
-    v.valor.vanos.forEach((_, i) => {
+    v.valor.vanos.forEach((vano, i) => {
       let mx: { v: number; s: number; comb: string } | null = null;
       let mn: { v: number; s: number; comb: string } | null = null;
-      conjunto.factores.forEach((f, kc) => {
-        const e = q.vano(id, i, f);
-        if (!e.valido) return;
-        const [a, b] = esfuerzo === "My" ? [e.valor.maxMy, e.valor.minMy] : [e.valor.maxVz, e.valor.minVz];
-        if (!mx || a.valor > mx.v) mx = { v: a.valor, s: a.s, comb: conjunto.nombres[kc]! };
-        if (!mn || b.valor < mn.v) mn = { v: b.valor, s: b.s, comb: conjunto.nombres[kc]! };
-      });
+      if (deVano)
+        conjunto.factores.forEach((f, kc) => {
+          const e = q.vano(id, i, f);
+          if (!e.valido) return;
+          const [a, b] = esfuerzo === "My" ? [e.valor.maxMy, e.valor.minMy] : [e.valor.maxVz, e.valor.minVz];
+          if (!mx || a.valor > mx.v) mx = { v: a.valor, s: a.s, comb: conjunto.nombres[kc]! };
+          if (!mn || b.valor < mn.v) mn = { v: b.valor, s: b.s, comb: conjunto.nombres[kc]! };
+        });
+      else {
+        // Las estaciones de la envolvente dentro del vano (de cara a cara), y la combinación que da cada extremo
+        for (const e of curva) {
+          if (e.s < vano.desde - 1e-9 || e.s > vano.hasta + 1e-9) continue;
+          if (!mx || e.max > mx.v) mx = { v: e.max, s: e.s, comb: "" };
+          if (!mn || e.min < mn.v) mn = { v: e.min, s: e.s, comb: "" };
+        }
+        for (const x of [mx, mn] as ({ v: number; s: number; comb: string } | null)[]) if (x) x.comb = combinacionDe(r, id, conjunto, comp, x.s, x.v);
+      }
       for (const [que, e, color] of [
         ["máximo", mx, "#b91c1c"],
         ["mínimo", mn, "#1d4ed8"],
@@ -906,7 +991,7 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
         const p = ordenada(id, x.s, x.v);
         const arriba = p[1] >= g(id)(x.s).p[1];
         P.push({ tipo: "texto", p, texto: rotulo(x.v), tamano: 11, color, fondo: true, ancla: "medio", dy: arriba ? -3 : 12, prioridad: Math.abs(x.v) / (maxAbs || 1) * 50 + 10, objeto: id });
-        extremos.push({ que: `${esfuerzo} ${que} del vano ${i + 1}`, valor: x.v, unidad, objeto: id, punto: g(id)(x.s).p, comb: x.comb });
+        extremos.push({ que: `${esfuerzo} ${que} del vano ${i + 1}`, valor: x.v, unidad, objeto: id, punto: g(id)(x.s).p, ...(x.comb || deVano ? { comb: x.comb } : {}) });
       }
     });
   }
@@ -916,13 +1001,20 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
     cabecera: cabecera(pl, `Vista: ${esfuerzo} de vigas y viguetas (${unidad}), envolvente de ${conjunto.descripcion}`, d),
     primitivas: P,
     leyenda: [
-      { estilo: "diagrama-positivo", texto: `Envolvente máxima de ${esfuerzo} donde es positiva: ${esfuerzo === "My" ? "abajo en las piezas en X y a la derecha en las piezas en Y" : "arriba en las piezas en X y a la izquierda en las piezas en Y"}` },
-      { estilo: "diagrama-negativo", texto: `Envolvente mínima de ${esfuerzo} donde es negativa, al otro lado (como en el alzado); las dos curvas enteras, en el alzado y en la tabla de la pieza` },
+      { estilo: "diagrama-positivo", texto: `Envolvente máxima de ${esfuerzo} donde es positiva: ${LEYENDA_PLANTA[esfuerzo][0]}` },
+      { estilo: "diagrama-negativo", texto: deVano ? `Envolvente mínima de ${esfuerzo} donde es negativa, al otro lado (como en el alzado); las dos curvas enteras, en el alzado y en la tabla de la pieza` : `Envolvente mínima de ${esfuerzo} donde es negativa: ${LEYENDA_PLANTA[esfuerzo][1]}; las dos curvas enteras, en el alzado y en la tabla de la pieza` },
     ],
     notas: [
-      esfuerzo === "My" ? "My > 0 tracciona la cara inferior (momento de vano)." : "Vz: cortante vertical de la pieza, con el convenio de las barras.",
-      `Escala: ${rotulo(maxAbs)} ${unidad} = ${rotulo(k * maxAbs)} m. Rotulados, el máximo y el mínimo de cada vano (de «fem consultar pieza»).`,
-      ...(ordenados.length ? [`Mayor |${esfuerzo}| de la planta: ${rotulo(ordenados[0]!.valor)} ${unidad} en ${ordenados[0]!.objeto}.`] : ["La planta no tiene vigas ni viguetas."]),
+      NOTA_PLANTA[esfuerzo],
+      ...(sinAxil.length ? [`${sinAxil.length} vigas y viguetas en el plano de un diafragma rígido, sin N: su axil no tiene valor (C1-d).`] : []),
+      ...(nulo && piezas.length
+        ? [`${esfuerzo} nulo en toda la planta (|${esfuerzo}| < ${DIAGRAMA_NULO.toExponential(0)} ${unidad}; el mayor, ${maxReal.toExponential(1)}): no se dibuja.`]
+        : [
+            `Escala: ${rotulo(maxAbs)} ${unidad} = ${rotulo(k * maxAbs)} m. Rotulados, el máximo y el mínimo de cada vano (de «fem consultar pieza»).`,
+            ...(ordenados.length
+              ? [`Mayor |${esfuerzo}| de la planta: ${rotulo(ordenados[0]!.valor)} ${unidad} en ${ordenados[0]!.objeto}.`]
+              : [deVano || (!piezas.length && !sinAxil.length) ? "La planta no tiene vigas ni viguetas." : piezas.length ? `${esfuerzo} nulo en toda la planta.` : "Ninguna viga ni vigueta de la planta tiene axil."]),
+          ]),
     ],
     extremos: ordenados,
     caja: caja(pl),

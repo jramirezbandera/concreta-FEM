@@ -16,7 +16,7 @@ import { consultar, CONSULTAS, resumen, TOP_POR_DEFECTO, type OpcionesConsulta }
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../src/agente/resultados.ts";
 import { revisar, type Revision } from "../src/agente/revision.ts";
-import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaArmado, vistaAxiles, vistaBandas, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Armadura, type Campo, type Envolvente, type Escena, type Vista } from "../src/agente/render/index.ts";
+import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, esfuerzoDeVista, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaArmado, vistaAxiles, vistaBandas, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Armadura, type Campo, type Envolvente, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { importarDxf, type OpcionesImportar } from "../src/agente/importarDxf.ts";
 import { FICHERO_APP, leerEstadoApp, seleccionApp } from "../src/agente/estadoApp.ts";
@@ -434,7 +434,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           else if (vista === "cargas") for (const caso of casos) escenas.push([vistaCargas(f, planta, caso, d), caso]);
           else if (vista === "diagnosticos") escenas.push([vistaDiagnosticos(f, planta, [...diags, ...previa], d), undefined]);
           else if (vista === "malla") escenas.push([vistaMalla(rr!, planta, d), undefined]);
-          else if (vista === "vigas-my" || vista === "vigas-vz") escenas.push([vistaDiagramas(rr!, planta, vista === "vigas-my" ? "My" : "Vz", conjuntos.get("esfuerzos")!, d), undefined]);
+          else if (esfuerzoDeVista(vista)) escenas.push([vistaDiagramas(rr!, planta, esfuerzoDeVista(vista)!, conjuntos.get("esfuerzos")!, d), undefined]);
           else if (vista === "pilares-n") escenas.push([vistaAxiles(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
           else if (vista === "reacciones") escenas.push([vistaReacciones(rr!, planta, conjuntos.get("reacciones")!, d), undefined]);
           else if (vista === "bandas") escenas.push([vistaBandas(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
