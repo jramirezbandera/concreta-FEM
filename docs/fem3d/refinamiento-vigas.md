@@ -454,6 +454,8 @@ Las diez peores son las mismas con y sin ella, y vienen de antes: los metros de 
 
 **Queda:** el coste (+70 %, §10) y las referencias `-lv2` antes de activar `refinoEsquinas`; los metros de los pilares de esquina y de borde con h = 0,75 (las diez peores), que son de SP-3/SP-4 y no de LV2.
 
+**Desde la fase PB** (`pilares-borde.md` §4, 2026-11-08), la plantilla de cara sólo va en las caras que pasan por dentro de la huella (el pilar que las cruza, como P3-1). En un pilar enrasado con la cara de su viga (30 × 30 bajo una de 30) apenas entraba, porque la junta de los anchos en la cara dejaba irregulares las celdas de delante. Donde entraba (`franjas: false`, o la losa hasta el eje), alejaba de la malla fina la viga en la cara (+9 %) y el metro de la franja en la cara del pilar (−19 % con 0,75, frente al +7 % sin ella).
+
 ## 15. El coste: perfil de la compilación y la graduada de 2 niveles en los cruces sin pilar (2026-10-18)
 
 **Lo que se iba a mirar** (§10, orden acordado): la compilación del edificio objetivo con vigas se duplicaba con LV2 (de 3,4 a 8,7 s) para una malla sólo 1,6 veces mayor, y antes de aceptar el +70 % total había que perfilarla y probar la plantilla graduada de 2 niveles en los cruces sin pilar.

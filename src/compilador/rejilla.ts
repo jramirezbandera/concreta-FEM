@@ -79,6 +79,12 @@
  *    suyo. Los pilares de un cruce que se queda sin plantilla van en `esquinasSinRefinar`, para el
  *    aviso `malla/esquina-sin-refinar` (LV2-g: refinar una esquina de la triangulación exigiría una
  *    plantilla propia para ella).
+ *    Las islas (fase PB, `islasJuntoAPilares`): el pilar de esquina en el cruce de dos vigas de borde
+ *    deja, entre los dos anchos y el borde, un cuadrado de losa apartado del resto (de b/2 de lado, lo
+ *    de la huella rígido con el pilar). Sus rasgos dejaban irregular la celda de la esquina del paño, al
+ *    otro lado de los anchos, y el pilar de esquina se quedaba siempre sin plantilla (con 30 × 30 en el
+ *    eje de vigas de 30, lo más corriente). Ahora sus rasgos sólo dejan irregulares las celdas que
+ *    tocan, no las que tienen a menos de δ: al otro lado de los anchos no hay láminas.
  * 9. Tiras de huella (fase LV2, LV-8): la huella de un pilar que el ancho de una viga atraviesa de
  *    lado a lado llega en tiras, una por lado del ancho (`tira`, del mismo `grupo`): lo que asoma de
  *    la viga (un 30 × 50 bajo una de 30). Cada tira es una huella de pilar de fachada enrasado
@@ -96,8 +102,11 @@
  *    de las caras de la viga delante de su huella son rígidos con él (C2-d): la losa está empotrada
  *    en el pilar, y su metro perpendicular a la viga (`esfuerzosFranjas.ts`, el escalón desde la cara)
  *    salía con h = 0,75 un 17 % por debajo de la malla de 0,25 con la celda entera contra el tramo
- *    rígido. Ahora, en cada cara de viga a ≤ `separacionRefino` de su huella, las celdas regulares de
- *    losa delante de ella (las que cruza la huella a lo largo de la cara) llevan una plantilla de cara:
+ *    rígido. Ahora, en cada cara de viga que pasa por dentro de su huella (el pilar la cruza: un 40
+ *    bajo una viga de 30), las celdas regulares de losa delante de ella (las que cruza la huella a lo
+ *    largo de la cara) llevan una plantilla de cara (con la huella enrasada con la cara o dentro del
+ *    ancho, nada: allí la plantilla alejaba de la malla fina la viga en la cara del pilar, un 3–9 %, y
+ *    el metro de su franja, hasta un 19 % por debajo; fase PB):
  *    el primer tramo desde la cara (la mitad de la celda si va partida, o la celda) en tercios a lo
  *    largo del tramo, con la transición de 3 a 1 en las celdas de los extremos (en su mitad exterior
  *    si van partidas a lo largo de la cara, o en la celda entera). El borde hacia la losa y los extremos
@@ -380,6 +389,81 @@ function lineaEn(L: readonly number[], x: number, tol: number): number {
   return -1;
 }
 
+/**
+ * Islas de losa junto a un pilar, apartadas del resto de la losa por los anchos de las vigas (fase PB,
+ * §8 de la cabecera), sólo con las esquinas de LV2: sus puntos y sus lados, que sólo dejan irregulares
+ * las celdas que tocan (no las que tienen a menos de δ). El pilar de esquina en el cruce de dos vigas
+ * de borde deja, fuera de los dos anchos, un cuadrado de losa entre ellos y el borde (de b/2 de lado,
+ * con lo que cae en la huella rígido con el pilar): sus vértices dejaban irregular la celda de la
+ * esquina del paño, al otro lado de los anchos, que sólo tienen piezas de carga.
+ */
+function islasJuntoAPilares(E: EntradaRejilla, nudoPunto: Int32Array, tol: number): { islaPunto: Uint8Array; islaLado: Uint8Array } {
+  const { P, lados } = E;
+  const islaPunto = new Uint8Array(P.length);
+  const islaLado = new Uint8Array(lados.length);
+  const H = E.huellasPilares;
+  if (!E.esquinas || !E.fuertes || !H?.length) return { islaPunto, islaLado };
+  const caja = (poli: readonly Vec2[]) => {
+    const c = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, y] of poli) [c[0], c[1], c[2], c[3]] = [Math.min(c[0]!, x), Math.min(c[1]!, y), Math.max(c[2]!, x), Math.max(c[3]!, y)];
+    return c as [number, number, number, number];
+  };
+  const cajas = H.map(caja);
+  // Islas: los componentes de los lados que tocan losa (unidos por sus extremos) que encierran losa
+  // (toda la losa a los lados de sus lados, como `ladoA` del mallador a 10·ε_geom de su punto medio,
+  // cae en su caja: un hueco la tiene fuera), tocan la huella de un pilar y caben en su caja ampliada
+  // en h (un bloque de losa aparte, o un paño entre vigas, no). Con una tira de borde (TB), el lado de
+  // fuera de la isla es la cara de la tira, una línea fuerte. Sólo las que tienen algún punto fuera de
+  // los nudos de la rejilla: las demás no estorban
+  const raiz = Int32Array.from(P, (_, p) => p);
+  const buscar = (p: number): number => {
+    while (raiz[p] !== p) p = raiz[p] = raiz[raiz[p]!]!;
+    return p;
+  };
+  lados.forEach((l, k) => {
+    if (!E.ladoEnLosa[k]) return;
+    const [a, b] = [buscar(l.a), buscar(l.b)];
+    if (a !== b) raiz[Math.max(a, b)] = Math.min(a, b);
+  });
+  const componentes = new Map<number, number[]>();
+  lados.forEach((l, k) => {
+    if (!E.ladoEnLosa[k]) return;
+    const r = buscar(l.a);
+    const v = componentes.get(r);
+    if (v) v.push(k);
+    else componentes.set(r, [k]);
+  });
+  const dl = 10 * E.epsGeom;
+  for (const S of componentes.values()) {
+    const T = [...new Set(S.flatMap((k) => [lados[k]!.a, lados[k]!.b]))];
+    if (T.every((p) => nudoPunto[p]! >= 0)) continue;
+    const c = caja(T.map((p) => P[p]!));
+    const m = H.findIndex((poli, i) => {
+      const ch = cajas[i]!;
+      if (c[0] < ch[0] - E.h || c[1] < ch[1] - E.h || c[2] > ch[2] + E.h || c[3] > ch[3] + E.h) return false;
+      return T.some((p) => {
+        const b = bordePoligono(P[p]!, poli);
+        return b.dentro || b.d <= tol;
+      });
+    });
+    if (m < 0) continue;
+    const encierra = S.every((k) => {
+      const [A, B] = [P[lados[k]!.a]!, P[lados[k]!.b]!];
+      const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+      if (!(L > 0)) return false;
+      const n: Vec2 = [-(B[1] - A[1]) / L, (B[0] - A[0]) / L];
+      return [1, -1].every((sg) => {
+        const q: Vec2 = [(A[0] + B[0]) / 2 + sg * dl * n[0], (A[1] + B[1]) / 2 + sg * dl * n[1]];
+        return E.enLosa(q) < 0 || (q[0] >= c[0] && q[0] <= c[2] && q[1] >= c[1] && q[1] <= c[3]);
+      });
+    });
+    if (!encierra) continue;
+    for (const k of S) islaLado[k] = 1;
+    for (const p of T) islaPunto[p] = 1;
+  }
+  return { islaPunto, islaLado };
+}
+
 /** Distancia de un segmento PQ (en u, v) al rectángulo [u0, u1] × [v0, v1]. */
 function distanciaSegmentoRect(P: Vec2, Q: Vec2, u0: number, v0: number, u1: number, v1: number): number {
   // ¿Lo corta? (Liang–Barsky)
@@ -559,15 +643,18 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     for (const p of hh.puntos) huellaDePunto[p] = huellaDePunto[p] === -2 ? grupoDe(k) : -3;
     for (const l of hh.lados) huellaDeLado[l] = huellaDeLado[l] === -2 ? grupoDe(k) : -3;
   });
-  const ajenos: { A: Vec2; B: Vec2; huella: number }[] = [];
+  // Las islas de losa junto a los pilares (fase PB, §8): sus rasgos sólo cuentan para las celdas que
+  // tocan, y para ellas siempre (`isla`)
+  const { islaPunto, islaLado } = islasJuntoAPilares(E, nudoPunto, tol);
+  const ajenos: { A: Vec2; B: Vec2; huella: number; isla?: true }[] = [];
   P.forEach((_, p) => {
-    if (E.puntoEnLosa[p] && nudoPunto[p]! < 0) ajenos.push({ A: W[p]!, B: W[p]!, huella: Math.max(-2, huellaDePunto[p]!) });
+    if (E.puntoEnLosa[p] && nudoPunto[p]! < 0) ajenos.push({ A: W[p]!, B: W[p]!, huella: Math.max(-2, huellaDePunto[p]!), ...(islaPunto[p] ? { isla: true as const } : {}) });
   });
   const nudoEnLado = new Map<number, number>();
   const enLinea: (LadoEnLinea | null)[] = lados.map((l, k) => {
     if (!E.ladoEnLosa[k]) return null;
     const [A, B] = [W[l.a]!, W[l.b]!];
-    const ajeno = (): null => (ajenos.push({ A, B, huella: Math.max(-2, huellaDeLado[k]!) }), null);
+    const ajeno = (): null => (ajenos.push({ A, B, huella: Math.max(-2, huellaDeLado[k]!), ...(islaLado[k] ? { isla: true as const } : {}) }), null);
     if (E.fijos[k]) return ajeno();
     // horizontal: v constante; c es la coordenada a lo largo del lado
     let horizontal: boolean;
@@ -610,16 +697,20 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
 
   // Celdas con rasgos ajenos a menos de δ: −1 ninguno, g sólo del grupo de huellas g, −2 otros
   const cerca = new Int32Array(nc).fill(-1);
-  for (const { A, B, huella } of ajenos) {
-    const i0 = Math.max(0, tramo(U, Math.min(A[0], B[0]) - delta));
-    const i1 = Math.min(nu - 2, tramo(U, Math.max(A[0], B[0]) + delta));
-    const j0 = Math.max(0, tramo(V, Math.min(A[1], B[1]) - delta));
-    const j1 = Math.min(nv - 2, tramo(V, Math.max(A[1], B[1]) + delta));
+  for (const { A, B, huella: h0, isla } of ajenos) {
+    // Un rasgo de una isla, sólo las celdas que toca, y siempre (es otra losa: ni su huella la limpia)
+    const d = isla ? tol : delta;
+    const huella = isla ? -2 : h0;
+    const i0 = Math.max(0, tramo(U, Math.min(A[0], B[0]) - d));
+    const i1 = Math.min(nu - 2, tramo(U, Math.max(A[0], B[0]) + d));
+    const j0 = Math.max(0, tramo(V, Math.min(A[1], B[1]) - d));
+    const j1 = Math.min(nv - 2, tramo(V, Math.max(A[1], B[1]) + d));
     for (let j = j0; j <= j1; j++)
       for (let i = i0; i <= i1; i++) {
         const c = celda(i, j);
         if (cerca[c] === -2 || cerca[c] === huella) continue;
-        if (distanciaSegmentoRect(A, B, U[i]!, V[j]!, U[i + 1]!, V[j + 1]!) < delta) cerca[c] = cerca[c] === -1 ? huella : -2;
+        const dist = distanciaSegmentoRect(A, B, U[i]!, V[j]!, U[i + 1]!, V[j + 1]!);
+        if (isla ? dist <= d : dist < d) cerca[c] = cerca[c] === -1 ? huella : -2;
       }
   }
   const losaCelda = new Int32Array(nc);
@@ -1584,7 +1675,6 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
   // fila de celdas a lo largo de la cara, en tercios hacia ella, con la transición en los extremos
   const tapadasSinRefinar: number[] = [];
   if (E.esquinas && E.fuertes && E.tapadas?.length && E.huellasPilares?.length) {
-    const sepT = E.separacionRefino ?? 0;
     /**
      * Tramo de celdas junto a una cara: con `vertical`, la cara es la línea U[linea] y el tramo recorre
      * las filas a0…a1; si no, la línea V[linea] y las columnas. `s`: el lado de la losa.
@@ -1708,7 +1798,11 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       for (const vertical of [true, false]) {
         const [L, f, B0, B1, LA, A0, A1] = vertical ? [U, fU, bu0, bu1, V, bv0, bv1] : [V, fV, bv0, bv1, U, bu0, bu1];
         for (let l = 1; l < L.length - 1; l++) {
-          if (!f[l] || L[l]! < B0 - sepT || L[l]! > B1 + sepT) continue;
+          // Sólo una cara de viga que pasa por dentro de la huella: el pilar la cruza (un 40 bajo una
+          // viga de 30). Con la huella dentro del ancho o enrasada con la cara (el 30 bajo una de 30, lo
+          // más corriente), sin plantilla: con ella la viga salía en la cara del pilar un 3–9 % alta y
+          // el metro de su franja, hasta un 19 % bajo con h = 0,75 (fase PB)
+          if (!f[l] || !(L[l]! > B0 + tol && L[l]! < B1 - tol)) continue;
           for (const s of [-1, 1] as const) {
             const t: TramoCara = { vertical, linea: l, s, a0: 0, a1: 0 };
             /**

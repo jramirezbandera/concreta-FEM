@@ -17,9 +17,11 @@
  *   sin viga que lo cruce), la primera fila de celdas junto a las caras de la viga va en tercios hacia
  *   ellas. En la retícula 1, P3-1 (fachada x = 15,7, bajo el zuncho Y3): con ella, su metro
  *   perpendicular a la viga con h = 0,75 queda a un 7 % del de h = 0,25 (sin ella, a un 17 %). Si una
- *   celda no sigue la rejilla, el pilar va en el aviso `malla/pilar-tapado-sin-refinar` (retícula 4,
- *   P1-1, junto al hueco de la escalera). En un pilar en un cruce de vigas no hace falta: las esquinas
- *   de los paños ya están refinadas (los edificios objetivo no cambian ni un nudo).
+ *   celda no sigue la rejilla, el pilar va en el aviso `malla/pilar-tapado-sin-refinar` (retícula 12,
+ *   P2-1, un 40 × 40). En un pilar en un cruce de vigas no hace falta: las esquinas de los paños ya
+ *   están refinadas (los edificios objetivo no cambian ni un nudo). Desde la fase PB, sólo en los que
+ *   cruzan la cara de la viga: un 25 × 60 dentro de una viga de 30 (retícula 4, P1-1, que avisaba) no
+ *   tiene metro perpendicular a ella ni plantilla (`pilaresBorde.test.ts`).
  * - Los lados de una tira son todos los que van entre sus puntos, también el trozo de la cara del
  *   ancho que la cierra (§19): cuando la plantilla parte esa cara (la celda de la huella va partida),
  *   su nudo de en medio tiene que estar en la cadena del lado; si no, `malla/lado-perdido` y la
@@ -86,13 +88,18 @@ describe("los pilares que asoman de su viga (LV-8)", () => {
     expect(lv2.diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar").flatMap((d) => d.ids)).not.toContain("P3-1");
   });
 
-  it("si una celda delante del pilar no sigue la rejilla, avisa con el pilar (retícula 4, P1-1 junto al hueco)", () => {
-    const lv2 = compila(4, { refinoEsquinas: true });
+  it("si una celda delante del pilar no sigue la rejilla, avisa con el pilar (retícula 12, P2-1, un 40 × 40 bajo vigas de 30)", () => {
+    const lv2 = compila(12, { refinoEsquinas: true });
     const av = lv2.diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar");
     expect(av.length).toBeGreaterThanOrEqual(1);
     expect(av[0]!.severidad).toBe("aviso");
-    expect(av[0]!.mensaje).toContain("P1-1");
-    expect(compila(4, { refinoEsquinas: false }).diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar")).toEqual([]);
+    expect(av[0]!.mensaje).toContain("P2-1");
+    expect(compila(12, { refinoEsquinas: false }).diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar")).toEqual([]);
+  });
+
+  it("un pilar cuya huella queda dentro del ancho de su viga no lleva plantilla de cara ni avisa (PB: retícula 4, P1-1, un 25 × 60 en una viga de 30)", () => {
+    const lv2 = compila(4, { refinoEsquinas: true });
+    expect(lv2.diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar").flatMap((d) => d.ids)).not.toContain("P1-1");
   });
 
   it("cuando las tiras no caben en la rejilla, avisa y deja la malla de antes (retícula 6)", () => {

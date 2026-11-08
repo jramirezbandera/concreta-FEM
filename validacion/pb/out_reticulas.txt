@@ -1,0 +1,56 @@
+# Fase PB: las 24 retículas al azar, antes y ahora
+
+Antes: D:\PROGRAMACION\cfem-antes; ahora: D:\PROGRAMACION\Concreta FEM. Avisos: pilares nombrados en cada aviso de la malla (una planta puede repetirlos).
+
+Retícula | nudos antes → ahora | jacobiano mínimo antes → ahora | avisos antes | avisos ahora
+---|---|---|---|---
+1 | 3396 → 3300 | 0.328 → 0.328 | esquina-sin-refinar 4, pilar-tapado-sin-refinar 2 | esquina-sin-refinar 4, pilar-tapado-sin-refinar 2
+1 con muros | 6390 → 6318 | 0.300 → 0.300 | esquina-sin-refinar 3, pilar-tapado-sin-refinar 3 | esquina-sin-refinar 3, pilar-tapado-sin-refinar 1
+2 | 860 → 830 | 0.316 → 0.316 | pilar-tapado-sin-refinar 1 | pilar-tapado-sin-refinar 1
+2 con muros | 2099 → 2081 | 0.288 → 0.288 | pilar-tapado-sin-refinar 1 | pilar-tapado-sin-refinar 1
+3 | 5188 → 5164 | 0.304 → 0.304 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 8 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 4
+3 con muros | 7496 → 7496 | 0.304 → 0.304 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 7 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 4
+4 | 1370 → 1344 | 0.309 → 0.309 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 2
+4 con muros | 2539 → 2539 | 0.302 → 0.302 | — | —
+5 | 1743 → 1685 | 0.250 → 0.250 | pilar-tapado-sin-refinar 1 | pilar-tapado-sin-refinar 1
+5 con muros | 3418 → 3368 | 0.304 → 0.304 | pilar-asoma-sin-plantilla 1, pilar-tapado-sin-refinar 1 | pilar-asoma-sin-plantilla 1, pilar-tapado-sin-refinar 1
+6 | 5148 → 5052 | 0.301 → 0.301 | pilar-asoma-sin-plantilla 4, esquina-sin-refinar 4, pilar-tapado-sin-refinar 2 | pilar-asoma-sin-plantilla 4, esquina-sin-refinar 4
+6 con muros | 7741 → 7647 | 0.302 → 0.302 | pilar-asoma-sin-plantilla 4, esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | pilar-asoma-sin-plantilla 4, esquina-sin-refinar 2
+7 | 2013 → 1995 | 0.306 → 0.306 | pilar-tapado-sin-refinar 3 | pilar-tapado-sin-refinar 3
+7 con muros | 3410 → 3398 | 0.301 → 0.301 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 3 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 3
+8 | 1700 → 1662 | 0.306 → 0.306 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 3 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 2
+8 con muros | 3013 → 2975 | 0.306 → 0.306 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 3 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 2
+9 | 2961 → 2947 | 0.313 → 0.313 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 3 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 2
+9 con muros | 4427 → 4427 | 0.302 → 0.302 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 3 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 2
+10 | 1872 → 1872 | 0.323 → 0.323 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 1
+10 con muros | 3255 → 3255 | 0.304 → 0.304 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | pilar-asoma-sin-plantilla 1, esquina-sin-refinar 2, pilar-tapado-sin-refinar 1
+11 | 1268 → 1256 | 0.388 → 0.388 | esquina-sin-refinar 2 | esquina-sin-refinar 2
+11 con muros | 2822 → 2810 | 0.302 → 0.302 | esquina-sin-refinar 2 | esquina-sin-refinar 2
+12 | 2960 → 2832 | 0.272 → 0.272 | pilar-tapado-sin-refinar 4 | pilar-tapado-sin-refinar 2
+12 con muros | 5623 → 5495 | 0.252 → 0.252 | esquina-sin-refinar 4, pilar-tapado-sin-refinar 4 | esquina-sin-refinar 4, pilar-tapado-sin-refinar 2
+13 | 1090 → 1090 | 0.727 → 0.727 | — | —
+13 con muros | 2456 → 2456 | 0.305 → 0.305 | — | —
+14 | 1382 → 1382 | 0.313 → 0.313 | pilar-tapado-sin-refinar 1 | pilar-tapado-sin-refinar 1
+14 con muros | 2595 → 2595 | 0.237 → 0.237 | pilar-tapado-sin-refinar 1 | pilar-tapado-sin-refinar 1
+15 | 2186 → 2174 | 0.501 → 0.501 | pilar-tapado-sin-refinar 2 | pilar-tapado-sin-refinar 2
+15 con muros | 4608 → 4602 | 0.303 → 0.303 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 1
+16 | 4285 → 4093 | 0.334 → 0.334 | esquina-sin-refinar 2 | esquina-sin-refinar 2
+16 con muros | 6923 → 6833 | 0.280 → 0.280 | esquina-sin-refinar 3, pilar-tapado-sin-refinar 2 | esquina-sin-refinar 3
+17 | 1239 → 1185 | 0.336 → 0.336 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 1
+17 con muros | 2627 → 2573 | 0.286 → 0.286 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 1, pilar-tapado-sin-refinar 1
+18 | 4792 → 4744 | 0.305 → 0.305 | — | —
+18 con muros | 7389 → 7341 | 0.303 → 0.303 | esquina-sin-refinar 4 | esquina-sin-refinar 4
+19 | 2087 → 2087 | 0.329 → 0.329 | — | —
+19 con muros | 4401 → 4401 | 0.261 → 0.261 | esquina-sin-refinar 4 | esquina-sin-refinar 4
+20 | 1854 → 1804 | 0.325 → 0.325 | pilar-tapado-sin-refinar 3 | pilar-tapado-sin-refinar 2
+20 con muros | 3404 → 3360 | 0.304 → 0.304 | pilar-tapado-sin-refinar 3 | pilar-tapado-sin-refinar 2
+21 | 3257 → 3137 | 0.360 → 0.360 | esquina-sin-refinar 4 | esquina-sin-refinar 4
+21 con muros | 5766 → 5656 | 0.275 → 0.275 | esquina-sin-refinar 6 | esquina-sin-refinar 6
+22 | 2423 → 2365 | 0.308 → 0.308 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 3 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 2
+22 con muros | 3765 → 3707 | 0.307 → 0.307 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 3 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 3
+23 | 1673 → 1645 | 0.297 → 0.297 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 1
+23 con muros | 2751 → 2737 | 0.297 → 0.297 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 1
+24 | 1951 → 1915 | 0.223 → 0.223 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 2
+24 con muros | 3294 → 3258 | 0.223 → 0.223 | esquina-sin-refinar 2, pilar-tapado-sin-refinar 1 | esquina-sin-refinar 2
+
+Con menos nudos: 37; con más: 0; con el jacobiano mínimo más bajo: 0 (de 48).

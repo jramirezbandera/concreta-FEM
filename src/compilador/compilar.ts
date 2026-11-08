@@ -46,7 +46,7 @@ import type { ModificadoresBarra } from "../elementos/barra.ts";
 import { puntoEnRegion } from "./poligonos.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "TB1";
+export const VERSION_COMPILADOR = "PB1";
 
 export interface EstadisticasCompilacion {
   nudos: number;

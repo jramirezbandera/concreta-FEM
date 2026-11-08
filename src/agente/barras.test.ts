@@ -105,7 +105,8 @@ describe("BN2: barra/compresion y la consulta de una barra", () => {
     const v = r.valor as { tipo: string; extremos: Record<string, { v: number; comb: string }> };
     expect(v.tipo).toBe("barra");
     expect(v.extremos["N+"]!.comb).toBe("W");
-    expect(v.extremos["N+"]!.v).toBeCloseTo(3.706, 3);
+    // 3,7066 desde la fase PB (los pilares de esquina, enrasados con la cara de su viga, sin la plantilla de cara; antes 3,7060)
+    expect(v.extremos["N+"]!.v).toBeCloseTo(3.707, 3);
     expect(v.extremos["N-"]!.v).toBeLessThan(0);
   });
 });

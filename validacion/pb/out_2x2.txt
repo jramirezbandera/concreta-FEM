@@ -1,0 +1,87 @@
+# Fase PB: recuadros de 2 × 2 (maciza de 30, pilares y vigas de borde de 30), frente a h = 0,0625 con ε_snap = 0,025
+
+`bun validacion/pb/comparar.ts despues-2x2 0.0625/0.025 …` (sin y con franjas). La malla fina es la misma con el código de antes y el de ahora (38 136 nudos).
+
+Caso | nudos | ecuaciones | avisos de malla
+despues-2x2:0.0625/0.025 | 38136 | 111510 | —
+antes-2x2:0.75 | 828 | 1962 | malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]; malla/pilar-tapado-sin-refinar [L-N1,P0-1,P1-0,P1-2,P2-1]
+despues-2x2:0.75 | 808 | 1878 | —
+antes-2x2:0.5 | 1228 | 3066 | malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]; malla/pilar-tapado-sin-refinar [L-N1,P0-1,P1-0,P1-2,P2-1]
+despues-2x2:0.5 | 1208 | 2982 | —
+antes-2x2:0.25 | 2896 | 7938 | —
+despues-2x2-sinf:0.75+{"franjas":false} | 472 | 966 | —
+despues-2x2-sinf:0.5+{"franjas":false} | 840 | 1974 | —
+antes-2x2-sinf:0.75+{"franjas":false} | 532 | 1170 | malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]
+
+## Vigas: My en las caras de los pilares y máximo del vano (ELU persistentes) (referencia: despues-2x2, h = 0.0625/0.025)
+
+Grupo | caso | n | mediana | máximo (dónde) | > 10 % | > 20 %
+viga cara (máximo) borde | antes-2x2:0.75 | 8 | 0.6 % | 0.6 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara (máximo) borde | despues-2x2:0.75 | 8 | 0.5 % | 0.5 % (N1-X0-0 P1-0) | 0 | 0
+viga cara (máximo) borde | antes-2x2:0.5 | 8 | 0.8 % | 0.8 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara (máximo) borde | despues-2x2:0.5 | 8 | 0.8 % | 0.8 % (N1-X0-0 P1-0) | 0 | 0
+viga cara (máximo) borde | antes-2x2:0.25 | 8 | 3.5 % | 3.5 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara (máximo) esquina | antes-2x2:0.75 | 8 | 11.0 % | 17.3 % (N1-Y2-0 P2-0) | 4 | 0
+viga cara (máximo) esquina | despues-2x2:0.75 | 8 | 4.9 % | 8.0 % (N1-Y2-0 P2-0) | 0 | 0
+viga cara (máximo) esquina | antes-2x2:0.5 | 8 | 9.0 % | 13.8 % (N1-Y2-0 P2-0) | 4 | 0
+viga cara (máximo) esquina | despues-2x2:0.5 | 8 | 2.7 % | 4.3 % (N1-Y2-0 P2-0) | 0 | 0
+viga cara (máximo) esquina | antes-2x2:0.25 | 8 | 2.9 % | 4.4 % (N1-Y2-1 P2-2) | 0 | 0
+viga cara borde | antes-2x2:0.75 | 8 | 0.6 % | 0.6 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara borde | despues-2x2:0.75 | 8 | 0.5 % | 0.5 % (N1-X0-0 P1-0) | 0 | 0
+viga cara borde | antes-2x2:0.5 | 8 | 0.8 % | 0.8 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara borde | despues-2x2:0.5 | 8 | 0.8 % | 0.8 % (N1-X0-0 P1-0) | 0 | 0
+viga cara borde | antes-2x2:0.25 | 8 | 3.5 % | 3.5 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara borde | despues-2x2-sinf:0.75+{"franjas":false} | 8 | 7.0 % | 7.0 % (N1-X0-1 P1-0) | 0 | 0
+viga cara borde | despues-2x2-sinf:0.5+{"franjas":false} | 8 | 7.3 % | 7.3 % (N1-X0-1 P1-0) | 0 | 0
+viga cara borde | antes-2x2-sinf:0.75+{"franjas":false} | 8 | 9.4 % | 9.4 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara esquina | antes-2x2:0.75 | 8 | 11.0 % | 17.3 % (N1-Y2-0 P2-0) | 4 | 0
+viga cara esquina | despues-2x2:0.75 | 8 | 4.9 % | 8.0 % (N1-Y2-0 P2-0) | 0 | 0
+viga cara esquina | antes-2x2:0.5 | 8 | 9.0 % | 13.8 % (N1-Y2-0 P2-0) | 4 | 0
+viga cara esquina | despues-2x2:0.5 | 8 | 2.7 % | 4.3 % (N1-Y2-0 P2-0) | 0 | 0
+viga cara esquina | antes-2x2:0.25 | 8 | 2.9 % | 4.4 % (N1-Y2-1 P2-2) | 0 | 0
+viga cara esquina | despues-2x2-sinf:0.75+{"franjas":false} | 8 | 5.0 % | 8.4 % (N1-Y2-1 P2-2) | 0 | 0
+viga cara esquina | despues-2x2-sinf:0.5+{"franjas":false} | 8 | 2.8 % | 4.5 % (N1-Y2-1 P2-2) | 0 | 0
+viga cara esquina | antes-2x2-sinf:0.75+{"franjas":false} | 8 | 11.7 % | 18.2 % (N1-Y2-1 P2-2) | 4 | 0
+viga vano | antes-2x2:0.75 | 8 | 6.0 % | 6.0 % (N1-Y2-0 ) | 0 | 0
+viga vano | despues-2x2:0.75 | 8 | 6.2 % | 6.2 % (N1-Y2-0 ) | 0 | 0
+viga vano | antes-2x2:0.5 | 8 | 4.1 % | 4.2 % (N1-Y2-1 ) | 0 | 0
+viga vano | despues-2x2:0.5 | 8 | 4.2 % | 4.2 % (N1-Y2-1 ) | 0 | 0
+viga vano | antes-2x2:0.25 | 8 | 1.5 % | 1.5 % (N1-Y2-1 ) | 0 | 0
+viga vano | despues-2x2-sinf:0.75+{"franjas":false} | 8 | 6.3 % | 6.3 % (N1-Y2-1 ) | 0 | 0
+viga vano | despues-2x2-sinf:0.5+{"franjas":false} | 8 | 4.3 % | 4.3 % (N1-Y2-1 ) | 0 | 0
+viga vano | antes-2x2-sinf:0.75+{"franjas":false} | 8 | 6.1 % | 6.1 % (N1-Y2-1 ) | 0 | 0
+
+## Franjas: Wood–Armer en las estaciones de cara y de apoyo (ELU persistentes) (referencia: despues-2x2, h = 0.0625/0.025)
+
+Grupo | caso | n | mediana | máximo (dónde) | > 10 % | > 20 %
+franja apoyo inf | antes-2x2:0.75 | 48 | 6.5 % | 14.3 % (L-N1:X1:apoyo:11.850:-1 N1-Y2-0) | 8 | 0
+franja apoyo inf | despues-2x2:0.75 | 48 | 6.0 % | 9.3 % (L-N1:Y6:apoyo:11.850:-1 N1-X2-0) | 0 | 0
+franja apoyo inf | antes-2x2:0.5 | 48 | 4.2 % | 11.2 % (L-N1:X2:apoyo:11.850:-1 N1-Y2-0) | 8 | 0
+franja apoyo inf | despues-2x2:0.5 | 48 | 3.5 % | 5.7 % (L-N1:Y9:apoyo:0.150:1 N1-X0-1) | 0 | 0
+franja apoyo inf | antes-2x2:0.25 | 48 | 2.8 % | 5.4 % (L-N1:X2:apoyo:11.850:-1 N1-Y2-0) | 0 | 0
+franja apoyo inf | despues-2x2-sinf:0.75+{"franjas":false} | 48 | 5.4 % | -29.8 % (L-N1:X8:apoyo:0.150:1 N1-Y0-1) | 8 | 8
+franja apoyo inf | despues-2x2-sinf:0.5+{"franjas":false} | 48 | 4.0 % | 9.9 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 0 | 0
+franja apoyo inf | antes-2x2-sinf:0.75+{"franjas":false} | 48 | 7.5 % | 18.1 % (L-N1:X13:apoyo:11.850:-1 N1-Y2-1) | 24 | 0
+franja apoyo sup | antes-2x2:0.75 | 24 | 11.8 % | 32.9 % (L-N1:X5:apoyo:11.850:-1 N1-Y2-0) | 16 | 8
+franja apoyo sup | despues-2x2:0.75 | 24 | 9.4 % | 32.3 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 8 | 8
+franja apoyo sup | antes-2x2:0.5 | 24 | 1.6 % | 21.5 % (L-N1:X5:apoyo:11.850:-1 N1-Y2-0) | 8 | 8
+franja apoyo sup | despues-2x2:0.5 | 24 | 3.2 % | 21.6 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 8 | 8
+franja apoyo sup | antes-2x2:0.25 | 24 | 3.2 % | 5.7 % (L-N1:Y6:apoyo:11.850:-1 N1-X2-0) | 0 | 0
+franja apoyo sup | despues-2x2-sinf:0.75+{"franjas":false} | 24 | 16.9 % | 25.5 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 16 | 8
+franja apoyo sup | despues-2x2-sinf:0.5+{"franjas":false} | 24 | 10.7 % | -11.3 % (L-N1:X8:apoyo:0.150:1 N1-Y0-1) | 16 | 0
+franja apoyo sup | antes-2x2-sinf:0.75+{"franjas":false} | 24 | 11.2 % | 33.5 % (L-N1:X5:apoyo:11.850:-1 N1-Y2-0) | 16 | 8
+franja cara borde sup | antes-2x2:0.75 | 8 | 7.4 % | 7.6 % (L-N1:Y13:cara:5.850:-1 P2-1) | 0 | 0
+franja cara borde sup | despues-2x2:0.75 | 8 | 7.4 % | 7.6 % (L-N1:X1:cara:6.150:1 P1-0) | 0 | 0
+franja cara borde sup | antes-2x2:0.5 | 8 | 1.3 % | 1.4 % (L-N1:Y13:cara:5.850:-1 P2-1) | 0 | 0
+franja cara borde sup | despues-2x2:0.5 | 8 | 1.3 % | 1.4 % (L-N1:X1:cara:6.150:1 P1-0) | 0 | 0
+franja cara borde sup | antes-2x2:0.25 | 8 | 5.2 % | -5.2 % (L-N1:Y1:cara:6.150:1 P0-1) | 0 | 0
+franja cara interior sup | antes-2x2:0.75 | 4 | 0.8 % | -0.8 % (L-N1:Y7:cara:6.150:1 P1-1) | 0 | 0
+franja cara interior sup | despues-2x2:0.75 | 4 | 0.9 % | -0.9 % (L-N1:Y7:cara:6.150:1 P1-1) | 0 | 0
+franja cara interior sup | antes-2x2:0.5 | 4 | 0.3 % | -0.3 % (L-N1:Y7:cara:6.150:1 P1-1) | 0 | 0
+franja cara interior sup | despues-2x2:0.5 | 4 | 0.3 % | -0.3 % (L-N1:Y7:cara:6.150:1 P1-1) | 0 | 0
+franja cara interior sup | antes-2x2:0.25 | 4 | 0.2 % | 0.2 % (L-N1:X7:cara:6.150:1 P1-1) | 0 | 0
+franja cara sin-pilar sup | antes-2x2:0.75 | 32 | 6.5 % | 14.7 % (L-N1:X5:cara:5.850:-1 ) | 8 | 0
+franja cara sin-pilar sup | despues-2x2:0.75 | 32 | 6.6 % | 14.6 % (L-N1:X5:cara:5.850:-1 ) | 8 | 0
+franja cara sin-pilar sup | antes-2x2:0.5 | 32 | 1.4 % | -2.7 % (L-N1:Y6:cara:6.150:1 ) | 0 | 0
+franja cara sin-pilar sup | despues-2x2:0.5 | 32 | 1.4 % | -2.7 % (L-N1:Y6:cara:6.150:1 ) | 0 | 0
+franja cara sin-pilar sup | antes-2x2:0.25 | 32 | 0.2 % | -1.4 % (L-N1:Y8:cara:6.150:1 ) | 0 | 0

@@ -6,7 +6,13 @@
  * con las esquinas en las retículas, y h = 0,1 en la 3 × 3 (a ≤ 0,45 % de la malla tensorial del
  * oráculo, `out_tensorial.txt`). Se regenera sólo a sabiendas, como las demás referencias congeladas.
  *
- *   bun validacion/hr/congelar-fina.ts   → src/compilador/__fixtures__/precision-fina.json
+ * Fase PB (`docs/fem3d/pilares-borde.md`): los recuadros de 2 × 2 con vigas de borde del ancho de los
+ * pilares (maciza y reticular, con las opciones por defecto), frente a h = 0,0625 con ε_snap = 0,025
+ * (las dos familias de mallas, con y sin plantilla de cara, convergen ahí; `validacion/pb/`).
+ *
+ *   bun validacion/hr/congelar-fina.ts [<modelo> ...]   → src/compilador/__fixtures__/precision-fina.json
+ *
+ * Con nombres, sólo esos modelos (los demás, tal como estaban en el fichero).
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,6 +22,7 @@ import { medirLocal, type MedidaLocal } from "../../src/pruebas/precisionLocal.t
 import { reticulaAleatoria } from "../../src/pruebas/reticulasAleatorias.ts";
 import { redondeo } from "../c5/congelar.ts";
 import { losa3x3Mezclada } from "../f3/modelos.ts";
+import { recuadros } from "../pb/modelos.ts";
 
 export interface ReferenciaFina {
   vigas: Record<string, { v: number; escala: number }>;
@@ -34,6 +41,9 @@ export const MODELOS_PRECISION: Record<string, { fisico: () => ModeloFisico; gru
   "reticula-12": { fisico: () => reticulaAleatoria(12), gruesa: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } },
   "reticula-16": { fisico: () => reticulaAleatoria(16), gruesa: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } },
   "losa-3x3-mezclada": { fisico: () => losa3x3Mezclada(), gruesa: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" }, fina: { unionLosaViga: "eje", tamanoMalla: 0.1, zonaRigidaBase: false, planoForjado: "medio" } },
+  // Fase PB: pilares de 30 × 30 en el eje de vigas de borde de 30 y la losa hasta su cara de fuera
+  "recuadros-borde": { fisico: () => recuadros(2, 2), gruesa: {}, fina: { tamanoMalla: 0.0625, epsSnap: 0.025 } },
+  "recuadros-borde-reticular": { fisico: () => recuadros(2, 2, { reticular: true }), gruesa: {}, fina: { tamanoMalla: 0.0625, epsSnap: 0.025 } },
 };
 
 export function aReferencia(m: MedidaLocal): ReferenciaFina {
@@ -42,12 +52,14 @@ export function aReferencia(m: MedidaLocal): ReferenciaFina {
 
 if (import.meta.main) {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "..", "src", "nucleo", "pkg", "nucleo_bg.wasm")));
-  const salida: Record<string, ReferenciaFina> = {};
+  const ruta = join(import.meta.dirname, "..", "..", "src", "compilador", "__fixtures__", "precision-fina.json");
+  const pedidos = process.argv.slice(2);
+  const salida: Record<string, ReferenciaFina> = pedidos.length ? JSON.parse(readFileSync(ruta, "utf8")) : {};
   for (const [nombre, m] of Object.entries(MODELOS_PRECISION)) {
+    if (pedidos.length && !pedidos.includes(nombre)) continue;
     process.stderr.write(`${nombre}\n`);
     salida[nombre] = aReferencia(medirLocal(m.fisico(), m.fina));
   }
-  const ruta = join(import.meta.dirname, "..", "..", "src", "compilador", "__fixtures__", "precision-fina.json");
   writeFileSync(ruta, JSON.stringify(salida, redondeo));
   console.log(`Escrito ${ruta}`);
 }

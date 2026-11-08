@@ -9,6 +9,10 @@
  * estaciones que no convergen van listadas por su clave, nunca en silencio.
  * Falla si se vuelve a la regla antigua de C2-d en el modelo compilado (los nudos de fuera a ≤ ε_snap,
  * rígidos): es la medida de LV2-4 y F3-8.
+ * Fase PB (`docs/fem3d/pilares-borde.md`): los recuadros de 2 × 2 con pilares de 30 × 30 en el eje de
+ * vigas de borde de 30 (maciza y reticular, opciones por defecto), frente a h = 0,0625. Fallan con el
+ * código de antes de PB: la viga en la cara de los pilares de esquina (maciza, 2,6 % de máximo) y las
+ * franjas junto a los pilares con viga (reticular, 5,2 % de mediana), sin la plantilla de esquina.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -40,6 +44,10 @@ const UMBRALES: Record<string, { vigas?: Umbral; conViga?: Umbral; sinViga?: Umb
   "reticula-16": { vigas: { mediana: 0.02, maximo: 0.1, masDe10: 0, masDe20: 0 }, conViga: { mediana: 0.04, maximo: 0.38, masDe10: 16, masDe20: 2 } },
   // Sin vigas: todas sus caras, 0,7 / 2,0 % frente a h = 0,1 (y a ≤ 1,5 % de la malla tensorial, `validacion/hr/out_tensorial.txt`)
   "losa-3x3-mezclada": { sinViga: { mediana: 0.015, maximo: 0.04, masDe10: 0, masDe20: 0 } },
+  // Fase PB (2026-11-08): vigas 0,55 / 1,22 % (antes de PB, 0,71 / 2,62 %); con viga 3,2 / 7,6 % (las caras de los pilares de borde, del lado seguro); sin viga 0,85 %
+  "recuadros-borde": { vigas: { mediana: 0.01, maximo: 0.018, masDe10: 0, masDe20: 0 }, conViga: { mediana: 0.04, maximo: 0.09, masDe10: 0, masDe20: 0 }, sinViga: { mediana: 0.015, maximo: 0.015, masDe10: 0, masDe20: 0 } },
+  // vigas 0,14 / 0,22 % (antes, 0,52 / 0,61 %); con viga 1,9 / 6,2 % (antes, 5,2 / 6,3 %); sin viga 0,30 %
+  "recuadros-borde-reticular": { vigas: { mediana: 0.003, maximo: 0.004, masDe10: 0, masDe20: 0 }, conViga: { mediana: 0.03, maximo: 0.08, masDe10: 0, masDe20: 0 }, sinViga: { mediana: 0.006, maximo: 0.006, masDe10: 0, masDe20: 0 } },
 };
 
 const grupo = (m: ReferenciaFina, g: "vigas" | "conViga" | "sinViga") =>
