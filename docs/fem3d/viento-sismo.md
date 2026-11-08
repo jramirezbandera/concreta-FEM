@@ -147,7 +147,7 @@ Cuatro piezas, todas en código puro:
 - **La combinación se hace en cada variable** (3.6.2.4, VS-e): cada consulta calcula el valor de cada modo y los combina.
   - Por defecto, como dice la norma: SRSS, con los modos a menos del 10 % de periodo sumados antes en valor absoluto.
   - Como opción, la CQC con Ω (VS-f).
-- **El signo** es el del modo con más masa efectiva en esa dirección (VS-g), el mismo para todas las variables. Así los concomitantes salen con signos coherentes: el N, My y Mz de un pilar, o el mx, my y mxy de Wood–Armer.
+- **El signo** es el del modo con más masa efectiva en esa dirección (VS-g), el mismo para todas las variables. Sirve para leer cada variable sola (mapas, diagramas, desplomes), pero no hace concomitantes los valores de dos variables: lo que junta varias (Wood–Armer, las ternas de un pilar) prueba los signos del sismo de cada una por separado (VS-o, §13.4).
 - **Así, EX es un caso más:** un `Float64Array` con el valor combinado de cada variable, que entra en las combinaciones con el ± y el 100/30 del generador, sin tocarlo.
 - **Lo que cambia en `Consultas`:** un «caso compuesto» (los casos modales con su regla), que se resuelve antes de aplicar los factores. Todo lo que hoy combina por factores pasa por ahí. Es el trabajo grande de la fase.
 - **La excentricidad accidental (VS-i).**
@@ -228,7 +228,7 @@ VS1 y VS2 son independientes. Por VS-m, VS1 va primero y sola; VS2 sólo a la ve
 ## 7. Riesgos
 
 - **El caso compuesto toca todas las consultas.** Si una se queda sin pasarlo, sale el SRSS mal o un caso modal sumado como estático, en silencio. Por eso el criterio 6 de VS3 y el test que lo busca.
-- **La concomitancia de los pilares** (H31) con un signo por dirección sigue siendo aproximada. Es lo que hacen los programas comerciales; se documenta.
+- **La concomitancia de los pilares** (H31) con un signo por dirección era aproximada y podía quedar del lado inseguro. No es lo que hace CYPECAD (lleva los modos hasta el dimensionado, con los efectos pésimos de cada comprobación); se corrigió con VS-o (§13.4).
 - **Plantas semirrígidas** (`"ninguno"`) con masa: hasta VS6, error.
 - **La norma puede cambiar** (NCSR-23). Por eso el espectro y las fracciones de masa quedan en un módulo de norma aparte (`src/normas/ncse02.ts`), como en Concreta.
 
@@ -248,7 +248,7 @@ Las recomendaciones de Claude, aceptadas por el usuario. Lo que cambia frente a 
   - todas se pueden cambiar por caso.
 - **VS-e, la combinación de los modos:** en cada variable (3.6.2.4). Las fuerzas de planta como un caso estático dejan la torsión ambigua, y aquí manda la precisión.
 - **VS-f, la regla:** SRSS con los modos a menos del 10 % sumados en valor absoluto, por defecto; la CQC con Ω como opción. Cuál se queda por defecto lo decide VS5: si el CYPECAD del usuario usa la CQC, hay que poder comparar con lo mismo.
-- **VS-g, el signo:** el del modo de más masa en la dirección, uno para todas las variables, que es lo que mantiene la concomitancia. El ± lo da el generador.
+- **VS-g, el signo:** el del modo de más masa en la dirección, uno para todas las variables. El ± lo da el generador. **Matizada por VS-o (2026-11-08, §13.4):** el signo vale para leer una variable; no mantiene la concomitancia entre variables.
 - **VS-h, plantas sin diafragma con masa:** error hasta VS6.
 - **VS-i, la excentricidad accidental:** torsor estático ±F_k·L/20; VS3 mide cuánto se separa de mover el CM.
 - **VS-j, el método simplificado:** sólo como comprobación de sensatez.
@@ -632,3 +632,26 @@ De la prueba de uso de la ficha: la gráfica del espectro se veía mal, ningún 
 - **Agente:** `fem emplazamiento` da la zona invernal y la capital de cada provincia y si el municipio es la capital; la skill pide en qué forjados va la nieve y explica `acciones.nieve`.
 
 **Validación:** `src/compilador/nieve.test.ts` (las pruebas de Concreta de la E.2, el cruce de cada capital con la 3.8 a ±0,1, μ y la capital por su nombre; sk desde el emplazamiento en Alhaurín, Granada capital y forzada la E.2; lo forzado; los motivos; el aviso, la hipótesis y el modelo analítico idéntico; las operaciones del caso) y `app/src/test/fichaAcciones.test.tsx` (Ávila: la 3.8, el ψ de más de 1 000 m, el hielo, «Cambiarle el ψ», la exposición y la E.2). Capturas en Chrome de la pestaña y de la plantilla con «Usar».
+
+### 13.4. VS-o, los efectos pésimos con el sismo (2026-11-08)
+
+**De dónde sale.** CYPECAD no deja ver los isovalores de una combinación con sismo dinámico. Su aviso dice que lleva la expansión modal hasta el dimensionado: en una misma sección, el cortante y la flexión pueden salir de esfuerzos distintos, porque la cuadrática completa con los efectos pésimos de cada comprobación es diferente; y que no tiene sentido hablar de combinaciones cuando entra la acción dinámica (sí, de un modo suelto o de un sismo estático equivalente).
+
+**Lo que hacíamos (VS-g).** Cada variable con el signo del modo dominante, el mismo para todas, y el sismo como un caso más del generador. En cada variable sola es correcto, pero el generador sólo da el ± del caso entero: nunca prueba un signo del sismo distinto en cada esfuerzo. Donde una comprobación junta varios esfuerzos, eso puede quedar del lado inseguro:
+
+- **Wood–Armer:** mx* = mx + |mxy|. Con un mxy estático que no sea despreciable frente al del sismo, +mx con −mxy no se prueba nunca (en la prueba de `woodArmer.test.ts`, la armadura superior en x pide 9 kN·m/m con los signos pésimos y 0 con un solo signo);
+- **las ternas de un pilar** (N, My, Mz), igual con la flexión esviada.
+
+**Decidido por el usuario** (las dos, como las proponía Claude):
+
+- **(a) Las comprobaciones, con los signos pésimos.** `Superposicion.partirLogico` y `partir` (`src/motor/espectral.ts`) parten una combinación en su parte estática (los mismos bits que `combinar` sin el sismo) y, por variable, la amplitud del sismo: Σ |factor·valor| de sus casos del sismo, sin signo (con el 100 % de uno y el 30 % del otro, se suman: el generador ya da todos los signos de cada uno).
+  - **Wood–Armer** (`woodArmerPesimo`, `src/dimensionado/woodArmer.ts`): los 8 signos de mx ± A, my ± A y mxy ± A, y cada momento de dimensionado con el peor. Es lo que dan las franjas (`EsfuerzosFranjas.envolvente`), así que también el mapa de armado, las zonas de refuerzo, el clic y `fem consultar franjas|franja|refuerzos`. El mx máximo y mínimo de la estación es la variable sola y no cambia.
+  - **Las ternas de los pilares** (`ternasPesimas`, `src/agente/consultas.ts`, en `fem consultar pieza` y el cuadro de Pilares): My, Mz, Vy, Vz y T con el signo que aumenta su valor absoluto, y N con los dos (primero la menor compresión, que gana los empates del mayor |My| o |Mz|). Las demás combinaciones de signos dan menos momento a igual N. Cada terna así lleva `pesimos: true` y en la app una «±» con su explicación.
+  - Nunca da menos que antes (lo comprueban las pruebas) y, sin el sismo del programa, los mismos bits.
+- **(b) Los mapas, dichos.** Con alguna combinación con el sismo, Losas lo avisa (`Combinaciones.sismo`: «± sismo» en la cabecera y una nota: es la envolvente de cada variable, no un estado de la losa ni simultánea entre puntos o magnitudes). La deformada de una combinación con el sismo ya no se dibuja (`visor/deformada-sismo`): sus desplazamientos no son una forma de la estructura; la de cada modo, en Modal, y los desplomes, en su tabla.
+
+**Fuera:** las bandas del Anejo I (`woodArmerEstacion`, que ya no usa la app) siguen con un solo signo; los diagramas y los extremos de vigas y barras son de una variable y no cambian; el ν de los pilares es del N solo. Para la integración, los módulos de Concreta que comprueben con varios esfuerzos tienen que hacer lo mismo: la parte estática y la amplitud del sismo por separado, no la combinación con signo.
+
+**Para VS5:** con CYPECAD no se comparan combinaciones con el sismo dinámico (no las da), sino cada modo (periodos, masas, forma y esfuerzos de un modo), el cortante en la base y las armaduras.
+
+**Validación:** `woodArmer.test.ts` (los 8 signos; sin amplitud, bit a bit; un estado con el sismo de signo y fracción cualesquiera nunca pide más), `espectral.test.ts` (`partir`), `sismoEspectral.test.ts` (las ternas y Wood–Armer de las franjas frente a la regla a mano; la envolvente en dos pasos, bit a bit con la de cada combinación) y `visor/sismo.test.ts` (sin deformada con el sismo, `Combinaciones.sismo`).

@@ -24,6 +24,7 @@ import { proponerEjes } from "../compilador/ejes.ts";
 import { sha256 } from "../compilador/huella.ts";
 import type { ApoyoPieza, Consultas } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
+import type { Superposicion } from "../motor/espectral.ts";
 import type { EleccionCombinaciones, Sesion } from "./sesion.ts";
 import type { EscenaPreparada } from "./escena.ts";
 
@@ -40,9 +41,19 @@ export interface Combinaciones {
   descripcion: string;
   nombres: string[];
   etiquetas: string[];
+  /**
+   * VS-o: alguna lleva el sismo del programa. Entonces cada variable sale de combinar los modos por
+   * separado: un mapa es la envolvente de cada variable, no un estado de la estructura.
+   */
+  sismo?: true;
 }
 
-const resumenConjunto = (c: ConjuntoCombinaciones): Combinaciones => ({ descripcion: c.descripcion, nombres: c.nombres, etiquetas: c.etiquetas });
+const resumenConjunto = (c: ConjuntoCombinaciones, sup?: Superposicion): Combinaciones => ({
+  descripcion: c.descripcion,
+  nombres: c.nombres,
+  etiquetas: c.etiquetas,
+  ...(sup?.conEspectrales && c.factores.some((f) => !sup.esLineal(f)) ? { sismo: true as const } : {}),
+});
 
 // ─── Un objeto (inspector) ──────────────────────────────────────────────────────────────────────
 
@@ -130,7 +141,7 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
     valor: {
       escena: esc.valor,
       campo,
-      combinaciones: resumenConjunto(conj.valor),
+      combinaciones: resumenConjunto(conj.valor, q.sup),
       dibujada: k >= 0 ? { nombre: conj.valor.nombres[k]!, etiqueta: conj.valor.etiquetas[k]! } : null,
       ...(env ? { envolvente: env } : {}),
       flechas: fl,
@@ -666,18 +677,17 @@ export function desplazamientos(s: Sesion, e: EleccionCombinaciones): Resultado<
   if (conj.valor.factores.length !== 1) return no("visor/una-combinacion", "La deformada es de una sola combinación.");
   const partes = q.sup.partes(conj.valor.factores[0]!);
   const fl = partes.lineal;
-  const conSismo = partes.espectrales.length > 0;
+  // VS-o: con el sismo del programa, cada desplazamiento sale de combinar los modos por separado y sin
+  // signo propio: juntos no son una forma de la estructura, así que no se dibujan (la de cada modo, en Modal)
+  if (partes.espectrales.length) return no("visor/deformada-sismo", `${conj.valor.nombres[0]} lleva el sismo del programa: cada desplazamiento sale de combinar los modos por separado, sin signo propio, y juntos no son una deformada de la estructura. La forma de cada modo está en Resultados · Modal; los desplazamientos y los desplomes de la combinación, en la tabla.`);
   const n = casos[0]!.u.length / 6;
   const u = new Float32Array(3 * n);
   let [nmax, umax, nmin, zmin] = [-1, -1, -1, Infinity];
-  // Con casos del sismo, cada desplazamiento es el de los modos, combinado (por μ): la deformada es una envolvente con signo
-  const sismo = conSismo ? [0, 1, 2].map((a) => q.sup.deEspectralesVector(partes, (k) => casos[k]!.u, n, true, a, 6)) : null;
   for (let i = 0; i < n; i++) {
     const w = [0, 0, 0];
     for (let a = 0; a < 3; a++) {
       let v = 0;
       for (let k = 0; k < fl.length; k++) if (fl[k]) v += fl[k]! * casos[k]!.u[6 * i + a]!;
-      if (sismo) v += sismo[a]![i]!;
       u[3 * i + a] = v;
       w[a] = v;
     }

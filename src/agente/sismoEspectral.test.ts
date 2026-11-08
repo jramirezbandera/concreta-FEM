@@ -20,7 +20,7 @@ import { compilar, type ResultadoCompilacion } from "../compilador/compilar.ts";
 import { Consultas } from "../compilador/consultas.ts";
 import type { AccionCaso, ModeloFisico, SismoEdificio } from "../compilador/fisico.ts";
 import { CASOS_SISMO } from "../compilador/sismo.ts";
-import { woodArmer } from "../dimensionado/woodArmer.ts";
+import { woodArmer, woodArmerPesimo } from "../dimensionado/woodArmer.ts";
 import { calcular } from "../motor/calcular.ts";
 import { GRAVEDAD, type ResultadoCalculo } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
@@ -119,6 +119,24 @@ function aMano(factores: readonly number[], base: (k: number) => number, desplaz
     s += fj * (desplazamiento ? sc.espectro.mu[caso.eje] * v : v);
   });
   return s;
+}
+
+/**
+ * VS-o, a mano: la combinación partida en su parte estática (los casos del cálculo, por su factor) y
+ * la amplitud del sismo: Σ |factor·valor| de cada caso del sismo, con `aMano` para su valor.
+ */
+function partesAMano(factores: readonly number[], base: (k: number) => number): { S: number; A: number } {
+  const ns = c.modelo.casos.length;
+  let S = 0;
+  for (let k = 0; k < ns; k++) if (factores[k]) S += factores[k]! * base(k);
+  let A = 0;
+  CASOS_SISMO.forEach((_, j) => {
+    const fj = factores[ns + j]!;
+    if (!fj) return;
+    const solo = factores.map((_, k) => (k === ns + j ? 1 : 0));
+    A += Math.abs(fj * aMano(solo, base));
+  });
+  return { S, A };
 }
 
 describe("VS3: los casos del sismo del programa", () => {
@@ -265,16 +283,26 @@ describe("VS3, criterio 6: cada consulta combina los modos en su variable", () =
     if (!t.valido) throw new Error("sin pilar");
     const p = pieza(q, una, PILAR);
     if (!p.valido) throw new Error("sin pieza");
-    const tramos = (p.valor as { tramos: { base: Record<string, { esfuerzos: number[] }>; cabeza: Record<string, { esfuerzos: number[] }> }[] }).tramos;
+    type Terna = { esfuerzos: number[]; pesimos?: true };
+    const tramos = (p.valor as { tramos: { base: Record<string, Terna>; cabeza: Record<string, Terna> }[] }).tramos;
     t.valor.forEach((tramo, i) => {
       for (const donde of ["base", "cabeza"] as const) {
         const e = tramo[donde].esfuerzos;
         const comb = q.combinar(e, 6, F);
+        const ternas = tramos[i]![donde];
         for (let cmp = 0; cmp < 6; cmp++) {
           const mano = aMano(F, (k) => e[6 * k + cmp]!);
           expect(rel(comb[cmp]!, mano)).toBeLessThan(1e-12);
-          // con una sola combinación, «pieza» da esos mismos esfuerzos
-          expect(rel(tramos[i]![donde]["N+"]!.esfuerzos[cmp]!, mano)).toBeLessThan(1e-12);
+          // VS-o: «pieza» da las ternas de los signos pésimos: N con la parte del sismo de los dos signos
+          // (N+ y N−) y los demás esfuerzos con el que aumenta su valor absoluto
+          const { S, A } = partesAMano(F, (k) => e[6 * k + cmp]!);
+          for (const [nombre, sN] of [["N+", 1], ["N-", -1]] as const) {
+            const esperado = cmp === 0 ? S + sN * A : S >= 0 ? S + A : S - A;
+            expect(rel(ternas[nombre]!.esfuerzos[cmp]!, esperado, 1e-6)).toBeLessThan(1e-12);
+            expect(ternas[nombre]!.pesimos).toBe(true);
+          }
+          // nunca menos que la combinación con el signo del modo dominante
+          if (cmp > 0) expect(Math.abs(ternas["N+"]!.esfuerzos[cmp]!)).toBeGreaterThanOrEqual(Math.abs(mano) * (1 - 1e-12));
         }
       }
     });
@@ -434,27 +462,44 @@ describe("VS3, criterio 6: cada consulta combina los modos en su variable", () =
     }
   });
 
-  it("las franjas de armado: los momentos medios combinados y, con ellos, Wood–Armer", () => {
+  it("las franjas de armado: los momentos medios combinados y, con ellos, Wood–Armer con los signos pésimos del sismo (VS-o)", () => {
     const fs = q.franjas("L-N2");
     if (!fs.valido) throw new Error("sin franjas");
-    let comparadas = 0;
+    let [comparadas, mas] = [0, 0];
     for (const fr of fs.valor.filter((_, i) => i % 5 === 0)) {
       const est = q.franja(fr.id);
       const arm = q.armadoFranja(fr.id, [F]);
       if (!est.valido || !arm.valido) throw new Error("sin franja");
       est.valor.estaciones.forEach((e, i) => {
         if (!e.valido) return;
+        // mx, la variable sola (con el signo del modo dominante)
         const [mx, my, mxy] = [0, 1, 2].map((cmp) => aMano(F, (k) => e.medios[3 * k + cmp]!)) as [number, number, number];
-        const w = woodArmer(mx, my, mxy);
         const a = arm.valor[i]!;
         expect(rel(a.mxMax, mx, 1e-6)).toBeLessThan(1e-10);
         expect(rel(a.mxMin, mx, 1e-6)).toBeLessThan(1e-10);
-        expect(rel(a.inferior, Math.max(0, w.inferiorX), 1e-6)).toBeLessThan(1e-10);
-        expect(rel(a.superior, Math.max(0, w.superiorX), 1e-6)).toBeLessThan(1e-10);
+        // Wood–Armer: el peor de los 8 signos de la parte del sismo de mx, my y mxy
+        const p = [0, 1, 2].map((cmp) => partesAMano(F, (k) => e.medios[3 * k + cmp]!));
+        let [inf, sup] = [0, 0];
+        for (const sx of [1, -1])
+          for (const sy of [1, -1])
+            for (const sxy of [1, -1]) {
+              const w = woodArmer(p[0]!.S + sx * p[0]!.A, p[1]!.S + sy * p[1]!.A, p[2]!.S + sxy * p[2]!.A);
+              inf = Math.max(inf, w.inferiorX);
+              sup = Math.max(sup, w.superiorX);
+            }
+        expect(rel(a.inferior, inf, 1e-6)).toBeLessThan(1e-10);
+        expect(rel(a.superior, sup, 1e-6)).toBeLessThan(1e-10);
+        // nunca menos que con los momentos del signo del modo dominante
+        const w = woodArmer(mx, my, mxy);
+        expect(a.inferior).toBeGreaterThanOrEqual(w.inferiorX * (1 - 1e-12));
+        expect(a.superior).toBeGreaterThanOrEqual(w.superiorX * (1 - 1e-12));
+        if (a.inferior > w.inferiorX * (1 + 1e-6) || a.superior > w.superiorX * (1 + 1e-6)) mas++;
         comparadas++;
       });
     }
     expect(comparadas).toBeGreaterThan(50);
+    // y en alguna estación da más (si no, la prueba no prueba nada)
+    expect(mas).toBeGreaterThan(0);
   });
 });
 
@@ -672,8 +717,9 @@ describe("VS4: las envolventes de la situación sísmica no rehacen en cada comb
       const w = a.valor[i]!;
       let [inf, sup, mxMax, mxMin] = [0, 0, -Infinity, Infinity];
       for (const fa of conjunto.factores) {
-        const [mx, my, mxy] = q.combinar(est.medios, 3, fa);
-        const wa = woodArmer(mx!, my!, mxy!);
+        const [mx] = q.combinar(est.medios, 3, fa);
+        const { estatica: s, sismo: a } = q.sup.partir(est.medios, 3, fa);
+        const wa = q.sup.esLineal(fa) ? woodArmer(...(Array.from(q.combinar(est.medios, 3, fa)) as [number, number, number])) : woodArmerPesimo(s[0]!, s[1]!, s[2]!, a[0]!, a[1]!, a[2]!);
         inf = Math.max(inf, wa.inferiorX);
         sup = Math.max(sup, wa.superiorX);
         mxMax = Math.max(mxMax, mx!);

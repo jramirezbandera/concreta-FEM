@@ -97,7 +97,7 @@
  * Todo es lineal en los casos salvo Wood–Armer: los medios de una combinación son la combinación de
  * los de sus casos.
  */
-import { woodArmer } from "../dimensionado/woodArmer.ts";
+import { woodArmer, woodArmerPesimo } from "../dimensionado/woodArmer.ts";
 import { CamposLaminas } from "../motor/campos.ts";
 import type { CasosEfimeros } from "../motor/casosEfimeros.ts";
 import { Cortes, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
@@ -291,14 +291,18 @@ export class EsfuerzosFranjas {
   envolvente(id: string, combinaciones: readonly ArrayLike<number>[]): EnvolventeEstacionFranja[] | null {
     const r = this.estaciones(id);
     if (!r) return null;
+    const conSismo = combinaciones.map((f) => !!this.logicos && !this.logicos.esLineal(f));
     return r.estaciones.map((e) => {
       const v: EnvolventeEstacionFranja = { inferior: 0, superior: 0, combInferior: -1, combSuperior: -1, mxMax: -Infinity, mxMin: Infinity, combMax: -1, combMin: -1 };
       if (!e.valido) return { ...v, inferior: NaN, superior: NaN, mxMax: NaN, mxMin: NaN };
       // Los momentos medios de cada caso con factor (los del sismo, ya combinados de sus modos), una vez por estación
       const porLogico = this.logicos?.porLogico(e.medios, 3);
       combinaciones.forEach((f, c) => {
+        // mx, la variable sola (con el signo del modo dominante, como en los mapas); Wood–Armer junta mx, my
+        // y mxy, y con el sismo del programa prueba los signos de su parte por separado (VS-o)
         const [mx, my, mxy] = porLogico ? this.logicos!.combinarLogico(porLogico, 3, f) : this.combinar(e.medios, 3, f);
-        const w = woodArmer(mx!, my!, mxy!);
+        const p = porLogico && conSismo[c] ? this.logicos!.partirLogico(porLogico, 3, f) : null;
+        const w = p ? woodArmerPesimo(p.estatica[0]!, p.estatica[1]!, p.estatica[2]!, p.sismo[0]!, p.sismo[1]!, p.sismo[2]!) : woodArmer(mx!, my!, mxy!);
         if (w.inferiorX > v.inferior) [v.inferior, v.combInferior] = [w.inferiorX, c];
         if (w.superiorX > v.superior) [v.superior, v.combSuperior] = [w.superiorX, c];
         if (mx! > v.mxMax) [v.mxMax, v.combMax] = [mx!, c];

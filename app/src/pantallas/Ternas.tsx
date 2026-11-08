@@ -29,7 +29,11 @@ export const EXTREMOS_TRAMO = [
 ] as const;
 
 /** Qué es cada fila. */
-export const NOTA_TERNAS = "Cada fila, los N, My y Mz concomitantes de una combinación: la que da ese pésimo en la cabeza o en el pie del tramo flexible (N < 0, compresión; My y Mz, en los ejes de la sección, con su signo). Un pilar se dimensiona con ellas.";
+export const NOTA_TERNAS =
+  "Cada fila, los N, My y Mz concomitantes de una combinación: la que da ese pésimo en la cabeza o en el pie del tramo flexible (N < 0, compresión; My y Mz, en los ejes de la sección, con su signo). Un pilar se dimensiona con ellas. Con el sismo del programa (marcadas con «±»), los esfuerzos de los modos combinados no tienen signo ni son simultáneos: la fila da cada uno con el signo pésimo, los momentos con el que más los aumenta y N con la menor o la mayor compresión.";
+
+/** VS-o: el título de la marca de una terna con el sismo del programa. */
+const TITULO_PESIMOS = "Con el sismo del programa: cada esfuerzo con su signo pésimo, no un estado simultáneo";
 
 function CeldaNu({ f, rowSpan }: { f: FilaPilar; rowSpan: number }) {
   if (!f.nu) return <td rowSpan={rowSpan}>—</td>;
@@ -102,7 +106,14 @@ export function TablaTernas({ filas, titulo, cabecera, activa, onFila, compacta 
                     )}
                     <td className="et" title={t.title}>
                       {t.nombre}
-                      <small style={{ whiteSpace: "nowrap" }}>{x?.comb ?? ""}</small>
+                      <small style={{ whiteSpace: "nowrap" }}>
+                        {x?.comb ?? ""}
+                        {x?.pesimos && (
+                          <span title={TITULO_PESIMOS} aria-label={`, ${TITULO_PESIMOS.toLowerCase()}`}>
+                            {" "}±
+                          </span>
+                        )}
+                      </small>
                     </td>
                     <td>{x ? fmt(x.esfuerzos[0], 1) : "—"}</td>
                     <td>{x ? fmt(x.esfuerzos[4], 1) : "—"}</td>

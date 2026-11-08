@@ -89,22 +89,22 @@ describe("VS3 en el visor: un proyecto con el sismo del programa", () => {
     expect(q.sup.conEspectrales).toBe(true);
   });
 
-  it("la deformada de una combinación sísmica: cada desplazamiento, el de los modos combinado y por μ", () => {
-    const q = s.q!;
+  it("VS-o: una combinación sísmica no tiene deformada (sus desplazamientos no son simultáneos); una sin sismo, sí", () => {
     const cj = valido(s.conjunto(SISMICA, "desplazamientos"));
     const nombre = cj.nombres[0]!;
-    const d = valido(desplazamientos(s, { tipo: "combinacion", situaciones: ["ELU-SIS"], nombre }));
-    const f = cj.factores[0]!;
-    const n = q.casos[0]!.u.length / 6;
-    expect(d.u.length).toBe(3 * n);
-    for (const nudo of [0, Math.floor(n / 3), Math.floor(n / 2), n - 1])
-      for (let a = 0; a < 3; a++) {
-        const esperado = q.sup.valor(f, (k) => q.casos[k]!.u[6 * nudo + a]!, true);
-        expect(Math.abs(d.u[3 * nudo + a]! - esperado)).toBeLessThanOrEqual(1e-6 * Math.abs(esperado) + 1e-12);
-      }
-    // con el sismo solo, el edificio se desplaza hacia donde lo lleva el modo dominante: no es cero
-    expect(d.extremos.length).toBeGreaterThan(0);
-    expect(d.extremos[0]!.valor).toBeGreaterThan(1);
+    const d = desplazamientos(s, { tipo: "combinacion", situaciones: ["ELU-SIS"], nombre });
+    expect(d.valido).toBe(false);
+    if (d.valido) return;
+    expect(d.diagnosticos[0]!.codigo).toBe("visor/deformada-sismo");
+    expect(d.diagnosticos[0]!.mensaje).toContain(nombre);
+    // la de un caso estático sigue saliendo
+    expect(desplazamientos(s, { tipo: "caso", caso: s.q!.fisico.casos[0]!.id }).valido).toBe(true);
+  });
+
+  it("VS-o: las combinaciones de Losas dicen si llevan el sismo del programa", () => {
+    const planta = s.proyecto.modelo.plantas[0]!.id;
+    expect(valido(datosLosas(s, planta, "m11", SISMICA)).combinaciones.sismo).toBe(true);
+    expect(valido(datosLosas(s, planta, "m11", { tipo: "caso", caso: s.q!.fisico.casos[0]!.id })).combinaciones.sismo).toBeUndefined();
   });
 
   it("el cuadro de pilares y el diagrama de una viga, con las combinaciones por defecto", () => {

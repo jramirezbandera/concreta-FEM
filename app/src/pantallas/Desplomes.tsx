@@ -140,7 +140,12 @@ export function ModoDeformada() {
             <Fuente3DModelo deformada={def3D} modo="analitico" />
           ),
         cabecera3D: () =>
-          proyecto.desactualizado ? null : (
+          proyecto.desactualizado ? null : deformada.diagnosticos?.some((x) => x.codigo === "visor/deformada-sismo") ? (
+            // VS-o: con el sismo del programa no hay deformada de la combinación
+            <Chip title={deformada.diagnosticos[0]!.mensaje}>
+              <strong className="font-semibold">Sin deformada</strong> · <span className="mono">{def?.tipo === "una" ? def.nombre : def?.tipo === "combinacion" ? def.nombre : def?.tipo === "caso" ? def.caso : "—"}</span> lleva el sismo del programa: sus desplazamientos no son simultáneos. La forma de cada modo, en Modal.
+            </Chip>
+          ) : (
             <>
               <Chip>
                 <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}

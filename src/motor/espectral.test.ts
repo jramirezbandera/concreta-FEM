@@ -495,4 +495,35 @@ describe("VS3: la superposición de casos lógicos sobre casos base", () => {
     const d = sup.combinar(porBase, n, f, true);
     for (let q = 0; q < n; q++) expect(rel(d[q]! - 1.2 * porBase[q]!, 3 * (r[q]! - 1.2 * porBase[q]!))).toBeLessThan(1e-12);
   });
+
+  it("VS-o, partir: la parte estática con los bits de combinar y, del sismo, Σ |factor·valor| por variable", () => {
+    const ex = caso([3, 4, 5]);
+    const ey = caso([3, 4, 5], { lineal: true });
+    const sup = new Superposicion(6, [
+      { id: "G", base: 0 },
+      { id: "Q", base: 1 },
+      { id: "W", base: 2 },
+      { id: "EX", espectral: ex },
+      { id: "EY", espectral: ey },
+    ]);
+    for (let rep = 0; rep < 20; rep++) {
+      const n = 5;
+      const porBase = numeros(6 * n);
+      const f = Float64Array.from([1, 0.3, rep % 2 ? 0 : 0.5, rep % 3 ? 1 : -1, rep % 4 ? 0.3 : 0]);
+      const { estatica, sismo } = sup.partir(porBase, n, f);
+      const lin = Float64Array.from(f, (v, k) => (k < 3 ? v : 0));
+      // sin los casos del sismo, la combinación de siempre, bit a bit
+      expect(Array.from(estatica)).toEqual(Array.from(sup.combinar(porBase, n, lin)));
+      const pl = sup.porLogico(porBase, n);
+      for (let q = 0; q < n; q++) {
+        const a = Math.abs(f[3]! * pl[n * 3 + q]!) + Math.abs(f[4]! * pl[n * 4 + q]!);
+        expect(sismo[q]).toBe(a);
+        // la combinación con el signo del modo dominante es uno de los estados entre estatica ± sismo
+        expect(Math.abs(sup.combinar(porBase, n, f)[q]! - estatica[q]!)).toBeLessThanOrEqual(sismo[q]! * (1 + 1e-12));
+      }
+      expect(Array.from(sup.partirLogico(pl, n, f).sismo)).toEqual(Array.from(sismo));
+    }
+    // sin casos del sismo con factor, la amplitud es 0
+    expect(Array.from(sup.partir(numeros(6), 1, [1, 1, 1, 0, 0]).sismo)).toEqual([0]);
+  });
 });

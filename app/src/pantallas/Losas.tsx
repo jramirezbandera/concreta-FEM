@@ -208,6 +208,7 @@ export function ModoLosas() {
           <Chip acento title={v.planta === planta ? `${x?.envolvente ? resumenComb : coma(x?.dibujada?.etiqueta ?? "")}${d.ms !== null ? ` · ${fmt(d.ms, 0)} ms` : ""}` : undefined}>
             {nombreCampo} · {unidad}
             {elegida.modo !== "completa" && ` · ${elegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
+            {v.planta === planta && x?.combinaciones.sismo && <span title="Con el sismo del programa, cada valor por separado: no es un estado simultáneo"> · ± sismo</span>}
             {v.planta === planta && (
               <>
                 {" · "}
@@ -269,6 +270,12 @@ export function ModoLosas() {
       {/* UI-23: lo de este panel es de la planta; el 3D puede estar enseñando los muros o todas las plantas */}
       {superficies !== "losas" && vistas.vistas[vistas.activa]?.tipo === "3d" && (
         <p className="nota">El 3D dibuja {SUPERFICIES.find((y) => y.id === superficies)!.nombre.toLowerCase()}; lo de aquí abajo es de las losas de {planta ?? "la planta"}.</p>
+      )}
+      {/* VS-o: con el sismo del programa, el mapa es de cada variable por separado */}
+      {x?.combinaciones.sismo && (
+        <p className="nota" data-aviso="sismo-no-simultaneo">
+          Con el sismo del programa, cada valor sale de combinar los modos en esa variable y en ese punto, con el signo del modo dominante: el mapa es la envolvente de {CAMPOS.find((c) => c.id === campo)!.nombre}, no un estado de la losa, y los valores de dos puntos o de dos magnitudes no son simultáneos. El armado (Wood–Armer) prueba los signos del sismo de mx, my y mxy por separado y se queda con el peor.
+        </p>
       )}
       {x && <p className="nota">uz en los nudos; momentos y cortantes suavizados entre láminas, en los ejes de cada losa. Las bandas no interpolan el color: el número de un punto, con un clic.</p>}
         <SeccionEscala

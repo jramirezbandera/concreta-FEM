@@ -52,6 +52,25 @@ export function woodArmer(mx: number, my: number, mxy: number): MomentosWoodArme
   return { inferiorX: ix, inferiorY: iy, superiorX: sx, superiorY: sy };
 }
 
+/**
+ * VS-o: Wood–Armer con el sismo del programa (análisis modal espectral). Tras combinar los modos, el
+ * sismo da en cada momento una amplitud sin signo (`amx`, `amy`, `amxy` ≥ 0) que no es simultánea con
+ * la de los otros dos: se prueban los 8 signos (mx ± amx, my ± amy, mxy ± amxy) y cada momento de
+ * dimensionado se queda con el peor (los efectos pésimos de cada comprobación). Sin sismo, `woodArmer`.
+ */
+export function woodArmerPesimo(mx: number, my: number, mxy: number, amx: number, amy: number, amxy: number): MomentosWoodArmer {
+  if (!amx && !amy && !amxy) return woodArmer(mx, my, mxy);
+  const r: MomentosWoodArmer = { inferiorX: 0, inferiorY: 0, superiorX: 0, superiorY: 0 };
+  for (let s = 0; s < 8; s++) {
+    const w = woodArmer(s & 1 ? mx - amx : mx + amx, s & 2 ? my - amy : my + amy, s & 4 ? mxy - amxy : mxy + amxy);
+    if (w.inferiorX > r.inferiorX) r.inferiorX = w.inferiorX;
+    if (w.inferiorY > r.inferiorY) r.inferiorY = w.inferiorY;
+    if (w.superiorX > r.superiorX) r.superiorX = w.superiorX;
+    if (w.superiorY > r.superiorY) r.superiorY = w.superiorY;
+  }
+  return r;
+}
+
 export interface EnvolventeWoodArmer {
   /** Máximo de cada momento de dimensionado en las combinaciones. */
   valores: MomentosWoodArmer;

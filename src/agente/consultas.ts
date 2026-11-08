@@ -557,13 +557,41 @@ export interface VanoEnvolvente {
   extremos: Record<string, Extremo>;
 }
 
+/** Un pésimo de un extremo de tramo de pilar: su combinación y sus [N, Vy, Vz, T, My, Mz]. */
+export interface TernaPilar {
+  comb: string;
+  esfuerzos: number[];
+  /** VS-o: la combinación lleva el sismo del programa y los esfuerzos son los de sus signos pésimos (`ternasPesimas`), no un estado simultáneo. */
+  pesimos?: true;
+}
+
 export interface TramoEnvolvente {
   planta: string;
   seccion: string;
   longitud: number;
   /** En la base y en la cabeza del tramo flexible: el máximo y el mínimo de N y el mayor |My| y |Mz|, cada uno con sus [N, Vy, Vz, T, My, Mz] concomitantes. */
-  base: Record<string, { comb: string; esfuerzos: number[] }>;
-  cabeza: Record<string, { comb: string; esfuerzos: number[] }>;
+  base: Record<string, TernaPilar>;
+  cabeza: Record<string, TernaPilar>;
+}
+
+/**
+ * VS-o: las ternas de un extremo de pilar en una combinación con el sismo del programa (`partes`, de
+ * `Superposicion.partir`). Tras combinar los modos, el sismo da en cada esfuerzo una amplitud sin signo
+ * y no simultánea con la de los demás, así que no hay una terna concomitante: se dan las pésimas para
+ * la flexocompresión. My, Mz, Vy, Vz y T, con el signo que aumenta su valor absoluto (para una sección
+ * simétrica, el peor en los dos ejes); N, con los dos: primero la menor compresión (y, así, en un
+ * empate del mayor |My| o |Mz| gana ésa, la peor para un pilar poco comprimido) y luego la mayor. Las
+ * demás combinaciones de signos dan ternas con menos momento a igual N: ninguna es peor que éstas.
+ */
+export function ternasPesimas(partes: { estatica: ArrayLike<number>; sismo: ArrayLike<number> }): number[][] {
+  const { estatica: S, sismo: A } = partes;
+  const mayor = (i: number) => (A[i] ? (S[i]! >= 0 ? S[i]! + A[i]! : S[i]! - A[i]!) : S[i]!);
+  const resto = [1, 2, 3, 4, 5].map(mayor);
+  if (!A[0]) return [[S[0]!, ...resto]];
+  return [
+    [S[0]! + A[0]!, ...resto],
+    [S[0]! - A[0]!, ...resto],
+  ];
 }
 
 export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string | undefined, o: { estaciones?: boolean } = {}): Respuesta<unknown> {
@@ -578,17 +606,20 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
     const r = q.pilar(id);
     if (!r.valido) return r;
     const extremo = (porCaso: Float64Array) => {
-      const ext: Record<string, { comb: string; esfuerzos: number[] }> = {};
+      const ext: Record<string, TernaPilar> = {};
       const valor: Record<string, number> = {};
       conjunto.factores.forEach((f, kc) => {
-        const e = Array.from(q.combinar(porCaso, 6, f));
-        for (const [nombre, c] of [["N+", 0], ["N-", 0], ["My", 4], ["Mz", 5]] as const) {
-          const v = e[c]!;
-          if (mejora(nombre, nombre in valor ? { v: valor[nombre]!, comb: "" } : undefined, v)) {
-            valor[nombre] = v;
-            ext[nombre] = { comb: conjunto.nombres[kc]!, esfuerzos: e };
+        // VS-o: con el sismo del programa, las ternas de los signos pésimos (`ternasPesimas`)
+        const sismo = !q.sup.esLineal(f);
+        const ternas = sismo ? ternasPesimas(q.sup.partir(porCaso, 6, f)) : [Array.from(q.combinar(porCaso, 6, f))];
+        for (const e of ternas)
+          for (const [nombre, c] of [["N+", 0], ["N-", 0], ["My", 4], ["Mz", 5]] as const) {
+            const v = e[c]!;
+            if (mejora(nombre, nombre in valor ? { v: valor[nombre]!, comb: "" } : undefined, v)) {
+              valor[nombre] = v;
+              ext[nombre] = { comb: conjunto.nombres[kc]!, esfuerzos: e, ...(sismo ? { pesimos: true as const } : {}) };
+            }
           }
-        }
       });
       return ext;
     };

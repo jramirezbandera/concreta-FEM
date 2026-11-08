@@ -23,6 +23,10 @@ export type Combinar = (porCaso: ArrayLike<number>, n: number, factores: ArrayLi
 export interface CombinarEnDosPasos {
   porLogico(porBase: ArrayLike<number>, n: number): Float64Array;
   combinarLogico(porLogico: ArrayLike<number>, n: number, factores: ArrayLike<number>): Float64Array;
+  /** ¿Sin ningún caso del sismo con factor? */
+  esLineal(factores: ArrayLike<number>): boolean;
+  /** VS-o: la parte estática y la amplitud del sismo, por separado (`Superposicion.partirLogico`). */
+  partirLogico(porLogico: ArrayLike<number>, n: number, factores: ArrayLike<number>): { estatica: Float64Array; sismo: Float64Array };
 }
 
 /** Combinación lineal de un vector por caso (n valores por caso) con unos factores por caso. */

@@ -515,6 +515,36 @@ export class Superposicion {
   }
 
   /**
+   * VS-o: la combinación de un vector por caso lógico, partida para las comprobaciones que juntan
+   * varias variables (Wood–Armer, las ternas de un pilar). `estatica`, la de sus casos estáticos (los
+   * mismos números que `combinarLogico` sin casos del sismo); `sismo`, por variable, Σ |factor·valor| de
+   * sus casos del sismo: una amplitud sin signo. Tras combinar los modos, el valor de una variable no
+   * tiene signo propio ni es simultáneo con el de las demás, así que quien comprueba prueba los dos
+   * signos de cada una por separado y se queda con el peor (`signosPesimos`). Con varios casos del
+   * sismo (el 100 % de uno y el 30 % del otro), sus amplitudes se suman: el generador ya da todos los
+   * signos de cada uno.
+   */
+  partirLogico(porLogico: ArrayLike<number>, n: number, factores: ArrayLike<number>): { estatica: Float64Array; sismo: Float64Array } {
+    this.comprobar(factores);
+    if (porLogico.length !== n * this.nl) throw new Error(`Superposicion.partirLogico: ${porLogico.length} valores no son ${n} por cada uno de los ${this.nl} casos`);
+    const estatica = new Float64Array(n);
+    const sismo = new Float64Array(n);
+    for (let k = 0; k < this.nl; k++) {
+      const f = factores[k]!;
+      if (!f) continue;
+      const o = n * k;
+      if (this.logicos[k]!.espectral) for (let q = 0; q < n; q++) sismo[q]! += Math.abs(f * porLogico[o + q]!);
+      else for (let q = 0; q < n; q++) estatica[q]! += f * porLogico[o + q]!;
+    }
+    return { estatica, sismo };
+  }
+
+  /** `partirLogico` de un vector por caso base. */
+  partir(porBase: ArrayLike<number>, n: number, factores: ArrayLike<number>): { estatica: Float64Array; sismo: Float64Array } {
+    return this.partirLogico(this.porLogico(porBase, n), n, factores);
+  }
+
+  /**
    * El valor de la combinación de una variable: `base(b)` da su valor en el caso base b (se llama sólo
    * con los que hacen falta). `desplazamiento`: la variable es un desplazamiento o un giro (los de los
    * casos espectrales van por μ).

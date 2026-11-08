@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { envolventeWoodArmer, woodArmer } from "./woodArmer.ts";
+import { envolventeWoodArmer, woodArmer, woodArmerPesimo } from "./woodArmer.ts";
 
 const fixture = JSON.parse(readFileSync(join(import.meta.dirname, "__fixtures__", "wood-armer-python.json"), "utf8")) as {
   filas: number[][];
@@ -162,5 +162,48 @@ describe("envolvente por combinación", () => {
 
   it("rechaza datos que no son ternas", () => {
     expect(() => envolventeWoodArmer([1, 2])).toThrow(/ternas/);
+  });
+});
+
+describe("VS-o: Wood–Armer con los signos pésimos del sismo del programa", () => {
+  it("sin amplitud del sismo, woodArmer bit a bit", () => {
+    const azar = aleatorio(20261108);
+    for (let k = 0; k < 200; k++) {
+      const [mx, my, mxy] = [0, 0, 0].map(() => (azar() - 0.5) * 100) as [number, number, number];
+      expect(woodArmerPesimo(mx, my, mxy, 0, 0, 0)).toEqual(woodArmer(mx, my, mxy));
+    }
+  });
+
+  it("es el peor de los 8 signos en cada momento de dimensionado, y nunca menos que un signo cualquiera", () => {
+    const azar = aleatorio(7);
+    for (let k = 0; k < 500; k++) {
+      const [mx, my, mxy] = [0, 0, 0].map(() => (azar() - 0.5) * 100) as [number, number, number];
+      const [ax, ay, axy] = [0, 0, 0].map(() => azar() * 40) as [number, number, number];
+      const p = woodArmerPesimo(mx, my, mxy, ax, ay, axy);
+      const peor = { inferiorX: 0, inferiorY: 0, superiorX: 0, superiorY: 0 };
+      for (const sx of [1, -1])
+        for (const sy of [1, -1])
+          for (const sxy of [1, -1]) {
+            const w = woodArmer(mx + sx * ax, my + sy * ay, mxy + sxy * axy);
+            for (const c of ["inferiorX", "inferiorY", "superiorX", "superiorY"] as const) peor[c] = Math.max(peor[c], w[c]);
+          }
+      expect(p).toEqual(peor);
+      // un estado con el sismo de signo y fracción cualesquiera (|t| ≤ 1) nunca pide más
+      const t = [0, 0, 0].map(() => 2 * azar() - 1);
+      const w = woodArmer(mx + t[0]! * ax, my + t[1]! * ay, mxy + t[2]! * axy);
+      for (const c of ["inferiorX", "inferiorY", "superiorX", "superiorY"] as const) expect(w[c]).toBeLessThanOrEqual(p[c] + 1e-9);
+    }
+  });
+
+  it("el signo de mxy cuenta: con mxy estático, +mx con −mxy no se queda fuera", () => {
+    // mx = 10 ± 5, my = 0, mxy = 8 ± 6. Cara inferior: mx + |mxy| con los dos mayores, 15 + 14
+    const p = woodArmerPesimo(10, 0, 8, 5, 0, 6);
+    expect(p.inferiorX).toBe(15 + 14);
+    // cara superior: −mx + |mxy| con el menor mx (5) y el mayor |mxy| (14), 9: es mx − 5 con mxy + 6
+    expect(p.superiorX).toBe(9);
+    // con un solo signo para los dos, (15, 14) o (5, 2), la superior en x no pide nada
+    const unSigno = Math.max(woodArmer(15, 0, 14).superiorX, woodArmer(5, 0, 2).superiorX);
+    expect(unSigno).toBe(0);
+    expect(p.superiorX).toBeGreaterThan(unSigno);
   });
 });
