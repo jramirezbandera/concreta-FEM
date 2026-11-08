@@ -93,7 +93,9 @@
  * y el medio salía de medio ancho. Por eso se corta con un margen más allá de la ventana, el mayor con
  * el que la recta sigue la malla (`margenesCara`). El corte directo y el escalón no miden lo mismo: en
  * la misma malla difieren un ~5 % por cara, hasta un ±10–13 % en los momentos que dimensionan (SP-6,
- * `docs/fem3d/spr-abacos.md` §10).
+ * `docs/fem3d/spr-abacos.md` §10). Es el torsor que entra en la tira por los bordes de la ventana, que
+ * el escalón no cuenta: sumado por campos cierra la diferencia en las mallas finas, pero con h ≥ 0,5 no
+ * es fiable y no se suma (PB-12, `docs/fem3d/pilares-borde.md` §14; `lateralEscalon`, para medirlo).
  *
  * Junto a una esquina entrante de la losa (las de sus huecos y las cóncavas de su contorno) el momento
  * es singular: las estaciones que pasan a menos de máx(h, b/2) de una (b, el ancho nominal) dependen
@@ -230,6 +232,11 @@ export class EsfuerzosFranjas {
   readonly muestrasEnCara: boolean;
   /** Sólo para medir LV2-h: la distancia de esa recta en cantos de la losa (por defecto, CANTOS_MUESTRAS). */
   readonly cantosMuestras: number;
+  /**
+   * Sólo para medir PB-12 (`pilares-borde.md` §14): lo que entra en la tira del escalón por los bordes
+   * de la ventana, por campos en la tira (`"campos"`) o a un canto de la cara hacia el vano (`"canto"`).
+   */
+  readonly lateralEscalon: "campos" | "canto" | null;
   private readonly cortes: Cortes;
   private readonly campos: CamposLaminas;
   private readonly franjasDe = new Map<string, Franja[]>();
@@ -251,7 +258,7 @@ export class EsfuerzosFranjas {
     ctx: Contexto,
     compilado: { modelo: ModeloAnalitico; mapeo: Mapeo },
     casos: readonly ResultadoCaso[],
-    opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number; combinar?: Combinar; logicos?: CombinarEnDosPasos; efimeros?: CasosEfimeros } = {},
+    opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number; lateralEscalon?: "campos" | "canto"; combinar?: Combinar; logicos?: CombinarEnDosPasos; efimeros?: CasosEfimeros } = {},
   ) {
     this.combinar = opciones.combinar ?? combinar;
     this.logicos = opciones.logicos ?? null;
@@ -265,6 +272,7 @@ export class EsfuerzosFranjas {
     this.caraDirecta = opciones.caraDirecta ?? true;
     this.muestrasEnCara = opciones.muestrasEnCara ?? false;
     this.cantosMuestras = opciones.cantosMuestras ?? CANTOS_MUESTRAS;
+    this.lateralEscalon = opciones.lateralEscalon ?? null;
     this.cortes = opciones.cortes ?? new Cortes(this.modelo);
     this.campos = opciones.campos ?? new CamposLaminas(this.modelo);
   }
@@ -709,6 +717,30 @@ export class EsfuerzosFranjas {
       const principal = nod.rv[0]!;
       for (let kc = 0; kc < nc; kc++) principal.m[3 * kc]! += nod.resto[kc]!;
       principal.w = ancho;
+      if (this.lateralEscalon && sp !== c.s) {
+        // PB-12: los bordes de la ventana en la tira, con la losa a los dos lados. x_l va de fuera hacia
+        // la ventana, así que el corte da lo de dentro sobre lo de fuera. T es el vector (sobre x_l) y My
+        // va con el convenio de las barras (por eso el traslado es My − dx·Vz), así que
+        // My(cara) = My(base) + Σ T_l·(x_l·y_f). Con `"canto"`, el mismo largo, a un canto de la cara
+        // hacia el vano (fuera de la capa límite de la cara de la viga, como las muestras de LV2-h)
+        const yf: Vec2 = [-sx * d[1], sx * d[0]];
+        const sm = (c.s + sp) / 2;
+        const s0 = this.lateralEscalon === "canto" ? sp + c.lado * l.losa.espesor : sp;
+        for (const [tw, o] of [
+          [ventana[0], -1],
+          [ventana[1], 1],
+        ] as const) {
+          if (!(anchoVentana(sm, [tw - 1e-4, tw]) > 0.5e-4 && anchoVentana(sm, [tw, tw + 1e-4]) > 0.5e-4)) continue;
+          const xl: Vec2 = [-o * n[0], -o * n[1]];
+          const ya = (c.s - sp) * (d[0] * -xl[1] + d[1] * xl[0]);
+          const O = punto(s0, tw);
+          const cl: Corte = { id: `${l.losa.id}:${k}@${sp.toFixed(3)}/${tw.toFixed(3)}`, origen: [O[0], O[1], z], x: [xl[0], xl[1], 0], vz: [0, 0, 1], y: [Math.min(0, ya), Math.max(0, ya)], z: [0, 0], soloLaminas: true, metodo: "campos", cuadratura: 2 };
+          const rl = this.cortes.cortar(cl, this.casos, this.campos);
+          if (!rl.valido) return null;
+          const f = xl[0] * yf[0] + xl[1] * yf[1];
+          for (let kc = 0; kc < nc; kc++) principal.m[3 * kc]! += f * rl.esfuerzos[6 * kc + 3]!;
+        }
+      }
       if (muestras) return { principal, muestras, diag: nod.diag };
       const cam = muestrasCara(sp, c.lado, [ventana], rango);
       return { principal, muestras: cam.rv[0]!, diag: [...nod.diag, ...(cam.valido ? [] : cam.diag)] };

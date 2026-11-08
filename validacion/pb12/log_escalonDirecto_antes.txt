@@ -1,0 +1,100 @@
+== 2x2-{"pilar":[0.3,0.5]}
+L-N1:X1 s=0.250 1 P0-0 directo 26.66 escalón 24.06 -9.7 %
+L-N1:X1 s=11.750 -1 P2-0 directo 26.66 escalón 24.06 -9.7 %
+L-N1:X7 s=0.250 1 P0-1 directo 22.25 escalón 19.45 -12.6 %
+L-N1:X7 s=11.750 -1 P2-1 directo 22.25 escalón 19.45 -12.6 %
+L-N1:X13 s=0.250 1 P0-2 directo 26.66 escalón 24.06 -9.7 %
+L-N1:X13 s=11.750 -1 P2-2 directo 26.66 escalón 24.06 -9.7 %
+2x2-{"pilar":[0.3,0.5]} h = 0.125: 6 estaciones; |escalón / directo − 1|: mediana 9.7 %, máximo -12.6 % (L-N1:X7 s=11.750 -1 P2-1)
+== 2x2-{"pilar":0.45}
+L-N1:X1 s=0.225 1 P0-0 directo 37.59 escalón 35.90 -4.5 %
+L-N1:X1 s=11.775 -1 P2-0 directo 37.59 escalón 35.90 -4.5 %
+L-N1:X7 s=0.225 1 P0-1 directo 24.87 escalón 23.29 -6.4 %
+L-N1:X7 s=11.775 -1 P2-1 directo 24.87 escalón 23.29 -6.4 %
+L-N1:X13 s=0.225 1 P0-2 directo 37.59 escalón 35.90 -4.5 %
+L-N1:X13 s=11.775 -1 P2-2 directo 37.59 escalón 35.90 -4.5 %
+L-N1:Y1 s=0.225 1 P0-0 directo 37.59 escalón 35.90 -4.5 %
+L-N1:Y1 s=11.775 -1 P0-2 directo 37.59 escalón 35.90 -4.5 %
+L-N1:Y7 s=0.225 1 P1-0 directo 24.87 escalón 23.29 -6.4 %
+L-N1:Y7 s=11.775 -1 P1-2 directo 24.87 escalón 23.29 -6.4 %
+L-N1:Y13 s=0.225 1 P2-0 directo 37.59 escalón 35.90 -4.5 %
+L-N1:Y13 s=11.775 -1 P2-2 directo 37.59 escalón 35.90 -4.5 %
+2x2-{"pilar":0.45} h = 0.125: 12 estaciones; |escalón / directo − 1|: mediana 4.5 %, máximo -6.4 % (L-N1:X7 s=0.225 1 P0-1)
+== 2x2-{"pilar":0.45,"interiores":true}
+L-N1:X1 s=0.225 1 P0-0 directo 36.42 escalón 34.79 -4.5 %
+L-N1:X1 s=5.775 -1 P1-0 directo 92.98 escalón 95.56 2.8 %
+L-N1:X1 s=6.225 1 P1-0 directo 92.98 escalón 95.56 2.8 %
+L-N1:X1 s=11.775 -1 P2-0 directo 36.42 escalón 34.79 -4.5 %
+L-N1:X7 s=0.225 1 P0-1 directo 26.27 escalón 25.31 -3.6 %
+L-N1:X7 s=5.775 -1 P1-1 directo 131.92 escalón 135.25 2.5 %
+L-N1:X7 s=6.225 1 P1-1 directo 131.92 escalón 135.25 2.5 %
+L-N1:X7 s=11.775 -1 P2-1 directo 26.27 escalón 25.31 -3.6 %
+L-N1:X13 s=0.225 1 P0-2 directo 36.42 escalón 34.79 -4.5 %
+L-N1:X13 s=5.775 -1 P1-2 directo 92.98 escalón 95.56 2.8 %
+L-N1:X13 s=6.225 1 P1-2 directo 92.98 escalón 95.56 2.8 %
+L-N1:X13 s=11.775 -1 P2-2 directo 36.42 escalón 34.79 -4.5 %
+L-N1:Y1 s=0.225 1 P0-0 directo 36.42 escalón 34.79 -4.5 %
+L-N1:Y1 s=5.775 -1 P0-1 directo 92.98 escalón 95.57 2.8 %
+L-N1:Y1 s=6.225 1 P0-1 directo 92.98 escalón 95.57 2.8 %
+L-N1:Y1 s=11.775 -1 P0-2 directo 36.42 escalón 34.79 -4.5 %
+L-N1:Y7 s=0.225 1 P1-0 directo 26.27 escalón 25.31 -3.7 %
+L-N1:Y7 s=5.775 -1 P1-1 directo 131.92 escalón 135.25 2.5 %
+L-N1:Y7 s=6.225 1 P1-1 directo 131.92 escalón 135.25 2.5 %
+L-N1:Y7 s=11.775 -1 P1-2 directo 26.27 escalón 25.31 -3.7 %
+L-N1:Y13 s=0.225 1 P2-0 directo 36.42 escalón 34.79 -4.5 %
+L-N1:Y13 s=5.775 -1 P2-1 directo 92.98 escalón 95.57 2.8 %
+L-N1:Y13 s=6.225 1 P2-1 directo 92.98 escalón 95.57 2.8 %
+L-N1:Y13 s=11.775 -1 P2-2 directo 36.42 escalón 34.79 -4.5 %
+2x2-{"pilar":0.45,"interiores":true} h = 0.125: 24 estaciones; |escalón / directo − 1|: mediana 3.6 %, máximo -4.5 % (L-N1:Y1 s=0.225 1 P0-0)
+== 2x2-{"pilar":0.5}
+L-N1:X1 s=0.250 1 P0-0 directo 44.98 escalón 42.11 -6.4 %
+L-N1:X1 s=11.750 -1 P2-0 directo 44.98 escalón 42.11 -6.4 %
+L-N1:X7 s=0.250 1 P0-1 directo 33.17 escalón 32.37 -2.4 %
+L-N1:X7 s=11.750 -1 P2-1 directo 33.17 escalón 32.37 -2.4 %
+L-N1:X13 s=0.250 1 P0-2 directo 44.98 escalón 42.11 -6.4 %
+L-N1:X13 s=11.750 -1 P2-2 directo 44.98 escalón 42.11 -6.4 %
+L-N1:Y1 s=0.250 1 P0-0 directo 44.98 escalón 42.11 -6.4 %
+L-N1:Y1 s=11.750 -1 P0-2 directo 44.98 escalón 42.11 -6.4 %
+L-N1:Y7 s=0.250 1 P1-0 directo 33.17 escalón 32.37 -2.4 %
+L-N1:Y7 s=11.750 -1 P1-2 directo 33.17 escalón 32.37 -2.4 %
+L-N1:Y13 s=0.250 1 P2-0 directo 44.98 escalón 42.11 -6.4 %
+L-N1:Y13 s=11.750 -1 P2-2 directo 44.98 escalón 42.11 -6.4 %
+2x2-{"pilar":0.5} h = 0.125: 12 estaciones; |escalón / directo − 1|: mediana 6.4 %, máximo -6.4 % (L-N1:Y1 s=11.750 -1 P0-2)
+== ej11-pf
+L-F1:X1 s=0.400 1 P1 directo 67.94 escalón 65.93 -3.0 %
+L-F1:X1 s=11.600 -1 P3 directo 68.57 escalón 66.90 -2.4 %
+L-F1:X9 s=0.400 1 P4 directo 62.33 escalón 58.57 -6.0 %
+L-F1:X9 s=11.600 -1 P6 directo 62.92 escalón 59.82 -4.9 %
+L-F1:X17 s=0.400 1 P7 directo 67.92 escalón 64.71 -4.7 %
+L-F1:X17 s=11.600 -1 P9 directo 68.40 escalón 65.64 -4.0 %
+L-F1:Y1 s=0.400 1 P1 directo 68.83 escalón 66.92 -2.8 %
+L-F1:Y1 s=11.600 -1 P7 directo 70.23 escalón 68.70 -2.2 %
+L-F1:Y9 s=0.400 1 P2 directo 62.76 escalón 58.98 -6.0 %
+L-F1:Y9 s=11.600 -1 P8 directo 64.48 escalón 61.29 -4.9 %
+L-F1:Y17 s=0.400 1 P3 directo 68.33 escalón 65.59 -4.0 %
+L-F1:Y17 s=11.600 -1 P9 directo 68.58 escalón 66.13 -3.6 %
+L-F2:X1 s=0.300 1 P1 directo 55.12 escalón 54.16 -1.7 %
+L-F2:X1 s=11.700 -1 P3 directo 55.65 escalón 54.67 -1.8 %
+L-F2:X9 s=0.300 1 P4 directo 49.71 escalón 48.37 -2.7 %
+L-F2:X9 s=11.700 -1 P6 directo 50.02 escalón 48.70 -2.6 %
+L-F2:X17 s=0.300 1 P7 directo 55.87 escalón 54.42 -2.6 %
+L-F2:X17 s=11.700 -1 P9 directo 56.23 escalón 54.83 -2.5 %
+L-F2:Y1 s=0.300 1 P1 directo 55.30 escalón 54.31 -1.8 %
+L-F2:Y1 s=11.700 -1 P7 directo 56.20 escalón 55.11 -1.9 %
+L-F2:Y9 s=0.300 1 P2 directo 49.79 escalón 48.46 -2.7 %
+L-F2:Y9 s=11.700 -1 P8 directo 50.81 escalón 49.42 -2.7 %
+L-F2:Y17 s=0.300 1 P3 directo 55.60 escalón 54.80 -1.5 %
+L-F2:Y17 s=11.700 -1 P9 directo 55.70 escalón 54.75 -1.7 %
+L-F3:X1 s=0.250 1 P1 directo 20.45 escalón 20.02 -2.1 %
+L-F3:X1 s=11.750 -1 P3 directo 20.60 escalón 20.16 -2.1 %
+L-F3:X9 s=0.250 1 P4 directo 14.96 escalón 12.24 -18.1 %
+L-F3:X9 s=11.750 -1 P6 directo 15.10 escalón 12.36 -18.1 %
+L-F3:X17 s=0.250 1 P7 directo 20.09 escalón 19.38 -3.5 %
+L-F3:X17 s=11.750 -1 P9 directo 20.01 escalón 19.33 -3.4 %
+L-F3:Y1 s=0.250 1 P1 directo 20.05 escalón 19.47 -2.9 %
+L-F3:Y1 s=11.750 -1 P7 directo 20.43 escalón 19.80 -3.1 %
+L-F3:Y9 s=0.250 1 P2 directo 15.14 escalón 12.50 -17.4 %
+L-F3:Y9 s=11.750 -1 P8 directo 15.46 escalón 12.85 -16.9 %
+L-F3:Y17 s=0.250 1 P3 directo 20.41 escalón 19.91 -2.5 %
+L-F3:Y17 s=11.750 -1 P9 directo 20.43 escalón 19.91 -2.6 %
+ej11-pf h = 0.125: 36 estaciones; |escalón / directo − 1|: mediana 2.8 %, máximo -18.1 % (L-F3:X9 s=0.250 1 P4)
