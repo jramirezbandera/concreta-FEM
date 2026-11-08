@@ -692,7 +692,7 @@ Lo que no sale de los datos y hay que forzar: el ancho de banda del viento de CY
 
 **Visto de paso (malla):** con la configuración más común —pilares de 30 × 30 en el eje de vigas de borde de 30 y la losa hasta el borde—, los refinamientos de LV2 no entran en ningún pilar de borde: `malla/esquina-sin-refinar` en las cuatro esquinas y `malla/pilar-tapado-sin-refinar` en los cuatro de borde, en las tres plantas. Pasa igual con una maciza y sin cargas, y no sin las vigas. Con 0,75 el momento de la viga en la cara de P2 sale un 16 % por debajo del de 0,25, como dice el aviso. **Pendiente técnico:** que la plantilla de esquina y la de cara entren con la viga de borde del ancho del pilar.
 
-**Decidido por el usuario (2026-11-08):** los 18 m del viento eran un error suyo; VS3-d, como CYPECAD (hecho); los ficheros de CYPECAD no se suben (`.gitignore`).
+**Decidido por el usuario (2026-11-08):** los 18 m del viento eran un error suyo; VS3-d, como CYPECAD (hecho); los ficheros de CYPECAD no se suben (`.gitignore`). Los esfuerzos de los pilares por hipótesis, que hacían falta para comparar sus momentos del análisis, los trae el segundo listado (§14.1).
 
 ### 14.1. El segundo ejemplo: los pilares con punto fijo (2026-11-08)
 
@@ -716,7 +716,57 @@ Ejes del listado por hipótesis: N de compresión positivo, Mx = M2, My = −M3,
 
 - **Con el punto fijo, el motor sale más rígido que CYPECAD y lleva más carga a las esquinas.** Con los pilares centrados queda como en el primer ejemplo (−2,3 % en el periodo); con el punto fijo, −7,1 %, también con h = 0,25, así que no es la malla. Con cargas gravitatorias, P1 lleva un 8–10 % más que en CYPECAD en todas las plantas (139,6 frente a 154,2 kN de peso propio en la base) y P5, un 5–7 % menos (748,3 frente a 699,0); P2 casa. Con los pilares centrados, P1 a +2,4 % y P5 a +1,0 %.
 - **Lo que cambia en el motor al llevar el pilar hacia dentro:** su huella rígida (C2-d, HR) queda entera dentro de la losa, en vez de media fuera bajo la viga de borde: en la planta 1, un 40 × 40 que asoma 0,25 m de la cara de la viga. La losa apoya en ese cuadrado rígido, que rigidiza el nudo y le atrae carga. Las vigas no lo explican: la de borde, que ahora acaba en la arista del pilar, pierde incluso su zona rígida dentro de él (una viga cuyo eje va por el borde de la huella), y eso la ablandaría.
-- **CYPECAD da, con el punto fijo, lo que el motor da con los pilares centrados:** como si la parte del pilar que asoma de la viga no rigidizara la losa. El motor sigue la regla de HR (validada frente a OpenSeesPy con `rigidLink` en la huella), que es lo físico para un pilar monolítico con la losa; CYPECAD no lo hace así o lo hace de otra manera. En dimensionado, el pilar interior P5 sale en el motor un 7 % menos cargado que en CYPECAD. **Para el usuario:** si se investiga cómo une CYPECAD la losa a la parte del pilar que asoma de la viga (y si su manual lo dice), o se deja como está.
+- **CYPECAD da, con el punto fijo, casi lo que el motor da con los pilares centrados:** como si la parte del pilar que asoma de la viga no rigidizara la losa. El motor sigue la regla de HR (validada frente a OpenSeesPy con `rigidLink` en la huella), que es lo físico para un pilar monolítico con la losa. En dimensionado, el pilar interior P5 sale en el motor un 7 % menos cargado que en CYPECAD. **Investigado en §14.2:** CYPECAD sólo une la losa al pilar donde una barra de su emparrillado (a un tercio del intereje) cruza una cara, y aquí casi no cruza ninguna de lo que asoma.
 - **Las comprobaciones E.L.U.** (los pésimos, `comparar.ts` §2) dicen lo mismo: con `pf`, N +3,1 % y cortantes con sismo +6,2 / +7,3 %; con `pf-centro`, +2,0 % y +3,8 / +9,2 %.
 - **Avisos de malla:** con el punto fijo los pilares de borde dejan de estar tapados por la viga (desaparece `malla/pilar-tapado-sin-refinar`), y en los de esquina de las plantas 2 y 3 sale `malla/pilar-asoma-sin-plantilla`.
- Para comparar los momentos de los pilares del análisis harían falta sus esfuerzos por hipótesis (el listado de esfuerzos de los pilares de CYPECAD), no los pésimos de las comprobaciones.
+
+### 14.2. Cómo une CYPECAD la losa a lo que asoma del pilar (2026-11-08)
+
+Investigado a petición del usuario. **Lo que dice CYPECAD** (*Memoria de cálculo*, ccadmc01, https://downloads2.cype.com/documentos_es/manuales/ccadmc01.pdf):
+
+- **p. 15, «1.3.1. Consideración del tamaño de los nudos»:** «Se crea un conjunto de nudos generales de dimensión finita en los ejes de los pilares y en la intersección de los elementos de los forjados con los ejes de las vigas. […] Los nudos asociados se forman en las intersecciones de los elementos de los forjados con las caras de las vigas y con las caras de los pilares y en la intersección de los ejes de las vigas con las caras de los pilares.» Y: «Las barras definidas entre el eje del pilar y sus bordes se consideran infinitamente rígidas».
+- **p. 13:** el reticular se discretiza en «mallas de elementos tipo barra cuyo tamaño es de un tercio del intereje», igual en el ábaco y en lo aligerado.
+- **Ninguna opción** cambia esto en la memoria (la p. 197 lo repite: «nudos de dimensión finita y rígidos en el ancho del apoyo»).
+
+La regla es, por tanto, la de HR: el pilar es rígido en toda su sección. Pero **la losa sólo llega al pilar donde una barra del emparrillado cruza una de sus caras.**
+
+**El emparrillado de este ejemplo**, de los nudos del primer listado: barras cada 0,24 m (intereje de 0,72 / 3) por los nervios, en las rectas x = 0,12 + 0,24·k e y = 0,15 + 0,24·k. Alrededor de P5, los nudos de las caras salen justo donde las cruzan: (5,85; 5,91), (5,88; 5,85)… Con la misma retícula en el segundo ejemplo (el mismo paño):
+
+- **P1, P3, P7 y P9:** en F2 y F3 ninguna barra cruza lo que asoma (caras de 0,15 y 0,10 m entre la cara de la viga y la arista), así que la losa sólo llega al pilar por las vigas. En F1, una barra por cara, a 1–4 cm de la esquina interior.
+- **P2, P4, P6 y P8:** dos barras en la cara interior en las tres plantas, y una por lado en F1.
+
+CYPECAD casi no ve lo que asoma, y lo que ve depende de dónde caen los nervios.
+
+**Medido en el motor** (`comparar.ts --union=<modo>`, sobre el modelo ya compilado; los nudos que dejan de ser rígidos pasan al diafragma; h = 0,75 salvo donde se dice):
+
+- `caras`: rígidas sólo las caras de la huella dentro de la losa;
+- `barras`: de esas caras, lo que queda a ≤ 0,12 m de una barra de CYPECAD que las cruza;
+- `asoma`: rígido sólo lo de la huella en el ancho de la viga;
+- `nada`: la losa no toca los pilares de borde.
+
+| Unión de los pilares de borde | T1 | Cortante por planta | N gravitatorio (mediana, \|dif.\|) | M gravitatorios | N con viento | Sismo Qx / N | P1, PP en la base (kN) | P5, PP en la base (kN) |
+|---|---|---|---|---|---|---|---|---|
+| **CYPECAD** | 0,771 s | 189,8 / 270,0 / 318,7 kN | | | | | 139,6 | 748,3 |
+| Motor actual (HR) | −7,5 % | +6,4…+6,9 % | +3,1 (6,9) % | +10,9 % | +11,1 % | +6,8 / +9,2 % | 154,4 | 697,3 |
+| Motor actual, h = 0,25 | −7,1 % | +6,1…+6,6 % | +3,0 (6,7) % | +10,0 % | +10,7 % | +7,4 / +9,0 % | 154,2 | 699,0 |
+| `caras` | −7,5 % | +6,4…+6,8 % | +3,1 (6,9) % | +10,9 % | +11,1 % | +6,8 / +9,2 % | 154,4 | 697,3 |
+| `barras` | −5,4 % | +4,2…+4,5 % | +3,8 (5,3) % | −2,9 % (\|dif.\| 23,6) | +7,0 % | +3,5 / +10,0 % | 151,4 | 700,2 |
+| `asoma` | −2,1 % | +2,1…+2,6 % | +2,2 (4,9) % | −12,1 % | +8,6 % | +4,1 / +6,7 % | 152,3 | 725,7 |
+| `asoma`, h = 0,25 | **−0,2 %** | **+0,4…+1,2 %** | +2,1 (3,5) % | −23,5 % | +5,9 % | +2,5 / +6,0 % | 150,0 | **739,2** |
+| `nada` | +7,0 % | −4,0…−5,4 % | +1,7 (5,9) % | −29,4 % | +22,6 % | +3,1 / +12,5 % | 150,5 | 794,8 |
+| `pf-centro` (otra geometría) | −2,3 % | +1,9…+2,5 % | +0,9 (1,0) % | +15,6 % | +0,6 % | +2,6 / +2,8 % | 143,0 | 755,8 |
+
+- **Lo que sobra de rigidez son las caras del pilar que tocan la losa.** Sin rigidez en lo que asoma (`asoma`, h = 0,25), el periodo, los cortantes por planta y la carga de P5 salen como en CYPECAD (−0,2 %, ≤ 1,2 %, −1,2 %). Con sólo las caras rígidas (`caras`), lo mismo que con toda la huella. El −7 % de P5 viene, pues, de la unión (las esquinas rígidas le quitan carga), y no del área tributaria. CYPECAD le da la misma carga con los pilares de 30 centrados y con el punto fijo: 1 134,0 y 1 137,2 kN en PP+CM+0,3·Qa−0,3·SX−SY (sismo nulo por simetría), con 2,9 kN más de peso del propio pilar.
+- **La regla literal de CYPECAD en láminas** (`barras`) se queda en medio (−5,4 %) y se dispersa pilar a pilar (\|dif.\| de los momentos gravitatorios, 24 %). Una ventana rígida en una lámina no es una barra del emparrillado.
+- **Los momentos gravitatorios de los pilares** de CYPECAD quedan entre la regla del motor (+10 %) y la unión sin lo que asoma (−23 %): en F1 y en las caras interiores de P2…P8, CYPECAD sí une.
+- **Lo que no explica ninguna unión:** el axil gravitatorio de los pilares de esquina, un 7–10 % alto en todas (150–154 kN frente a 139,6; también con `nada`). Planta a planta crece con el pilar: en P1, +9 % en F3 (25 × 25) y +15 % en F1 (40 × 40). Es el eje del pilar 0,20 m hacia dentro (área tributaria de la esquina +6,5 %). CYPECAD reparte como con los pilares centrados (`pf-centro`, +2,4 %); con lo que hay, no se sabe por qué.
+- **Las vigas tampoco:** la de borde P1–P2 de CYPECAD es flexible en 5,55 / 5,70 / 5,775 m en F1 / F2 / F3 (sus comprobaciones a d = 0,258 m de cada cara). Son 0,15 m más que de cara a cara del pilar de debajo (5,40 / 5,55 / 5,625). La del motor es flexible en todo su largo, también dentro del pilar, y se une al nudo en la proyección de su eje (una viga cuyo eje va por la arista de la huella). La de CYPECAD es más rígida, y el que sale más rígido es el motor.
+
+**Valoración de Claude:** lo de CYPECAD es efecto de su emparrillado, no un criterio. Con los nervios corridos 12 cm, las barras cruzarían otras caras y el resultado cambiaría. Lo físico para un pilar hormigonado con la losa es HR (validada frente a OpenSeesPy, fase HR), y la recomendación es dejarla. Frente a CYPECAD, en esta disposición (pilares de fachada con punto fijo que asoman de la viga de borde), el motor da:
+
+- cortantes de sismo un 6 % mayores (del lado seguro);
+- derivas un 3–13 % menores;
+- un 8–10 % más de axil en las esquinas;
+- un 7 % menos en P5: aquí es CYPECAD el que va del lado seguro.
+
+**Para el usuario:** dejar HR como está (recomendado) o añadir una opción que imite a CYPECAD. Si quiere confirmarlo en CYPECAD: correr el punto de paso de los nervios del segundo ejemplo 12 cm (media barra) y recalcular. Si cambian el periodo y los axiles de P1 y P5, es el emparrillado. La comparación del pilar girado (PF-b) necesita un modelo suyo.

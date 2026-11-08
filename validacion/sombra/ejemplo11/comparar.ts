@@ -9,12 +9,25 @@
  *    del listado, con las combinaciones E.L.U. del generador (persistentes y sísmicas), y la de uz con
  *    las características; por zonas (ábacos y aligerado), sin los nudos junto a la cara de los pilares.
  * 4. Vigas del pórtico 1: las envolventes de My y Vz en las caras, frente a las capturas.
+ * 5. Con el segundo listado: los pilares por hipótesis y el sumatorio por planta.
  *
  * Lo que sale está en `viento-sismo.md` §14.
  *
- *   bun validacion/sombra/ejemplo11/comparar.ts [<variante>] [--nudos]
+ *   bun validacion/sombra/ejemplo11/comparar.ts [<variante>] [--nudos] [--union=<modo>]
  *
- * La variante es una carpeta de `.datos/` (por defecto, `cype`). Escribe `out_<variante>.txt`.
+ * La variante es una carpeta de `.datos/` (por defecto, `cype`). Escribe `out_<variante>.txt`
+ * (`out_<variante>-union-<modo>.txt` con `--union`).
+ *
+ * `--union` cambia, sólo para medir, la unión de la losa con los pilares cuya huella pisa el ancho de
+ * una viga (los de borde), en el modelo analítico ya compilado (`viento-sismo.md` §14.2). Los nudos
+ * que dejan de ser rígidos pasan al diafragma de su planta:
+ *   - `asoma`: sólo quedan rígidos los nudos de la huella en el ancho de la viga (en su cara); lo que
+ *     asoma de la viga es losa normal;
+ *   - `caras`: sólo las caras de la huella dentro de la losa (las que no son cara de una viga);
+ *   - `barras`: de esas caras, sólo lo que queda a ≤ 0,12 m de una barra del emparrillado de CYPECAD
+ *     que las cruza (las rectas x = 0,12 + 0,24·k e y = 0,15 + 0,24·k de los nudos del primer
+ *     listado: un tercio del intereje de 0,72, por los nervios);
+ *   - `nada`: la losa no toca esos pilares (sólo sus vigas).
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -32,6 +45,8 @@ const WASM = readFileSync(join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm"));
 await iniciarNucleo(WASM);
 const variante = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "cype";
 const conNudos = process.argv.includes("--nudos");
+const union = process.argv.find((x) => x.startsWith("--union="))?.slice("--union=".length);
+if (union && !["asoma", "caras", "barras", "nada"].includes(union)) throw new Error(`--union=${union}: asoma, caras, barras o nada`);
 const texto = readFileSync(join(AQUI, ".datos", variante, "proyecto.json"), "utf8");
 // El listado: el del primer ejemplo (1.pdf) o, en las variantes `pf`, el del segundo (2.pdf)
 const listado = variante.startsWith("pf") ? "cype2" : "cype";
@@ -40,6 +55,7 @@ const cy = JSON.parse(readFileSync(join(AQUI, ".datos", `${listado}.json`), "utf
 const a = Sesion.abrir(texto, sha256(new Uint8Array(WASM)));
 if (!a.valido) throw new Error(JSON.stringify(a.diagnosticos));
 const s = a.sesion;
+const textoUnion = union ? cambiarUniones(union) : "";
 const k = await s.calcular();
 if (!k.ok) throw new Error(JSON.stringify(k.diagnosticos));
 const q = s.q!;
@@ -52,8 +68,12 @@ const f1 = (v: number) => v.toFixed(1);
 const f3 = (v: number) => v.toFixed(3);
 const pc = (a: number, b: number) => (Math.abs(b) < 1e-9 ? "—" : `${((a / b - 1) * 100).toFixed(1)} %`);
 
-log(`# Ejemplo 11 frente a CYPECAD 2027, variante ${variante}`);
+log(`# Ejemplo 11 frente a CYPECAD 2027, variante ${variante}${union ? `, unión «${union}»` : ""}`);
 log();
+if (textoUnion) {
+  log(textoUnion);
+  log();
+}
 
 // ─── 1. Sismo ───────────────────────────────────────────────────────────────────────────────────
 {
@@ -411,4 +431,85 @@ if (conNudos) {
   }
 }
 
-writeFileSync(join(AQUI, `out_${variante}${conNudos ? "-nudos" : ""}.txt`), out.join("\n") + "\n");
+writeFileSync(join(AQUI, `out_${variante}${union ? `-union-${union}` : ""}${conNudos ? "-nudos" : ""}.txt`), out.join("\n") + "\n");
+
+/** `--union`: cambia los enlaces de las huellas de los pilares de borde en la compilación de la sesión. */
+function cambiarUniones(modo: string): string {
+  const c = s.compilacion;
+  if (!c.valido) throw new Error(JSON.stringify(c.diagnosticos));
+  const fis = s.proyecto.modelo;
+  const nudos = c.modelo.nudos;
+  const E = 1e-6;
+  // El ancho de las vigas de cada planta: sus tramos con medio ancho
+  const tramos = new Map<string, { a: Vec2; b: Vec2; m: number }[]>();
+  for (const v of fis.vigas ?? []) {
+    const sec = fis.secciones.find((x) => x.id === v.seccion) as { b?: number } | undefined;
+    if (!sec?.b) continue;
+    const l = tramos.get(v.planta) ?? [];
+    for (let i = 0; i + 1 < v.puntos.length; i++) l.push({ a: v.puntos[i]!, b: v.puntos[i + 1]!, m: sec.b / 2 });
+    tramos.set(v.planta, l);
+  }
+  const enAncho = (planta: string, x: number, y: number) =>
+    (tramos.get(planta) ?? []).some(({ a, b, m }) => {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)));
+      return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) <= m + E;
+    });
+  const rejilla = (o: number, a0: number, a1: number) => {
+    const r: number[] = [];
+    for (let k = Math.ceil((a0 - o) / 0.24) - 1; o + 0.24 * k <= a1 + E; k++) if (o + 0.24 * k > a0 + E) r.push(o + 0.24 * k);
+    return r;
+  };
+  const resumen: string[] = [];
+  const restr = c.modelo.restricciones as { tipo: string; id: string; maestro: number; esclavos: number[] }[];
+  for (let r = restr.length - 1; r >= 0; r--) {
+    const h = restr[r]!;
+    const m = /^(.+)@(.+):huella$/.exec(h.id);
+    if (!m) continue;
+    const [, pilar, planta] = m as unknown as [string, string, string];
+    const esc = h.esclavos;
+    const en = esc.filter((i) => enAncho(planta, nudos[i]!.x, nudos[i]!.y));
+    if (!en.length) continue;
+    let quedan: number[];
+    if (modo === "asoma") quedan = en;
+    else if (modo === "nada") quedan = [];
+    else {
+      // Las caras de la huella dentro de la losa: los lados de su caja que no son cara de una viga
+      const xs = esc.map((i) => nudos[i]!.x);
+      const ys = esc.map((i) => nudos[i]!.y);
+      const caja = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+      const lados = (
+        [
+          ["x", caja.x0, caja.y0, caja.y1],
+          ["x", caja.x1, caja.y0, caja.y1],
+          ["y", caja.y0, caja.x0, caja.x1],
+          ["y", caja.y1, caja.x0, caja.x1],
+        ] as const
+      ).filter(([t, v]) => {
+        const sobre = esc.filter((i) => Math.abs((t === "x" ? nudos[i]!.x : nudos[i]!.y) - v) < E);
+        return !sobre.every((i) => enAncho(planta, nudos[i]!.x, nudos[i]!.y));
+      });
+      quedan = esc.filter((i) => {
+        const nd = nudos[i]!;
+        return lados.some(([t, v, a0, a1]) => {
+          if (Math.abs((t === "x" ? nd.x : nd.y) - v) >= E) return false;
+          if (modo === "caras") return true;
+          const u = t === "x" ? nd.y : nd.x;
+          return rejilla(t === "x" ? 0.15 : 0.12, a0, a1).some((g) => Math.abs(u - g) <= 0.12 + E);
+        });
+      });
+    }
+    const sueltos = esc.filter((i) => !quedan.includes(i));
+    const dia = restr.find((x) => x.id === `${planta}:diafragma`);
+    if (!dia) throw new Error(`sin diafragma en ${planta}`);
+    dia.esclavos = [...dia.esclavos, ...sueltos].sort((x, y) => x - y);
+    if (quedan.length) h.esclavos = quedan.sort((x, y) => x - y);
+    else {
+      restr.splice(r, 1);
+      c.mapeo.restricciones.splice(r, 1);
+    }
+    resumen.push(`${pilar}@${planta} ${quedan.length}/${esc.length}`);
+  }
+  return `Unión «${modo}» en las huellas de los pilares de borde (nudos rígidos que quedan / que había): ${resumen.reverse().join(", ")}`;
+}
