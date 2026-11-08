@@ -71,7 +71,7 @@ const AYUDA = {
     "Sólo para el periodo fundamental aproximado del art. 3.7.2.2, con el que se contrasta el cortante en la base del método simplificado. No cambia el cálculo por espectros.",
   omega: "Amortiguamiento de la estructura, en % del crítico (tabla 3.1 de la norma). Corrige el espectro con ν = (5/Ω)^0,4 (art. 2.5) y entra en la combinación cuadrática completa. Por defecto, 5 %.",
   regla:
-    "Cómo se suman las respuestas de los modos. La del art. 3.6.2.4: raíz de la suma de los cuadrados, con los modos de periodos a menos del 10 % sumados en valor absoluto. La cuadrática completa (comentario C.3.6.2.4) usa la correlación entre modos con el amortiguamiento Ω.",
+    "Cómo se suman las respuestas de los modos. La del art. 3.6.2.4: raíz de la suma de los cuadrados, con los modos de periodos a menos del 10 % sumados en valor absoluto. La cuadrática completa (comentario C.3.6.2.4, la «expresión general» de la norma) usa la correlación entre modos con el amortiguamiento Ω y no depende de cómo gire la malla dos modos de igual periodo. Por defecto, la cuadrática completa.",
   excentricidad:
     "Excentricidad accidental de las masas, como fracción de la dimensión de cada planta perpendicular al sismo (art. 3.2: no menos de 1/20 = 0,05). Da los casos EX+e, EX−e, EY+e y EY−e. Con 0, sin ella.",
   zonaInvernal:
@@ -129,7 +129,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
   const [muY, setMuY] = useState(typeof mu0 === "object" && mu0.y !== mu0.x ? String(mu0.y) : "");
   const [importancia, setImportancia] = useState<"normal" | "especial">(a.sismo?.importancia ?? "normal");
   const [omega, setOmega] = useState(texto(a.sismo?.omega));
-  const [regla, setRegla] = useState<"srss" | "cqc">(a.sismo?.regla ?? "srss");
+  const [regla, setRegla] = useState<"srss" | "cqc">(a.sismo?.regla ?? "cqc");
   const [excentricidad, setExcentricidad] = useState(texto(a.sismo?.excentricidad));
   const [sistema, setSistema] = useState<SistemaEstructural | "">(a.sismo?.sistema ?? "");
   const [nieve, setNieve] = useState(a.sismo?.nievePermanente ?? false);
@@ -197,7 +197,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
           if (typeof n === "string") return { error: `${nombre}: ${n}.` };
           if (n !== undefined) poner(n);
         }
-        if (regla !== "srss") s.regla = regla;
+        if (regla !== "cqc") s.regla = regla;
         if (sistema) s.sistema = sistema;
       }
       r.sismo = s;
@@ -525,8 +525,8 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
                   Combinación de modos
                 </Etiqueta>
                 <select id="s-reg" className="sel" value={regla} onChange={(e) => setRegla(e.target.value as "srss" | "cqc")}>
-                  <option value="srss">La del art. 3.6.2.4 (raíz de la suma de los cuadrados)</option>
                   <option value="cqc">Cuadrática completa (comentario C.3.6.2.4)</option>
+                  <option value="srss">La del art. 3.6.2.4 (raíz de la suma de los cuadrados)</option>
                 </select>
                 <Etiqueta htmlFor="s-exc" ayuda={AYUDA.excentricidad}>
                   Excentricidad accidental

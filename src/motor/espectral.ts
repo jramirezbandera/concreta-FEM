@@ -57,8 +57,9 @@ export const periodosProximos = (Ti: number, Tj: number): boolean => Math.min(Ti
 
 export interface OpcionesRegla {
   /**
-   * "srss" (por defecto): la regla del articulado, con los pares de modos próximos sumados en valor
-   * absoluto. "cqc": la combinación cuadrática completa, con el amortiguamiento `zeta`.
+   * "srss" (por defecto en el motor): la regla del articulado, con los pares de modos próximos sumados
+   * en valor absoluto. "cqc": la combinación cuadrática completa, con el amortiguamiento `zeta`. El
+   * compilador la da siempre; en el modelo físico, por defecto, "cqc" (VS-f).
    */
   tipo?: "srss" | "cqc";
   /** Amortiguamiento, en tanto por uno del crítico (cqc). Por defecto, 0,05. */

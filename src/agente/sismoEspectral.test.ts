@@ -83,39 +83,46 @@ beforeAll(async () => {
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 /**
- * La regla, a mano (art. 3.6.2.4): el valor de una variable en una combinación, con sus valores en
- * los casos base. Los casos estáticos, por su factor; cada caso del sismo, la raíz de la suma de los
- * cuadrados de las respuestas de los modos (con los pares de periodos a menos del 10 %, en valor
- * absoluto), con el signo del modo de más masa en su dirección, más el torsor de su excentricidad; y
- * por μ si es un desplazamiento.
+ * La regla, a mano (art. 3.6.2.4 y su comentario): el valor de una variable en una combinación, con
+ * sus valores en los casos base. Los casos estáticos, por su factor; cada caso del sismo, la regla de
+ * su espectro sobre las respuestas de los modos —la cuadrática completa de C.3.6.2.4 (por defecto,
+ * VS-f), con πᵢₖ escrita aquí, o la raíz de la suma de los cuadrados con los pares de periodos a
+ * menos del 10 % en valor absoluto—, con el signo del modo de más masa en su dirección, más el torsor
+ * de su excentricidad; y por μ si es un desplazamiento. `x`, el edificio (por defecto, el de 3 plantas).
  */
-function aMano(factores: readonly number[], base: (k: number) => number, desplazamiento = false): number {
-  const ns = c.modelo.casos.length;
-  const md = r.modal!;
-  const sc = q.sismoCalculado!;
+function aMano(factores: readonly number[], base: (k: number) => number, desplazamiento = false, x: { c: Compilado; r: Calculado; q: Consultas } = { c, r, q }): number {
+  const ns = x.c.modelo.casos.length;
+  const md = x.r.modal!;
+  const sc = x.q.sismoCalculado!;
+  const cqc = sc.espectro.regla === "cqc";
+  const z = sc.espectro.omega / 100;
   let s = 0;
   for (let k = 0; k < ns; k++) if (factores[k]) s += factores[k]! * base(k);
   CASOS_SISMO.forEach((caso, j) => {
     const fj = factores[ns + j]!;
     if (!fj) return;
     const resp = sc.respuestas[caso.eje];
-    const x = md.modos.map((_, i) => resp.coeficientes[i]! * base(ns + i));
+    const y = md.modos.map((_, i) => resp.coeficientes[i]! * base(ns + i));
     let s2 = 0;
-    for (let i = 0; i < x.length; i++) {
-      s2 += x[i]! ** 2;
-      for (let k = i + 1; k < x.length; k++) {
+    for (let i = 0; i < y.length; i++) {
+      s2 += y[i]! ** 2;
+      for (let k = i + 1; k < y.length; k++) {
         const [Ti, Tk] = [md.modos[i]!.periodo, md.modos[k]!.periodo];
-        if (Math.min(Ti, Tk) > 0.9 * Math.max(Ti, Tk)) s2 += 2 * Math.abs(x[i]! * x[k]!);
+        if (cqc) {
+          const g = Ti / Tk;
+          const pi = (8 * z * z * (1 + g) * g ** 1.5) / ((1 - g * g) ** 2 + 4 * z * z * g * (1 + g) ** 2);
+          s2 += 2 * pi * y[i]! * y[k]!;
+        } else if (Math.min(Ti, Tk) > 0.9 * Math.max(Ti, Tk)) s2 += 2 * Math.abs(y[i]! * y[k]!);
       }
     }
     let dominante = 0;
     md.modos.forEach((m, i) => {
       if (m.participacion[caso.eje] ** 2 > md.modos[dominante]!.participacion[caso.eje] ** 2) dominante = i;
     });
-    let v = (x[dominante]! < 0 ? -1 : 1) * Math.sqrt(s2);
+    let v = (y[dominante]! < 0 ? -1 : 1) * Math.sqrt(s2);
     // +e: la recta de acción, hacia +Y con el sismo según X (par −F·e) y hacia +X según Y (par +F·e)
     const signo = (caso.eje === 0 ? -1 : 1) * caso.exc;
-    md.modos.forEach((_, i) => (v += signo * resp.torsor![i]! * base(ns + i)));
+    md.modos.forEach((_, i) => (v += signo * (resp.torsor?.[i] ?? 0) * base(ns + i)));
     s += fj * (desplazamiento ? sc.espectro.mu[caso.eje] * v : v);
   });
   return s;
@@ -201,7 +208,7 @@ describe("VS3: los casos del sismo del programa", () => {
     expect(v.casos).toEqual(["EX+e", "EX-e", "EY+e", "EY-e"]);
     expect(v.omega).toBe(5);
     expect(v.nu).toBe(1);
-    expect(v.regla).toBe("srss");
+    expect(v.regla).toBe("cqc");
     expect(v.excentricidad).toBe(0.05);
     expect(rel(v.peso, r.modal!.masas.diafragmas * GRAVEDAD)).toBeLessThan(1e-14);
     v.direcciones.forEach((d, eje) => {
@@ -549,7 +556,7 @@ describe("VS3: sin el espectro, como sin el sismo", () => {
     const casos = [...edificio(2).casos, { id: "EX+e", accion: { tipo: "E" as const, direccion: "X" as const } }];
     expect(codigos(SISMO, { casos })).toContain("sismo/caso-existente");
     // lo que vale: los estratos, μ por dirección, la regla y la importancia
-    const bien: SismoEdificio = { ab: 0.07, K: 1.1, importancia: "especial", terreno: [{ tipo: "II", espesor: 8 }, { C: 1.7, espesor: 30 }], mu: { x: 2, y: 3 }, omega: 4, regla: "cqc", excentricidad: 0, sistema: "porticos-ha" };
+    const bien: SismoEdificio = { ab: 0.07, K: 1.1, importancia: "especial", terreno: [{ tipo: "II", espesor: 8 }, { C: 1.7, espesor: 30 }], mu: { x: 2, y: 3 }, omega: 4, regla: "srss", excentricidad: 0, sistema: "porticos-ha" };
     expect(codigos(bien)).toEqual([]);
     // y un caso de sismo escrito a mano además del del programa, un aviso
     const aMano2 = compilar({ ...edificio(2), casos: [...edificio(2).casos, { id: "Sx", accion: { tipo: "E", direccion: "X" } }] });
@@ -557,8 +564,8 @@ describe("VS3: sin el espectro, como sin el sismo", () => {
     expect(aMano2.diagnosticos.map((d) => d.codigo)).toContain("sismo/casos-a-mano");
   });
 
-  it("μ por dirección, la regla cuadrática completa y sin excentricidad", () => {
-    const x = calculado(edificio(2, { ab: 0.07, K: 1.1, importancia: "especial", terreno: [{ tipo: "II", espesor: 8 }, { C: 1.7, espesor: 30 }], mu: { x: 2, y: 3 }, omega: 4, regla: "cqc", excentricidad: 0, sistema: "porticos-ha" }));
+  it("μ por dirección, la regla del articulado y sin excentricidad", () => {
+    const x = calculado(edificio(2, { ab: 0.07, K: 1.1, importancia: "especial", terreno: [{ tipo: "II", espesor: 8 }, { C: 1.7, espesor: 30 }], mu: { x: 2, y: 3 }, omega: 4, regla: "srss", excentricidad: 0, sistema: "porticos-ha" }));
     const s = sismo(x.q);
     if (!s.valido) throw new Error(s.diagnosticos[0]!.mensaje);
     // C = (1,3·8 + 1,7·22)/30; ρ = 1,3; ν = (5/4)^0,4
@@ -567,7 +574,7 @@ describe("VS3: sin el espectro, como sin el sismo", () => {
     expect(s.valor.nu).toBeCloseTo(1.25 ** 0.4, 14);
     expect(s.valor.direcciones.map((d) => d.mu)).toEqual([2, 3]);
     expect(s.valor.direcciones[1]!.beta).toBeCloseTo(1.25 ** 0.4 / 3, 14);
-    expect(s.valor.regla).toBe("cqc");
+    expect(s.valor.regla).toBe("srss");
     for (const d of s.valor.direcciones) {
       for (const p of d.plantas) expect(p.par).toBe(0);
       // con el sistema estructural, también el periodo aproximado: 0,09·n
@@ -579,6 +586,9 @@ describe("VS3: sin el espectro, como sin el sismo", () => {
     if (!t.valido) throw new Error("sin pilar");
     const e = t.valor[0]!.base.esfuerzos;
     expect(Array.from(x.q.combinar(e, 6, [0, 0, 0, 0, 1, 0, 0, 0]))).toEqual(Array.from(x.q.combinar(e, 6, [0, 0, 0, 0, 0, 1, 0, 0])));
+    // la regla del articulado, a mano, en los esfuerzos de la base del pilar
+    const comb = x.q.combinar(e, 6, F);
+    for (let cmp = 0; cmp < 6; cmp++) expect(rel(comb[cmp]!, aMano(F, (k) => e[6 * k + cmp]!, false, x), 1e-6), `componente ${cmp}`).toBeLessThan(1e-12);
   });
 });
 

@@ -734,9 +734,11 @@ export interface SismoEdificio {
   /** Amortiguamiento Ω, en % del crítico (tabla 3.1). Por defecto, 5. */
   omega?: number;
   /**
-   * Regla de combinación de los modos: "srss" (por defecto), la del art. 3.6.2.4 (raíz de la suma de
-   * los cuadrados, con los modos de periodos a menos del 10 % sumados en valor absoluto), o "cqc", la
-   * combinación cuadrática completa de su comentario, con el amortiguamiento Ω.
+   * Regla de combinación de los modos: "cqc" (por defecto), la combinación cuadrática completa con el
+   * amortiguamiento Ω, la «expresión general» del comentario C.3.6.2.4; o "srss", la simplificación
+   * del art. 3.6.2.4 (raíz de la suma de los cuadrados, con los modos de periodos a menos del 10 %
+   * sumados en valor absoluto). La CQC no depende de cómo gire la malla dos modos de igual periodo
+   * (VS-f, `viento-sismo.md` §14).
    */
   regla?: "srss" | "cqc";
   /**

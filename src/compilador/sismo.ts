@@ -334,7 +334,8 @@ function espectroDe(s: SismoEdificio, casos: readonly CasoFisico[], m: ModeloFis
     nu,
     mu,
     beta: [nu / mu[0], nu / mu[1]],
-    regla: s.regla ?? "srss",
+    // VS-f (decisión del usuario, 2026-11-08): la cuadrática completa del comentario C.3.6.2.4
+    regla: s.regla ?? "cqc",
     excentricidad,
     ...(s.sistema ? { sistema: s.sistema } : {}),
   };
