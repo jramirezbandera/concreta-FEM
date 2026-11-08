@@ -908,6 +908,7 @@
   - `src/compilador/nieve.ts`: sk desde el emplazamiento (la 3.8 en la capital, si no la E.2), qn = μ·sk en cubierta plana, aviso `nieve/psi-altitud` y la hipótesis.
   - App: pestaña «Nieve» (botón en Cargas) con «Crear el caso» o «Cambiarle el ψ»; en la plantilla de Superficie con un caso de nieve activo, «μ·sk · Usar».
   - Pruebas: `nieve.test.ts` y `fichaAcciones.test.tsx`.
+- **2026-11-08: plan de la fase DO** (los datos de la obra en una pantalla; `docs/fem3d/datos-obra.md`), de las capturas de los «Datos generales» de CYPECAD. Propone un diálogo «Datos de la obra» (nombre, emplazamiento con lo que sale de él, materiales por defecto por tipo de elemento en `obra.materiales`, fuera de la huella, y resúmenes de acciones, plantas y casos con su acceso) como primer paso de una obra nueva y desde la barra de Modelo; lo que es de las comprobaciones se queda para Concreta. **Pendiente del usuario:** DO-a…DO-h.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
