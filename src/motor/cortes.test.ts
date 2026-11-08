@@ -128,6 +128,34 @@ describe("F3: con soloLaminas, las restricciones nombradas sí entran", () => {
     // Con una normal el maestro queda del lado B (igual) y con la otra, del lado A (cambia)
     expect(cambian.sort()).toEqual([false, true]);
   });
+
+  it("con esclavos (PB-11), sólo esos nudos: todos, lo de soloEsclavos bit a bit; ninguno, sin la restricción; dos grupos, la suma", () => {
+    const [L, b, F] = [3, 1.5, 4];
+    const base = mensulaPlaca(6, 3, L, b, F);
+    const enHuella = base.nudos.flatMap((n, i) => (n.x >= 1 - 1e-9 && n.x <= 2 + 1e-9 && n.y >= 0.5 - 1e-9 && n.y <= 1 + 1e-9 ? [i] : []));
+    const maestro = enHuella.find((i) => Math.abs(base.nudos[i]!.x - 2) < 1e-9 && Math.abs(base.nudos[i]!.y - 0.5) < 1e-9)!;
+    const esclavos = enHuella.filter((i) => i !== maestro);
+    const modelo = { ...base, restricciones: [{ tipo: "enlace-rigido" as const, id: "H", maestro, esclavos }] };
+    const casos = casosValidos(calcular(modelo));
+    const ct = new Cortes(modelo);
+    // Del lado A (x < 1,5) quedan los esclavos de x = 1
+    const corte: Corte = { origen: [1.5, 0, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, b], soloLaminas: true, restricciones: ["H"], soloEsclavos: true };
+    const todos = ct.cortar(corte, casos);
+    expect(todos.valido && todos.restricciones.length === 1).toBe(true);
+    expect([...ct.cortar({ ...corte, esclavos }, casos).esfuerzos]).toEqual([...todos.esfuerzos]);
+    const ninguno = ct.cortar({ ...corte, esclavos: [] }, casos);
+    expect(ninguno.restricciones).toEqual([]);
+    expect([...ninguno.esfuerzos]).toEqual([...ct.cortar({ ...corte, restricciones: undefined, soloEsclavos: undefined }, casos).esfuerzos]);
+    const enA = esclavos.filter((i) => base.nudos[i]!.x < 1.5);
+    expect(enA.length).toBeGreaterThan(1);
+    const [a, c] = [enA.slice(0, 1), enA.slice(1)];
+    const ra = ct.cortar({ ...corte, esclavos: a }, casos).esfuerzos;
+    const rc = ct.cortar({ ...corte, esclavos: c }, casos).esfuerzos;
+    const escala = Math.max(...[...todos.esfuerzos].map(Math.abs));
+    todos.esfuerzos.forEach((v, k) => expect(Math.abs(ra[k]! + rc[k]! - ninguno.esfuerzos[k]! - v)).toBeLessThan(1e-12 * escala));
+    // Y uno que no es un índice, no válido
+    expect(ct.cortar({ ...corte, esclavos: [0.5] }, casos).valido).toBe(false);
+  });
 });
 
 describe("criterio 2 de E5: convenio de las barras", () => {

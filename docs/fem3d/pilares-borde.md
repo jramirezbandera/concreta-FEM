@@ -181,14 +181,56 @@ Mejora mucho la viga en la cara del pilar en los recuadros, pero el metro de la 
 
 **Pruebas:** `src/motor/cortes.test.ts` (con el maestro al otro lado, bit a bit; del mismo lado, cambia) y `src/compilador/metroPuntoFijo.test.ts` (el metro con 0,75 y 0,6 a menos del 20 % del de 0,125; falla con el código de antes).
 
-**Sigue abierto (PB-11):** el 30 × 50 de esquina con el lado largo a lo largo de una viga. Su cara en esa dirección queda entera dentro del ancho de la viga y no toca la losa, así que su «estación de cara» mide la losa junto a la esquina del pilar. Por el escalón sale mx = −0,57 frente a −5,25 de la fina (con 4,6 de mxy, el Wood–Armer superior a −52 %). No tiene enlace que contar (en la losa la huella no tiene esclavos delante de la base), así que esto no lo arregla. Lo natural sería que un pilar cuya cara no toca la losa no tenga estación de cara en esa dirección, y dejar que la franja tome ahí la de apoyo en la cara de la viga.
+**Sigue abierto (PB-11):** el 30 × 50 de esquina con el lado largo a lo largo de una viga. Su cara en esa dirección queda entera dentro del ancho de la viga y no toca la losa, así que su «estación de cara» mide la losa junto a la esquina del pilar. Por el escalón sale mx = −0,57 frente a −5,25 de la fina (con 4,6 de mxy, el Wood–Armer superior a −52 %). No tiene enlace que contar (en la losa la huella no tiene esclavos delante de la base), así que esto no lo arregla. Lo natural sería que un pilar cuya cara no toca la losa no tenga estación de cara en esa dirección, y dejar que la franja tome ahí la de apoyo en la cara de la viga. **Medido en §12: no era eso.**
 
-## 12. Ficheros
+## 12. PB-11: lo que la tira del escalón da a la viga que llega al pilar (2026-11-08)
+
+**Dónde.** El 2 × 2 de PB con pilares de 30 × 50, el lado largo según X. En P2-2 (esquina de (12, 12)), la huella va de x = 11,75 a 12,25 y de y = 11,85 a 12,15: según X asoma 10 cm de la viga Y (cara x = 11,85) y según Y queda entera en el ancho de la viga X (de 11,85 a 12,15). La franja X13 mide su metro en x = 11,75, con la ventana de y = 11,5 a 12,5 (losa hasta 11,85: 0,35 m). Con h ≥ 0,5 la recta no sigue la malla y va por el escalón desde la cara de la viga Y (x = 11,85, dx = 0,1); con h ≤ 0,25, por el corte directo.
+
+**Lo que dice la malla fina** (`validacion/pb11/estacion.ts`, mx del caso Q, kN·m/m):
+
+| h | 0,75 | 0,5 | 0,25 | 0,125 | 0,0625 |
+|---|---|---|---|---|---|
+| en x = 11,75 (la estación), antes | −0,57 (escalón) | −0,12 (escalón) | −5,50 | −6,11 | −5,25 |
+| en x = 11,85 (la cara de la viga), corte directo en la ventana | −0,35 | −0,53 | −0,03 | −1,27 | −1,50 |
+
+En 10 cm el momento de la franja cae de −5,3 a −1,5: casi todo entra entre las dos rectas. **La propuesta de §11 (quitar la estación y tomar la de apoyo en la cara de la viga) daba aún menos**, y además esa estación de apoyo deja fuera la ventana del pilar (LV2 §14), así que no habría ninguna.
+
+**Por dónde entra.** Los nudos de la losa en y = 11,85 con x de 11,75 a 11,85 (el borde de la huella que da a la losa) no son de la huella: son de la cara de la viga X, enlazados (LV) a su nudo del eje en x = 11,8, a 7,5 cm de su zona rígida. La losa de la tira da el momento a esos nudos, la viga lo lleva al pilar por torsión en un tramo de centímetros, casi rígido. El escalón (F3, SP-3) cuenta la recta base y lo que la tira da a la huella del pilar (su enlace), pero no lo que da a la viga.
+
+**El arreglo** (motor y franjas; sin cambio de malla ni de versión del compilador):
+- en el motor, la opción `esclavos` del corte (con `restricciones` y `soloEsclavos`, sólo esos nudos de sus esclavos);
+- en el escalón (`esfuerzosFranjas.ts`), además del enlace del pilar, los enlaces de las caras de las vigas con sus nudos en la tira (entre la recta base y la de la cara, incluida esta) y en la ventana, con tres condiciones:
+  - **de una viga según la franja** (el enlace va de la cara al eje según n). Sin esto, en `aleatorio-3-lv` (LV1, con la cara de una viga inclinada unos mm) entraban los nudos de la cara de la viga de la recta base, con todo su apoyo: una estación de 3,6 pasaba a 86 kN·m/m;
+  - **en la ventana**, no en todo el tramo cortado;
+  - **con losa flexible al lado:** a 1 mm del nudo, hacia la losa y hacia la base, no está la huella (`SONDA_TIRA`). Bajo lo que asoma de un pilar mayor que su viga (el 45 o el 50 bajo vigas de 30, las esquinas del ejemplo 11 con punto fijo), la cara de la viga recibe lo que le da la huella, no la losa de la franja. Sin esta condición, en la F3 del ejemplo con punto fijo (25 × 25 con la esquina fija) el metro de las esquinas pasaba del −2…−4 % al −14…−22 % de la fina con h = 0,75, del lado inseguro.
+
+Con eso el arreglo sólo actúa donde la viga que llega al pilar tiene losa flexible delante de la huella: el 30 × 50 de PB-11 y la punta de un pilar girado sobre su viga.
+
+**Resultado en la estación de PB-11:**
+
+| h | 0,75 | 0,5 | 0,25 | 0,125 | 0,0625 |
+|---|---|---|---|---|---|
+| mx, ahora | −4,62 | −4,12 | −5,50 | −6,11 | −5,25 |
+| Wood–Armer superior, ahora (antes) | 8,81 (4,77) | 8,49 (4,49) | 9,32 | 10,66 | 9,88 |
+
+**En el conjunto** (`validacion/pb11/out_comparar.txt`: `validacion/pb/medir.ts` con el código de antes, en un árbol de trabajo, y el de ahora, frente a h = 0,0625 de ahora; las vigas y los grupos de franjas de §6, en los 2 × 2 de 30, 30 con interiores, 45, 45 con interiores, 50 y 30 × 50, y en el ejemplo 11 con y sin punto fijo): sólo cambia el 30 × 50, las caras de las esquinas (superior, con h = 0,75, del −51,7 al −10,8 %; con 0,5, del −54,7 al −14,1 %; la inferior, que antes no era nula frente a una referencia nula, ahora lo es). Todo lo demás, igual.
+
+**El escalón frente al corte directo en la misma malla** (`escalonDirecto.ts`, h = 0,125, todas las estaciones de cara de los pilares sin cara de franja, Wood–Armer superior): en el 30 × 50, la mediana de |escalón / directo − 1| pasa del 49,0 al 9,7 %; en los recuadros de 45 y 50 y en el ejemplo 11 con punto fijo, los mismos bits que antes.
+
+**Lo que queda, PB-12:** en la estación de PB-11, el escalón sale un ~10 % por debajo del directo también con las mallas finas (−4,17 frente a −5,25 con h = 0,0625). Es lo que entra por los bordes laterales de la ventana en la tira, el torsor (mxy ≈ 4,6 × 0,1 m / 0,35 m ≈ 1,3 kN·m/m): el mismo ~5–13 % de SP-6. Se probó a sumarlo con un corte por campos según n por cada borde de la ventana: en las esquinas del 30 × 50 deja el escalón a 0,5–2,1 % del directo, pero en los pilares de borde (con los dos bordes en la losa) lo aleja (−14…−21 %, −41 % en el ejemplo con punto fijo), porque el reparto de las láminas en los bordes de la ventana no es una recta exacta y en una tira de 7,5–10 cm pesa tanto como el término. Descartado.
+
+**Pruebas:** `src/motor/cortes.test.ts` (con todos los esclavos, lo de `soloEsclavos` bit a bit; sin ninguno, sin la restricción; dos grupos, la suma) y `src/compilador/metroCaraEnViga.test.ts` (el metro de P2-2 con 0,75 y 0,5: mx a menos del 35 % y Wood–Armer superior a menos del 25 % del de 0,125; falla con el código de antes, con mx a −91 %).
+
+**Referencia congelada de F** (`validacion/f/out_cambiosPB11.txt`, regenerada a sabiendas): cambian sólo las estaciones del pilar girado 45° de `aleatorio-3-lv` (tres) y de `-lv2` (dos), la punta que asoma de su viga de borde; las otras 16, bit a bit. En Y5, con h = 0,75 / 0,5 / 0,25 / 0,125, mx pasa de −4,2 / −7,2 / −8,7 / −7,0 a −7,9 / −8,6 / −9,9 / −9,1: estable con la malla. En X1 (cara 4,867), de 0 en todas las mallas a −9,9 / −9,9 / −7,8 / −3,8 (−2,0 con 0,0625): del lado seguro, sin converger con la malla gruesa; es la punta de un pilar girado, singular.
+
+## 13. Ficheros
 
 - `src/compilador/rejilla.ts`: `islasJuntoAPilares`, los rasgos de una isla en `cerca` y la regla de §10; la cabecera, §8 y §10.
 - `src/compilador/compilar.ts`: compilador PB1.
 - `src/compilador/pilaresBorde.test.ts` (nueva), `precision.test.ts` (dos modelos), `asoma.test.ts` (el aviso, con P2-1 de la retícula 12; P1-1 de la 4 ya no avisa) y `src/agente/barras.test.ts` (el axil del tirante).
 - `validacion/pb/`: `modelos.ts` (recuadros con vigas de borde), `medir.ts`, `comparar.ts`, `reticulas.ts` y las salidas `out_*.txt` (las de cada medida en bruto, `out_*.json`, no se versionan).
 - `validacion/hr/congelar-fina.ts`: los dos modelos y regenerar sólo los que se nombran.
+- PB-11 (§12): `src/motor/cortes.ts` (`esclavos`), `src/compilador/esfuerzosFranjas.ts` (los enlaces de las vigas en la tira del escalón), `cortes.test.ts`, `metroCaraEnViga.test.ts`, `validacion/f/cambiosPB11.ts` y `out_cambiosPB11.txt`, y `validacion/pb11/`: `estacion.ts` (las estaciones de las esquinas, por defecto y con el escalón), `escalonDirecto.ts` (el escalón frente al corte directo en la misma malla), `serieCongelado.ts` (una estación de la referencia congelada con varias mallas), `medir.sh` y `medirAhora.sh` (las medidas de `validacion/pb/medir.ts`, antes con un árbol de trabajo en el commit anterior; sus `out_pb11-*.json`, sin versionar) y las salidas `out_*.txt` y `log_*.txt`.
 - PB-8 (§11): `src/motor/cortes.ts` (`soloEsclavos`), `src/compilador/esfuerzosFranjas.ts`, `cortes.test.ts`, `metroPuntoFijo.test.ts` y, en `validacion/pb5/`, `pb8min.ts` y `out_pb8_pf.txt`.
 - PB-5 (§10): `src/compilador/losas.ts` (la holgura de `tapada`), `pilaresBorde.test.ts` y `validacion/pb5/`: `avisos.ts` y `ej11.ts` (avisos con el código de una carpeta), `medir.sh` (las medidas con `validacion/pb/medir.ts`; sus `out_pb5-*.json` en `validacion/pb/`, sin versionar), `serie.ts`, `lista.ts` y `valores.ts` (leerlas), `estacion.ts` (una estación de franja con mx, my y mxy), `absorcion.patch` y las salidas `out_*.txt` y `log_*.txt`.

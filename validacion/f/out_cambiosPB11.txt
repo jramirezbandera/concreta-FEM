@@ -1,0 +1,67 @@
+
+== h25-plana (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 64; cambian: 0; nuevas: 0; desaparecen: 0
+
+== h25-reticular (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 72; cambian: 0; nuevas: 0; desaparecen: 0
+
+== pilares-mezclados (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 78; cambian: 0; nuevas: 0; desaparecen: 0
+
+== aleatorio-3 (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 53; cambian: 0; nuevas: 0; desaparecen: 0
+
+== losa-3x3-refinada (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 210; cambian: 0; nuevas: 0; desaparecen: 0
+
+== h25-plana-sin-refinar (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 64; cambian: 0; nuevas: 0; desaparecen: 0
+
+== losa-3x3-mezclada (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 210; cambian: 0; nuevas: 0; desaparecen: 0
+
+== reticular-2x2-abacos (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 110; cambian: 0; nuevas: 0; desaparecen: 0
+
+== aleatorio-3-lv (malla idéntica): mx de cara y paso que se mueven: 9; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 46; cambian: 3; nuevas: 0; desaparecen: 0
+  superior: mediana 9.9 %, de 9.0 % a 45.5 %; |cambio| > 5 %: 3, > 10 %: 1
+  inferior: mediana 0.0 %, de -17.8 % a 0.0 %
+  las cinco que más cambian la superior:
+    L-N1:X1            cara4.867157:-1              3.61 →    13.54     45.5 %
+    L-N1:Y5            cara0.282843:1               6.01 →     9.71      9.9 %
+    L-N1:Y6            cara0.282843:1               6.01 →     9.71      9.0 %
+
+== reticular-2x2-abacos-lv (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 154; cambian: 0; nuevas: 0; desaparecen: 0
+
+== aleatorio-3-lv2 (malla idéntica): mx de cara y paso que se mueven: 6; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 96; cambian: 2; nuevas: 0; desaparecen: 0
+  superior: mediana 8.2 %, de 7.7 % a 8.2 %; |cambio| > 5 %: 2, > 10 %: 0
+  inferior: mediana 0.0 %, de 0.0 % a 0.0 %
+  las cinco que más cambian la superior:
+    L-N1:Y5            cara0.282843:1               6.18 →     9.84      8.2 %
+    L-N1:Y6            cara0.282843:1               6.18 →     9.84      7.7 %
+
+== reticular-2x2-abacos-lv2 (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 154; cambian: 0; nuevas: 0; desaparecen: 0
+
+== edificio-2x2-lv2 (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 122; cambian: 0; nuevas: 0; desaparecen: 0
+
+== edificio-2x2-lvd (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 122; cambian: 0; nuevas: 0; desaparecen: 0
+
+== edificio-2x2-rvb (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 122; cambian: 0; nuevas: 0; desaparecen: 0
+
+== reticular-2x2-planas-rva (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 154; cambian: 0; nuevas: 0; desaparecen: 0
+
+== edificio-2x2-tb (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 110; cambian: 0; nuevas: 0; desaparecen: 0
+
+== reticular-2x2-abacos-tb (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 142; cambian: 0; nuevas: 0; desaparecen: 0
+
+En total: 5 de 2083 estaciones de cara y apoyo que siguen cambian; 0 nuevas y 0 desaparecen.

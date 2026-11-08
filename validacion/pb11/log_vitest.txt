@@ -1,0 +1,87 @@
+
+ RUN  v4.1.11 D:/PROGRAMACION/Concreta FEM
+
+ ❯ src/compilador/congelado-c5.test.ts (4 tests | 1 failed) 22952ms
+     × pilares-mezclados 7515ms
+ ❯ src/visor/visor.test.ts (66 tests | 16 skipped) 182333ms
+ ❯ src/visor/i4.test.ts (41 tests | 1 failed) 186139ms
+     × bajo el cursor: valor-lamina en las losas es valor-punto, bit a bit; en un vértice, su valor 66956ms
+ ❯ src/agente/sismoEspectral.test.ts (25 tests | 1 failed) 219174ms
+     × una viga: los esfuerzos partidos y los pares de signos pésimos de cortante con torsión y de flexión con cortante (VS-o) 83860ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/visor/visor.test.ts > V1 con edificio
+Error: Hook timed out in 120000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ src/visor/visor.test.ts:150:3
+    148|   let binCli: Uint8Array;
+    149|
+    150|   beforeAll(async () => {
+       |   ^
+    151|     const sub = join(dir, nombre);
+    152|     mkdirSync(sub, { recursive: true });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/agente/sismoEspectral.test.ts > VS3, criterio 6: cada consulta combina los modos en su variable > una viga: los esfuerzos partidos y los pares de signos pésimos de cortante con torsión y de flexión con cortante (VS-o)
+Error: Test timed out in 60000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/agente/sismoEspectral.test.ts:402:3
+    400|   });
+    401|
+    402|   it("una viga: los esfuerzos partidos y los pares de signos pésimos d…
+       |   ^
+    403|     const viga = f.vigas!.find((v) => v.planta === "N2")!.id;
+    404|     const ep = q.esfuerzosPiezas;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/compilador/congelado-c5.test.ts > criterio 9 de C5: referencia congelada > pilares-mezclados
+AssertionError: estaciones: expected [ …(6) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   ".L-N1:1:C1-2[0].wa[0]: 5.067718788116 ≠ 5.06771074371",
++   ".L-N1:1:C1-2[1].wa[0]: 30.13131086029 ≠ 30.13129897856",
++   ".L-N1:1:C1-2[2].wa[1]: 24.14814192757 ≠ 24.14814182485",
++   ".L-N1:1:C1-2[4].wa[0]: 24.76518436638 ≠ 24.76517667217",
++   ".L-N1:1:C1-2[4].wa[1]: 20.94828315383 ≠ 20.94827656434",
++   ".L-N1:1:C1-2[5].wa[1]: 33.27607742881 ≠ 33.27607160596",
++ ]
+
+ ❯ src/compilador/congelado-c5.test.ts:54:113
+     52|         expect(errorResultados(a, b), `caso ${k}`).toBeLessThan(1e-9);
+     53|       });
+     54|       for (const k of ["estaciones", "muros", "consultas"] as const) e…
+       |                                                                                                                 ^
+     55|     });
+     56|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/visor/i4.test.ts > I4 (resto) con edificio > bajo el cursor: valor-lamina en las losas es valor-punto, bit a bit; en un vértice, su valor
+Error: Test timed out in 60000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/visor/i4.test.ts:263:3
+    261|   });
+    262|
+    263|   it("bajo el cursor: valor-lamina en las losas es valor-punto, bit a …
+       |   ^
+    264|     const rr = s.rr!;
+    265|     const c = rr.c;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  4 failed | 157 passed (161)
+      Tests  3 failed | 1995 passed | 16 skipped (2014)
+   Start at  20:06:56
+   Duration  340.34s (transform 54.83s, setup 0ms, import 237.63s, tests 4171.22s, environment 34ms)
+

@@ -91,6 +91,13 @@ export interface Corte {
    */
   soloEsclavos?: boolean;
   /**
+   * Con `restricciones` y `soloEsclavos`, sólo estos nudos de sus esclavos (índices): los demás cuentan
+   * como del otro lado del plano. Es el escalón de un pilar de esquina cuya cara va en el ancho de una
+   * viga (fase PB, PB-11): de los enlaces de la cara de la viga que llega a él sólo entran los nudos de
+   * la tira entre la recta del corte y la cara del pilar.
+   */
+  esclavos?: readonly number[];
+  /**
    * Método «campos»: coordenadas y en las que se parten los tramos de lámina antes de integrarlos
    * (los bordes de las franjas de una estación, F), para que cada punto de integración caiga entero
    * a un lado. Sin ellas, los tramos de siempre.
@@ -410,8 +417,8 @@ export class Cortes {
     const y = corte.y ?? [0, 0];
     const z = corte.z ?? [0, 0];
     const quiebres = corte.quiebres;
-    if (!vec(corte.origen) || !vec(corte.x) || !vec(corte.vz) || !rango(y) || !rango(z) || (corte.metodo !== undefined && corte.metodo !== "fuerzas-nodales" && corte.metodo !== "campos") || (quiebres !== undefined && !(Array.isArray(quiebres) && quiebres.every((q) => typeof q === "number" && Number.isFinite(q)))) || (corte.cuadratura !== undefined && corte.cuadratura !== 2 && corte.cuadratura !== 4) || (corte.restricciones !== undefined && !(Array.isArray(corte.restricciones) && corte.restricciones.every((r) => typeof r === "string")))) {
-      diag.error("corte/no-valido", `El corte ${id} no está bien definido: origen, x y vz son vectores finitos, y e z rangos [mín, máx] finitos, el método "fuerzas-nodales" o "campos", los quiebres, números finitos, la cuadratura, 2 o 4, y las restricciones, ids.`, [id]);
+    if (!vec(corte.origen) || !vec(corte.x) || !vec(corte.vz) || !rango(y) || !rango(z) || (corte.metodo !== undefined && corte.metodo !== "fuerzas-nodales" && corte.metodo !== "campos") || (quiebres !== undefined && !(Array.isArray(quiebres) && quiebres.every((q) => typeof q === "number" && Number.isFinite(q)))) || (corte.cuadratura !== undefined && corte.cuadratura !== 2 && corte.cuadratura !== 4) || (corte.restricciones !== undefined && !(Array.isArray(corte.restricciones) && corte.restricciones.every((r) => typeof r === "string"))) || (corte.esclavos !== undefined && !(Array.isArray(corte.esclavos) && corte.esclavos.every((v) => Number.isInteger(v) && v >= 0)))) {
+      diag.error("corte/no-valido", `El corte ${id} no está bien definido: origen, x y vz son vectores finitos, y e z rangos [mín, máx] finitos, el método "fuerzas-nodales" o "campos", los quiebres, números finitos, la cuadratura, 2 o 4, las restricciones, ids, y los esclavos, índices de nudos.`, [id]);
       return null;
     }
     const nx = norma(corte.x);
@@ -706,6 +713,11 @@ export class Cortes {
       }
       return true;
     };
+    // De cada restricción, los nudos que cuentan del lado A: con `soloEsclavos`, sin el maestro y, con
+    // `esclavos`, sólo esos
+    const sinMaestro = soloEstas !== null && corte.soloEsclavos === true;
+    const filtro = sinMaestro && corte.esclavos ? new Set(corte.esclavos) : null;
+    const cuenta = (v: number, maestro: boolean) => !(maestro && sinMaestro) && (filtro === null || (!maestro && filtro.has(v))) && lado(v) === -1;
     for (const ir of conBarras || soloEstas ? ind.restricciones.buscar(caja.min, caja.max) : []) {
       if (soloEstas && !soloEstas.has(lista[ir]!.id)) continue;
       if (!yz(ir)) continue;
@@ -718,10 +730,9 @@ export class Cortes {
       let dentro = false;
       let fuera = false;
       const n = rs.esclavos.length;
-      const sinMaestro = soloEstas !== null && corte.soloEsclavos === true;
       for (let a = -1; a < n && !(otros && dentro && fuera); a++) {
         const v = a < 0 ? rs.maestro : rs.esclavos[a % 2 ? n - 1 - (a >> 1) : a >> 1]!;
-        if ((a < 0 && sinMaestro) || lado(v) !== -1) otros = true;
+        if (!cuenta(v, a < 0)) otros = true;
         else {
           enA = true;
           if (cp.dentroNudo(v)) dentro = true;
@@ -752,9 +763,8 @@ export class Cortes {
         for (const ir of incluidas) {
           const rs = lista[ir]!;
           const f = fr.get(ir)!;
-          const sinMaestro = soloEstas !== null && corte.soloEsclavos === true;
           [rs.maestro, ...rs.esclavos].forEach((v, a) => {
-            if ((a === 0 && sinMaestro) || lado(v) !== -1) return;
+            if (!cuenta(v, a === 0)) return;
             suma.agregar(k, X(v), f.subarray(6 * a, 6 * a + 3), f.subarray(6 * a + 3, 6 * a + 6));
             if (k === 0) extender(X(v));
           });

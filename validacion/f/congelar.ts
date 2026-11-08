@@ -36,6 +36,11 @@
  * que salen idénticos; el terminado en `-rva` es el reticular de 2 × 2 con las vigas planas, de 40 ×
  * 35 (el canto del forjado), con su flexión ×0,6 (por defecto).
  *
+ * PB-11 (`docs/fem3d/pilares-borde.md` §12): el escalón cuenta lo que la tira entre la recta base y la
+ * cara del pilar da a la cara de una viga según la franja con losa flexible al lado. Cambian sólo tres
+ * estaciones del pilar girado 45° de `aleatorio-3-lv` y dos de `aleatorio-3-lv2`, la punta que asoma de
+ * su viga (`out_cambiosPB11.txt`); las demás, idénticas.
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/f/congelar.ts
  */
