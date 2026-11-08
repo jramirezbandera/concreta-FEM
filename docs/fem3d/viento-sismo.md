@@ -266,7 +266,8 @@ Las recomendaciones de Claude, aceptadas por el usuario. Lo que cambia frente a 
 - Las reglas de diseño sismorresistente del capítulo 4 (armado por ductilidad), que son de los módulos de comprobación.
 - γc = 1,3 y γs = 1,0 en la situación sísmica (RES-13), también de los módulos.
 - Las presiones locales de viento por zonas y la nieve, que ya da Concreta para los elementos.
-- La amplificación por segundo orden, P-Δ (S1: fuera del MVP).
+- La amplificación por segundo orden, P-Δ (S1: fuera del MVP). **Pendiente para la integración (2026-11-08, a petición del usuario):** CYPECAD calcula el P-Δ con los desplazamientos de las hipótesis horizontales (los del sismo, por μ) y amplifica sus esfuerzos; por eso avisa si no hay viento ni sismo, y por eso sus coeficientes de pandeo por defecto son β = 1. Aquí sólo está el aviso θ del sismo (VS-k) y nada con viento solo. Antes de que los resultados alimenten las comprobaciones de pilares de Concreta hay que elegir: el P-Δ en el motor (coeficiente de amplificación por hipótesis, como CYPE, o iteración geométrica) o β > 1 en los pilares de estructuras traslacionales. En la sombra, comparar con el segundo orden de CYPE desactivado, o descontar su coeficiente de amplificación (lo da el listado), y medirlo con una pasada con él y otra sin él.
+- **El viento en una planta sólo de vigas** (una pérgola sin losa como planta propia; 2026-11-08): `huellaPlanta` la toma por sus vigas, así que recibe viento como fachada cerrada y va a un diafragma rígido (C1-d), sin aviso. Una pérgola abierta no es fachada (el CTE trata las estructuras abiertas aparte) ni rígida en su plano. Por ver qué hace CYPECAD (la variante con pérgola del modelo de 3 × 3 de la sombra) y decidir entre igualarlo o, como mínimo, avisar. Las vigas que salen de una losa ya no cuentan (VS1-2).
 
 ## 10. VS1 hecho (2026-11-06): el viento
 
