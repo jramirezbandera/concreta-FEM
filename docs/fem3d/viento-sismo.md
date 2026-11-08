@@ -67,7 +67,7 @@
   - **esa rama ascendente no está en el simplificado** (3.7.3), y Concreta lo avisa: son dos funciones distintas y no se cambian una por otra;
   - los desplazamientos se multiplican por μ.
 - **3.6.2.3.1:** como mínimo, 4 modos en un modelo espacial (2 traslacionales y 2 rotacionales) y todos los de periodo mayor que TA.
-- **3.6.2.4:** SRSS **«para toda variable asociada a cada grado de libertad (desplazamientos, solicitaciones, tensiones…)»**. Los modos con periodos que difieren menos del 10 % se suman antes en valor absoluto. No nombra la CQC.
+- **3.6.2.4:** SRSS **«para toda variable asociada a cada grado de libertad (desplazamientos, solicitaciones, tensiones…)»**. Los modos con periodos que difieren menos del 10 % se suman antes en valor absoluto («puede aplicarse»). El articulado no nombra la CQC, pero su comentario sí (C.3.6.2.4, p. 38 de la edición de Fomento; corregido el 2026-11-08, antes aquí se decía que no la nombraba): «Las reglas establecidas en el articulado son una simplificación de la expresión general» S = √(Σᵢ Σⱼ Sᵢ·Sⱼ·πᵢⱼ), con πᵢⱼ = 8·(Ω/100)²·(1 + f)·f^(3/2) / [(1 − f²)² + 4·(Ω/100)²·f·(1 + f)²] y f = Tᵢ/Tⱼ (el texto imprime Tᵢ/Tᵢ, una errata). Es la CQC de `correlacionCqc` (`src/motor/espectral.ts`) con ζ = Ω/100, la de `"regla": "cqc"`. Y añade que la raíz de la suma de los cuadrados «presenta una aproximación razonable cuando los distintos modos no pueden acoplarse por tener períodos muy diferentes».
 - **3.6.2.5:** con 3 GDL por planta, las solicitaciones globales de planta se asignan a los elementos. Además, hay que considerar el segundo orden «de acuerdo con la importancia de los desplazamientos».
 - **Vigencia:** la NCSE-02 (RD 997/2002) sigue en vigor.
   - Hay un proyecto de NCSR-23 (2023): basado en el Eurocódigo 8, con otro mapa, y derogaría la NCSE-02.
@@ -247,7 +247,7 @@ Las recomendaciones de Claude, aceptadas por el usuario. Lo que cambia frente a 
   - **nieve, cambiado:** la norma dice «más de 30 días al año», no una altitud. Va una casilla `nievePermanente` en `acciones.sismo`; si no se da, se toma por defecto que permanece por encima de 1 000 m (0,5) y que no por debajo (0), y la hipótesis lo dice;
   - todas se pueden cambiar por caso.
 - **VS-e, la combinación de los modos:** en cada variable (3.6.2.4). Las fuerzas de planta como un caso estático dejan la torsión ambigua, y aquí manda la precisión.
-- **VS-f, la regla:** SRSS con los modos a menos del 10 % sumados en valor absoluto, por defecto; la CQC con Ω como opción. Cuál se queda por defecto lo decide VS5: si el CYPECAD del usuario usa la CQC, hay que poder comparar con lo mismo.
+- **VS-f, la regla:** SRSS con los modos a menos del 10 % sumados en valor absoluto, por defecto; la CQC con Ω como opción. Cuál se queda por defecto lo decide VS5: si el CYPECAD del usuario usa la CQC, hay que poder comparar con lo mismo. La norma la admite: es la «expresión general» de su comentario C.3.6.2.4 (§2).
 - **VS-g, el signo:** el del modo de más masa en la dirección, uno para todas las variables. El ± lo da el generador. **Matizada por VS-o (2026-11-08, §13.4):** el signo vale para leer una variable; no mantiene la concomitancia entre variables.
 - **VS-h, plantas sin diafragma con masa:** error hasta VS6.
 - **VS-i, la excentricidad accidental:** torsor estático ±F_k·L/20; VS3 mide cuánto se separa de mover el CM.
