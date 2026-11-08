@@ -88,4 +88,28 @@ Decidido por el usuario: «0,15·L por lado», «casetones enteros» y, al ver l
   - en la vivienda, la cubierta L-CUB sale con 11 ábacos, como la suya, con las tres parejas que se unieron a mano (P1+P7, P18+P22, P19+P23). Sin el mínimo del perímetro crítico, P22 y P18, a 1,87 m, daban 0,67 × 0,34 m cada uno. En L-CUB-S salen 9 en lugar de 10, porque P5 y P8 se unen;
   - los de borde quedan más estrechos que los dibujados (0,83 m frente a 2,00), porque acaban en el borde en lugar de salirse de la losa. Lo que se salía no contaba.
 - **Pruebas:** `src/editor/abacosLuces.test.ts` (los mínimos y el redondeo, los lados en la cara de un casetón, el borde y el voladizo, la regla girada 30° y que compila) y `dibujo2.test.ts` («Con ábacos» da lo mismo que dibujar sin ellos y añadir los de «Según las luces» después, y avisa sin pilares).
-- **Sin contrastar:** la regla frente a los ábacos que pone CYPECAD en el mismo modelo.
+- **Contrastada** con los automáticos de CYPECAD en el ejemplo 11 del usuario (§7.1).
+
+### 7.1. Frente a los ábacos automáticos de CYPECAD (2026-11-08)
+
+El ejemplo 11 (`viento-sismo.md` §14, `validacion/sombra/ejemplo11/`): 2 × 2 vanos de 6 m, pilares de 30 × 30, vigas de borde de 30 × 30, reticular 25+5 a 72/12. Los ábacos de CYPECAD, por las coordenadas de los nudos de su listado y los casetones recortados del DWG; los de AC-e, con la misma retícula (punto de paso (0,84; 1,11)). Desde el eje de cada pilar, en m:
+
+| Pilar | CYPECAD x | AC-e x | CYPECAD y | AC-e y |
+|---|---|---|---|---|
+| P1 (0, 0) | hasta +1,10 | +0,90 | hasta +1,17 | +1,17 |
+| P2 (6, 0) | −1,10 … +1,38 | −0,90 … +1,38 | hasta +1,17 | +1,17 |
+| P3 (12, 0) | desde −1,14 | −1,14 | hasta +1,17 | +1,17 |
+| P4 (0, 6) | hasta +1,10 | +0,90 | −1,35 … +1,65 | −1,35 … +0,93 |
+| P5 (6, 6) | −1,10 … +1,38 | −0,90 … +1,38 | −1,35 … +1,65 | −1,35 … +0,93 |
+| P6 (12, 6) | desde −1,14 | −1,14 | −1,35 … +1,13 | −1,35 … +0,93 |
+| P7 (0, 12) | hasta +1,10 | +0,90 | desde −1,59 | −1,59 |
+| P8 (6, 12) | −1,10 … +1,38 | −0,90 … +1,38 | desde −1,59 | −1,59 |
+| P9 (12, 12) | desde −1,14 | −1,14 | desde −1,27 | −1,59 |
+
+- **Coinciden** los bordes en las caras de casetón (x = 7,38 y 10,86; y = 1,17, 4,65 y 10,41), que son la mitad.
+- **CYPECAD corta casetones** (x = 1,10 y 4,90; y = 7,13 y 10,73): sus bordes no van siempre a la cara de un casetón, y donde AC-e acaba en la cara (0,90 desde el eje), CYPECAD sigue 0,20 m.
+- **CYPECAD no es simétrico:** P4 y P5 llegan a +1,65 en y (una fila de casetones más que AC-e), y P6, en la misma fila de pilares, a +1,13; P9 llega a −1,27 y P7, a −1,59. Con la misma luz a los dos lados, AC-e da lo mismo en todos.
+- **Área:** 29,3 m² de ábacos por planta en CYPECAD y 24,7 en AC-e (−16 %).
+- **En el cálculo, casi nada:** con los de AC-e, los cortantes de los pilares con sismo cambian ±0,5 %, el periodo −0,4 % (menos masa) y los momentos de los forjados ≤ 1 %.
+
+Con un solo modelo no se puede deducir la regla de CYPECAD; AC-e se queda como está.

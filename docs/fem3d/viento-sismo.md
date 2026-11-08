@@ -1,6 +1,6 @@
 # VS: viento y sismo generados desde la situación
 
-> **Fecha:** 2026-11-06. **Estado:** decidido el 2026-11-06 (§8); VS1 (§10), VS2 (§11), VS3 (§12) y VS4 (§13), hechos; sigue VS5 (en sombra con el CYPECAD del usuario).
+> **Fecha:** 2026-11-06. **Estado:** decidido el 2026-11-06 (§8); VS1 (§10), VS2 (§11), VS3 (§12) y VS4 (§13), hechos; VS5 (en sombra con el CYPECAD del usuario), primera sombra con el ejemplo 11 (§14).
 >
 > **Origen:** el usuario, el 2026-11-05: viento y sismo «como en CYPECAD». Hoy son casos con las cargas metidas a mano, y el sismo, como fuerzas estáticas equivalentes con signo (`investigacion/03-resultados.md`, RES-13).
 
@@ -656,3 +656,40 @@ De la prueba de uso de la ficha: la gráfica del espectro se veía mal, ningún 
 **Para VS5:** con CYPECAD no se comparan combinaciones con el sismo dinámico (no las da), sino cada modo (periodos, masas, forma y esfuerzos de un modo), el cortante en la base y las armaduras.
 
 **Validación:** `woodArmer.test.ts` (los 8 signos; sin amplitud, bit a bit; un estado con el sismo de signo y fracción cualesquiera nunca pide más), `espectral.test.ts` (`partir`), `sismoEspectral.test.ts` (las ternas y Wood–Armer de las franjas frente a la regla a mano; la envolvente en dos pasos, bit a bit con la de cada combinación) y `visor/sismo.test.ts` (sin deformada con el sismo, `Combinaciones.sismo`).
+
+## 14. VS5, primera sombra (2026-11-08): el ejemplo 11 de CYPECAD
+
+**El modelo del usuario** (CYPECAD 2027, «prueba.c3e»; listado de 999 páginas, DWG y capturas en `ejemplos/ejemplo 1 6x6/ejemplo 11/`): tres plantas de 3 m, 2 × 2 vanos de 6 m con pilares de 30 × 30 de HA-25, reticular 25+5 de casetón perdido a 72/12 (4,487 kN/m²) con vigas planas de 30 × 30 en el perímetro y los ábacos automáticos de CYPECAD; CM 2 kN/m² y 3 kN/m en el perímetro, uso A 2 kN/m²; viento zona A, aspereza I; sismo ab 0,11 g, K 1, suelo II, ductilidad baja, Ω 5 %, CQC, «según norma» (5 modos).
+
+**La réplica** (`validacion/sombra/ejemplo11/`):
+- `leer_listado.py` lee el PDF con pymupdf: las tablas de los pilares por la posición de cada palabra (el texto sale desordenado y las tildes de algunas páginas, rotas), los modos, los centros de masas, los cortantes por planta, el viento y las envolventes de 2 724 nudos por planta;
+- `dwg.ts` saca del DWG, con el lector propio, la retícula de casetones (el punto de paso de los nervios, (0,84; 1,11)) y los bordes de ábaco que cortan un casetón;
+- `modelo.ts` escribe el proyecto (también en `ejemplos/ejemplo 1 6x6/proyecto.json`, para abrirlo en la app), con los ábacos de CYPECAD por las coordenadas de los nudos del listado y variantes (`cype-e`, `luces`, `srss`, `-h025`…);
+- `comparar.ts` compara con las mismas combinaciones (`out_<variante>-nudos.txt`).
+
+Lo que no sale de los datos y hay que forzar: el ancho de banda del viento de CYPECAD es de 18 m en las dos direcciones (y d = 18 m en la esbeltez), y el edificio tiene 12,3 m; se reproduce con `fachadas`. Con el ancho que sale del modelo, el motor da un 26 % menos (27,0 / 49,9 / 43,2 kN). **Pendiente del usuario:** si los 18 m los escribió él.
+
+**Resultado** (con h = 0,25; entre paréntesis, con la malla por defecto de 0,75):
+
+| | CYPECAD | motor |
+|---|---|---|
+| Viento por planta | 36,473 / 67,380 / 58,328 kN | igual |
+| Peso sísmico | ≈ 4 290 kN (de las aceleraciones y masas de sus modos) | 4 326 kN (+0,9 %) |
+| Centro de masas | (6,00; 6,02) | (6,00; 6,02) |
+| T1 = T2 / T torsión / T4 = T5 | 0,802 / 0,635 / 0,275 s | 0,791 / 0,627 / 0,274 s (−1,4 %; −2,3 % con 0,75) |
+| Masa de los 5 primeros modos | 96,37 % | 96,44 % |
+| Cortante por planta (X) | 182,6 / 281,6 / 341,4 kN | 185,9 / 289,7 / 350,4 kN (+1,8 / +2,9 / +2,6 %) |
+
+- **Pilares** (`comparar.ts` §2: 106 filas de «esfuerzos pésimos» del listado, las de cabeza y pie). Ejes: Mxx = −M3, Myy = M2, Qx = V3, Qy = −V2 del motor. N, a +1,8 % de mediana (+1,4 % sin sismo). En las combinaciones con sismo, los cortantes de la dirección principal, a +0,1 % / +1,2 % de mediana (máximo 9,5 %; con 0,75, +5 %), y los momentos, a −3,5 %.
+  - **Los momentos del listado no son todos del análisis.** En las filas de N,M llevan la excentricidad mínima y el segundo orden (en P5, con cortante nulo, 57–67 kN·m). Y en las de cortante, con axil reducido ν ≥ 0,25, CYPECAD lleva siempre N·(1,2 a 2,5 cm) de más: con ν ≤ 0,2 (los pilares de esquina y los de la planta 3) casan a ±5 %, y la diferencia crece con el axil, sin cambiar el cortante. Se comparan los cortantes.
+  - **Los signos pésimos (VS-o).** En una combinación con sismo, CYPECAD no da los esfuerzos concomitantes con el signo del modo dominante: en las filas de cortante, N lleva el 30 % de la otra dirección con el signo que reduce la compresión (así, N casa a +0,1 % de mediana, frente a +1,8 % con el signo de la combinación), y las componentes del 30 % no son comparables.
+- **Excentricidad accidental:** CYPECAD no la aplica. Con la del 5 % (la de por defecto del motor, VS-i), los cortantes de los pilares se separan más (máximo 17,8 % frente a 9,5 %; Mxx, |dif.| 12,5 % frente a 4,5 %), y su listado sólo tiene «Sismo X» y «Sismo Y», con el centro de masas real. Tampoco mueve la masa (VS3-g).
+- **Fuerza equivalente por planta (VS3-d):** la de CYPECAD es la combinación de las fuerzas de planta de los modos (182,6 / 135,0 / 92,1 kN, que suman más que el cortante en la base); la del motor, la diferencia de los cortantes combinados (185,9 / 103,8 / 60,7). Sólo la usa el torsor de la excentricidad, que CYPECAD no tiene; con ella, la del motor sale un 23–34 % corta en las plantas de abajo. **Para el usuario:** si el torsor pasa a la combinación de las fuerzas de los modos.
+- **Regla de combinación:** CYPECAD usa la CQC. Aquí la CQC y la regla del art. 3.6.2.4 dan lo mismo con h = 0,25. Con 0,75, la malla gira 10° la pareja de modos de igual periodo (2,5 % de masa cruzada) y la regla de la norma suma los dos en valor absoluto: los cortantes de los pilares se separan un 9,7 % de mediana.
+- **Forjados** (envolventes E.L.U. en los nudos, sin los picos de un solo nudo pegado a la cara de los pilares, que en CYPECAD son singulares: −172 junto a otro de −100): momentos positivos a 0,92–0,96 de CYPECAD (0,91–0,93), negativos a 0,95–0,97, cortantes a 0,96–1,04 (en los ábacos, 1,03–1,09 con 0,75) y flechas características a 0,91–0,95 en el aligerado. Como en la vivienda (`fase-lv.md` §2.4).
+- **Vigas del pórtico 1** (capturas): en la planta 1, persistentes, My en las caras −60,2 / −52,1 · −52,4 / −60,3 kN·m frente a −60,0 / −57,3 · −52,7 / −60,2 (0–9 %); con 0,75, −57,7 / −48,3 · −49,5 / −60,4. En la planta 3, sísmicas, −5 a −14 % en las caras y los positivos de vano iguales (9,9 / 10,0 frente a 10,1 / 11,4). Vz, ±20 %: junto al pilar de esquina el motor lleva una concentración del sismo (de 29,6 a 7,2 kN en 0,36 m) que CYPECAD no tiene. CYPECAD dibuja con «Decalar las leyes de momentos» marcado.
+- **Ábacos:** los de AC-e casi no cambian el resultado (cortantes de los pilares a ±0,5 %); su geometría, en `abacos.md` §7.1.
+
+**Visto de paso (malla):** con la configuración más común —pilares de 30 × 30 en el eje de vigas de borde de 30 y la losa hasta el borde—, los refinamientos de LV2 no entran en ningún pilar de borde: `malla/esquina-sin-refinar` en las cuatro esquinas y `malla/pilar-tapado-sin-refinar` en los cuatro de borde, en las tres plantas. Pasa igual con una maciza y sin cargas, y no sin las vigas. Con 0,75 el momento de la viga en la cara de P2 sale un 16 % por debajo del de 0,25, como dice el aviso. **Pendiente técnico:** que la plantilla de esquina y la de cara entren con la viga de borde del ancho del pilar.
+
+**Pendiente del usuario:** el ancho de banda del viento; la fuerza de planta del torsor (VS3-d); si los ficheros de CYPECAD (36 MB) se versionan. Para comparar los momentos de los pilares del análisis harían falta sus esfuerzos por hipótesis (el listado de esfuerzos de los pilares de CYPECAD), no los pésimos de las comprobaciones.
