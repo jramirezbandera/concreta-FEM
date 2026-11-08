@@ -98,7 +98,10 @@ describe("unidades y signos a mano (C5, criterio 5)", () => {
     if (!e.valido) return;
     expect(e.valor.inicio.esfuerzos[4]).toBeCloseTo(-P * L, 9);
     expect(e.valor.inicio.esfuerzos[2]).toBeCloseTo(-P, 9);
-    expect(e.valor.minMy).toEqual({ s: 0, valor: e.valor.inicio.esfuerzos[4] });
+    expect(e.valor.minMy).toMatchObject({ s: 0, valor: e.valor.inicio.esfuerzos[4] });
+    // sin sismo, sus esfuerzos son los concomitantes de la sección del empotramiento, y la amplitud del sismo, nula
+    expect(Array.from(e.valor.minMy.partes.estatica)).toEqual(Array.from(e.valor.inicio.esfuerzos));
+    expect(Array.from(e.valor.minMy.partes.sismo)).toEqual([0, 0, 0, 0, 0, 0]);
     expect(e.valor.maxMy.valor).toBeCloseTo(0, 9);
     // la reacción del empotramiento: Fz = P y My = −P·L (global, respecto al nudo: equilibra (L, 0, 0) × (0, 0, −P) = +P·L)
     const R = c.reacciones("E");

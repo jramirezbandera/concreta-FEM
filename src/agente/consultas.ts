@@ -25,7 +25,7 @@
 import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import type { ResultadoCompilacion } from "../compilador/compilar.ts";
-import type { Consultas } from "../compilador/consultas.ts";
+import type { Consultas, ExtremoDiagrama } from "../compilador/consultas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
 import type { EmplazamientoEdificio, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
@@ -76,6 +76,13 @@ export interface Extremo {
   s?: number;
   punto?: readonly number[];
   comb: string;
+  /**
+   * Los extremos de los vanos de una viga: [N, Vy, Vz, T, My, Mz] en ese punto, los concomitantes de la
+   * combinación o, con el sismo del programa (`pesimos: true`), los de sus signos pésimos
+   * (`esfuerzosPesimosViga`), para las comprobaciones que juntan varios esfuerzos.
+   */
+  esfuerzos?: number[];
+  pesimos?: true;
 }
 
 const no = <T>(codigo: string, mensaje: string, ids?: string[]): Respuesta<T> => ({ valido: false, diagnosticos: [{ codigo, severidad: "error", mensaje, ...(ids ? { ids } : {}) }] });
@@ -594,6 +601,26 @@ export function ternasPesimas(partes: { estatica: ArrayLike<number>; sismo: Arra
   ];
 }
 
+/**
+ * VS-o: los esfuerzos de un extremo de vano de una viga en una combinación con el sismo del programa
+ * (`partes`, de `Consultas.vano`), con sus signos pésimos para las comprobaciones que juntan varios: el
+ * cortante con la torsión (las dos tensiones tangenciales se suman en una de las caras: la interacción
+ * y las armaduras crecen con |Vz| y con |T|) y la flexión con el cortante (el decalaje, y la
+ * interacción M–V del acero). Como en las ternas de los pilares (`ternasPesimas`), no es un estado
+ * simultáneo: Vy, Vz, T y Mz, con el signo que aumenta su valor absoluto; My, con el que pide el
+ * extremo (`my`: 1, el máximo; −1, el mínimo; 0, el que aumenta su valor absoluto); y N, con la
+ * menor compresión (N > 0 tracciona), que baja la resistencia a cortante y aumenta la armadura de
+ * tracción.
+ */
+export function esfuerzosPesimosViga(partes: { estatica: ArrayLike<number>; sismo: ArrayLike<number> }, my: 1 | -1 | 0): number[] {
+  const { estatica: S, sismo: A } = partes;
+  return [0, 1, 2, 3, 4, 5].map((c) => {
+    if (!A[c]) return S[c]!;
+    const signo = c === 0 ? 1 : c === 4 && my ? my : S[c]! >= 0 ? 1 : -1;
+    return S[c]! + signo * A[c]!;
+  });
+}
+
 export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string | undefined, o: { estaciones?: boolean } = {}): Respuesta<unknown> {
   if (!id) return no("consulta/sin-id", "La consulta «pieza» necesita el id de la pieza (fem consultar <proyecto> pieza <id>).");
   if (o.estaciones) {
@@ -650,13 +677,24 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
     const va = v.valor.vanos[i]!;
     const ext: Record<string, Extremo> = {};
     for (let kc = 0; kc < conjunto.factores.length; kc++) {
-      const e = q.vano(id, i, conjunto.factores[kc]!);
+      const f = conjunto.factores[kc]!;
+      const e = q.vano(id, i, f);
       if (!e.valido) return e;
       const comb = conjunto.nombres[kc]!;
       const x = e.valor;
-      if (mejora("My+", ext["My+"], x.maxMy.valor)) ext["My+"] = { v: x.maxMy.valor, s: x.maxMy.s, comb };
-      if (mejora("My-", ext["My-"], x.minMy.valor)) ext["My-"] = { v: x.minMy.valor, s: x.minMy.s, comb };
-      for (const c of [x.maxVz, x.minVz]) if (mejora("Vz", ext.Vz, c.valor)) ext.Vz = { v: c.valor, s: c.s, comb };
+      // Con cada extremo, sus esfuerzos: los concomitantes o, con el sismo del programa, los de sus signos pésimos (VS-o)
+      const sismo = !q.sup.esLineal(f);
+      const extremo = (c: ExtremoDiagrama, my: 1 | -1 | 0): Extremo => ({
+        v: c.valor,
+        s: c.s,
+        comb,
+        esfuerzos: sismo ? esfuerzosPesimosViga(c.partes, my) : Array.from(c.partes.estatica),
+        ...(sismo ? { pesimos: true as const } : {}),
+      });
+      if (mejora("My+", ext["My+"], x.maxMy.valor)) ext["My+"] = extremo(x.maxMy, 1);
+      if (mejora("My-", ext["My-"], x.minMy.valor)) ext["My-"] = extremo(x.minMy, -1);
+      for (const c of [x.maxVz, x.minVz]) if (mejora("Vz", ext.Vz, c.valor)) ext.Vz = extremo(c, 0);
+      for (const c of [x.maxT, x.minT]) if (mejora("T", ext.T, c.valor)) ext.T = extremo(c, 0);
     }
     vanos.push({ desde: va.desde, hasta: va.hasta, apoyos: [va.apoyoInicio?.objeto ?? null, va.apoyoFin?.objeto ?? null], ...(va.torsionEquilibrio ? { torsionEquilibrio: true as const } : {}), extremos: ext });
   }

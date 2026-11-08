@@ -25,10 +25,10 @@ import { calcular } from "../motor/calcular.ts";
 import { GRAVEDAD, type ResultadoCalculo } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones } from "./combinaciones.ts";
-import { deriva, envolventes, flechas, pieza, reacciones, sismo } from "./consultas.ts";
+import { deriva, envolventes, esfuerzosPesimosViga, flechas, pieza, reacciones, sismo } from "./consultas.ts";
 import { VERSION_ESQUEMA } from "./proyecto.ts";
 import { envolventeCampo, ResultadosRender, valoresCampo } from "./render/resultados.ts";
-import { recorrerDiagrama } from "../motor/diagramaCompuesto.ts";
+import { esfuerzosPartidos, recorrerDiagrama } from "../motor/diagramaCompuesto.ts";
 import { desempaquetarResultados, empaquetarResultados } from "./resultados.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
@@ -383,6 +383,91 @@ describe("VS3, criterio 6: cada consulta combina los modos en su variable", () =
     const env = envolventes(q, una, { planta: "N2", tipo: "viga" });
     if (!env.valido) throw new Error("sin envolventes");
     expect(env.valor.grupos[0]!.extremos["My-"]!.v).toBeLessThan(0);
+  });
+
+  it("una viga: los esfuerzos partidos y los pares de signos pésimos de cortante con torsión y de flexión con cortante (VS-o)", () => {
+    const viga = f.vigas!.find((v) => v.planta === "N2")!.id;
+    const ep = q.esfuerzosPiezas;
+    const ns = c.modelo.casos.length;
+    // 1. La combinación partida en cada estación del diagrama: la parte estática y la amplitud del sismo de
+    //    cada esfuerzo, frente a la regla a mano y frente a `Superposicion.partir` con los esfuerzos de cada caso base
+    let [comparados, peores] = [0, 0];
+    for (const t of ep.tramos(viga)) {
+      const D = q.diagramaBarra(t.barra, F);
+      for (const x of D.estaciones())
+        for (const lado of [-1, 1] as const) {
+          const base = (k: number, cmp: number) => ep.diagrama(t.barra, k).esfuerzosEn(x, lado)[cmp]!;
+          // Con la excentricidad, la amplitud depende del signo del modo dominante (como el valor): donde pasa por cero, no se compara
+          const juntoACero = (cmp: number) =>
+            CASOS_SISMO.some((caso, j) => {
+              if (!F[ns + j]) return false;
+              const resp = q.sismoCalculado!.respuestas[caso.eje];
+              const xs = r.modal!.modos.map((_, i) => Math.abs(resp.coeficientes[i]! * base(ns + i, cmp)));
+              return xs[resp.dominante]! < 1e-6 * Math.max(...xs, 1e-12);
+            });
+          // Vz, T y My, los que juntan las comprobaciones (N y lo del plano del diafragma son ruido)
+          if ([2, 3, 4].some(juntoACero)) continue;
+          const p = esfuerzosPartidos(D, x, lado);
+          const porBase = Float64Array.from({ length: 6 * q.nb }, (_, i) => base(Math.floor(i / 6), i % 6));
+          const sup = q.sup.partir(porBase, 6, F);
+          const e = D.esfuerzosEn(x, lado);
+          const pes = esfuerzosPesimosViga(p, 0);
+          for (let cmp = 0; cmp < 6; cmp++) {
+            if (juntoACero(cmp)) continue;
+            const { S, A } = partesAMano(F, (k) => base(k, cmp));
+            const donde = `barra ${t.barra}, x = ${x}, lado ${lado}, componente ${cmp}`;
+            expect(rel(p.estatica[cmp]!, S, 1e-3), donde).toBeLessThan(1e-9);
+            expect(rel(p.sismo[cmp]!, A, 1e-3), donde).toBeLessThan(1e-9);
+            expect(rel(p.sismo[cmp]!, sup.sismo[cmp]!, 1e-3), donde).toBeLessThan(1e-9);
+            // la combinación con el signo del modo dominante es uno de los estados que cubre: S ± A
+            expect(Math.abs(e[cmp]! - p.estatica[cmp]!)).toBeLessThanOrEqual(p.sismo[cmp]! * (1 + 1e-12) + 1e-12);
+            // y el pésimo nunca da menos (N, la menor compresión)
+            if (cmp === 0) expect(pes[0]!).toBeGreaterThanOrEqual(e[0]! - 1e-9);
+            else expect(Math.abs(pes[cmp]!)).toBeGreaterThanOrEqual(Math.abs(e[cmp]!) * (1 - 1e-12) - 1e-12);
+          }
+          // donde el estado del signo dominante no junta |Vz| y |T| máximos, el par pésimo es otro
+          if (Math.abs(e[2]!) + Math.abs(e[3]!) < Math.abs(pes[2]!) + Math.abs(pes[3]!) - 1e-6) peores++;
+          comparados++;
+        }
+    }
+    expect(comparados).toBeGreaterThan(50);
+    expect(peores).toBeGreaterThan(0);
+
+    // 2. «pieza», con la situación sísmica entera (todos los signos de cada caso del sismo): cada extremo
+    //    de vano con los esfuerzos de sus signos pésimos, en su punto, y el suyo es el del extremo
+    const sis = conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: ["ELU-SIS"] });
+    if (!sis.valido) throw new Error(sis.diagnosticos[0]!.mensaje);
+    const p = pieza(q, sis.valor, viga);
+    if (!p.valido) throw new Error("sin pieza");
+    type Ext = { v: number; s: number; comb: string; esfuerzos: number[]; pesimos?: true };
+    const vanos = (p.valor as { vanos: { extremos: Record<string, Ext> }[] }).vanos;
+    const propio = { "My+": [4, 1], "My-": [4, -1], Vz: [2, 0], T: [3, 0] } as const;
+    for (const [i, va] of vanos.entries())
+      for (const [nombre, [cmp, my]] of Object.entries(propio)) {
+        const x = va.extremos[nombre]!;
+        expect(x.pesimos, `${nombre} del vano ${i}`).toBe(true);
+        expect(rel(x.esfuerzos[cmp]!, x.v, 1e-6), `${nombre} del vano ${i}`).toBeLessThan(1e-12);
+        // la regla, escrita aquí: Vy, Vz, T y Mz aumentan su valor absoluto, My va con el extremo y N, con la menor compresión
+        const fx = sis.valor.factores[sis.valor.nombres.indexOf(x.comb)]!;
+        const e = q.vano(viga, i, fx);
+        if (!e.valido) throw new Error("sin vano");
+        const d = { "My+": e.valor.maxMy, "My-": e.valor.minMy, Vz: Math.abs(e.valor.maxVz.valor) >= Math.abs(e.valor.minVz.valor) ? e.valor.maxVz : e.valor.minVz, T: Math.abs(e.valor.maxT.valor) >= Math.abs(e.valor.minT.valor) ? e.valor.maxT : e.valor.minT }[nombre as keyof typeof propio];
+        expect(d.s).toBe(x.s);
+        const { estatica: S, sismo: A } = d.partes;
+        x.esfuerzos.forEach((v, k) => expect(v).toBe(k === 0 ? S[0]! + A[0]! : k === 4 && my ? S[4]! + my * A[4]! : S[k]! >= 0 ? S[k]! + A[k]! : S[k]! - A[k]!));
+      }
+
+    // 3. Sin el sismo, los esfuerzos concomitantes de la combinación, y el del extremo, bit a bit
+    const pt = conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: ["ELU-PT"] });
+    if (!pt.valido) throw new Error(pt.diagnosticos[0]!.mensaje);
+    const sin = pieza(q, pt.valor, viga);
+    if (!sin.valido) throw new Error("sin pieza");
+    for (const va of (sin.valor as { vanos: { extremos: Record<string, Ext> }[] }).vanos)
+      for (const [nombre, [cmp]] of Object.entries(propio)) {
+        const x = va.extremos[nombre]!;
+        expect(x.pesimos).toBeUndefined();
+        expect(x.esfuerzos[cmp]).toBe(x.v);
+      }
   });
 
   it("los casos de los modos son ligeros: sus esfuerzos de extremo salen de sus resultados y son los de su diagrama", () => {

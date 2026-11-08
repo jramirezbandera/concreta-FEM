@@ -413,6 +413,24 @@ export class DiagramaCompuesto implements DiagramaLeible {
   }
 
   /**
+   * VS-o: los esfuerzos en x partidos como `Superposicion.partirLogico`: `estatica`, los de la parte
+   * estática (los mismos números que `lineal.esfuerzosEn`), y `sismo`, por esfuerzo, la amplitud del
+   * sismo: Σ |factor·valor| de sus casos espectrales, sin signo. Con la excentricidad accidental, el
+   * valor de un caso es s·√(…) + su torsor, así que su amplitud depende del signo s del modo dominante
+   * y se toma por el lado pedido, como en `esfuerzosEn`.
+   */
+  partidoEn(x: number, lado: -1 | 1 = 1): EsfuerzosPartidos {
+    const l = x <= 0 ? 1 : x >= this.L ? -1 : lado;
+    const estatica = Float64Array.from(this.estatico(x, l));
+    const sismo = new Float64Array(6);
+    for (const p of this.partes) {
+      const e = p.espectral.esfuerzosEn(x, l);
+      for (let c = 0; c < 6; c++) sismo[c]! += Math.abs(p.factor * e[c]!);
+    }
+    return { estatica, sismo };
+  }
+
+  /**
    * Una combinación lineal de los esfuerzos en x, Σ k·e[c] con `pesos` = [c, k]… (el momento en el
    * plano de un alzado, que mezcla My, Mz y T): lo de los casos espectrales, la de cada modo,
    * combinada (no la de los esfuerzos ya combinados).
@@ -503,6 +521,21 @@ export function recorrerDiagrama(D: DiagramaLeible, ver: (x: number, lado: -1 | 
       if ((x === 0 && lado < 0) || (x === D.L && lado > 0)) continue;
       ver(x, lado, D.esfuerzosEn(x, lado));
     }
+}
+
+/** [N, Vy, Vz, T, My, Mz] partidos en su parte estática y la amplitud del sismo de cada uno (VS-o). */
+export interface EsfuerzosPartidos {
+  estatica: Float64Array;
+  sismo: Float64Array;
+}
+
+/**
+ * Los esfuerzos de un diagrama en x partidos (`DiagramaCompuesto.partidoEn`); sin casos espectrales,
+ * los de la combinación con la amplitud del sismo nula.
+ */
+export function esfuerzosPartidos(D: DiagramaLeible, x: number, lado: -1 | 1 = 1): EsfuerzosPartidos {
+  if (D instanceof DiagramaCompuesto) return D.partidoEn(x, lado);
+  return { estatica: Float64Array.from(D.esfuerzosEn(x, lado)), sismo: new Float64Array(6) };
 }
 
 /** Una combinación lineal de los esfuerzos de un diagrama en x: Σ k·e[c], con `pesos` = [c, k]… (`DiagramaCompuesto.proyectadoEn`). */

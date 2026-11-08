@@ -40,7 +40,7 @@ import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { CamposLaminas } from "../motor/campos.ts";
 import { CasosEfimeros } from "../motor/casosEfimeros.ts";
 import { Cortes } from "../motor/cortes.ts";
-import { DiagramaCompuesto, EspectralBarra, type DiagramaLeible } from "../motor/diagramaCompuesto.ts";
+import { DiagramaCompuesto, EspectralBarra, esfuerzosPartidos, type DiagramaLeible, type EsfuerzosPartidos } from "../motor/diagramaCompuesto.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import { modeloConModos, Superposicion, type CasoEspectral, type PartesCombinacion } from "../motor/espectral.ts";
 import type { ModeloAnalitico, ModoVibracion, ResultadoCaso, ResultadoModal, Vec3 } from "../motor/modelo.ts";
@@ -121,6 +121,14 @@ export interface PiezaVanos {
 export interface ExtremoDiagrama {
   s: number;
   valor: number;
+  /**
+   * VS-o: [N, Vy, Vz, T, My, Mz] en ese punto (por el lado del extremo), partidos
+   * (`DiagramaCompuesto.partidoEn`): sin el sismo del programa, `estatica` son los concomitantes de la
+   * combinación y `sismo`, ceros; con él, la parte estática y la amplitud del sismo de cada esfuerzo,
+   * para los signos pésimos de las comprobaciones que juntan varios (cortante con torsión, flexión con
+   * cortante).
+   */
+  partes: EsfuerzosPartidos;
 }
 
 /** Esfuerzos de un vano en una combinación (o un caso). */
@@ -128,11 +136,13 @@ export interface EsfuerzosVano {
   /** [N, Vy, Vz, T, My, Mz] en sus extremos (las caras o, si caen en una zona rígida, el extremo del tramo flexible). */
   inicio: SeccionPieza;
   fin: SeccionPieza;
-  /** Máximo y mínimo de My (exactos: los extremos del diagrama combinado) y de Vz dentro del vano. */
+  /** Máximo y mínimo de My (exactos: los extremos del diagrama combinado), de Vz y de T dentro del vano. */
   maxMy: ExtremoDiagrama;
   minMy: ExtremoDiagrama;
   maxVz: ExtremoDiagrama;
   minVz: ExtremoDiagrama;
+  maxT: ExtremoDiagrama;
+  minT: ExtremoDiagrama;
 }
 
 export interface Resultante {
@@ -646,7 +656,10 @@ export class Consultas {
     const hasta = Math.min(v.hasta, ts[ts.length - 1]!.s1);
     const inicio = this.seccion(id, factores, desde, 1)!;
     const fin = this.seccion(id, factores, hasta, -1)!;
-    const ext = { maxMy: { s: desde, valor: -Infinity }, minMy: { s: desde, valor: Infinity }, maxVz: { s: desde, valor: -Infinity }, minVz: { s: desde, valor: Infinity } };
+    // Cada extremo con el punto donde está, para partir allí sus esfuerzos al final (VS-o)
+    type Donde = { s: number; valor: number; D: DiagramaLeible | null; x: number; lado: -1 | 1 };
+    const nuevo = (valor: number): Donde => ({ s: desde, valor, D: null, x: 0, lado: 1 });
+    const ext = { maxMy: nuevo(-Infinity), minMy: nuevo(Infinity), maxVz: nuevo(-Infinity), minVz: nuevo(Infinity), maxT: nuevo(-Infinity), minT: nuevo(Infinity) };
     for (const t of ts) {
       const D = this.diagramaCombinado(t.barra, factores);
       const [a, b] = [Math.max(desde, t.s0) - t.s0, Math.min(hasta, t.s1) - t.s0];
@@ -656,13 +669,21 @@ export class Consultas {
           if ((x === a && lado < 0) || (x === b && lado > 0)) continue;
           const e = D.esfuerzosEn(x, lado);
           const s = t.s0 + x;
-          if (e[4]! > ext.maxMy.valor) ext.maxMy = { s, valor: e[4]! };
-          if (e[4]! < ext.minMy.valor) ext.minMy = { s, valor: e[4]! };
-          if (e[2]! > ext.maxVz.valor) ext.maxVz = { s, valor: e[2]! };
-          if (e[2]! < ext.minVz.valor) ext.minVz = { s, valor: e[2]! };
+          const aqui = (valor: number): Donde => ({ s, valor, D, x, lado });
+          if (e[4]! > ext.maxMy.valor) ext.maxMy = aqui(e[4]!);
+          if (e[4]! < ext.minMy.valor) ext.minMy = aqui(e[4]!);
+          if (e[2]! > ext.maxVz.valor) ext.maxVz = aqui(e[2]!);
+          if (e[2]! < ext.minVz.valor) ext.minVz = aqui(e[2]!);
+          if (e[3]! > ext.maxT.valor) ext.maxT = aqui(e[3]!);
+          if (e[3]! < ext.minT.valor) ext.minT = aqui(e[3]!);
         }
     }
-    return { valido: true, valor: { inicio, fin, ...ext }, diagnosticos: [] };
+    const partido = (d: Donde): ExtremoDiagrama => ({ s: d.s, valor: d.valor, partes: d.D ? esfuerzosPartidos(d.D, d.x, d.lado) : { estatica: new Float64Array(6), sismo: new Float64Array(6) } });
+    return {
+      valido: true,
+      valor: { inicio, fin, maxMy: partido(ext.maxMy), minMy: partido(ext.minMy), maxVz: partido(ext.maxVz), minVz: partido(ext.minVz), maxT: partido(ext.maxT), minT: partido(ext.minT) },
+      diagnosticos: [],
+    };
   }
 
   /**
