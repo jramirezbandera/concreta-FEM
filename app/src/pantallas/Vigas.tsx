@@ -27,7 +27,7 @@ import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazo
 import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDiagramas, IcPilar, IcViga } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, filaElegible, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, coma } from "../fmt.ts";
@@ -35,6 +35,7 @@ import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
 import { conMalla, Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { COLUMNAS_BARRA, COLUMNAS_VANO, FILAS_BARRA, FILAS_VANO, NOTA_EXTREMOS, TablaExtremos } from "./Extremos.tsx";
 import { NOTA_TERNAS, TablaTernas } from "./Ternas.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
@@ -335,46 +336,35 @@ export function ModoDiagramas() {
             />
             <Seccion titulo="En la estación">{est.datos ? <Estacion d={est.datos} unidad={unidad} /> : <p className="nota">…</p>}</Seccion>
             {v.tipo === "pilar" && <CuadroPilar filas={cuadro.datos?.filas ?? null} />}
-            {v.tipo !== "pilar" && <Seccion titulo="Vanos de cara a cara">
-              <table className="tb">
-                <thead>
-                  <tr>
-                    <th>Vano</th>
-                    <th>My+ kN·m</th>
-                    <th>My− kN·m</th>
-                    <th title="El mayor |Vz| del vano, con su signo">Vz kN</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {v.vanos.map((va, i) => {
-                    const c = (k: string) =>
-                      va.extremos[k] ? (
-                        <>
-                          {fmt(va.extremos[k].v, 1)}
-                          <small>{va.extremos[k].comb}</small>
-                        </>
-                      ) : (
-                        "—"
-                      );
-                    return (
-                      <tr key={i} className="clic" {...filaElegible(() => setS((va.desde + va.hasta) / 2), sValida >= va.desde && sValida <= va.hasta)}>
-                        <td>
-                          {i + 1}
-                          <small>
-                            {fmt(va.desde, 2)}–{fmt(va.hasta, 2)} m{va.torsionEquilibrio ? " · torsión de equilibrio" : ""}
-                          </small>
-                          <small>{va.apoyos.map((a) => a ?? "libre").join(" – ")}</small>
-                        </td>
-                        <td>{c("My+")}</td>
-                        <td>{c("My-")}</td>
-                        <td>{c("Vz")}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <p className="nota">Máximos exactos del diagrama combinado dentro de cada vano, de cara a cara de sus apoyos.</p>
-            </Seccion>}
+            {v.tipo === "barra" && v.extremos && (
+              <Seccion titulo="Extremos a lo largo de la barra">
+                <TablaExtremos grupos={[{ extremos: v.extremos }]} filas={FILAS_BARRA} columnas={COLUMNAS_BARRA} />
+                <p className="nota">{NOTA_EXTREMOS}</p>
+              </Seccion>
+            )}
+            {v.tipo !== "pilar" && v.tipo !== "barra" && (
+              <Seccion titulo="Vanos de cara a cara">
+                <TablaExtremos
+                  grupos={v.vanos.map((va, i) => ({
+                    titulo: (
+                      <>
+                        Vano {i + 1}
+                        <small>
+                          {fmt(va.desde, 2)}–{fmt(va.hasta, 2)} m · {va.apoyos.map((a) => a ?? "libre").join(" – ")}
+                          {va.torsionEquilibrio ? " · torsión de equilibrio" : ""}
+                        </small>
+                      </>
+                    ),
+                    extremos: va.extremos,
+                    onGrupo: () => setS((va.desde + va.hasta) / 2),
+                    activo: sValida >= va.desde && sValida <= va.hasta,
+                  }))}
+                  filas={FILAS_VANO}
+                  columnas={COLUMNAS_VANO}
+                />
+                <p className="nota">Máximos exactos del diagrama combinado dentro de cada vano, de cara a cara de sus apoyos. {NOTA_EXTREMOS}</p>
+              </Seccion>
+            )}
           </>
         )}
     </>

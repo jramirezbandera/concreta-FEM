@@ -7,7 +7,16 @@
  *   vertical, un círculo).
  * - Alzado: de un extremo al otro, en (u, z), si los dos están cerca del plano; si lo cruza, un círculo.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { pieza } from "../agente/consultas.ts";
+import { VERSION_ESQUEMA } from "../agente/proyecto.ts";
+import { conjuntoPorDefecto } from "../agente/render/index.ts";
+import { sha256 } from "../compilador/huella.ts";
+import { iniciarNucleo } from "../nucleo/index.ts";
+import { datosViga } from "./datos.ts";
+import { Sesion } from "./sesion.ts";
 import { vistaAlzado } from "../agente/render/alzado.ts";
 import type { Primitiva } from "../agente/render/escena.ts";
 import { vistaModelo } from "../agente/render/modelo.ts";
@@ -87,4 +96,25 @@ describe("BN2: las barras en la planta y en el alzado", () => {
     // En el analítico no se dibuja el modelo físico
     expect(objeto(vistaAlzado(f, { desde: [-1, 4], hasta: [6, 4] }, { huella: "x" }, { modo: "analitico" }).primitivas, "T1").filter((p) => p.tipo === "linea" && p.estilo === "barra-alzado")).toEqual([]);
   });
+});
+
+describe("los extremos de una barra en Diagramas (VS-o)", () => {
+  it("son los de «pieza», con sus esfuerzos", async () => {
+    const wasm = readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm"));
+    await iniciarNucleo(wasm);
+    const a = Sesion.abrir(JSON.stringify({ esquema: VERSION_ESQUEMA, modelo: porticoArriostrado() }), sha256(new Uint8Array(wasm)));
+    if (!a.valido) throw new Error("no abre");
+    const s = a.sesion;
+    expect((await s.calcular()).ok).toBe(true);
+    const D = { tipo: "defecto" } as const;
+    for (const id of ["X1", "T1", "T2"]) {
+      const v = datosViga(s, id, "N", D);
+      if (!v.valido) throw new Error(JSON.stringify(v.diagnosticos));
+      const p = pieza(s.q!, conjuntoPorDefecto(s.q!, s.resumen!, "esfuerzos"), id);
+      if (!p.valido) throw new Error("sin pieza");
+      expect(v.valor.extremos).toEqual((p.valor as { extremos: unknown }).extremos);
+      // cada extremo, con los seis esfuerzos de su punto
+      for (const e of Object.values(v.valor.extremos!)) expect(e.esfuerzos).toHaveLength(6);
+    }
+  }, 120_000);
 });

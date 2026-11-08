@@ -470,6 +470,74 @@ describe("VS3, criterio 6: cada consulta combina los modos en su variable", () =
       }
   });
 
+  it("una barra: sus extremos con los esfuerzos de los signos pésimos (VS-o), y los mismos valores que antes", () => {
+    // El edificio con una diagonal de acero en la fachada y = 0, de la base de P0-0 a la cabeza de P6-0 en N1
+    const g: ModeloFisico = {
+      ...f,
+      materiales: [...f.materiales, { id: "S", tipo: "acero" }],
+      secciones: [...f.secciones, { id: "t", material: "S", forma: "general", A: 1.2e-3, Iy: 1.5e-6, Iz: 1.5e-6, J: 3e-6 }],
+      barras: [{ id: "D1", inicio: { planta: "C", x: 0, y: 0 }, fin: { planta: "N1", x: 6, y: 0 }, seccion: "t" }],
+    };
+    const x = calculado(g);
+    const ep = x.q.esfuerzosPiezas;
+    const comp = ["N", "Vy", "Vz", "T", "My", "Mz"];
+    for (const situaciones of [["ELU-SIS"], ["ELU-PT"]] as const) {
+      const cj = conjuntoCombinaciones(x.q, { tipo: "situaciones", situaciones: [...situaciones] });
+      if (!cj.valido) throw new Error(cj.diagnosticos[0]!.mensaje);
+      const p = pieza(x.q, cj.valor, "D1");
+      if (!p.valido) throw new Error("sin pieza");
+      type Ext = { v: number; s: number; comb: string; esfuerzos: number[]; pesimos?: true };
+      const extremos = (p.valor as { extremos: Record<string, Ext> }).extremos;
+      const sismo = situaciones[0] === "ELU-SIS";
+      for (const [nombre, e] of Object.entries(extremos)) {
+        const cmp = comp.indexOf(nombre.replace(/[+-]$/, ""));
+        const kc = cj.valor.nombres.indexOf(e.comb);
+        // el valor, la estación y la combinación, los de antes: los extremos de «diagrama» de la pieza
+        let viejo: { v: number; s: number; kc: number } | null = null;
+        cj.valor.factores.forEach((fc, k) => {
+          const d = x.q.diagrama("D1", fc);
+          if (!d.valido) throw new Error("sin diagrama");
+          for (const es of d.valor)
+            for (const lado of [es.izquierda, es.derecha]) {
+              const v = lado[cmp]!;
+              const mejor = !viejo || (nombre.endsWith("+") ? v > viejo.v : nombre.endsWith("-") ? v < viejo.v : Math.abs(v) > Math.abs(viejo.v));
+              if (mejor) viejo = { v, s: es.s, kc: k };
+            }
+        });
+        expect([e.v, e.s, kc]).toEqual([viejo!.v, viejo!.s, viejo!.kc]);
+        // los esfuerzos: en el punto del extremo (su tramo y su lado), la parte estática y la amplitud del sismo
+        const fx = cj.valor.factores[kc]!;
+        const puntos: { S: Float64Array; A: Float64Array; e: number[] }[] = [];
+        for (const t of ep.tramos("D1")) {
+          const D = x.q.diagramaBarra(t.barra, fx);
+          recorrerDiagrama(D, (xx, lado, es) => {
+            if (t.s0 + xx === e.s && es[cmp] === e.v) {
+              const pt = esfuerzosPartidos(D, xx, lado);
+              puntos.push({ S: pt.estatica, A: pt.sismo, e: Array.from(es) });
+            }
+          });
+        }
+        expect(puntos.length).toBeGreaterThan(0);
+        const { S, A, e: conc } = puntos[0]!;
+        if (!sismo) {
+          expect(e.pesimos).toBeUndefined();
+          expect(e.esfuerzos).toEqual(conc);
+          continue;
+        }
+        expect(e.pesimos).toBe(true);
+        // la regla, escrita aquí: N+ y N−, con el suyo; lo demás (N incluido en los otros extremos), aumentando su valor absoluto
+        const signoN = nombre === "N+" ? 1 : nombre === "N-" ? -1 : 0;
+        e.esfuerzos.forEach((v, k) => {
+          const esperado = !A[k] ? S[k]! : k === 0 && signoN ? S[0]! + signoN * A[0]! : S[k]! >= 0 ? S[k]! + A[k]! : S[k]! - A[k]!;
+          expect(v, `${nombre}, ${comp[k]}`).toBe(esperado);
+          expect(Math.abs(v)).toBeGreaterThanOrEqual(k === 0 && signoN ? 0 : Math.abs(conc[k]!) * (1 - 1e-12) - 1e-12);
+        });
+        // con todos los signos del sismo en el conjunto, el suyo es el del extremo
+        expect(rel(e.esfuerzos[cmp]!, e.v, 1e-6), nombre).toBeLessThan(1e-12);
+      }
+    }
+  });
+
   it("los casos de los modos son ligeros: sus esfuerzos de extremo salen de sus resultados y son los de su diagrama", () => {
     const ep = q.esfuerzosPiezas;
     expect(ep.ligeros).toBe(c.modelo.casos.length);

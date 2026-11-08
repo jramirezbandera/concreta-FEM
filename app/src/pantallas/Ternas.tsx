@@ -33,7 +33,7 @@ export const NOTA_TERNAS =
   "Cada fila, los N, My y Mz concomitantes de una combinación: la que da ese pésimo en la cabeza o en el pie del tramo flexible (N < 0, compresión; My y Mz, en los ejes de la sección, con su signo). Un pilar se dimensiona con ellas. Con el sismo del programa (marcadas con «±»), los esfuerzos de los modos combinados no tienen signo ni son simultáneos: la fila da cada uno con el signo pésimo, los momentos con el que más los aumenta y N con la menor o la mayor compresión.";
 
 /** VS-o: el título de la marca de una terna con el sismo del programa. */
-const TITULO_PESIMOS = "Con el sismo del programa: cada esfuerzo con su signo pésimo, no un estado simultáneo";
+export const TITULO_PESIMOS = "Con el sismo del programa: cada esfuerzo con su signo pésimo, no un estado simultáneo";
 
 function CeldaNu({ f, rowSpan }: { f: FilaPilar; rowSpan: number }) {
   if (!f.nu) return <td rowSpan={rowSpan}>—</td>;

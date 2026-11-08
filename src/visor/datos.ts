@@ -10,7 +10,7 @@
  * Puro: sin IO.
  */
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
-import { deriva, flechas, pieza, reacciones, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
+import { deriva, flechas, pieza, reacciones, type DerivaPlanta, type Extremo, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
 import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
@@ -289,6 +289,8 @@ export interface DatosViga {
   flexibles: [number, number][];
   /** En un pilar: la estación de cada planta que atraviesa (la de su base, 0); en una barra, las de sus dos extremos. */
   plantas?: { planta: string; s: number }[];
+  /** En una barra: sus extremos a lo largo de ella con sus esfuerzos (`fem consultar pieza`; VS-o, con el sismo, los pésimos). */
+  extremos?: Record<string, Extremo>;
 }
 
 export function datosViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: EleccionCombinaciones): Resultado<DatosViga> {
@@ -304,6 +306,8 @@ export function datosViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: Eleccion
     const bs = s.compilado!.mapeo.piezas[id] ?? [];
     if (!bs.length) return no("visor/objeto", `${id} no tiene barras.`);
     const L = s.compilado!.mapeo.barras[bs[0]!]!.s[3];
+    const p = pieza(q, conj.valor, id);
+    if (!p.valido) return p;
     return {
       valido: true,
       valor: {
@@ -321,6 +325,7 @@ export function datosViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: Eleccion
           { planta: barra.inicio.planta, s: 0 },
           { planta: barra.fin.planta, s: L },
         ],
+        extremos: (p.valor as { extremos: Record<string, Extremo> }).extremos,
       },
     };
   }

@@ -31,7 +31,7 @@ import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
 import type { EmplazamientoEdificio, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import type { ObraProyecto } from "./obra.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import { recorrerDiagrama, type DiagramaLeible } from "../motor/diagramaCompuesto.ts";
+import { esfuerzosPartidos, recorrerDiagrama, type DiagramaLeible, type EsfuerzosPartidos } from "../motor/diagramaCompuesto.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 import type { ConjuntoCombinaciones, Proposito } from "./combinaciones.ts";
 import type { Proyecto } from "./proyecto.ts";
@@ -591,14 +591,8 @@ export interface TramoEnvolvente {
  * demás combinaciones de signos dan ternas con menos momento a igual N: ninguna es peor que éstas.
  */
 export function ternasPesimas(partes: { estatica: ArrayLike<number>; sismo: ArrayLike<number> }): number[][] {
-  const { estatica: S, sismo: A } = partes;
-  const mayor = (i: number) => (A[i] ? (S[i]! >= 0 ? S[i]! + A[i]! : S[i]! - A[i]!) : S[i]!);
-  const resto = [1, 2, 3, 4, 5].map(mayor);
-  if (!A[0]) return [[S[0]!, ...resto]];
-  return [
-    [S[0]! + A[0]!, ...resto],
-    [S[0]! - A[0]!, ...resto],
-  ];
+  if (!partes.sismo[0]) return [esfuerzosPesimos(partes)];
+  return [esfuerzosPesimos(partes, { 0: 1 }), esfuerzosPesimos(partes, { 0: -1 })];
 }
 
 /**
@@ -613,12 +607,30 @@ export function ternasPesimas(partes: { estatica: ArrayLike<number>; sismo: Arra
  * tracción.
  */
 export function esfuerzosPesimosViga(partes: { estatica: ArrayLike<number>; sismo: ArrayLike<number> }, my: 1 | -1 | 0): number[] {
+  return esfuerzosPesimos(partes, my ? { 0: 1, 4: my } : { 0: 1 });
+}
+
+/**
+ * VS-o: [N, Vy, Vz, T, My, Mz] con el sismo del programa en sus signos pésimos: los de `fijos` (por
+ * componente), S + signo·A; los demás, con el signo que aumenta su valor absoluto. La regla común de
+ * las ternas de los pilares, los extremos de las vigas y los de las barras.
+ */
+export function esfuerzosPesimos(partes: { estatica: ArrayLike<number>; sismo: ArrayLike<number> }, fijos: Partial<Record<number, 1 | -1>> = {}): number[] {
   const { estatica: S, sismo: A } = partes;
   return [0, 1, 2, 3, 4, 5].map((c) => {
     if (!A[c]) return S[c]!;
-    const signo = c === 0 ? 1 : c === 4 && my ? my : S[c]! >= 0 ? 1 : -1;
+    const signo = fijos[c] ?? (S[c]! >= 0 ? 1 : -1);
     return S[c]! + signo * A[c]!;
   });
+}
+
+/**
+ * VS-o: los esfuerzos de un extremo de una barra (fase BN) con el sismo del programa, en sus signos
+ * pésimos. Una barra es casi siempre de acero, que se comprueba con la interacción de N con M (y de M
+ * con V), creciente en |N|: N+ y N− con el suyo y, en los demás extremos, |N| aumentado como el resto.
+ */
+export function esfuerzosPesimosBarra(partes: { estatica: ArrayLike<number>; sismo: ArrayLike<number> }, extremo: string): number[] {
+  return esfuerzosPesimos(partes, extremo === "N+" ? { 0: 1 } : extremo === "N-" ? { 0: -1 } : {});
 }
 
 export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string | undefined, o: { estaciones?: boolean } = {}): Respuesta<unknown> {
@@ -654,17 +666,31 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
     return si({ pieza: id, tipo: "pilar", combinaciones: conjunto.descripcion, tramos }, r.diagnosticos);
   }
   if (q.fisico.barras?.some((b) => b.id === id)) {
-    // Fase BN: los extremos a lo largo de la barra, desde su inicio (sin vanos)
+    // Fase BN: los extremos a lo largo de la barra, desde su inicio (sin vanos), cada uno con sus esfuerzos:
+    // los concomitantes o, con el sismo del programa, los de sus signos pésimos (VS-o, `esfuerzosPesimosBarra`)
     const extremos: Record<string, Extremo> = {};
+    const donde: Record<string, { D: DiagramaLeible; x: number; lado: -1 | 1; sismo: boolean }> = {};
+    const tramos = q.esfuerzosPiezas.tramos(id);
     for (let kc = 0; kc < conjunto.factores.length; kc++) {
-      const d = q.diagrama(id, conjunto.factores[kc]!);
-      if (!d.valido) return d;
-      for (const e of d.valor)
-        for (const lado of [e.izquierda, e.derecha])
+      const f = conjunto.factores[kc]!;
+      const sismo = !q.sup.esLineal(f);
+      for (const t of tramos) {
+        const D = q.diagramaBarra(t.barra, f);
+        recorrerDiagrama(D, (x, lado, e) => {
           for (const nombre of EXTREMOS.barra) {
-            const v = lado[COMPONENTES.indexOf(nombre.replace(/[+-]$/, "") as (typeof COMPONENTES)[number])]!;
-            if (mejora(nombre, extremos[nombre], v)) extremos[nombre] = { v, s: e.s, comb: conjunto.nombres[kc]! };
+            const v = e[COMPONENTES.indexOf(nombre.replace(/[+-]$/, "") as (typeof COMPONENTES)[number])]!;
+            if (!mejora(nombre, extremos[nombre], v)) continue;
+            extremos[nombre] = { v, s: t.s0 + x, comb: conjunto.nombres[kc]! };
+            donde[nombre] = { D, x, lado, sismo };
           }
+        });
+      }
+    }
+    for (const [nombre, x] of Object.entries(extremos)) {
+      const { D, x: xx, lado, sismo } = donde[nombre]!;
+      const partes: EsfuerzosPartidos = esfuerzosPartidos(D, xx, lado);
+      x.esfuerzos = sismo ? esfuerzosPesimosBarra(partes, nombre) : Array.from(partes.estatica);
+      if (sismo) x.pesimos = true;
     }
     const bs = q.mapeo.piezas[id] ?? [];
     const longitud = bs.length ? q.mapeo.barras[bs[bs.length - 1]!]!.s[3] : 0;
