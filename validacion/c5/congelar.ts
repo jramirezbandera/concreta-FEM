@@ -27,7 +27,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compilar } from "../../src/compilador/compilar.ts";
 import { Consultas } from "../../src/compilador/consultas.ts";
-import { woodArmerEstacion } from "../../src/compilador/esfuerzosBandas.ts";
+import { woodArmerEstacion } from "./woodArmerBandas.ts";
 import type { Banda } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";

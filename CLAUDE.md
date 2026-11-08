@@ -921,7 +921,9 @@
   - Wood–Armer de las franjas con el peor de los 8 signos (`woodArmerPesimo`: mapa de armado, refuerzos, `fem consultar franja`); el mx de la estación no cambia;
   - ternas de los pilares (`ternasPesimas`, `pesimos: true`, «±» en la app): momentos con el signo que los aumenta y N con los dos;
   - Losas avisa de que con sismo el mapa es la envolvente de cada variable; la deformada de una combinación con sismo no se dibuja (`visor/deformada-sismo`);
-  - sin el sismo del programa, los mismos bits; con él, nunca menos que antes. Pendiente para la integración: las comprobaciones de Concreta con varios esfuerzos, igual.
+  - sin el sismo del programa, los mismos bits; con él, nunca menos que antes;
+  - `woodArmerEstacion` (las bandas del Anejo I, con un solo signo) sale del motor a `validacion/c5/woodArmerBandas.ts`, sólo lineal (la referencia congelada de C5, idéntica);
+  - **pendiente para la integración** (`viento-sismo.md` §9): Concreta comprueba con las ternas y el Wood–Armer del motor y nunca recombina los casos con el sismo; las comprobaciones de vigas con dos esfuerzos (cortante con torsión) necesitarán los pares de signos pésimos.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

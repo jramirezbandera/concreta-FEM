@@ -16,7 +16,8 @@ import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
 import { proponerBandas } from "./bandas.ts";
 import { compilar } from "./compilar.ts";
-import { EsfuerzosBandas, woodArmerEstacion } from "./esfuerzosBandas.ts";
+import { woodArmerEstacion } from "../../validacion/c5/woodArmerBandas.ts";
+import { EsfuerzosBandas } from "./esfuerzosBandas.ts";
 import type { ModeloFisico, Pilar, Vec2 } from "./fisico.ts";
 
 beforeAll(async () => {
@@ -289,7 +290,7 @@ describe("reticular: momento por nervio (C4-j)", () => {
   });
 });
 
-describe("Wood–Armer en las bandas (C5, criterio 3)", () => {
+describe("Wood–Armer en las bandas (C5, criterio 3; desde VS-o, en validacion/c5)", () => {
   it("por combinación, con los momentos medios, es woodArmer de su combinación de casos", () => {
     const e = eb.estaciones("L:1:P2")!.find((x) => x.tipo === "cara")!;
     const combinaciones = [Float64Array.from([1.35, 1.5]), Float64Array.from([1, 0])];

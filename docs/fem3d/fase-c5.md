@@ -126,3 +126,5 @@ bun validacion/c5/etabs15c.ts                      # criterio 4 → out_etabs15c
 bun validacion/c5/banco.ts                         # criterio 8 → out_banco.txt
 bun validacion/c5/congelar.ts                      # SÓLO a sabiendas: regenera la referencia congelada de C5
 ```
+
+**2026-11-08 (VS-o):** `woodArmerEstacion` sale de `src/compilador/esfuerzosBandas.ts` a `validacion/c5/woodArmerBandas.ts`. La app ya no usa las bandas (fase F) y con el sismo del programa daba Wood–Armer con un solo signo (`viento-sismo.md` §13.4). Allí sólo combina linealmente; la referencia congelada de C5 y las medidas de C5-c (`bandas.ts`, `banco.ts`) dan lo mismo.

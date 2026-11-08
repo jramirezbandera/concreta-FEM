@@ -13,7 +13,7 @@ export { fisicosDeIds, traducirDiagnosticos, type BarraMapeada, type Mapeo, type
 export { TOL_SIN_PERDIDAS } from "./cargas.ts";
 export { EsfuerzosPiezas, type TramoFlexible } from "./resultados.ts";
 export { CARA_COMUN, carasComunes, proponerBandas, type PropuestaBandas } from "./bandas.ts";
-export { EsfuerzosBandas, woodArmerEstacion, DELTA_MUESTRAS, type EstacionResultado, type LineaReparto, type MetodoWoodArmer } from "./esfuerzosBandas.ts";
+export { EsfuerzosBandas, DELTA_MUESTRAS, type EstacionResultado, type LineaReparto } from "./esfuerzosBandas.ts";
 export { estacionesBanda, ejesBanda, type EstacionBanda } from "./estaciones.ts";
 export { EsfuerzosMuros, DELTA_BORDE, type Dintel, type EsfuerzosCorte, type Machon } from "./esfuerzosMuros.ts";
 export {
