@@ -44,7 +44,7 @@ function useFocoDialogo(caja: React.RefObject<HTMLDivElement | null>) {
       if (e.key !== "Tab" || !c) return;
       const abiertos = document.querySelectorAll(".dialogo");
       if (abiertos[abiertos.length - 1] !== c) return;
-      const t = [...c.querySelectorAll<HTMLElement>(ENFOCABLES)].filter((x) => x.offsetParent !== null || x === document.activeElement);
+      const t = [...c.querySelectorAll<HTMLElement>(ENFOCABLES)].filter((x) => (x.offsetParent !== null || x === document.activeElement) && !x.closest("[inert]"));
       if (!t.length) return;
       const [a, z] = [t[0]!, t[t.length - 1]!];
       if (!c.contains(document.activeElement)) {
@@ -79,8 +79,9 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = nu
   const caja = useRef<HTMLDivElement>(null);
   const [preguntando, setPreguntando] = useState(false);
   const intentar = () => (pendiente ? setPreguntando(true) : onCerrar());
+  // Con la pregunta abierta, Esc es «Seguir editando»
   const cerrar = useRef(intentar);
-  cerrar.current = intentar;
+  cerrar.current = preguntando && pendiente ? () => setPreguntando(false) : intentar;
   useFocoDialogo(caja);
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
@@ -97,7 +98,7 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = nu
   return (
     <div ref={fondo} className="dialogo-fondo" onMouseDown={(e) => fondoCierra && e.target === e.currentTarget && intentar()}>
       <div ref={caja} className={clase ? `dialogo ${clase}` : "dialogo"} role="dialog" aria-modal="true" aria-label={titulo}>
-        <div className="dialogo-cab">
+        <div className="dialogo-cab" inert={preguntando && !!pendiente}>
           <h2>{titulo}</h2>
           <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Cerrar (Esc)" onClick={intentar}>
             <X size={16} />
@@ -105,6 +106,7 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = nu
         </div>
         <div
           className="dialogo-cuerpo"
+          inert={preguntando && !!pendiente}
           onKeyDown={(e) => {
             const t = e.target as HTMLElement;
             if (!alConfirmar || e.key !== "Enter" || e.defaultPrevented || e.shiftKey || e.ctrlKey || e.altKey || t.tagName !== "INPUT" || ["button", "submit", "file"].includes((t as HTMLInputElement).type)) return;
@@ -114,18 +116,26 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = nu
         >
           {children}
         </div>
-        {preguntando && pendiente ? (
-          <div className="pie pie-pregunta" role="alertdialog" aria-label="Cambios sin aplicar">
-            <span className="mr-auto text-[13px]">{pendiente} Si cierra, se pierden.</span>
-            <button type="button" className="btn" autoFocus onClick={() => setPreguntando(false)}>
-              Seguir editando
-            </button>
-            <button type="button" className="btn btn-peligro" onClick={onCerrar}>
-              Cerrar sin aplicar
-            </button>
+        <div className="pie" inert={preguntando && !!pendiente}>
+          {pie}
+        </div>
+        {/* UI-30: la pregunta, centrada sobre el diálogo y con su velo (abajo, en el pie, pasaba
+            desapercibida); lo de detrás queda inerte hasta elegir */}
+        {preguntando && pendiente && (
+          <div className="confirma-velo" onMouseDown={(e) => e.target === e.currentTarget && setPreguntando(false)}>
+            <div className="confirma" role="alertdialog" aria-modal="true" aria-labelledby="confirma-titulo" aria-describedby="confirma-texto">
+              <h3 id="confirma-titulo">¿Cerrar sin aplicar los cambios?</h3>
+              <p id="confirma-texto">{pendiente} Si cierra, se pierden.</p>
+              <div className="confirma-pie">
+                <button type="button" className="btn" autoFocus onClick={() => setPreguntando(false)}>
+                  Seguir editando
+                </button>
+                <button type="button" className="btn btn-peligro" onClick={onCerrar}>
+                  Cerrar sin aplicar
+                </button>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="pie">{pie}</div>
         )}
       </div>
     </div>
