@@ -140,3 +140,53 @@ El coste de la fase en ecuaciones es cero (el modelo analítico no cambia). El t
 - El **coeficiente por planta** (θ_i de cada planta en vez del γz global): el A22 §5.2.2(5)B amplifica por planta; CYPECAD, globalmente. Si la sombra enseña plantas blandas (una planta baja diáfana), se mide.
 - El **P-Δ geométrico** (B2) y los **periodos con la rigidez fisurada** (EC8 §4.3.1(7), la mitad de la bruta; NCSE-02 no lo pide).
 - La **reducción de sobrecarga** en P (CYPECAD tampoco la hace).
+
+## 11. Hecho (2026-11-08): SO1–SO4
+
+Implementado el mismo día con las decisiones de §8 tal como se proponían (**pendientes de confirmar por el usuario**: si cambia SO-b o SO-c, es un valor por defecto en `src/compilador/segundoOrden.ts`).
+
+**Lo que hay en el repo:**
+- **Motor** (`src/motor/calcular.ts`, `modelo.ts`): cada caso lleva `cargas` (`CargasCaso`): la resultante de sus fuerzas nodales equivalentes, `F` = [ΣFx, ΣFy, ΣFz] y `zF` = [Σ z·Fx, Σ z·Fy], y `pdelta`, el trabajo P·δ con cada caso del modelo, Σ_v P_v,k·[ux_v, uy_v] (2 números por caso). Los modos también (con sus fuerzas de inercia en los maestros y su forma), y los casos base de los modos lo heredan (`casosModales`). Es un bucle más sobre los nudos por caso; los casos no cambian ni un bit (las referencias congeladas del motor, idénticas). En los resultados guardados va en la cabecera (`CargasCabecera`, con `pdelta` como lista); unos resultados sin ello se recalculan una vez, como con la firma.
+- **El dato:** `acciones.segundoOrden` (`SegundoOrdenEdificio`: `amplificar`, `multiplicadorDesplazamientos`), en los dos esquemas; el multiplicador fuera de (0, 10] es un error de `validar` (`segundo-orden/multiplicador`).
+- **El cálculo** (`src/compilador/segundoOrden.ts`, puro): `calcularSegundoOrden` con las definiciones de §7.1 (z₀, dirección con el sentido del cortante en la base, M_H, M_Pδ,k y C_k por hipótesis; con el sismo, `Superposicion.valor` combina cada suma modo a modo, los desplazamientos por μ); `coeficientes` (Q y γz de una combinación), `amplificar` (la combinación con los factores por su γz y `amplificacion`), `maximos`, `diagnosticosSegundoOrden` e `hipotesisSegundoOrden`.
+- **Consultas:** `combinaciones()` devuelve las del generador ya amplificadas (todas las situaciones, ELU y ELS), `combinacionesGeneradas()` las de primer orden, `coeficientesSegundoOrden(factores)` y `segundoOrden()` (el detalle de `fem consultar segundo-orden`, con los avisos). Todo lo que pide las combinaciones hereda la amplificación: envolventes, ternas pésimas, Wood–Armer de las franjas, flechas, desplomes, reacciones, mapas y el informe. `Combinacion.amplificacion` dice qué se aplicó.
+- **Agente:** `fem consultar segundo-orden [--top N | --todos]` (las combinaciones de mayor Q), `fem calcular` con el máximo por hipótesis y los avisos, la sección «Segundo orden global (P-Δ)» del informe de `fem revisar` (dentro de «Viento y sismo del programa», también con hipótesis horizontales escritas a mano), la hipótesis del cálculo y la skill.
+- **App:** la pestaña «Segundo orden» de la ficha «Viento y sismo» (activar, multiplicador, con sus ayudas y el resumen del modelo aplicado) y la sección en Resultados · Modal, por el pedido `segundo-orden` (`DatosSegundoOrden`).
+
+**Criterios (§9):**
+
+| criterio | estado |
+|---|---|
+| 1 | pasa: `segundoOrden.test.ts`, la resultante y Σ P·u de cada caso y de cada modo a 1e-12 (con cargas nodales, exacto) |
+| 2 | pasa: las referencias congeladas del motor, idénticas |
+| 3 | pasa: `desempaquetarResultados` rechaza los guardados sin `cargas` con su motivo, y la CLI recalcula |
+| 4 | pasa: Q y γz a 1e-10 de la fórmula a mano en cada combinación del generador, y los factores amplificados bit a bit con los demás intactos |
+| 5 | pasa: con `amplificar: false` o sin hipótesis horizontales, las combinaciones son las del generador bit a bit, y el resto de la batería (2 903 pruebas) sin cambios salvo los tres tests que comparaban las combinaciones con el generador (ahora lo hacen con `combinacionesGeneradas()` y comprueban además el γz) |
+| 6 | pasa: Q lineal con la carga gravitatoria y con el multiplicador e invariante con la escala del viento; EX+e, EX−e, EY+e y EY−e con la misma C en el edificio simétrico (1e-6) |
+| 7 | **pasa, mejor de lo pedido:** el oráculo de OpenSeesPy (abajo) |
+| 8 | pasa: la consulta y el informe salen de `Consultas.segundoOrden()`; la skill lo explica |
+| 9 | en vitest (`app/src/test/segundoOrden.test.tsx`: la ficha escribe sólo lo que no es lo de por defecto, lee lo del fichero y rechaza el multiplicador fuera de rango); **el banco de Chrome no se ha pasado** |
+| 10 | **pendiente del usuario:** el listado de CYPECAD del ejemplo 11 con los efectos de 2º orden activados (con el multiplicador 1,00 que trae y con 2) |
+
+**El oráculo externo (criterio 7, `validacion/so/oraculo_pdelta.py`, `src/compilador/oraculo-so.test.ts`):** el edificio de 3 plantas de `validacion/so/modelos.ts` (2 × 2 vanos de 6 m, pilares de 40 × 40, vigas de 30 × 50, cargas como puntuales en los pilares), compilado sin empotramiento parcial y sin áreas de cortante, en OpenSeesPy 3.8 con `elasticBeamColumn`, `-jntOffset`, `rigidDiaphragm` y `geomTransf PDelta`: la gravedad (γ_G = 1,35·g, γ_Q = 1,05·g) y después el viento (1,5·W+) con la rigidez geométrica de los axiles; el efecto del viento con P-Δ entre el lineal, frente al γz del motor con esos factores y el multiplicador 1 (el P-Δ es elástico). El primer orden coincide a 1e-6 (los momentos del viento en la base).
+
+| g | Q | γz del motor | OpenSees: ΣM base P-Δ / lineal | OpenSees: u alto P-Δ / lineal |
+|---|---|---|---|---|
+| 1 | 0,0084 | 1,0085 | 1,0084 | 1,0076 |
+| 2 | 0,0168 | 1,0171 | 1,0169 | 1,0153 |
+| 4 | 0,0336 | 1,0347 | 1,0343 | 1,0310 |
+| 6 | 0,0503 | 1,0530 | 1,0523 | 1,0473 |
+| 12 | 0,1007 | 1,1119 | 1,1101 | 1,0995 |
+| 20 | 0,1678 | 1,2016 | 1,1975 | 1,1782 |
+
+El coeficiente único da la amplificación de los momentos de la base de los pilares a ≤ 0,1 % hasta Q = 0,10 y a +0,3 % con Q = 0,17 (los nueve pilares, entre 1,1954 y 1,1988 frente a 1,2016), y la del desplazamiento de la planta alta queda un 1–2 % por debajo (el P-Δ amplifica más abajo que arriba; el coeficiente único reparte igual). Del lado seguro en lo que dimensiona, y dentro del 3 % del criterio hasta mucho más allá del 0,10 de Q.
+
+**En el ejemplo 11** (`fem consultar segundo-orden`, multiplicador 2): z₀ = 0; el viento, M_H = 907,5 kN·m, C = 0,0256 (PP), 0,0136 (CM) y 0,0092 (Qa), Q máx. 0,067 y γz = 1,072 en ELU-PT; el sismo, M_H = 2 427 kN·m (el cortante combinado, 354 kN), C = 0,0503 / 0,0268 / 0,0181, Q máx. 0,083 y γz = 1,090 en ELU-SIS (la gravedad va con γ = 1 y ψ₂·Q). Menos que la estimación de §6 con γg = 1,4, porque las combinaciones sísmicas no mayoran la gravedad. Ningún aviso de traslacional (γz < 1,10).
+
+**Las referencias congeladas:** la de C5 `pilares-mezclados` tiene viento y sus bandas van con `q.combinaciones()`, así que lleva `amplificar: false` en `validacion/c5/congelar.ts` y sale idéntica; las de F no cambian (su Wood–Armer va con factores escritos). No se ha añadido una referencia `-so` con la amplificación porque el árbol tenía a medias la regeneración de la de F de otra sesión (PB-11); queda para cuando esté limpio.
+
+**Pendiente:**
+- SO5, la sombra con CYPECAD (criterio 10) y el banco de Chrome (criterio 9).
+- Una referencia congelada `-so` con la amplificación (C5 o F).
+- El coeficiente por planta y las cargas nocionales (§10), y la θ de planta con viento en la consulta (hoy sólo la del sismo, NCSE-02 3.8).
+- `fem consultar franja` y las bandas dan ya los valores amplificados sin decirlo: que la CLI y la app digan «×γz» en la etiqueta de las combinaciones del selector.
