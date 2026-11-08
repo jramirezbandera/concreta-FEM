@@ -25,6 +25,16 @@ import { idSeccion, materialPorId, seccionIgual, type UsoSeccion } from "./gesto
 import type { Operacion } from "./operaciones.ts";
 import type { Coleccion, Objeto } from "./referencias.ts";
 
+/**
+ * El tipo de elemento de la obra de una sección nueva, para su material por defecto: de acero, los
+ * perfiles; de hormigón, los pilares o los forjados (vigas y viguetas) según su uso; sin uso, ninguno.
+ */
+export function tipoObraDeSeccion(uso: UsoSeccion | null, familia: Material["tipo"] | null): TipoObra | null {
+  if (familia === "acero") return "perfiles";
+  if (familia !== "hormigon") return null;
+  return uso === "pilar" ? "pilares" : uso === "viga" || uso === "vigueta" ? "forjados" : null;
+}
+
 /** Una pieza que lleva sección: su colección, el objeto y los campos de sección que tiene. */
 type ConSeccion = { coleccion: "pilares" | "vigas" | "barras" | "panos"; o: Objeto };
 

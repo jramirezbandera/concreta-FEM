@@ -44,6 +44,9 @@ import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, plural } from "../fmt.ts";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
+import { tipoObraDeSeccion } from "../../../src/editor/obra.ts";
+import { DatosObra } from "./DatosObra.tsx";
+import { FichaAcciones } from "./FichaAcciones.tsx";
 import { GestorCasos } from "./GestorCasos.tsx";
 import { GestorPlantas } from "./GestorPlantas.tsx";
 import { cerrarGestor, useGestor, type PedidoGestor } from "./referencia.tsx";
@@ -65,6 +68,10 @@ export function GestorAbierto() {
       return <GestorCasos key={n} pedido={pedido} />;
     case "plantas":
       return <GestorPlantas key={n} pedido={pedido} />;
+    case "obra":
+      return <DatosObra key={n} pedido={pedido} />;
+    case "acciones":
+      return <FichaAcciones key={n} pestana={pedido.pestana ?? "viento"} activar={pedido.activar} onCerrar={() => cerrarGestor()} />;
   }
 }
 
@@ -233,7 +240,12 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
   const ed = proyecto.edicion!;
   const m = ed.proyecto.modelo;
   const uso: UsoSeccion | null = pedido.uso ?? null;
-  const nuevaPropuesta = (forma: FormaSeccion = formaPropuesta(uso)): FormSeccion => formDe(seccionPropuesta(forma, uso, materialPropuesto(m, FAMILIA_FORMA[forma])), "");
+  // DO: el material de la obra para ese tipo de pieza, si lo tiene
+  const deObra = (forma: FormaSeccion) => {
+    const t = tipoObraDeSeccion(uso, FAMILIA_FORMA[forma]);
+    return t ? ed.proyecto.obra?.materiales?.[t] : undefined;
+  };
+  const nuevaPropuesta = (forma: FormaSeccion = formaPropuesta(uso)): FormSeccion => formDe(seccionPropuesta(forma, uso, materialPropuesto(m, FAMILIA_FORMA[forma], deObra(forma))), "");
   const inicial = pedido.nueva ? null : (m.secciones.find((s) => s.id === pedido.id) ?? m.secciones[0] ?? null);
   const [elegida, setElegida] = useState<string | null>(inicial?.id ?? null);
   const [form, setForm] = useState<FormSeccion>(() => (inicial ? formDe(sinId(inicial), inicial.id) : nuevaPropuesta()));

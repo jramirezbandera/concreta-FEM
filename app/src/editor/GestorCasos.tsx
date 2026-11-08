@@ -45,7 +45,8 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
   // La nieve de la obra, por la altitud del emplazamiento: el juego la marca y la propone
   const psiObra = nieveObra(m).nieve?.psi ?? null;
   const nieveObraJuego: JuegoCasos["nieve"] = psiObra === "nieve-mas-de-1000" ? "mas-de-1000" : psiObra === "nieve-hasta-1000" ? "hasta-1000" : null;
-  const [juego, setJuego] = useState<JuegoCasos>(() => ({ ...JUEGO_DEFECTO, nieve: nieveObraJuego }));
+  // DO-b: la Q de uso, la del uso de la obra si lo tiene
+  const [juego, setJuego] = useState<JuegoCasos>(() => ({ ...JUEGO_DEFECTO, nieve: nieveObraJuego, uso: ed.proyecto.obra?.uso ?? JUEGO_DEFECTO.uso }));
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [borrar, setBorrar] = useState<string | null>(null);

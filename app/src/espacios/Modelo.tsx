@@ -34,7 +34,7 @@ import { indiceIds } from "../../../src/editor/referencias.ts";
 import { Chip, Desplegable, Disposicion, GrupoPlegable, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { FichaAcciones } from "../editor/FichaAcciones.tsx";
 import { IcNieve, IcSismo, IcViento } from "../armazon/iconos.tsx";
-import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcObra, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { eleccionLista } from "../armazon/eleccionLista.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -63,6 +63,7 @@ import { nuevaPlantilla } from "../../../src/editor/dibujo/plantilla.ts";
 import { importarDxf, nombreLibre, usePlantillasDxf } from "../plantilla/plantillas.ts";
 import { NavPlantillas } from "../plantilla/NavPlantillas.tsx";
 import { abrirGestor } from "../editor/referencia.tsx";
+import { provinciaPorIne } from "../../../src/normas/provincias.ts";
 import { FichaAbacos } from "../editor/FichaAbaco.tsx";
 import { borrarAbacos, esIdAbaco, leerIdAbaco, nombreAbaco, toleranciaAbacos } from "../../../src/editor/abacos.ts";
 
@@ -113,6 +114,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const foto = useSyncExternalStore(ctrl.suscribir, ctrl.instantanea);
   const [plantillasDibujo, setPlantillasDibujo] = useState<Plantillas>({ pilar: {}, viga: {} });
   const modeloEd = ed?.proyecto.modelo ?? null;
+  const obraEd = ed?.proyecto.obra;
   // Por defecto, el primero que no es el del peso propio (que es del programa: lo del usuario va aparte)
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : ((e.casos.find((c) => !c.pesoPropio) ?? e.casos[0])?.id ?? "");
   // Las cargas que se dibujan van al caso activo
@@ -124,7 +126,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const [dxfActiva, setDxfActiva] = useState<string | null>(null);
   const [errorDxf, setErrorDxf] = useState<string | null>(null);
   const ficheroDxf = useRef<HTMLInputElement>(null);
-  const plantillas = useMemo(() => ({ ...plantillasEfectivas(modeloEd, plantillasDibujo, casoDibujo), dxf: { nombre: dxfActiva ?? undefined, lista: listaDxf } }), [modeloEd, plantillasDibujo, casoDibujo, dxfActiva, listaDxf]);
+  const plantillas = useMemo(() => ({ ...plantillasEfectivas(modeloEd, plantillasDibujo, casoDibujo, obraEd), dxf: { nombre: dxfActiva ?? undefined, lista: listaDxf } }), [modeloEd, plantillasDibujo, casoDibujo, obraEd, dxfActiva, listaDxf]);
   const indiceDxf = useMemo(() => (pl: string) => dxf.porPlanta(pl).indice(), [dxf.porPlanta]);
   const editarDibujo = (o: Operacion, etiqueta: string): string | null => {
     if (!ed) return "No hay ningún proyecto que editar.";
@@ -477,6 +479,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {ed && (
         <>
           {/* En el orden en que se mete un edificio: plantas y datos, el plano y los ejes, lo vertical, las vigas, los forjados, los apoyos; después, editar */}
+          <Herramienta icono={IcObra} nombre="Obra" onClick={() => abrirGestor({ coleccion: "obra" })} title="Datos de la obra: nombre, emplazamiento (viento, nieve y sismo), uso del edificio y materiales de lo que se crea" />
           <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirGestor({ coleccion: "plantas", ...(planta ? { planta } : {}) })} title="Añadir plantas encima o debajo de una, viendo cómo quedan las cotas, y la tabla desde él" />
           <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él" />
           <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él" />
@@ -714,7 +717,7 @@ function Proyecto() {
   return (
     <Seccion titulo="Proyecto" valor={e.huella.slice(0, 12)}>
       {ed ? (
-        <DatosProyecto />
+        <ResumenObra />
       ) : (
         <div className="px-3.5 py-2">
           <div className="text-[13px] font-semibold">{e.nombre ?? "Sin nombre"}</div>
@@ -875,36 +878,28 @@ function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => vo
   );
 }
 
-/** Nombre y descripción del proyecto, editables (no entran en la huella). */
-function DatosProyecto() {
+/**
+ * DO-g: el nombre y lo esencial de la obra (el municipio y los materiales), con el acceso a «Datos de
+ * la obra», donde se escriben.
+ */
+function ResumenObra() {
   const { proyecto } = useVisor();
-  const ed = proyecto.edicion!;
-  const p = ed.proyecto;
-  const [nombre, setNombre] = useState<string | null>(null);
-  const [descripcion, setDescripcion] = useState<string | null>(null);
-  // Al salir del campo, recortado; mientras se escribe, tras una pausa y tal cual (UI-26: lo escrito
-  // no llegaba al proyecto, ni se guardaba, hasta salir del campo)
-  const escribir = (final = true) => {
-    const t = (x: string) => (final ? x.trim() : x);
-    const cambio: { nombre?: string; descripcion?: string } = {};
-    if (nombre !== null && t(nombre) !== (p.nombre ?? "")) cambio.nombre = t(nombre);
-    if (descripcion !== null && t(descripcion) !== (p.descripcion ?? "")) cambio.descripcion = t(descripcion);
-    if (Object.keys(cambio).length) ed.editar({ op: "datos", ...cambio }, "Datos del proyecto");
-    if (!final) return;
-    setNombre(null);
-    setDescripcion(null);
-  };
-  const escribirRef = useRef(escribir);
-  escribirRef.current = escribir;
-  useEffect(() => {
-    if (nombre === null && descripcion === null) return;
-    const t = window.setTimeout(() => escribirRef.current(false), 700);
-    return () => window.clearTimeout(t);
-  }, [nombre, descripcion]);
+  const p = proyecto.edicion!.proyecto;
+  const emp = p.modelo.acciones?.emplazamiento;
+  const lugar = emp?.municipio ?? (emp?.provincia ? provinciaPorIne(emp.provincia)?.nombre : undefined);
+  const mats = [...new Set(Object.values(p.obra?.materiales ?? {}))];
   return (
-    <div className="flex flex-col gap-0.5 px-2 pb-2">
-      <input className="sel en-sitio sel-nombre w-full" aria-label="Nombre del proyecto" title={nombre ?? p.nombre ?? undefined} placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={() => escribir()} onKeyDown={(x) => x.key === "Enter" && escribir()} />
-      <textarea className="sel en-sitio sel-descripcion w-full" aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={() => escribir()} />
+    <div className="px-3.5 pb-2">
+      <button type="button" className="block w-full truncate text-left text-[13px] font-semibold hover:underline" title="Datos de la obra" onClick={() => abrirGestor({ coleccion: "obra" })}>
+        {p.nombre || "Sin nombre"}
+      </button>
+      {p.descripcion && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-text-secondary">{p.descripcion}</p>}
+      <p className="mt-0.5 text-[12px] text-text-secondary">
+        {[lugar ?? "sin emplazamiento", p.obra?.uso ? `uso ${p.obra.uso}` : null, mats.length ? mats.join(", ") : null].filter(Boolean).join(" · ")}
+      </p>
+      <button type="button" className="enlace mt-1 text-[12px]" onClick={() => abrirGestor({ coleccion: "obra" })}>
+        Datos de la obra…
+      </button>
     </div>
   );
 }

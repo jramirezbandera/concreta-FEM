@@ -87,6 +87,7 @@ describe("la hoja con varias filas elegidas", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "varias" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     elegirTabla("secciones");

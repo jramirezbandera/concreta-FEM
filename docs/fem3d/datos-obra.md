@@ -1,6 +1,6 @@
 # DO: los datos de la obra en una pantalla (plan)
 
-> **Fecha:** 2026-11-08. **Estado:** decidido por el usuario el 2026-11-08, con las recomendaciones de §6. **DO1 hecho el 2026-11-08** (§7); sigue DO2.
+> **Fecha:** 2026-11-08. **Estado:** decidido por el usuario el 2026-11-08, con las recomendaciones de §6. **DO1 y DO2 hechos el 2026-11-08** (§7 y §8); falta la puerta de uso del usuario (criterio 6).
 >
 > **Origen:** el usuario, con capturas de los «Datos generales» de CYPECAD (2026-11-08): «nosotros todavía no tenemos nada de esto, pero cosas como municipio, nombre proyecto y descripción, e información necesaria de configurar podrían estar en una pantalla inicial como esta, o ver si nos interesa y es más cómodo o no». Lo que se propone: una pantalla con los datos que decide la obra y no el dibujo, que sea el primer paso de una obra nueva y que se pueda abrir después. Sólo lo que cambia el cálculo FEM o lo que hace falta para modelar; lo que es de las comprobaciones se queda para Concreta (§3.7).
 
@@ -164,4 +164,30 @@ Con la recomendación de Claude:
 - **2:** pasa en lo puro (`materialPropuesto`); en el dibujo y en el gestor de secciones, con DO2.
 - **3:** pasa. En las seis referencias y en los cuatro tipos, las piezas de los otros tipos quedan con los mismos materiales efectivos, no queda ninguna del tipo con otro material y deshacer da los bytes; en un modelo hecho a mano, la sección compartida se copia y la propia cambia.
 - **4 a 6:** con DO2.
+
+## 8. DO2 hecho (2026-11-08)
+
+### 8.1 Qué hay
+
+- **`app/src/editor/DatosObra.tsx`**: el diálogo «Datos de la obra» con los bloques de §3.1. Proyecto (nombre, descripción y uso); el emplazamiento con la zona eólica, ab, K y la sk al momento; los materiales por tipo con «Cambiar también las N piezas existentes con otro hormigón» (sin marcar por defecto: se pregunta); acciones, plantas y casos como resúmenes con su acceso; las normas en una línea. «Aplicar» escribe todo en un paso de deshacer («Datos de la obra»).
+- **`app/src/editor/Emplazamiento.tsx`**: `useEmplazamiento` y `CampoEmplazamiento`, sacados de la ficha de acciones, que ahora los usa (DO-d). Al escribir el emplazamiento desde los datos de la obra, el `ine` del sismo y la altitud del viento de un fichero de antes pasan a él, como en la ficha.
+- **El pedido de los gestores** lleva también `"obra"` y `"acciones"` (la ficha, con su pestaña y `activar`), y `volver`: lo que se abre desde los datos de la obra («Configurar…», «Plantas…», «Casos…», «Materiales…», o marcar «Con viento» o «Con sismo», que abre la ficha con él marcado) aplica antes lo escrito y, al cerrarse, vuelve a ellos (`cerrarGestor`).
+- **Obra nueva:** «Proyecto nuevo» abre los datos de la obra en su modo de inicio («Siguiente: plantas» y «Más tarde»; cerrar es «Más tarde») y después el gestor de plantas como antes. `fem visor --nuevo` pasa `&nuevo=1` en la URL, que hace lo mismo y se quita de la barra de direcciones.
+- **Accesos:** «Obra», el primero de la barra de Modelo; el nombre del proyecto en la barra de título (un botón); «Datos de la obra…» en la paleta; y en el navegador, la sección «Proyecto» con el nombre, la descripción, el municipio, el uso y los materiales y su enlace (DO-g: ya no se escriben allí).
+- **El material de la obra, en lo que se crea:** el gestor de secciones lo propone por el uso de la sección (`tipoObraDeSeccion`: pilar, viga o vigueta de hormigón; acero, perfiles), y la plantilla de Forjado y de Muro, por delante del último forjado y del más usado (no de lo escrito en la plantilla).
+- **Casos típicos:** la Q de uso, la del uso de la obra.
+
+### 8.2 Criterios
+
+- **2:** pasa también en la app: con los pilares de la obra en HA-25, la sección nueva de un pilar desde la hoja propone HA-25 (`app/src/test/datosObra.test.tsx`).
+- **4:** pasa. La altitud escrita en la ficha de acciones sale en los datos de la obra, y la escrita aquí, en la ficha; el código es el mismo componente.
+- **5:** pasa en las pruebas de DOM (desde «Mis proyectos»: nombre → datos → plantas; «Más tarde» llega a las plantas sin escribir nada y sin paso de deshacer). Con `fem visor --nuevo`, por el mismo pedido (`?nuevo=1`), sin banco de Chrome: el de AL crea la obra nueva y no toca el diálogo.
+- **6:** la puerta de uso, del usuario.
+
+Las pruebas de DOM que crean una obra nueva (dibujo, editor, gestores, hoja con varias filas, plantilla DXF) pasan antes por «Más tarde». La batería de la app (142) y la del editor y la CLI pasan.
+
+### 8.3 Pendiente
+
+- La puerta de uso.
+- No se ha mirado en el navegador: la disposición del diálogo en pantallas estrechas sale de las clases de la ficha de acciones (`dialogo-ancho`, `acc-form`).
 

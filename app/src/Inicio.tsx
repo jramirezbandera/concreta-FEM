@@ -37,6 +37,13 @@ const ORDEN_EJEMPLOS = ["ejemplo", "vivienda", "muestrario", "nucleo", "1022", "
 
 export async function abrirDesdeUrl(p: ProyectoAbierto): Promise<void> {
   const q = new URLSearchParams(location.search);
+  // DO: `fem visor --nuevo` abre la obra nueva con sus datos y sus plantas, como «Proyecto nuevo»;
+  // el parámetro se quita para que recargar no lo repita
+  if (q.get("nuevo") === "1") {
+    abrirGestor({ coleccion: "obra", inicio: true });
+    q.delete("nuevo");
+    history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}${location.hash}`);
+  }
   const local = q.get("local");
   if (local && hayAlmacen()) {
     const f = await ficha(local).catch(() => null);
@@ -98,8 +105,8 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
     if (nuevo === null || creandoRef.current) return;
     const nombre = nuevo.trim() || "Proyecto nuevo";
     const texto = serializar(proyectoNuevo(nombre));
-    // Lo primero de una obra nueva son sus plantas: el gestor se abre en cuanto el editor lo esté
-    abrirGestor({ coleccion: "plantas", inicio: true });
+    // Lo primero de una obra nueva son sus datos y sus plantas (DO): se abren en cuanto el editor lo esté
+    abrirGestor({ coleccion: "obra", inicio: true });
     if (!almacen) return proyecto.abrirTexto(texto, nombreFichero(nombre));
     creandoRef.current = true;
     setCreando(true);

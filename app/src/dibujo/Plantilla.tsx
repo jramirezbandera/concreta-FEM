@@ -12,6 +12,7 @@ import { Fragment, useMemo, useState, type KeyboardEvent, type ReactNode } from 
 import { comoUna, describirSeccion, type UsoSeccion } from "../../../src/editor/gestores.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
 import type { ModeloFisico, PuntoFijo, Seccion as SeccionFisica } from "../../../src/compilador/fisico.ts";
+import type { ObraProyecto } from "../../../src/agente/obra.ts";
 import type { Seis, Vec3 } from "../../../src/motor/modelo.ts";
 import { medidasSeccion, SIGNOS_PUNTO_FIJO } from "../../../src/compilador/puntoFijo.ts";
 import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
@@ -110,7 +111,7 @@ function materialPorDefecto(m: ModeloFisico, xs: readonly { material: string }[]
  * La plantilla de Forjado con lo que no dice tomado del último forjado de su tipo (o de lo típico). El
  * pp no se hereda: sin él, sale de la sección y del casetón o la bovedilla (`pesoForjado.ts`).
  */
-function forjadoEfectivo(m: ModeloFisico, t: PlantillaForjado): PlantillaForjado {
+function forjadoEfectivo(m: ModeloFisico, t: PlantillaForjado, obra?: ObraProyecto): PlantillaForjado {
   const tipo = t.tipo ?? "maciza";
   const valida = (s: string | undefined) => (s && m.secciones.some((x) => x.id === s) ? s : undefined);
   const materialValido = (s: string | undefined) => (s && m.materiales.some((x) => x.id === s) ? s : undefined);
@@ -120,24 +121,26 @@ function forjadoEfectivo(m: ModeloFisico, t: PlantillaForjado): PlantillaForjado
   }
   const losas = (m.losas ?? []).filter((l) => !!l.reticular === (tipo === "reticular"));
   const u = losas.at(-1);
-  const material = materialValido(t.material) ?? materialValido(u?.material) ?? materialPorDefecto(m, m.losas ?? []);
+  // DO: el de la obra manda sobre el del último forjado y el más usado (no sobre el de la plantilla)
+  const material = materialValido(t.material) ?? materialValido(obra?.materiales?.forjados) ?? materialValido(u?.material) ?? materialPorDefecto(m, m.losas ?? []);
   if (tipo === "maciza") return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.25, material };
   const r = u?.reticular;
   return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.3, material, intereje: t.intereje ?? r?.intereje ?? 0.8, nervio: t.nervio ?? r?.nervio ?? 0.12, capa: t.capa ?? r?.capa ?? 0.05, caseton: t.caseton ?? r?.caseton };
 }
 
 /** La plantilla con lo de por defecto donde no hay nada válido; `caso`, el activo de la barra de Cargas. */
-export function plantillasEfectivas(m: ModeloFisico | null, t: Plantillas, caso?: string): Plantillas {
+export function plantillasEfectivas(m: ModeloFisico | null, t: Plantillas, caso?: string, obra?: ObraProyecto): Plantillas {
   if (!m) return t;
   const valida = (s: string | undefined) => (s && m.secciones.some((x) => x.id === s) ? s : undefined);
   const muro = m.muros?.at(-1);
-  const materialMuro = t.muro?.material && m.materiales.some((x) => x.id === t.muro!.material) ? t.muro.material : materialPorDefecto(m, m.muros ?? []);
+  const deObra = obra?.materiales?.muros;
+  const materialMuro = t.muro?.material && m.materiales.some((x) => x.id === t.muro!.material) ? t.muro.material : deObra && m.materiales.some((x) => x.id === deObra) ? deObra : materialPorDefecto(m, m.muros ?? []);
   return {
     ...t,
     pilar: { ...t.pilar, seccion: valida(t.pilar.seccion) ?? seccionPorDefecto(m, "pilares") },
     viga: { ...t.viga, seccion: valida(t.viga.seccion) ?? seccionPorDefecto(m, "vigas") },
     barraNiveles: { ...t.barraNiveles, seccion: valida(t.barraNiveles?.seccion) ?? seccionBarra(m), fin: t.barraNiveles?.fin && m.plantas.some((x) => x.id === t.barraNiveles!.fin) ? t.barraNiveles.fin : undefined },
-    forjado: forjadoEfectivo(m, t.forjado ?? {}),
+    forjado: forjadoEfectivo(m, t.forjado ?? {}, obra),
     hueco: { ...t.hueco, z0: t.hueco?.z0 ?? HUECO_MURO.z0, z1: t.hueco?.z1 ?? HUECO_MURO.z1 },
     muro: { ...t.muro, espesor: t.muro?.espesor ?? muro?.espesor ?? 0.25, material: materialMuro },
     apoyo: { coartados: t.apoyo?.coartados ?? COARTADOS.empotrado },

@@ -15,7 +15,8 @@ import type { NombreTabla } from "../../../src/editor/tablas.ts";
 export type ColeccionGestor = "secciones" | "materiales" | "casos" | "plantas";
 
 export interface PedidoGestor {
-  coleccion: ColeccionGestor;
+  /** DO: también «Datos de la obra» y la ficha de acciones, que van por el mismo pedido. */
+  coleccion: ColeccionGestor | "obra" | "acciones";
   /** Abrir con ésta elegida («Editar…»). */
   id?: string;
   /** Abrir en «Nueva». */
@@ -30,6 +31,11 @@ export interface PedidoGestor {
   inicio?: boolean;
   /** Lo que se rellena: «la sección de P3», «la plantilla de Pilar». */
   para?: string;
+  /** La ficha de acciones: la pestaña, y con `activar`, con el viento o el sismo ya marcado. */
+  pestana?: "viento" | "nieve" | "sismo";
+  activar?: boolean;
+  /** DO: el pedido al que se vuelve al cerrar (desde «Datos de la obra», ella). */
+  volver?: PedidoGestor;
   /** Desde un campo: con lo elegido o creado; devuelve el error o null (y entonces se cierra). */
   alElegir?: (id: string, crear: readonly Operacion[]) => string | null;
 }
@@ -44,7 +50,10 @@ export function abrirGestor(p: PedidoGestor): void {
   avisar();
 }
 
+/** Cierra el gestor abierto; si se abrió desde otro (`volver`), vuelve a él. */
 export function cerrarGestor(): void {
+  const volver = actual.pedido?.volver;
+  if (volver) return abrirGestor(volver);
   actual = { pedido: null, n: actual.n };
   avisar();
 }

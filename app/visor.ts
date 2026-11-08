@@ -63,5 +63,5 @@ const servidor = await createServer({
 });
 await servidor.listen();
 const puerto = (servidor.httpServer?.address() as { port: number } | null)?.port ?? 5180;
-const url = `http://127.0.0.1:${puerto}/?proyecto=${encodeURIComponent(`/proyecto/${basename(ruta)}`)}`;
+const url = `http://127.0.0.1:${puerto}/?proyecto=${encodeURIComponent(`/proyecto/${basename(ruta)}`)}${nuevo ? "&nuevo=1" : ""}`;
 console.log(`Visor de ${ruta}\n  ${url}\n(Ctrl+C para cerrarlo)`);

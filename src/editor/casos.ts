@@ -24,7 +24,8 @@ export interface CasoTipico {
   caso: CasoFisico;
 }
 
-const USOS: readonly [CategoriaUso, string][] = [
+/** Las categorías de uso con un nombre corto (también para «Datos de la obra»). */
+export const USOS: readonly [CategoriaUso, string][] = [
   ["A", "residencial"],
   ["B", "administrativo"],
   ["C", "público"],

@@ -105,6 +105,14 @@ export const IcAPlantas = icono(
     <path d="M3 13l9 5 9-5" />
   </>,
 );
+/** Obra: un edificio con su chincheta de emplazamiento (los datos de la obra, DO). */
+export const IcObra = icono(
+  <>
+    <path d="M4 21V9l6-4v16M10 21V11h7v10M3 21h18" />
+    <path d="M13 14h1M13 17h1" />
+    <path d="M18 3.5a2 2 0 0 1 2 2c0 1.6-2 3.5-2 3.5s-2-1.9-2-3.5a2 2 0 0 1 2-2z" strokeWidth={1.2} />
+  </>,
+);
 /** Plantas: tres niveles en alzado con los pilares que los cruzan (no una hamburguesa, UI-52). */
 export const IcPlantas = icono(
   <>

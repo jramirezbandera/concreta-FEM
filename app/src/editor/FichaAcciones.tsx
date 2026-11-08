@@ -16,12 +16,11 @@
  * paso de deshacer (operación `acciones`); el `ine` y la `altitud` que los ficheros de antes llevan en
  * el sismo o en el viento pasan al emplazamiento. Los textos no nombran programas comerciales.
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AccionesEdificio, EmplazamientoEdificio, NieveEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
+import { useEffect, useMemo, useState } from "react";
+import type { AccionesEdificio, NieveEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
 import { leerNumero } from "../../../src/editor/celdas.ts";
 import { ASPEREZAS, ORDEN_ASPEREZAS, ZONAS_EOLICAS, type GradoAspereza, type ZonaEolica } from "../../../src/normas/cteViento.ts";
-import { buscarMunicipios, municipioPorIne, textoProcedencia, type Municipio } from "../../../src/normas/peligrosidad.ts";
-import { PROVINCIAS, provinciaPorIne } from "../../../src/normas/provincias.ts";
+import { provinciaPorIne } from "../../../src/normas/provincias.ts";
 import { SISTEMAS_ESTRUCTURALES, type SistemaEstructural } from "../../../src/normas/ncse02.ts";
 import { ZONAS_INVERNALES, type ExposicionNieve, type ZonaInvernal } from "../../../src/normas/cteNieve.ts";
 import { esCapitalDeProvincia } from "../../../src/normas/provincias.ts";
@@ -29,11 +28,12 @@ import { nieveObra } from "../../../src/compilador/nieve.ts";
 import { propuestaCasoNieve } from "../../../src/editor/casos.ts";
 import { comoUna } from "../../../src/editor/gestores.ts";
 import type { DatosSismo, DatosViento } from "../../../src/visor/programa.ts";
-import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
+import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Dialogo } from "./Dialogos.tsx";
+import { CampoEmplazamiento, Etiqueta, useEmplazamiento } from "./Emplazamiento.tsx";
 import { Espectro } from "./Espectro.tsx";
 
 const NOMBRE_SISTEMA: Record<SistemaEstructural, string> = {
@@ -54,11 +54,6 @@ const DUCTILIDAD: Record<number, string> = { 1: "sin ductilidad", 2: "baja", 3: 
 
 /** Lo que dice el «?» de cada campo. */
 const AYUDA = {
-  provincia:
-    "Decide la zona eólica del viento: la de su capital en la figura D.1 del DB SE-AE. La figura es un mapa y sus líneas cruzan provincias: si la obra cae al otro lado, se fuerza la zona en la pestaña Viento.",
-  municipio:
-    "De él salen la aceleración sísmica básica ab y el coeficiente de contribución K del sismo (Anejo 1 de la NCSE-02). El Anejo 1 sólo lista los municipios con ab ≥ 0,04 g: si el suyo no figura puede estar exento (art. 1.2.3), pero también ser una errata o un municipio segregado después de 2002. Compruébelo: puede guardarlo sólo con su nombre y escribir ab y K en Sismo.",
-  altitud: "Altitud topográfica de la obra sobre el nivel del mar, en m. El DB SE-AE no es aplicable al viento por encima de 2 000 m (art. 3.3.1-2).",
   zona: "Zona de la figura D.1 del DB SE-AE: A (vb = 26 m/s, qb = 0,42 kN/m²), B (27 m/s, 0,45) o C (29 m/s, 0,52). Por defecto, la de la provincia del emplazamiento; fuércela si la obra está al otro lado de una línea del mapa.",
   qb: "Presión dinámica del viento, qb = 0,5·δ·vb². La de la zona es el valor preciso del Anejo D; el DB admite 0,5 kN/m² en cualquier punto (art. 3.3.2-1), del lado de la seguridad en las zonas A y B y por debajo en la C. Escrita, para un estudio de viento o un dato empírico.",
   aspereza:
@@ -98,17 +93,7 @@ type Pestana = "viento" | "nieve" | "sismo";
 type OrigenSk = "auto" | "capital" | "e2" | "escrita";
 type ModoQb = "zona" | "simplificado" | "escrita";
 
-/** Etiqueta de una fila del formulario, con su «?». */
-function Etiqueta({ htmlFor, children, ayuda }: { htmlFor: string; children: ReactNode; ayuda?: string }) {
-  return (
-    <span className="acc-etq">
-      <label htmlFor={htmlFor}>{children}</label>
-      {ayuda && <Ayuda texto={ayuda} />}
-    </span>
-  );
-}
-
-export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCerrar: (hecho?: string) => void; pestana?: Pestana }) {
+export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar = false }: { onCerrar: (hecho?: string) => void; pestana?: Pestana; activar?: boolean }) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion!;
   const a = ed.proyecto.modelo.acciones ?? {};
@@ -116,27 +101,13 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
   const [error, setError] = useState<string | null>(null);
 
   // Emplazamiento: el de las acciones o, en un fichero de antes, el municipio del sismo y la altitud del viento
+  const emp = useEmplazamiento(a);
+  const { municipio, prov, nombreLibre } = emp;
   const e0 = a.emplazamiento;
   const ine0 = e0?.ine ?? a.sismo?.ine ?? "";
-  const [ine, setIne] = useState(ine0);
-  const [provincia, setProvincia] = useState(e0?.provincia ?? (ine0 ? ine0.slice(0, 2) : ""));
-  const [nombreLibre, setNombreLibre] = useState(!e0?.ine && e0?.municipio ? e0.municipio : "");
-  const [busqueda, setBusqueda] = useState("");
-  const [altitud, setAltitud] = useState(texto(e0?.altitud ?? a.viento?.altitud));
-
-  const municipio = useMemo(() => (/^\d{5}$/.test(ine) ? municipioPorIne(ine) : null), [ine]);
-  const prov = provincia ? provinciaPorIne(provincia) : undefined;
-  // Los de la provincia elegida primero; los de otras, detrás (si la provincia está mal, que se vea)
-  const { candidatos, deOtras } = useMemo(() => {
-    if (busqueda.trim().length < 2) return { candidatos: [], deOtras: [] };
-    const todos = buscarMunicipios(busqueda, 400);
-    if (!provincia) return { candidatos: todos.slice(0, 12), deOtras: [] };
-    const aqui = todos.filter((m) => m.ine.startsWith(provincia)).slice(0, 12);
-    return { candidatos: aqui, deOtras: todos.filter((m) => !m.ine.startsWith(provincia)).slice(0, Math.max(4, 12 - aqui.length)) };
-  }, [busqueda, provincia]);
 
   // Viento: con el interruptor apagado no hay viento del programa
-  const [conViento, setConViento] = useState(a.viento !== undefined);
+  const [conViento, setConViento] = useState(a.viento !== undefined || (activar && inicial === "viento"));
   const zonaInicial = a.viento?.zona && a.viento.zona !== (provinciaPorIne(e0?.provincia ?? ine0)?.zonaEolica ?? "") ? a.viento.zona : "";
   const [zonaForzada, setZonaForzada] = useState<ZonaEolica | "">(zonaInicial);
   const qb0 = a.viento?.qb;
@@ -147,7 +118,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
   const zona: ZonaEolica | undefined = zonaForzada || prov?.zonaEolica;
 
   // Sismo
-  const [conSismo, setConSismo] = useState(a.sismo !== undefined);
+  const [conSismo, setConSismo] = useState(a.sismo !== undefined || (activar && inicial === "sismo"));
   const [ab, setAb] = useState(texto(a.sismo?.ab));
   const [K, setK] = useState(texto(a.sismo?.K));
   const t0 = a.sismo?.terreno;
@@ -173,18 +144,8 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
   /** Lo que se escribirá, o por qué no. */
   const acciones = useMemo((): { valor: AccionesEdificio | null } | { error: string } => {
     const r: AccionesEdificio = {};
-    const emp: EmplazamientoEdificio = {};
-    if (municipio) {
-      emp.ine = municipio.ine;
-      emp.municipio = municipio.nombre;
-    } else {
-      if (provincia) emp.provincia = provincia;
-      if (nombreLibre.trim()) emp.municipio = nombreLibre.trim();
-    }
-    const nAlt = numeroOpcional(altitud);
-    if (typeof nAlt === "string") return { error: `La altitud: ${nAlt}.` };
-    if (nAlt !== undefined) emp.altitud = nAlt;
-    if (Object.keys(emp).length) r.emplazamiento = emp;
+    if ("error" in emp.valor) return { error: emp.valor.error };
+    if (emp.valor.valor) r.emplazamiento = emp.valor.valor;
 
     if (conViento) {
       const v: VientoEdificio = { aspereza };
@@ -253,7 +214,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
     if (exposicion !== "normal") nv.exposicion = exposicion;
     if (Object.keys(nv).length) r.nieve = nv;
     return { valor: r.viento || r.sismo || r.emplazamiento || r.nieve ? r : null };
-  }, [municipio, provincia, nombreLibre, altitud, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, zonaInv, origenSk, skEscrita, exposicion]);
+  }, [emp.valor, municipio, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, zonaInv, origenSk, skEscrita, exposicion]);
 
   // Lo que sale en el modelo aplicado (la sesión del worker tiene el proyecto guardado): lo escrito se ve al aplicar
   const viento = usePedido(proyecto.cliente, { tipo: "viento" });
@@ -283,21 +244,6 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
 
   useEffect(() => setError(null), [acciones]);
 
-  const elegirMunicipio = (m: Municipio) => {
-    setIne(m.ine);
-    setProvincia(m.ine.slice(0, 2));
-    setNombreLibre("");
-    setBusqueda("");
-  };
-  const cambiarProvincia = (p: string) => {
-    setProvincia(p);
-    if (ine && ine.slice(0, 2) !== p) setIne("");
-  };
-  const quitarMunicipio = () => {
-    setIne("");
-    setNombreLibre("");
-  };
-
   return (
     <Dialogo
       titulo="Viento, nieve y sismo"
@@ -318,94 +264,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento" }: { onCer
         </>
       }
     >
-      <fieldset className="acc-grupo">
-        <legend>Emplazamiento · común al viento, la nieve y el sismo</legend>
-        <div className="acc-form">
-          <Etiqueta htmlFor="e-prov" ayuda={AYUDA.provincia}>
-            Provincia
-          </Etiqueta>
-          <select id="e-prov" className="sel" value={provincia} onChange={(e) => cambiarProvincia(e.target.value)}>
-            <option value="">Elija la provincia</option>
-            {[...PROVINCIAS]
-              .sort((x, y) => x.nombre.localeCompare(y.nombre, "es"))
-              .map((p) => (
-                <option key={p.ine} value={p.ine}>
-                  {p.nombre}
-                </option>
-              ))}
-          </select>
-          <Etiqueta htmlFor="e-mun" ayuda={AYUDA.municipio}>
-            Municipio
-          </Etiqueta>
-          <div>
-            {municipio || nombreLibre ? (
-              <p className="acc-elegido">
-                {municipio ? (
-                  <>
-                    <b>{municipio.nombre}</b> <span className="text-text-secondary">({municipio.provincia}, INE {municipio.ine})</span>
-                  </>
-                ) : (
-                  <>
-                    <b>{nombreLibre}</b> <span className="text-text-secondary">· no figura en el Anejo 1</span>
-                  </>
-                )}
-                <button type="button" className="enlace ml-auto" onClick={quitarMunicipio}>
-                  Cambiar
-                </button>
-              </p>
-            ) : (
-              <>
-                <input id="e-mun" className="sel w-full" value={busqueda} autoComplete="off" placeholder={prov ? `Escriba el nombre de un municipio de ${prov.nombre}` : "Escriba el nombre y elija uno de la lista"} onChange={(e) => setBusqueda(e.target.value)} aria-label="Buscar municipio" />
-                {candidatos.length + deOtras.length > 0 && (
-                  <ul className="lista-candidatos" role="listbox" aria-label="Municipios del Anejo 1">
-                    {[...candidatos, ...deOtras].map((m, i) => (
-                      <li key={m.ine}>
-                        {provincia && i === candidatos.length && <p className="acc-separador">En otras provincias</p>}
-                        <button type="button" role="option" aria-selected={false} className="w-full text-left" onClick={() => elegirMunicipio(m)}>
-                          {m.nombre} <span className="text-text-secondary">({m.provincia}, INE {m.ine})</span> · ab = {fmt(m.ab, 2)} g, K = {fmt(m.K, 1)}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {busqueda.trim().length >= 2 && !candidatos.length && (
-                  <div className="nota acc-nota">
-                    <p>
-                      «{busqueda.trim()}» no figura en el Anejo 1{prov ? ` en ${prov.nombre}` : ""}. Puede estar por debajo de 0,04 g (exento, art. 1.2.3), ser una errata del nombre o un municipio creado después de 2002. Compruébelo antes de darlo por exento.
-                    </p>
-                    {prov ? (
-                      <button type="button" className="enlace" onClick={() => (setNombreLibre(busqueda.trim()), setBusqueda(""))}>
-                        Guardarlo sólo con su nombre (el sismo necesitará ab y K escritos)
-                      </button>
-                    ) : (
-                      <p>Elija antes la provincia para guardarlo sólo con su nombre.</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          <Etiqueta htmlFor="e-alt" ayuda={AYUDA.altitud}>
-            Altitud
-          </Etiqueta>
-          <span className="flex items-center gap-2">
-            <input id="e-alt" className="sel mono w-[7rem]" value={altitud} inputMode="decimal" placeholder="—" onChange={(e) => setAltitud(e.target.value)} />
-            <span className="text-text-secondary">m sobre el nivel del mar</span>
-          </span>
-        </div>
-        <dl className="acc-derivados">
-          <div>
-            <dt>Zona eólica</dt>
-            <dd>{prov ? `${prov.zonaEolica} · qb = ${fmt(ZONAS_EOLICAS[prov.zonaEolica].qb, 2)} kN/m²` : "— (falta la provincia)"}</dd>
-          </div>
-          <div>
-            <dt>Sismo</dt>
-            <dd>{municipio ? `ab = ${fmt(municipio.ab, 2)} g · K = ${fmt(municipio.K, 1)}` : nombreLibre ? "fuera del Anejo 1: ab y K escritos" : "— (falta el municipio)"}</dd>
-          </div>
-          {municipio && <p className="acc-fuente">ab y K: {textoProcedencia(municipio.procedencia)}.</p>}
-          {prov?.frontera && <p className="acc-fuente text-state-warn">Zona eólica: {prov.frontera.eolica}</p>}
-        </dl>
-      </fieldset>
+      <CampoEmplazamiento e={emp} />
 
       <div role="tablist" className="mb-3 mt-4 flex gap-1 border-b border-border-main">
         {(["viento", "nieve", "sismo"] as const).map((p) => (

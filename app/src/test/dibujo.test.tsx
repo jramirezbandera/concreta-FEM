@@ -68,6 +68,7 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     const pilar = screen.getByRole("button", { name: "Pilar" });
@@ -150,6 +151,7 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     // Forjado: recuadro y maciza por defecto, con el material del proyecto; reticular, 25+5 y el pp que sale solo (obligatorio con un casetón de otro material)
@@ -231,6 +233,7 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     const celda = () => document.querySelector<HTMLElement>(".celda")!;

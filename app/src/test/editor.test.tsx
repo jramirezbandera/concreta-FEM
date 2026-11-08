@@ -284,6 +284,7 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
     // I1: la paleta de órdenes (Ctrl+K) lleva a las tablas
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
@@ -412,6 +413,7 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     elegirTabla("secciones");

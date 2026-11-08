@@ -302,6 +302,7 @@ export function App() {
     for (const p of e?.plantas ?? []) r.push({ id: `planta-${p.id}`, grupo: "Planta", nombre: `${p.id} ${cota(p.cota)}${p.nombre ? ` · ${p.nombre}` : ""}`, hacer: () => setPlanta(p.id) });
     if (ed) for (const t of TABLAS) r.push({ id: `tabla-${t}`, grupo: "Tabla", nombre: DEF_TABLAS[t].titulo, hacer: () => pedirTabla(t) });
     if (ed) {
+      r.push({ id: "datos-obra", grupo: "Modelo", nombre: "Datos de la obra… (nombre, emplazamiento, uso y materiales)", claves: "datos generales municipio", hacer: () => abrirGestor({ coleccion: "obra" }) });
       r.push({ id: "gestor-secciones", grupo: "Modelo", nombre: "Secciones… (gestor)", hacer: () => abrirGestor({ coleccion: "secciones" }) });
       r.push({ id: "gestor-nueva-seccion", grupo: "Modelo", nombre: "Nueva sección…", hacer: () => abrirGestor({ coleccion: "secciones", nueva: true }) });
       r.push({ id: "gestor-materiales", grupo: "Modelo", nombre: "Materiales… (gestor)", hacer: () => abrirGestor({ coleccion: "materiales" }) });
@@ -395,9 +396,15 @@ export function App() {
               <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-[18px] w-[18px]" aria-hidden="true" />
               Concreta
             </span>
-            <span className="nombre-proyecto min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={nombreProyecto || undefined}>
-              {nombreProyecto}
-            </span>
+            {ed ? (
+              <button type="button" className="nombre-proyecto min-w-0 max-w-[340px] shrink truncate rounded px-1 text-[13px] text-text-primary hover:bg-bg-surface" title={`${nombreProyecto ? `${nombreProyecto} · ` : ""}Datos de la obra`} onClick={() => abrirGestor({ coleccion: "obra" })}>
+                {nombreProyecto || "Sin nombre"}
+              </button>
+            ) : (
+              <span className="nombre-proyecto min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={nombreProyecto || undefined}>
+                {nombreProyecto}
+              </span>
+            )}
             <nav className="espacios" aria-label="Espacios de trabajo">
               {ESPACIOS.map((x) => (
                 <button key={x.id} type="button" aria-current={espacioValido === x.id ? "page" : undefined} disabled={x.calculo && !e?.calculado && espacioValido !== x.id} title={x.calculo && !e?.calculado ? "Necesita el cálculo" : undefined} onClick={() => irA(x.id)}>

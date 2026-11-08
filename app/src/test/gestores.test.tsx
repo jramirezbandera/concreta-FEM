@@ -59,7 +59,7 @@ beforeAll(async () => {
   (globalThis as unknown as { __motor: string }).__motor = sha256(new Uint8Array(wasm));
 }, 120_000);
 
-/** Una obra nueva abre el gestor de plantas; con `abierto`, se queda abierto. */
+/** Una obra nueva abre sus datos y, tras «Más tarde», el gestor de plantas; con `abierto`, se queda abierto. */
 async function proyectoNuevo(nombre: string, abierto = false) {
   render(
     <ThemeProvider>
@@ -70,6 +70,8 @@ async function proyectoNuevo(nombre: string, abierto = false) {
   fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: nombre } });
   fireEvent.click(screen.getByRole("button", { name: "Crear" }));
   await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+  // DO: primero los datos de la obra; «Más tarde» lleva a las plantas
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
   if (!abierto) fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 }
 
