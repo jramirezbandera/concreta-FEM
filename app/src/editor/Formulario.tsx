@@ -36,7 +36,7 @@ const AVANZADAS = "Opciones avanzadas";
 const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly string[]])[]>> = {
   forjados: [
     ["General", ["id", "nombre", "planta", "tipo"]],
-    ["Geometría en planta", ["contorno", "huecos", "abacos", "abacosPilares", "direccion"]],
+    ["Geometría en planta", ["contorno", "huecos", "abacos", "abacosPilares", "direccion", "paso"]],
     ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion", "bovedilla"]],
     ["Material y peso", ["material", "pp", "relleno", "procedencia"]],
     ["Rigidez del aligerado", ["multiplicadores"]],

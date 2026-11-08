@@ -623,7 +623,16 @@ function abacosPilaresFila(L: Lector, f: Fila): AbacosPilares | undefined {
   return undefined;
 }
 
-const DEL_RETICULAR = ["nervio", "capa", "caseton", "abacos", "abacosPilares", "multiplicadores"] as const;
+/** El punto de paso de los nervios: un solo punto «x y». */
+function puntoPasoFila(L: Lector): Vec2 | undefined {
+  const ps = L.puntos("paso", { min: 1 });
+  if (!ps) return undefined;
+  if (ps.length === 1) return ps[0];
+  L.errores.push({ columna: "paso", mensaje: "un solo punto «x y»" });
+  return undefined;
+}
+
+const DEL_RETICULAR = ["nervio", "capa", "paso", "caseton", "abacos", "abacosPilares", "multiplicadores"] as const;
 
 /** Las columnas propias de cada tipo; las demás (id, planta, contorno, pp, dirección…) son de todos. */
 const PROPIAS: Readonly<Record<TipoForjado, readonly string[]>> = {
@@ -809,6 +818,7 @@ const forjados: DefTabla = {
     { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: entre ejes de nervios; unidireccional: entre ejes de viguetas; vacío en una maciza" },
     { clave: "nervio", titulo: "nervio", unidad: "m", ayuda: "reticular: ancho del nervio (bw)" },
     { clave: "capa", titulo: "capa", unidad: "m", ayuda: "reticular: espesor de la capa de compresión (hf)" },
+    { clave: "paso", titulo: "punto de paso", unidad: "m", ayuda: "reticular: un punto «x y» por el que pasan los ejes de un nervio de cada dirección. Vacío, la retícula va centrada en el forjado. En la planta, con el forjado elegido, se mueve arrastrando el círculo con cruz de su cruce de nervios. Sólo cambia dónde se dibujan los nervios y los casetones y adónde redondean los ábacos según las luces, no el cálculo", defecto: (f) => (tipoFila(f) === "reticular" ? "centrado" : undefined) },
     { clave: "caseton", titulo: "casetón", ayuda: "reticular: de qué es el casetón, para el peso propio. Perdido de hormigón (por defecto), cerámico o de poliestireno, recuperable o perdido de otro material (entonces se escribe el pp)", opciones: opcionesCaseton },
     { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado. Los que se tocan o quedan a menos de media malla se unen en su rectángulo", defecto: () => "ninguno" },
     { clave: "abacosPilares", titulo: "ábacos en pilares", unidad: "m", ayuda: "reticular: un ábaco centrado en cada pilar que llega al forjado, «2» (cuadrado) o «2 x 1,6» (según los nervios por la perpendicular); siguen a los pilares y se unen si se tocan", defecto: () => "ninguno" },
@@ -851,6 +861,7 @@ const forjados: DefTabla = {
         intereje: n(p.intereje),
         nervio: "",
         capa: "",
+        paso: "",
         caseton: "",
         abacos: "",
         abacosPilares: "",
@@ -877,6 +888,7 @@ const forjados: DefTabla = {
       intereje: n(r?.intereje),
       nervio: n(r?.nervio),
       capa: n(r?.capa),
+      paso: r?.paso ? textoPuntos([r.paso]) : "",
       caseton: s(r?.caseton),
       abacos: r?.abacos?.length ? textoPoligonos(r.abacos) : "",
       abacosPilares: textoAbacosPilares(r?.abacosPilares),
@@ -928,6 +940,7 @@ const forjados: DefTabla = {
         intereje: L.longitud("intereje", { obligatorio: true, max: LONGITUD_MAXIMA.intereje }),
         nervio: L.longitud("nervio", { obligatorio: true, max: LONGITUD_MAXIMA.nervio }),
         capa: L.longitud("capa", { obligatorio: true, max: LONGITUD_MAXIMA.nervio }),
+        paso: puntoPasoFila(L),
         caseton: L.opcion("caseton", CASETONES),
         abacos: L.poligonos("abacos"),
         abacosPilares: abacosPilaresFila(L, f),

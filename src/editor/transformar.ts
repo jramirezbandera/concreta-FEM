@@ -33,14 +33,14 @@
  */
 import { huellaSeccion, PlantaFisica } from "../agente/render/modelo.ts";
 import { direccionEjes, ejesDe, letraEje } from "../compilador/ejes.ts";
-import type { ApoyoFisico, Barra, CargaFisica, ModeloFisico, Pilar, PuntoFijo, Vec2, Viga } from "../compilador/fisico.ts";
+import type { ApoyoFisico, Barra, CargaFisica, Losa, ModeloFisico, Pilar, PuntoFijo, Vec2, Viga } from "../compilador/fisico.ts";
 import { distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
 import { limpio } from "./dibujo/cotas.ts";
 import { reestacionar } from "./estaciones.ts";
 import { moverPilar } from "./estirar.ts";
 import type { Operacion } from "./operaciones.ts";
-import { TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
+import { puntoPasoNervios, TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
 import { asasAbaco, cambiarAbacos, leerIdAbaco, moverAsaAbaco, type ResultadoAbacos } from "./abacos.ts";
 import { conValor, indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 import { idCarga, idNuevo } from "./tablas.ts";
@@ -363,8 +363,8 @@ function transformado(m: ModeloFisico, tr: Transformador, c: Coleccion, o: Objet
       const r: Record<string, unknown> = { ...o, contorno: linea(o.contorno as Vec2[]) };
       const huecos = anillos(o.huecos as Vec2[][] | undefined);
       if (huecos) r.huecos = huecos;
-      const ret = o.reticular as { abacos?: Vec2[][] } | undefined;
-      if (ret?.abacos) r.reticular = { ...ret, abacos: anillos(ret.abacos) };
+      const ret = o.reticular as { abacos?: Vec2[][]; paso?: Vec2 } | undefined;
+      if (ret?.abacos || ret?.paso) r.reticular = { ...ret, ...(ret.abacos ? { abacos: anillos(ret.abacos) } : {}), ...(ret.paso ? { paso: tr.punto(ret.paso) } : {}) };
       if (gira) {
         const e = direccion(o.eje1 as number | undefined);
         delete r.eje1;
@@ -611,7 +611,7 @@ function copiar(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Ob
 export interface Asa {
   id: string;
   coleccion: Coleccion;
-  /** La ruta del punto en el objeto: ["x"] (pilar, apoyo, puntual), ["puntos", i], ["contorno", i], ["huecos", j, i], ["reticular", "abacos", j, i], ["zona", i], ["desde"], ["hasta"]. */
+  /** La ruta del punto en el objeto: ["x"] (pilar, apoyo, puntual), ["puntos", i], ["contorno", i], ["huecos", j, i], ["reticular", "paso"] (el punto de paso de los nervios), ["abaco", tipo, k], ["zona", i], ["desde"], ["hasta"]. */
   ruta: readonly (string | number)[];
   p: Vec2;
 }
@@ -661,7 +661,12 @@ export function asas(m: ModeloFisico, ids: readonly string[], planta: string): A
         if (!enPlanta) break;
         linea("contorno", o.contorno as Vec2[]);
         anillos("huecos", o.huecos as Vec2[][] | undefined);
-        // AC: los ábacos, no: se eligen solos
+        // AC: los ábacos, no: se eligen solos. El punto de paso de los nervios de un reticular (el dado
+        // o, sin él, el cruce de la retícula centrada más cercano al centro), para moverla
+        if (c === "losas") {
+          const p = puntoPasoNervios(o as unknown as Losa);
+          if (p) add(["reticular", "paso"], p);
+        }
         break;
       case "bandas":
         if (enPlanta) (["desde", "hasta"] as const).forEach((k) => add([k], o[k] as Vec2));
@@ -701,6 +706,11 @@ export function moverAsa(m: ModeloFisico, a: Asa, q: Vec2, conVigas = true, tole
     return r.ok ? { ok: true, operacion: r.operacion, avisos: r.avisos, nuevos: [] } : r;
   }
   const o = lista(m, a.coleccion)[x.indice]!;
+  if (a.ruta[0] === "reticular" && a.ruta[1] === "paso") {
+    const ret = (o as unknown as Losa).reticular;
+    if (!ret) return { ok: false, mensaje: `${a.id} no es un reticular.` };
+    return { ok: true, operacion: { op: "cambiar", coleccion: "losas", id: a.id, objeto: { ...o, reticular: { ...ret, paso: q } } }, avisos: [], nuevos: [] };
+  }
   if (a.ruta[0] === "x") return { ok: true, operacion: { op: "cambiar", coleccion: a.coleccion, id: a.id, objeto: { ...o, x: q[0], y: q[1] } }, avisos: [], nuevos: [] };
   if (a.ruta[0] === "desde" || a.ruta[0] === "hasta") {
     const otro = o[a.ruta[0] === "desde" ? "hasta" : "desde"] as Vec2;

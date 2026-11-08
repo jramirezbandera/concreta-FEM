@@ -22,6 +22,8 @@ export type Estilo =
   | "abaco-borde"
   | "pano"
   | "pano-viguetas"
+  /** Los ejes de los nervios de un reticular, en su zona aligerada (por su punto de paso). */
+  | "nervio"
   /** La dirección de una losa (eje 1) o de los nervios de un reticular: flechas dobles en su rótulo. */
   | "forjado-direccion"
   | "viga"

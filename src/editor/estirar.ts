@@ -307,8 +307,10 @@ export function estirar(m: ModeloFisico, e: Estiramiento, valor: number): Result
     const contorno = linea(l.contorno);
     const huecos = anillos(l.huecos);
     const abacos = anillos(l.reticular?.abacos);
-    if (contorno === l.contorno && huecos === l.huecos && abacos === l.reticular?.abacos) continue;
-    cambiar("losas", l, { ...l, contorno, ...(huecos ? { huecos } : {}), ...(l.reticular ? { reticular: { ...l.reticular, ...(abacos ? { abacos } : {}) } } : {}) });
+    const P = l.reticular?.paso;
+    const paso = P && tr.punto(P);
+    if (contorno === l.contorno && huecos === l.huecos && abacos === l.reticular?.abacos && paso === P) continue;
+    cambiar("losas", l, { ...l, contorno, ...(huecos ? { huecos } : {}), ...(l.reticular ? { reticular: { ...l.reticular, ...(abacos ? { abacos } : {}), ...(paso ? { paso } : {}) } } : {}) });
   }
   for (const l of m.panos ?? []) {
     const contorno = linea(l.contorno);

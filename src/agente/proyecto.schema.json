@@ -2084,6 +2084,10 @@
           "type": "number",
           "description": "Espesor de la capa de compresión (hf)."
         },
+        "paso": {
+          "$ref": "#/$defs/Vec2",
+          "description": "Punto de paso de los nervios (como en CYPECAD), m: el cruce de los ejes de un nervio de cada\nfamilia (según el `eje1` y su perpendicular). Por defecto, la retícula va centrada en la caja de\nla losa según sus ejes. No cambia el cálculo (la zona aligerada va con sus multiplicadores, C4-h):\nsólo dónde se dibujan los nervios y los casetones y adónde redondean los ábacos por luces (AC-e)."
+        },
         "caseton": {
           "enum": [
             "ceramica",

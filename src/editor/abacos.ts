@@ -439,8 +439,9 @@ function porLuces(m: ModeloFisico, l: Losa, fraccion: number): (c: Vec2, pilar: 
   const ls = l.contorno.map(S);
   const lt = l.contorno.map(T);
   const c0 = s - bw;
-  const [xs] = reticulaCasetones(Math.min(...ls), Math.max(...ls), s, c0);
-  const [xt] = reticulaCasetones(Math.min(...lt), Math.max(...lt), s, c0);
+  const P = l.reticular!.paso;
+  const [xs] = reticulaCasetones(Math.min(...ls), Math.max(...ls), s, c0, P && S(P));
+  const [xt] = reticulaCasetones(Math.min(...lt), Math.max(...lt), s, c0, P && T(P));
   // Los pilares de la planta que llegan a algún forjado: los extremos de los vanos
   const vistos = new Set<string>();
   const ejes: Vec2[] = [];

@@ -397,6 +397,13 @@ export interface Reticular {
   /** Espesor de la capa de compresión (hf). */
   capa: number;
   /**
+   * Punto de paso de los nervios (como en CYPECAD), m: el cruce de los ejes de un nervio de cada
+   * familia (según el `eje1` y su perpendicular). Por defecto, la retícula va centrada en la caja de
+   * la losa según sus ejes. No cambia el cálculo (la zona aligerada va con sus multiplicadores, C4-h):
+   * sólo dónde se dibujan los nervios y los casetones y adónde redondean los ábacos por luces (AC-e).
+   */
+  paso?: Vec2;
+  /**
    * Casetón (C4-i, `pesoForjado.ts`). Sin `pp`, el peso sale de él: γ·volumen de hormigón más el peso
    * aparente del casetón en el hueco entre nervios, en la zona aligerada, y γ·h en los ábacos. Por
    * defecto, "hormigon" (perdido de hormigón, el más común en obra; desde el 2026-10-28). Los perdidos

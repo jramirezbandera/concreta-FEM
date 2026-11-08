@@ -620,7 +620,7 @@ export class ControladorDibujo {
     if (!a) return null;
     // M-22: con mayúscula inicial, como los demás avisos de la herramienta
     // AC: en un ábaco rectangular, el vértice va con el opuesto fijo y el lado, en paralelo
-    const que = a.ruta[0] === "abaco" ? (a.ruta[1] === "lado" ? `Un lado del ábaco ${nombreAbaco(a.id)}` : `Una esquina del ábaco ${nombreAbaco(a.id)}`) : a.coleccion === "pilares" ? `${a.id} (su punto fijo)` : a.ruta[0] === "x" ? a.id : `Un vértice de ${a.id}`;
+    const que = a.ruta[0] === "abaco" ? (a.ruta[1] === "lado" ? `Un lado del ábaco ${nombreAbaco(a.id)}` : `Una esquina del ábaco ${nombreAbaco(a.id)}`) : a.ruta[0] === "reticular" ? `El punto de paso de los nervios de ${a.id}` : a.coleccion === "pilares" ? `${a.id} (su punto fijo)` : a.ruta[0] === "x" ? a.id : `Un vértice de ${a.id}`;
     return `${que}: el punto nuevo (clic, o «x; y», «@dx; dy» e Intro)${a.coleccion === "pilares" ? "; con Ctrl, sin sus vigas" : ""}. Esc lo suelta.`;
   }
 
@@ -642,7 +642,7 @@ export class ControladorDibujo {
       this.cambiar({ error: r.mensaje });
       return r.mensaje;
     }
-    const etiqueta = a.ruta[0] === "abaco" ? `Cambiar el ábaco ${nombreAbaco(a.id)}` : `Mover ${a.coleccion === "pilares" || a.ruta[0] === "x" ? a.id : `un vértice de ${a.id}`}${solo && a.coleccion === "pilares" ? ", sin sus vigas" : ""}`;
+    const etiqueta = a.ruta[0] === "abaco" ? `Cambiar el ábaco ${nombreAbaco(a.id)}` : a.ruta[0] === "reticular" ? `Mover los nervios de ${a.id}` : `Mover ${a.coleccion === "pilares" || a.ruta[0] === "x" ? a.id : `un vértice de ${a.id}`}${solo && a.coleccion === "pilares" ? ", sin sus vigas" : ""}`;
     const error = this.aplicar({ operacion: r.operacion, etiqueta, ...(r.elegidos ? { elegir: r.elegidos } : {}) });
     if (error) {
       this.cambiar({ error });
@@ -1144,6 +1144,20 @@ export class ControladorDibujo {
       const [x, y] = aPx(a.p);
       const on = a === this.asaBajo || (this.asaActiva && a.id === this.asaActiva.id && a.ruta.join() === this.asaActiva.ruta.join());
       ctx.fillStyle = on ? c.acento : c.fondo;
+      if (a.ruta[0] === "reticular") {
+        // El punto de paso de los nervios: un círculo con su cruz, para no confundirlo con un vértice
+        ctx.beginPath();
+        ctx.arc(x, y, r + 2, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x - r - 5, y);
+        ctx.lineTo(x + r + 5, y);
+        ctx.moveTo(x, y - r - 5);
+        ctx.lineTo(x, y + r + 5);
+        ctx.stroke();
+        continue;
+      }
       ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
       ctx.strokeRect(x - r, y - r, 2 * r, 2 * r);
     }

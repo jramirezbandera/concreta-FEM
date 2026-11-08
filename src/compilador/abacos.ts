@@ -26,7 +26,7 @@
 import type { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { AbacosPilares, Losa, ModeloFisico, Seccion, Vec2 } from "./fisico.ts";
 import { TAMANO_MALLA } from "./fisico.ts";
-import { areaConSigno, areaInterseccionRegiones, distanciaABorde, distanciaEntreSegmentos, puntoEnPoligono, puntoEnRegion, type Region } from "./poligonos.ts";
+import { areaConSigno, areaInterseccionRegiones, distanciaABorde, distanciaEntreSegmentos, puntoEnPoligono, puntoEnRegion, trozosSegmento, type Region } from "./poligonos.ts";
 import { ejeSeccion } from "./puntoFijo.ts";
 
 /** Tolerancia de unión por defecto (MA-d): la mitad del tamaño de malla por defecto. */
@@ -116,11 +116,97 @@ export function pilaresEnLosa(m: ModeloFisico, l: Losa): { pilar: string; eje: V
  * Devuelve el inicio x0 de la celda 0 y la primera y la última que tocan [a, b]: la celda i va de
  * x0 + i·s a x0 + i·s + c. Es la del sólido (`visor/solido.ts`) y la de los ábacos por luces
  * (`editor/abacos.ts`), así que un ábaco redondeado a ella cubre casetones enteros en el dibujo.
+ *
+ * Con `paso` (la coordenada según esa dirección del punto de paso de los nervios, `Reticular.paso`),
+ * un eje de nervio pasa por él: las celdas empiezan a medio nervio, (s − c)/2, de cada eje. Sin él,
+ * las celdas enteras van centradas, como antes.
  */
-export function reticulaCasetones(a: number, b: number, s: number, c: number): [number, number, number] {
-  const k = Math.max(1, Math.floor((b - a - c) / s + 1e-9) + 1);
-  const x0 = (a + b) / 2 - ((k - 1) * s + c) / 2;
+export function reticulaCasetones(a: number, b: number, s: number, c: number, paso?: number): [number, number, number] {
+  let x0: number;
+  if (paso === undefined) {
+    const k = Math.max(1, Math.floor((b - a - c) / s + 1e-9) + 1);
+    x0 = (a + b) / 2 - ((k - 1) * s + c) / 2;
+  } else {
+    // El eje de nervio del punto de paso, llevado al primero que no pasa de a
+    const e = paso - Math.floor((paso - a) / s) * s;
+    x0 = e + (s - c) / 2;
+  }
   return [x0, Math.floor((a - x0) / s), Math.ceil((b - x0 - c) / s)];
+}
+
+/**
+ * Los ejes de los nervios de un reticular en una dirección, en coordenadas según ella: los de
+ * `reticulaCasetones` (entre dos celdas, a medio nervio de cada una) que caen dentro de (a, b).
+ */
+export function ejesNervios(a: number, b: number, s: number, c: number, paso?: number): number[] {
+  const [x0, i0, i1] = reticulaCasetones(a, b, s, c, paso);
+  const r: number[] = [];
+  for (let i = i0; i <= i1 + 1; i++) {
+    const x = x0 + i * s - (s - c) / 2;
+    if (x > a && x < b) r.push(x);
+  }
+  return r;
+}
+
+/** (cos, sen) del ángulo en grados, exactos en los múltiplos de 90° (como el sólido y `direccionEje1`). */
+function direccionGrados(grados: number): Vec2 {
+  const g = ((grados % 360) + 360) % 360;
+  const q = g / 90;
+  return Number.isInteger(q) ? (([[1, 0], [0, 1], [-1, 0], [0, -1]] as const)[q] as Vec2) : [Math.cos((g * Math.PI) / 180), Math.sin((g * Math.PI) / 180)];
+}
+
+/**
+ * Los ejes de los nervios de un reticular en planta: los trozos de cada eje (de las dos familias,
+ * según el `eje1` y su perpendicular, por el punto de paso) que caen en la zona aligerada, la losa sin
+ * sus huecos ni sus ábacos (los que tiene la losa: se le pasa ya resuelta). Es la retícula del sólido.
+ * Vacío si la losa no es un reticular bien formado.
+ */
+export function nerviosLosa(l: Losa): [Vec2, Vec2][] {
+  const ret = l.reticular;
+  if (!ret || !(ret.intereje > 0 && ret.nervio > 0 && ret.nervio < ret.intereje) || l.contorno.length < 3) return [];
+  const s = ret.intereje;
+  const c = s - ret.nervio;
+  const d = direccionGrados(l.eje1 ?? 0);
+  const n: Vec2 = [-d[1], d[0]];
+  const huecos = (l.huecos ?? []) as Vec2[][];
+  const abacos = (ret.abacos ?? []) as Vec2[][];
+  const R: Region = { contorno: l.contorno, huecos };
+  const aligerada = (q: Vec2) => puntoEnRegion(q, R) && !abacos.some((a) => puntoEnPoligono(q, a));
+  const anillos = [l.contorno as Vec2[], ...huecos, ...abacos];
+  const S = (q: readonly number[]) => q[0]! * d[0] + q[1]! * d[1];
+  const T = (q: readonly number[]) => q[0]! * n[0] + q[1]! * n[1];
+  const [ls, lt] = [l.contorno.map(S), l.contorno.map(T)];
+  const [X0, X1, Y0, Y1] = [Math.min(...ls), Math.max(...ls), Math.min(...lt), Math.max(...lt)];
+  const g = (x: number, y: number): Vec2 => [x * d[0] + y * n[0], x * d[1] + y * n[1]];
+  const P = ret.paso;
+  const r: [Vec2, Vec2][] = [];
+  for (const x of ejesNervios(X0, X1, s, c, P && S(P))) r.push(...trozosSegmento(g(x, Y0), g(x, Y1), anillos, aligerada));
+  for (const y of ejesNervios(Y0, Y1, s, c, P && T(P))) r.push(...trozosSegmento(g(X0, y), g(X1, y), anillos, aligerada));
+  return r;
+}
+
+/**
+ * El punto de paso de los nervios de un reticular: el dado o, sin él, el cruce de nervios de la
+ * retícula centrada más cercano al centro de la caja de la losa (por donde se coge para moverla).
+ * null si la losa no es un reticular bien formado o no le cabe ningún nervio.
+ */
+export function puntoPasoNervios(l: Losa): Vec2 | null {
+  const ret = l.reticular;
+  if (!ret || !(ret.intereje > 0 && ret.nervio > 0 && ret.nervio < ret.intereje) || l.contorno.length < 3) return null;
+  if (ret.paso) return ret.paso;
+  const d = direccionGrados(l.eje1 ?? 0);
+  const n: Vec2 = [-d[1], d[0]];
+  const ls = l.contorno.map((q) => q[0] * d[0] + q[1] * d[1]);
+  const lt = l.contorno.map((q) => q[0] * n[0] + q[1] * n[1]);
+  const c = ret.intereje - ret.nervio;
+  const cerca = (a: number, b: number) => {
+    const xs = ejesNervios(a, b, ret.intereje, c);
+    const m = (a + b) / 2;
+    return xs.length ? xs.reduce((x, y) => (Math.abs(y - m) < Math.abs(x - m) - 1e-9 ? y : x)) : null;
+  };
+  const x = cerca(Math.min(...ls), Math.max(...ls));
+  const y = cerca(Math.min(...lt), Math.max(...lt));
+  return x === null || y === null ? null : [x * d[0] + y * n[0], x * d[1] + y * n[1]];
 }
 
 /** Distancia entre dos polígonos: 0 si se cortan o uno contiene al otro. */

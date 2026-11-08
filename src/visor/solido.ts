@@ -896,7 +896,8 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     } else {
       const { intereje: s, nervio: bw, capa: hf } = ret;
       const abacos = (ret.abacos ?? []) as Vec2[][];
-      // La retícula de casetones, centrada en la caja de la losa y recortada por la zona aligerada: la
+      // La retícula de casetones, centrada en la caja de la losa (o por el punto de paso de los nervios)
+      // y recortada por la zona aligerada: la
       // región menos los ábacos y las huellas de pilares, vigas y muros. Sin zuncho: si el borde no lleva
       // una viga en el modelo, se ve abierto, como se calcula
       const c = s - bw;
@@ -904,9 +905,10 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       const [X0, X1] = [Math.min(...loc.map((q) => q[0])), Math.max(...loc.map((q) => q[0]))];
       const [Y0, Y1] = [Math.min(...loc.map((q) => q[1])), Math.max(...loc.map((q) => q[1]))];
       /** Inicio de las celdas (las enteras, centradas) y la primera y la última que tocan [a, b]. */
-      const reticula = (a: number, b: number) => reticulaCasetones(a, b, s, c);
-      const [ax, i0, i1] = reticula(X0, X1);
-      const [ay, j0, j1] = reticula(Y0, Y1);
+      // Con el punto de paso de los nervios, un eje de cada familia pasa por él
+      const P = ret.paso;
+      const [ax, i0, i1] = reticulaCasetones(X0, X1, s, c, P && P[0] * d[0] + P[1] * d[1]);
+      const [ay, j0, j1] = reticulaCasetones(Y0, Y1, s, c, P && P[0] * n[0] + P[1] * n[1]);
       const g = (x: number, y: number): Vec2 => [x * d[0] + y * n[0], x * d[1] + y * n[1]];
       const celdas: Vec2[][] = [];
       for (let j = j0; j <= j1; j++)

@@ -10,7 +10,7 @@
  *
  * Puro: sin IO.
  */
-import { idAbaco, resolverAbacos } from "../../compilador/abacos.ts";
+import { idAbaco, nerviosLosa, resolverAbacos } from "../../compilador/abacos.ts";
 import { tramosBorde } from "../../compilador/bordes.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { ejePilar, ejeSeccion, medidasSeccion } from "../../compilador/puntoFijo.ts";
@@ -243,6 +243,8 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   for (const l of pl.enPlanta(f.losas)) {
     const anillos = [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])];
     P.push({ tipo: "poligono", anillos, estilo: est(l.reticular ? "losa-reticular" : "losa"), objeto: l.id });
+    // Los ejes de los nervios en la zona aligerada (sin los ábacos), por su punto de paso
+    if (l.reticular && !o.atenuado) for (const t of nerviosLosa(l)) P.push({ tipo: "linea", puntos: t, estilo: est("nervio"), objeto: l.id });
     // Los ábacos, sólo en lo que cae en la losa, que es lo que cuenta el compilador (en una esquina,
     // un cuarto; en un borde, la mitad); uno no convexo, entero
     const region: Region = { contorno: l.contorno, huecos: l.huecos ?? [] };
@@ -391,6 +393,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   entrada("losa", "Losa maciza (su nombre o el id y el canto, cm)");
   entrada("losa-reticular", "Forjado reticular, zona aligerada (su nombre o el id y canto+capa/intereje, cm)");
   entrada("forjado-direccion", "Dirección de la losa (eje 1) o, en cruz, de los nervios del reticular");
+  entrada("nervio", "Ejes de los nervios del reticular, por su punto de paso");
   entrada("abaco", "Ábaco macizo");
   entrada("hueco-aspa", "Hueco de losa (con aspa)");
   entrada("pano", "Paño unidireccional; las rayas, en la dirección de sus viguetas");

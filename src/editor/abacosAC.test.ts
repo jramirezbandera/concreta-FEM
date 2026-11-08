@@ -111,7 +111,9 @@ describe("AC: los ábacos uno a uno", () => {
 
   it("los pinzamientos van por transformar: con el ábaco elegido, sus asas; con la losa, ya no", () => {
     expect(asas(m, ["L2/A6"], "PL1")).toHaveLength(8);
-    expect(asas(m, ["L2"], "PL1").some((a) => a.ruta[0] === "reticular")).toBe(false);
+    // La losa no da los vértices de sus ábacos (sí el punto de paso de sus nervios, ["reticular", "paso"])
+    expect(asas(m, ["L2"], "PL1").some((a) => a.ruta[0] === "reticular" && a.ruta[1] === "abacos")).toBe(false);
+    expect(asas(m, ["L2"], "PL1").filter((a) => a.ruta[0] === "reticular").map((a) => a.ruta[1])).toEqual(["paso"]);
     const d = asas(m, ["L2/A6"], "PL1").find((a) => a.ruta[1] === "lado" && a.p[0] === 7.2)!;
     // Hasta pisar el de P7 (que empieza en 10.8): se unen
     const r = moverAsa(m, d, [11, 5.5]);

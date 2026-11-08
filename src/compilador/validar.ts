@@ -1136,7 +1136,7 @@ const MULTIPLICADORES = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"]
 function validarReticular(l: Losa, region: Region, mal: (id: string, que: string) => void, op: OpcionesResueltas, diag: Diagnosticos): { abacos: Vec2[][] } | null {
   const r = l.reticular as unknown;
   if (!esObjeto(r)) {
-    mal(l.id, "el reticular tiene que ser { intereje, nervio, capa, caseton?, abacos?, abacosPilares?, multiplicadores? }");
+    mal(l.id, "el reticular tiene que ser { intereje, nervio, capa, paso?, caseton?, abacos?, abacosPilares?, multiplicadores? }");
     return null;
   }
   let bien = true;
@@ -1149,6 +1149,7 @@ function validarReticular(l: Losa, region: Region, mal: (id: string, que: string
     if (!((r.nervio as number) < (r.intereje as number))) no("el nervio del reticular tiene que ser más estrecho que su intereje");
     if (pos(l.espesor) && !((r.capa as number) < l.espesor)) no("la capa de compresión del reticular tiene que ser más delgada que el canto total (el espesor de la losa)");
   }
+  if (r.paso !== undefined && !(Array.isArray(r.paso) && r.paso.length === 2 && r.paso.every(num))) no("el punto de paso de los nervios tiene que ser [x, y] (m)");
   if (r.relleno !== undefined) {
     const e = rellenoNoValido(r.relleno);
     if (e) no(e);
