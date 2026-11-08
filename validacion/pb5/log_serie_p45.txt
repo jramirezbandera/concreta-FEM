@@ -1,0 +1,6 @@
+pb5-serieD-p45 2x2-{"pilar":0.45} h = 0.9: 956 nudos, 8 vigas, 104 estaciones, 0.5 s; sin avisos de malla
+pb5-serieD-p45 2x2-{"pilar":0.45} h = 0.6: 1140 nudos, 8 vigas, 104 estaciones, 0.4 s; sin avisos de malla
+pb5-serieD-p45 2x2-{"pilar":0.45} h = 0.45: 1720 nudos, 8 vigas, 104 estaciones, 0.4 s; sin avisos de malla
+pb5-serieD-p45 2x2-{"pilar":0.45} h = 0.375: 1524 nudos, 8 vigas, 104 estaciones, 0.3 s; malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]
+pb5-serieD-p45 2x2-{"pilar":0.45} h = 0.3: 2044 nudos, 8 vigas, 104 estaciones, 0.4 s; malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]
+pb5-serieD-p45 2x2-{"pilar":0.45} h = 0.25: 2828 nudos, 8 vigas, 104 estaciones, 0.5 s; malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]

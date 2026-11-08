@@ -1,0 +1,40 @@
+0.3 {}                                   true    808 
+0.3 {"reticular":true}                   true    944 
+0.3 {"interiores":true}                  true    699 
+0.3 {"continuas":true}                   true    808 
+0.3 {"vuelo":0.2}                        true    808 
+0.35 {}                                  true   2930 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1] | calidad []
+0.35 {"reticular":true}                  true   3318 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1] | calidad []
+0.35 {"interiores":true}                 true   2883 esquina-sin-refinar [P0-0,P0-1,P0-2,P2-0,P2-1,P2-2] | calidad []
+0.35 {"continuas":true}                  true   2930 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1] | calidad []
+0.35 {"vuelo":0.2}                       true    804 pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {}                                   true    784 pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {"reticular":true}                   true    920 pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {"interiores":true}                  true    615 
+0.4 {"continuas":true}                   true    784 pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {"vuelo":0.2}                        true    784 pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.45 {}                                  true    956 
+0.45 {"reticular":true}                  true   1120 
+0.45 {"interiores":true}                 true    687 
+0.45 {"continuas":true}                  true    956 
+0.45 {"vuelo":0.2}                       true    956 
+0.5 {}                                   true    876 
+0.5 {"reticular":true}                   true    992 
+0.5 {"interiores":true}                  true    687 
+0.5 {"continuas":true}                   true    876 
+0.5 {"vuelo":0.2}                        true    876 
+[0.3,0.5] {}                             true    844 
+[0.3,0.5] {"reticular":true}             true    984 
+[0.3,0.5] {"interiores":true}            true    699 
+[0.3,0.5] {"continuas":true}             true    844 
+[0.3,0.5] {"vuelo":0.2}                  true    844 
+[0.5,0.3] {}                             true    844 
+[0.5,0.3] {"reticular":true}             true    984 
+[0.5,0.3] {"interiores":true}            true    699 
+[0.5,0.3] {"continuas":true}             true    844 
+[0.5,0.3] {"vuelo":0.2}                  true    844 
+[0.4,0.6] {}                             true    740 
+[0.4,0.6] {"reticular":true}             true    790 
+[0.4,0.6] {"interiores":true}            true    615 
+[0.4,0.6] {"continuas":true}             true    740 
+[0.4,0.6] {"vuelo":0.2}                  true    740 

@@ -104,6 +104,30 @@ describe("F3: con soloLaminas, las restricciones nombradas sí entran", () => {
     const c: Corte = { origen: [1.5, 0, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, b], soloLaminas: true };
     expect([...ct.cortar({ ...c, restricciones: ["otra"] }, casos).esfuerzos]).toEqual([...ct.cortar(c, casos).esfuerzos]);
   });
+
+  it("con soloEsclavos (PB-8), del enlace sólo cuentan sus esclavos: con el maestro del otro lado, lo mismo bit a bit; del mismo lado, sin él", () => {
+    const [L, b, F] = [3, 1.5, 4];
+    const base = mensulaPlaca(6, 3, L, b, F);
+    const enHuella = base.nudos.flatMap((n, i) => (n.x >= 1 - 1e-9 && n.x <= 2 + 1e-9 && n.y >= 0.5 - 1e-9 && n.y <= 1 + 1e-9 ? [i] : []));
+    // El maestro en x = 1, a un lado de la recta x = 1,5 (como el eje de un pilar con un punto fijo)
+    const maestro = enHuella.find((i) => Math.abs(base.nudos[i]!.x - 1) < 1e-9 && Math.abs(base.nudos[i]!.y - 0.5) < 1e-9)!;
+    const modelo = { ...base, restricciones: [{ tipo: "enlace-rigido" as const, id: "H", maestro, esclavos: enHuella.filter((i) => i !== maestro) }] };
+    const casos = casosValidos(calcular(modelo));
+    const ct = new Cortes(modelo);
+    const cambian: boolean[] = [];
+    for (const sx of [1, -1] as const) {
+      const corte: Corte = { origen: [1.5, 0, 0], x: [sx, 0, 0], vz: [0, 0, 1], y: sx > 0 ? [0, b] : [-b, 0], soloLaminas: true, restricciones: ["H"] };
+      const con = ct.cortar(corte, casos);
+      const esclavos = ct.cortar({ ...corte, soloEsclavos: true }, casos);
+      expect(con.valido && esclavos.valido).toBe(true);
+      cambian.push([...con.esfuerzos].some((v, k) => v !== esclavos.esfuerzos[k]));
+      // Sin `restricciones`, no hace nada
+      const sin = { ...corte, restricciones: undefined };
+      expect([...ct.cortar({ ...sin, soloEsclavos: true }, casos).esfuerzos]).toEqual([...ct.cortar(sin, casos).esfuerzos]);
+    }
+    // Con una normal el maestro queda del lado B (igual) y con la otra, del lado A (cambia)
+    expect(cambian.sort()).toEqual([false, true]);
+  });
 });
 
 describe("criterio 2 de E5: convenio de las barras", () => {

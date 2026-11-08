@@ -1,0 +1,26 @@
+
+ RUN  v4.1.11 D:/PROGRAMACION/Concreta FEM
+
+ ❯ src/visor/visor.test.ts (66 tests | 16 skipped) 148167ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/visor/visor.test.ts > V1 con edificio
+Error: Hook timed out in 120000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ src/visor/visor.test.ts:150:3
+    148|   let binCli: Uint8Array;
+    149|
+    150|   beforeAll(async () => {
+       |   ^
+    151|     const sub = join(dir, nombre);
+    152|     mkdirSync(sub, { recursive: true });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 158 passed (159)
+      Tests  1987 passed | 16 skipped (2003)
+   Start at  19:18:25
+   Duration  296.04s (transform 44.51s, setup 0ms, import 197.21s, tests 3515.45s, environment 34ms)
+

@@ -1,0 +1,40 @@
+0.3 {}                                   true    808 
+0.3 {"reticular":true}                   true    944 
+0.3 {"interiores":true}                  true    699 
+0.3 {"continuas":true}                   true    808 
+0.3 {"vuelo":0.2}                        true    808 
+0.35 {}                                  true   2930 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1] | calidad []
+0.35 {"reticular":true}                  true   3318 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1] | calidad []
+0.35 {"interiores":true}                 true   2883 esquina-sin-refinar [P0-0,P0-1,P0-2,P2-0,P2-1,P2-2] | calidad []
+0.35 {"continuas":true}                  true   2930 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1] | calidad []
+0.35 {"vuelo":0.2}                       true    804 pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {}                                   true    912 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {"reticular":true}                   true   1048 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {"interiores":true}                  true    743 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.4 {"continuas":true}                   true    912 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2] | pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.4 {"vuelo":0.2}                        true    784 pilar-tapado-sin-refinar [P0-1,P1-0,P1-2,P2-1]
+0.45 {}                                  true   1040 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.45 {"reticular":true}                  true   1272 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.45 {"interiores":true}                 true   1023 esquina-sin-refinar [P0-0,P0-1,P0-2,P1-0,P1-1,P1-2,P2-0,P2-1,P2-2]
+0.45 {"continuas":true}                  true   1040 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.45 {"vuelo":0.2}                       true   1040 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.5 {}                                   true    960 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.5 {"reticular":true}                   true   1072 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.5 {"interiores":true}                  true   1023 esquina-sin-refinar [P0-0,P0-1,P0-2,P1-0,P1-1,P1-2,P2-0,P2-1,P2-2]
+0.5 {"continuas":true}                   true    960 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+0.5 {"vuelo":0.2}                        true    960 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.3,0.5] {}                             true    880 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.3,0.5] {"reticular":true}             true   1040 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.3,0.5] {"interiores":true}            true    735 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.3,0.5] {"continuas":true}             true    880 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.3,0.5] {"vuelo":0.2}                  true    844 
+[0.5,0.3] {}                             true    884 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.5,0.3] {"reticular":true}             true   1044 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.5,0.3] {"interiores":true}            true    739 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.5,0.3] {"continuas":true}             true    884 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.5,0.3] {"vuelo":0.2}                  true    844 
+[0.4,0.6] {}                             true    800 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.4,0.6] {"reticular":true}             true    846 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.4,0.6] {"interiores":true}            true    675 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.4,0.6] {"continuas":true}             true    800 esquina-sin-refinar [P0-0,P0-2,P2-0,P2-2]
+[0.4,0.6] {"vuelo":0.2}                  true    740 

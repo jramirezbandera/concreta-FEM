@@ -1,0 +1,244 @@
+=== p45
+viga cara (máximo) borde | pb5-antes-p45:0.75 | 8 | 0.2 % | -0.4 % (N1-Y0-1 P0-1) | 0 | 0
+viga cara (máximo) borde | pb5-despues-p45:0.75 | 8 | 0.1 % | -0.3 % (N1-X2-0 P1-2) | 0 | 0
+viga cara (máximo) borde | pb5-antes-p45:0.5 | 8 | 0.6 % | -0.6 % (N1-Y0-0 P0-1) | 0 | 0
+viga cara (máximo) borde | pb5-despues-p45:0.5 | 8 | 0.5 % | -0.5 % (N1-X2-0 P1-2) | 0 | 0
+viga cara (máximo) esquina | pb5-antes-p45:0.75 | 8 | 5.5 % | -5.9 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara (máximo) esquina | pb5-despues-p45:0.75 | 8 | 1.2 % | 1.2 % (N1-X2-1 P2-2) | 0 | 0
+viga cara (máximo) esquina | pb5-antes-p45:0.5 | 8 | 5.4 % | -5.8 % (N1-X0-0 P0-0) | 0 | 0
+viga cara (máximo) esquina | pb5-despues-p45:0.5 | 8 | 1.0 % | -1.0 % (N1-Y0-1 P0-2) | 0 | 0
+viga cara borde | pb5-antes-p45:0.75 | 8 | 0.2 % | -0.4 % (N1-Y0-1 P0-1) | 0 | 0
+viga cara borde | pb5-despues-p45:0.75 | 8 | 0.1 % | -0.3 % (N1-X2-0 P1-2) | 0 | 0
+viga cara borde | pb5-antes-p45:0.5 | 8 | 0.6 % | -0.6 % (N1-Y0-0 P0-1) | 0 | 0
+viga cara borde | pb5-despues-p45:0.5 | 8 | 0.5 % | -0.5 % (N1-X2-0 P1-2) | 0 | 0
+viga cara esquina | pb5-antes-p45:0.75 | 8 | 5.5 % | -5.9 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara esquina | pb5-despues-p45:0.75 | 8 | 1.2 % | 1.2 % (N1-X2-1 P2-2) | 0 | 0
+viga cara esquina | pb5-antes-p45:0.5 | 8 | 5.4 % | -5.8 % (N1-X0-0 P0-0) | 0 | 0
+viga cara esquina | pb5-despues-p45:0.5 | 8 | 1.0 % | -1.0 % (N1-Y0-1 P0-2) | 0 | 0
+viga vano | pb5-antes-p45:0.75 | 8 | 4.8 % | 4.8 % (N1-X2-1 ) | 0 | 0
+viga vano | pb5-despues-p45:0.75 | 8 | 5.3 % | 5.3 % (N1-Y2-1 ) | 0 | 0
+viga vano | pb5-antes-p45:0.5 | 8 | 3.5 % | 3.5 % (N1-X0-1 ) | 0 | 0
+viga vano | pb5-despues-p45:0.5 | 8 | 3.6 % | 3.6 % (N1-X0-1 ) | 0 | 0
+franja apoyo inf | pb5-antes-p45:0.75 | 40 | 5.2 % | -6.8 % (L-N1:X3:apoyo:0.150:1 N1-Y0-0) | 0 | 0
+franja apoyo inf | pb5-despues-p45:0.75 | 40 | 5.3 % | -16.0 % (L-N1:X2:apoyo:0.150:1 N1-Y0-0) | 8 | 0
+franja apoyo inf | pb5-antes-p45:0.5 | 40 | 4.5 % | 8.3 % (L-N1:X2:apoyo:11.850:-1 N1-Y2-0) | 0 | 0
+franja apoyo inf | pb5-despues-p45:0.5 | 40 | 4.4 % | -7.5 % (L-N1:Y2:apoyo:0.150:1 N1-X0-0) | 0 | 0
+franja apoyo sup | pb5-antes-p45:0.75 | 16 | 26.6 % | 39.5 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 16 | 8
+franja apoyo sup | pb5-despues-p45:0.75 | 16 | 26.5 % | 39.4 % (L-N1:X5:apoyo:11.850:-1 N1-Y2-0) | 16 | 8
+franja apoyo sup | pb5-antes-p45:0.5 | 16 | 16.2 % | 25.6 % (L-N1:Y5:apoyo:0.150:1 N1-X0-0) | 8 | 8
+franja apoyo sup | pb5-despues-p45:0.5 | 16 | 16.3 % | 25.9 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 8 | 8
+franja cara borde inf | pb5-antes-p45:0.75 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p45:0.75 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-antes-p45:0.5 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p45:0.5 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde sup | pb5-antes-p45:0.75 | 12 | 0.4 % | -0.6 % (L-N1:Y1:cara:6.225:1 P0-1) | 0 | 0
+franja cara borde sup | pb5-despues-p45:0.75 | 12 | 0.4 % | -0.5 % (L-N1:X13:cara:5.775:-1 P1-2) | 0 | 0
+franja cara borde sup | pb5-antes-p45:0.5 | 12 | 1.9 % | -7.0 % (L-N1:Y7:cara:11.775:-1 P1-2) | 0 | 0
+franja cara borde sup | pb5-despues-p45:0.5 | 12 | 1.9 % | -7.0 % (L-N1:X7:cara:0.225:1 P0-1) | 0 | 0
+franja cara esquina inf | pb5-antes-p45:0.75 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-despues-p45:0.75 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-antes-p45:0.5 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-despues-p45:0.5 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina sup | pb5-antes-p45:0.75 | 8 | 1.3 % | -1.8 % (L-N1:Y1:cara:11.775:-1 P0-2) | 0 | 0
+franja cara esquina sup | pb5-despues-p45:0.75 | 8 | 1.4 % | 1.4 % (L-N1:Y13:cara:11.775:-1 P2-2) | 0 | 0
+franja cara esquina sup | pb5-antes-p45:0.5 | 8 | 1.7 % | 2.0 % (L-N1:X13:cara:11.775:-1 P2-2) | 0 | 0
+franja cara esquina sup | pb5-despues-p45:0.5 | 8 | 9.9 % | -9.9 % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara interior inf | pb5-antes-p45:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p45:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-antes-p45:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p45:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p45:0.75 | 4 | 0.1 % | -0.1 % (L-N1:Y7:cara:6.225:1 P1-1) | 0 | 0
+franja cara interior sup | pb5-despues-p45:0.75 | 4 | 0.1 % | -0.1 % (L-N1:Y7:cara:6.225:1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p45:0.5 | 4 | 0.4 % | -0.4 % (L-N1:Y7:cara:6.225:1 P1-1) | 0 | 0
+franja cara interior sup | pb5-despues-p45:0.5 | 4 | 0.4 % | -0.4 % (L-N1:Y7:cara:6.225:1 P1-1) | 0 | 0
+franja cara sin-pilar inf | pb5-antes-p45:0.75 | 40 | NaN % | NaN % (L-N1:X2:cara:5.775:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-despues-p45:0.75 | 40 | NaN % | NaN % (L-N1:X2:cara:5.775:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-antes-p45:0.5 | 40 | NaN % | NaN % (L-N1:X2:cara:5.775:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-despues-p45:0.5 | 40 | NaN % | NaN % (L-N1:X2:cara:5.775:-1 ) | 0 | 0
+franja cara sin-pilar sup | pb5-antes-p45:0.75 | 32 | 7.5 % | 11.5 % (L-N1:Y9:cara:5.775:-1 ) | 16 | 0
+franja cara sin-pilar sup | pb5-despues-p45:0.75 | 32 | 7.5 % | 11.5 % (L-N1:X9:cara:5.775:-1 ) | 16 | 0
+franja cara sin-pilar sup | pb5-antes-p45:0.5 | 32 | 1.5 % | -3.9 % (L-N1:X6:cara:6.225:1 ) | 0 | 0
+franja cara sin-pilar sup | pb5-despues-p45:0.5 | 32 | 1.5 % | -3.9 % (L-N1:Y6:cara:5.775:-1 ) | 0 | 0
+=== p45i
+viga cara (máximo) borde | pb5-antes-p45i:0.75 | 12 | 0.4 % | -13.0 % (N1-Y1-0 P1-0) | 4 | 0
+viga cara (máximo) borde | pb5-despues-p45i:0.75 | 12 | 2.4 % | 2.5 % (N1-X1-1 P2-1) | 0 | 0
+viga cara (máximo) borde | pb5-antes-p45i:0.5 | 12 | 1.2 % | -11.6 % (N1-Y1-0 P1-0) | 4 | 0
+viga cara (máximo) borde | pb5-despues-p45i:0.5 | 12 | 5.0 % | 5.0 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara (máximo) esquina | pb5-antes-p45i:0.75 | 8 | 5.3 % | -5.8 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara (máximo) esquina | pb5-despues-p45i:0.75 | 8 | 1.8 % | 1.8 % (N1-X2-1 P2-2) | 0 | 0
+viga cara (máximo) esquina | pb5-antes-p45i:0.5 | 8 | 5.2 % | -5.7 % (N1-X0-0 P0-0) | 0 | 0
+viga cara (máximo) esquina | pb5-despues-p45i:0.5 | 8 | 3.8 % | 3.8 % (N1-Y2-1 P2-2) | 0 | 0
+viga cara (máximo) interior | pb5-antes-p45i:0.75 | 4 | 1.9 % | -1.9 % (N1-Y1-0 P1-1) | 0 | 0
+viga cara (máximo) interior | pb5-despues-p45i:0.75 | 4 | 2.4 % | 2.4 % (N1-X1-1 P1-1) | 0 | 0
+viga cara (máximo) interior | pb5-antes-p45i:0.5 | 4 | 2.4 % | -2.4 % (N1-Y1-0 P1-1) | 0 | 0
+viga cara (máximo) interior | pb5-despues-p45i:0.5 | 4 | 5.1 % | 5.1 % (N1-Y1-1 P1-1) | 0 | 0
+viga cara borde | pb5-antes-p45i:0.75 | 12 | 0.4 % | -13.0 % (N1-Y1-0 P1-0) | 4 | 0
+viga cara borde | pb5-despues-p45i:0.75 | 12 | 2.4 % | 2.5 % (N1-X1-1 P2-1) | 0 | 0
+viga cara borde | pb5-antes-p45i:0.5 | 12 | 1.2 % | -11.6 % (N1-Y1-0 P1-0) | 4 | 0
+viga cara borde | pb5-despues-p45i:0.5 | 12 | 5.0 % | 5.0 % (N1-Y2-1 P2-1) | 0 | 0
+viga cara esquina | pb5-antes-p45i:0.75 | 8 | 5.3 % | -5.8 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara esquina | pb5-despues-p45i:0.75 | 8 | 1.8 % | 1.8 % (N1-X2-1 P2-2) | 0 | 0
+viga cara esquina | pb5-antes-p45i:0.5 | 8 | 5.2 % | -5.7 % (N1-X0-0 P0-0) | 0 | 0
+viga cara esquina | pb5-despues-p45i:0.5 | 8 | 3.8 % | 3.8 % (N1-Y2-1 P2-2) | 0 | 0
+viga cara interior | pb5-antes-p45i:0.75 | 4 | 1.9 % | -1.9 % (N1-Y1-0 P1-1) | 0 | 0
+viga cara interior | pb5-despues-p45i:0.75 | 4 | 2.4 % | 2.4 % (N1-X1-1 P1-1) | 0 | 0
+viga cara interior | pb5-antes-p45i:0.5 | 4 | 2.4 % | -2.4 % (N1-Y1-0 P1-1) | 0 | 0
+viga cara interior | pb5-despues-p45i:0.5 | 4 | 5.1 % | 5.1 % (N1-Y1-1 P1-1) | 0 | 0
+viga vano | pb5-antes-p45i:0.75 | 12 | 5.0 % | 5.0 % (N1-X0-1 ) | 0 | 0
+viga vano | pb5-despues-p45i:0.75 | 12 | 6.0 % | 6.0 % (N1-X2-1 ) | 0 | 0
+viga vano | pb5-antes-p45i:0.5 | 12 | 3.6 % | 3.6 % (N1-X0-1 ) | 0 | 0
+viga vano | pb5-despues-p45i:0.5 | 12 | 4.1 % | 4.1 % (N1-Y2-1 ) | 0 | 0
+franja apoyo inf | pb5-antes-p45i:0.75 | 40 | 3.9 % | -7.0 % (L-N1:X3:apoyo:0.150:1 N1-Y0-0) | 0 | 0
+franja apoyo inf | pb5-despues-p45i:0.75 | 40 | 10.2 % | -21.6 % (L-N1:X6:apoyo:11.850:-1 N1-Y2-0) | 24 | 8
+franja apoyo inf | pb5-antes-p45i:0.5 | 40 | 2.6 % | 8.2 % (L-N1:X2:apoyo:11.850:-1 N1-Y2-0) | 0 | 0
+franja apoyo inf | pb5-despues-p45i:0.5 | 40 | 3.1 % | -21.5 % (L-N1:Y6:apoyo:0.150:1 N1-X0-0) | 8 | 8
+franja apoyo sup | pb5-antes-p45i:0.75 | 24 | 9.4 % | -16.6 % (L-N1:X6:apoyo:6.150:1 N1-Y1-0) | 8 | 0
+franja apoyo sup | pb5-despues-p45i:0.75 | 24 | 5.4 % | 12.3 % (L-N1:X5:apoyo:5.850:-1 N1-Y1-0) | 8 | 0
+franja apoyo sup | pb5-antes-p45i:0.5 | 24 | 3.6 % | -6.1 % (L-N1:X6:apoyo:6.150:1 N1-Y1-0) | 0 | 0
+franja apoyo sup | pb5-despues-p45i:0.5 | 24 | 1.7 % | 3.6 % (L-N1:X12:apoyo:5.850:-1 N1-Y1-1) | 0 | 0
+franja cara borde inf | pb5-antes-p45i:0.75 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p45i:0.75 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-antes-p45i:0.5 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p45i:0.5 | 12 | NaN % | NaN % (L-N1:X1:cara:5.775:-1 P1-0) | 0 | 0
+franja cara borde sup | pb5-antes-p45i:0.75 | 12 | 17.8 % | 18.9 % (L-N1:X1:cara:6.225:1 P1-0) | 12 | 0
+franja cara borde sup | pb5-despues-p45i:0.75 | 12 | 5.9 % | 12.4 % (L-N1:X7:cara:11.775:-1 P2-1) | 4 | 0
+franja cara borde sup | pb5-antes-p45i:0.5 | 12 | 11.8 % | 12.4 % (L-N1:X1:cara:6.225:1 P1-0) | 8 | 0
+franja cara borde sup | pb5-despues-p45i:0.5 | 12 | 0.7 % | -13.5 % (L-N1:Y7:cara:0.225:1 P1-0) | 4 | 0
+franja cara esquina inf | pb5-antes-p45i:0.75 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-despues-p45i:0.75 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-antes-p45i:0.5 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-despues-p45i:0.5 | 8 | NaN % | NaN % (L-N1:X1:cara:0.225:1 P0-0) | 0 | 0
+franja cara esquina sup | pb5-antes-p45i:0.75 | 8 | 1.2 % | -1.6 % (L-N1:Y1:cara:11.775:-1 P0-2) | 0 | 0
+franja cara esquina sup | pb5-despues-p45i:0.75 | 8 | 1.8 % | 1.8 % (L-N1:Y13:cara:11.775:-1 P2-2) | 0 | 0
+franja cara esquina sup | pb5-antes-p45i:0.5 | 8 | 1.6 % | 2.0 % (L-N1:X13:cara:11.775:-1 P2-2) | 0 | 0
+franja cara esquina sup | pb5-despues-p45i:0.5 | 8 | 15.0 % | -15.0 % (L-N1:X1:cara:0.225:1 P0-0) | 8 | 0
+franja cara interior inf | pb5-antes-p45i:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p45i:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-antes-p45i:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p45i:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p45i:0.75 | 4 | 22.5 % | 22.5 % (L-N1:Y7:cara:6.225:1 P1-1) | 4 | 4
+franja cara interior sup | pb5-despues-p45i:0.75 | 4 | 3.6 % | 3.6 % (L-N1:Y7:cara:6.225:1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p45i:0.5 | 4 | 11.0 % | 11.0 % (L-N1:Y7:cara:6.225:1 P1-1) | 4 | 0
+franja cara interior sup | pb5-despues-p45i:0.5 | 4 | 2.7 % | -2.7 % (L-N1:X7:cara:5.775:-1 P1-1) | 0 | 0
+=== p50
+viga cara (máximo) borde | pb5-antes-p50:0.75 | 8 | 0.6 % | -0.9 % (N1-Y0-1 P0-1) | 0 | 0
+viga cara (máximo) borde | pb5-despues-p50:0.75 | 8 | 0.6 % | -0.7 % (N1-X0-1 P1-0) | 0 | 0
+viga cara (máximo) borde | pb5-antes-p50:0.5 | 8 | 0.6 % | -1.0 % (N1-Y0-1 P0-1) | 0 | 0
+viga cara (máximo) borde | pb5-despues-p50:0.5 | 8 | 0.4 % | -0.9 % (N1-X0-1 P1-0) | 0 | 0
+viga cara (máximo) esquina | pb5-antes-p50:0.75 | 8 | 6.9 % | -7.4 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara (máximo) esquina | pb5-despues-p50:0.75 | 8 | 2.1 % | 2.1 % (N1-X2-1 P2-2) | 0 | 0
+viga cara (máximo) esquina | pb5-antes-p50:0.5 | 8 | 4.7 % | -5.3 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara (máximo) esquina | pb5-despues-p50:0.5 | 8 | 0.0 % | 0.0 % (N1-X2-0 P0-2) | 0 | 0
+viga cara borde | pb5-antes-p50:0.75 | 8 | 0.6 % | -0.9 % (N1-Y0-1 P0-1) | 0 | 0
+viga cara borde | pb5-despues-p50:0.75 | 8 | 0.6 % | -0.7 % (N1-X0-1 P1-0) | 0 | 0
+viga cara borde | pb5-antes-p50:0.5 | 8 | 0.6 % | -1.0 % (N1-Y0-1 P0-1) | 0 | 0
+viga cara borde | pb5-despues-p50:0.5 | 8 | 0.4 % | -0.9 % (N1-X0-1 P1-0) | 0 | 0
+viga cara esquina | pb5-antes-p50:0.75 | 8 | 6.9 % | -7.4 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara esquina | pb5-despues-p50:0.75 | 8 | 2.1 % | 2.1 % (N1-X2-1 P2-2) | 0 | 0
+viga cara esquina | pb5-antes-p50:0.5 | 8 | 4.7 % | -5.3 % (N1-Y0-0 P0-0) | 0 | 0
+viga cara esquina | pb5-despues-p50:0.5 | 8 | 0.0 % | 0.0 % (N1-X2-0 P0-2) | 0 | 0
+viga vano | pb5-antes-p50:0.75 | 8 | 4.3 % | 4.3 % (N1-X2-1 ) | 0 | 0
+viga vano | pb5-despues-p50:0.75 | 8 | 5.0 % | 5.0 % (N1-Y2-1 ) | 0 | 0
+viga vano | pb5-antes-p50:0.5 | 8 | 3.2 % | 3.2 % (N1-X2-0 ) | 0 | 0
+viga vano | pb5-despues-p50:0.5 | 8 | 3.4 % | 3.4 % (N1-Y2-1 ) | 0 | 0
+franja apoyo inf | pb5-antes-p50:0.75 | 40 | 5.4 % | -30.8 % (L-N1:Y6:apoyo:0.150:1 N1-X0-0) | 16 | 8
+franja apoyo inf | pb5-despues-p50:0.75 | 40 | 15.1 % | -30.7 % (L-N1:Y6:apoyo:0.150:1 N1-X0-0) | 24 | 16
+franja apoyo inf | pb5-antes-p50:0.5 | 40 | 7.2 % | -10.4 % (L-N1:X3:apoyo:0.150:1 N1-Y0-0) | 8 | 0
+franja apoyo inf | pb5-despues-p50:0.5 | 40 | 7.1 % | -12.5 % (L-N1:X2:apoyo:0.150:1 N1-Y0-0) | 8 | 0
+franja apoyo sup | pb5-antes-p50:0.75 | 16 | 21.4 % | 40.8 % (L-N1:Y5:apoyo:0.150:1 N1-X0-0) | 8 | 8
+franja apoyo sup | pb5-despues-p50:0.75 | 16 | 21.5 % | 41.1 % (L-N1:X5:apoyo:0.150:1 N1-Y0-0) | 8 | 8
+franja apoyo sup | pb5-antes-p50:0.5 | 16 | 18.6 % | 25.5 % (L-N1:Y5:apoyo:0.150:1 N1-X0-0) | 16 | 8
+franja apoyo sup | pb5-despues-p50:0.5 | 16 | 18.8 % | 26.0 % (L-N1:X5:apoyo:0.150:1 N1-Y0-0) | 16 | 8
+franja cara borde inf | pb5-antes-p50:0.75 | 12 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p50:0.75 | 12 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-antes-p50:0.5 | 12 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p50:0.5 | 12 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde sup | pb5-antes-p50:0.75 | 12 | 2.6 % | -15.0 % (L-N1:X7:cara:0.250:1 P0-1) | 4 | 0
+franja cara borde sup | pb5-despues-p50:0.75 | 12 | 2.8 % | -15.0 % (L-N1:X7:cara:0.250:1 P0-1) | 4 | 0
+franja cara borde sup | pb5-antes-p50:0.5 | 12 | 0.4 % | -1.2 % (L-N1:X7:cara:0.250:1 P0-1) | 0 | 0
+franja cara borde sup | pb5-despues-p50:0.5 | 12 | 0.3 % | -1.1 % (L-N1:X7:cara:0.250:1 P0-1) | 0 | 0
+franja cara esquina inf | pb5-antes-p50:0.75 | 8 | NaN % | NaN % (L-N1:X1:cara:0.250:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-despues-p50:0.75 | 8 | NaN % | NaN % (L-N1:X1:cara:0.250:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-antes-p50:0.5 | 8 | NaN % | NaN % (L-N1:X1:cara:0.250:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-despues-p50:0.5 | 8 | NaN % | NaN % (L-N1:X1:cara:0.250:1 P0-0) | 0 | 0
+franja cara esquina sup | pb5-antes-p50:0.75 | 8 | 15.1 % | 15.8 % (L-N1:Y13:cara:11.750:-1 P2-2) | 8 | 0
+franja cara esquina sup | pb5-despues-p50:0.75 | 8 | 0.5 % | -0.5 % (L-N1:X1:cara:11.750:-1 P2-0) | 0 | 0
+franja cara esquina sup | pb5-antes-p50:0.5 | 8 | 3.7 % | 4.2 % (L-N1:Y13:cara:11.750:-1 P2-2) | 0 | 0
+franja cara esquina sup | pb5-despues-p50:0.5 | 8 | 11.6 % | -11.6 % (L-N1:X1:cara:0.250:1 P0-0) | 8 | 0
+franja cara interior inf | pb5-antes-p50:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p50:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-antes-p50:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p50:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p50:0.75 | 4 | 0.1 % | 0.1 % (L-N1:X7:cara:6.250:1 P1-1) | 0 | 0
+franja cara interior sup | pb5-despues-p50:0.75 | 4 | 0.2 % | 0.2 % (L-N1:X7:cara:6.250:1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p50:0.5 | 4 | 0.2 % | -0.2 % (L-N1:Y7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-despues-p50:0.5 | 4 | 0.2 % | -0.2 % (L-N1:Y7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara sin-pilar inf | pb5-antes-p50:0.75 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-despues-p50:0.75 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-antes-p50:0.5 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-despues-p50:0.5 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar sup | pb5-antes-p50:0.75 | 40 | 4.4 % | -10.5 % (L-N1:Y6:cara:5.750:-1 ) | 16 | 0
+franja cara sin-pilar sup | pb5-despues-p50:0.75 | 40 | 4.4 % | 10.4 % (L-N1:X9:cara:5.750:-1 ) | 16 | 0
+franja cara sin-pilar sup | pb5-antes-p50:0.5 | 40 | 1.2 % | -4.2 % (L-N1:Y6:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar sup | pb5-despues-p50:0.5 | 40 | 1.3 % | -4.2 % (L-N1:Y6:cara:5.750:-1 ) | 0 | 0
+=== p3050
+viga cara (máximo) borde | pb5-antes-p3050:0.75 | 8 | 1.3 % | 1.6 % (N1-X0-0 P1-0) | 0 | 0
+viga cara (máximo) borde | pb5-despues-p3050:0.75 | 8 | 1.3 % | 1.5 % (N1-X0-0 P1-0) | 0 | 0
+viga cara (máximo) borde | pb5-antes-p3050:0.5 | 8 | 3.2 % | 6.1 % (N1-X0-1 P1-0) | 0 | 0
+viga cara (máximo) borde | pb5-despues-p3050:0.5 | 8 | 3.2 % | 6.1 % (N1-X0-1 P1-0) | 0 | 0
+viga cara (máximo) esquina | pb5-antes-p3050:0.75 | 8 | 21.8 % | 29.8 % (N1-Y0-0 P0-0) | 8 | 4
+viga cara (máximo) esquina | pb5-despues-p3050:0.75 | 8 | 9.0 % | 14.2 % (N1-Y0-0 P0-0) | 4 | 0
+viga cara (máximo) esquina | pb5-antes-p3050:0.5 | 8 | 20.1 % | 28.1 % (N1-Y2-0 P2-0) | 8 | 4
+viga cara (máximo) esquina | pb5-despues-p3050:0.5 | 8 | 9.6 % | 14.9 % (N1-Y2-0 P2-0) | 4 | 0
+viga cara borde | pb5-antes-p3050:0.75 | 8 | 1.3 % | 1.6 % (N1-X0-0 P1-0) | 0 | 0
+viga cara borde | pb5-despues-p3050:0.75 | 8 | 1.3 % | 1.5 % (N1-X0-0 P1-0) | 0 | 0
+viga cara borde | pb5-antes-p3050:0.5 | 8 | 3.2 % | 6.1 % (N1-X0-1 P1-0) | 0 | 0
+viga cara borde | pb5-despues-p3050:0.5 | 8 | 3.2 % | 6.1 % (N1-X0-1 P1-0) | 0 | 0
+viga cara esquina | pb5-antes-p3050:0.75 | 8 | 21.8 % | 29.8 % (N1-Y0-0 P0-0) | 8 | 4
+viga cara esquina | pb5-despues-p3050:0.75 | 8 | 9.0 % | 14.2 % (N1-Y0-0 P0-0) | 4 | 0
+viga cara esquina | pb5-antes-p3050:0.5 | 8 | 20.1 % | 28.1 % (N1-Y2-0 P2-0) | 8 | 4
+viga cara esquina | pb5-despues-p3050:0.5 | 8 | 9.6 % | 14.9 % (N1-Y2-0 P2-0) | 4 | 0
+viga vano | pb5-antes-p3050:0.75 | 8 | 5.5 % | 6.1 % (N1-X0-0 ) | 0 | 0
+viga vano | pb5-despues-p3050:0.75 | 8 | 5.8 % | 6.3 % (N1-X0-0 ) | 0 | 0
+viga vano | pb5-antes-p3050:0.5 | 8 | 4.0 % | 4.5 % (N1-X0-0 ) | 0 | 0
+viga vano | pb5-despues-p3050:0.5 | 8 | 4.0 % | 4.5 % (N1-X0-0 ) | 0 | 0
+franja apoyo inf | pb5-antes-p3050:0.75 | 44 | 4.1 % | 7.5 % (L-N1:X2:apoyo:11.850:-1 N1-Y2-0) | 0 | 0
+franja apoyo inf | pb5-despues-p3050:0.75 | 44 | 4.2 % | -29.0 % (L-N1:Y13:apoyo:11.850:-1 N1-X2-1) | 8 | 4
+franja apoyo inf | pb5-antes-p3050:0.5 | 44 | 3.8 % | -15.5 % (L-N1:Y13:apoyo:11.850:-1 N1-X2-1) | 12 | 0
+franja apoyo inf | pb5-despues-p3050:0.5 | 44 | 3.4 % | -26.8 % (L-N1:Y13:apoyo:11.850:-1 N1-X2-1) | 4 | 4
+franja apoyo sup | pb5-antes-p3050:0.75 | 26 | 26.0 % | 51.3 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 18 | 16
+franja apoyo sup | pb5-despues-p3050:0.75 | 26 | 15.8 % | 51.0 % (L-N1:Y5:apoyo:11.850:-1 N1-X2-0) | 18 | 8
+franja apoyo sup | pb5-antes-p3050:0.5 | 26 | 8.2 % | -32.9 % (L-N1:Y7:apoyo:0.150:1 N1-X0-0) | 10 | 6
+franja apoyo sup | pb5-despues-p3050:0.5 | 26 | 16.3 % | -33.0 % (L-N1:Y7:apoyo:0.150:1 N1-X0-0) | 14 | 6
+franja cara borde inf | pb5-antes-p3050:0.75 | 10 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p3050:0.75 | 10 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-antes-p3050:0.5 | 10 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde inf | pb5-despues-p3050:0.5 | 10 | NaN % | NaN % (L-N1:X1:cara:5.750:-1 P1-0) | 0 | 0
+franja cara borde sup | pb5-antes-p3050:0.75 | 10 | 7.0 % | -10.5 % (L-N1:X7:cara:0.250:1 P0-1) | 2 | 0
+franja cara borde sup | pb5-despues-p3050:0.75 | 10 | 7.0 % | -10.5 % (L-N1:X7:cara:0.250:1 P0-1) | 2 | 0
+franja cara borde sup | pb5-antes-p3050:0.5 | 10 | 11.5 % | -19.7 % (L-N1:X7:cara:0.250:1 P0-1) | 6 | 0
+franja cara borde sup | pb5-despues-p3050:0.5 | 10 | 11.5 % | -19.7 % (L-N1:X7:cara:0.250:1 P0-1) | 6 | 0
+franja cara esquina inf | pb5-antes-p3050:0.75 | 4 | Infinity % | Infinity % (L-N1:X1:cara:0.250:1 P0-0) | 4 | 4
+franja cara esquina inf | pb5-despues-p3050:0.75 | 4 | NaN % | NaN % (L-N1:X1:cara:0.250:1 P0-0) | 0 | 0
+franja cara esquina inf | pb5-antes-p3050:0.5 | 4 | Infinity % | Infinity % (L-N1:X1:cara:0.250:1 P0-0) | 4 | 4
+franja cara esquina inf | pb5-despues-p3050:0.5 | 4 | Infinity % | Infinity % (L-N1:X1:cara:0.250:1 P0-0) | 4 | 4
+franja cara esquina sup | pb5-antes-p3050:0.75 | 4 | 51.7 % | -51.7 % (L-N1:X13:cara:11.750:-1 P2-2) | 4 | 4
+franja cara esquina sup | pb5-despues-p3050:0.75 | 4 | 12.6 % | -12.6 % (L-N1:X13:cara:11.750:-1 P2-2) | 4 | 0
+franja cara esquina sup | pb5-antes-p3050:0.5 | 4 | 54.7 % | -54.7 % (L-N1:X13:cara:0.250:1 P0-2) | 4 | 4
+franja cara esquina sup | pb5-despues-p3050:0.5 | 4 | 39.6 % | -39.6 % (L-N1:X13:cara:0.250:1 P0-2) | 4 | 4
+franja cara interior inf | pb5-antes-p3050:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p3050:0.75 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-antes-p3050:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior inf | pb5-despues-p3050:0.5 | 4 | NaN % | NaN % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p3050:0.75 | 4 | 0.2 % | -0.4 % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-despues-p3050:0.75 | 4 | 0.2 % | -0.4 % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-antes-p3050:0.5 | 4 | 0.2 % | -0.2 % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara interior sup | pb5-despues-p3050:0.5 | 4 | 0.2 % | -0.2 % (L-N1:X7:cara:5.750:-1 P1-1) | 0 | 0
+franja cara sin-pilar inf | pb5-antes-p3050:0.75 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-despues-p3050:0.75 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-antes-p3050:0.5 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar inf | pb5-despues-p3050:0.5 | 40 | NaN % | NaN % (L-N1:X2:cara:5.750:-1 ) | 0 | 0
+franja cara sin-pilar sup | pb5-antes-p3050:0.75 | 32 | 7.2 % | 14.7 % (L-N1:X5:cara:5.750:-1 ) | 12 | 0
+franja cara sin-pilar sup | pb5-despues-p3050:0.75 | 32 | 7.1 % | 14.6 % (L-N1:X9:cara:6.250:1 ) | 12 | 0
+franja cara sin-pilar sup | pb5-antes-p3050:0.5 | 32 | 1.9 % | -3.6 % (L-N1:Y6:cara:5.850:-1 ) | 0 | 0
+franja cara sin-pilar sup | pb5-despues-p3050:0.5 | 32 | 1.8 % | -3.7 % (L-N1:Y6:cara:5.850:-1 ) | 0 | 0

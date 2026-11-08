@@ -1,0 +1,53 @@
+referencia nueva frente a la anterior, máx. rel. 0.00e+0
+0.75 estaciones de franja que cambian: 19 de 816
+   L-F3:X1:cara:0.250:1@P1@esquina@sup            ref 28.6 antes -1.8% ahora -1.8%
+   L-F3:X1:cara:11.750:-1@P3@esquina@sup          ref 28.8 antes -2.0% ahora -2.0%
+   L-F3:X17:cara:0.250:1@P7@esquina@sup           ref 28.8 antes -9.1% ahora -9.1%
+   L-F3:X17:cara:11.750:-1@P9@esquina@sup         ref 28.8 antes 1.6% ahora 1.6%
+   L-F3:Y1:cara:0.250:1@P1@esquina@sup            ref 28.6 antes -3.6% ahora -3.6%
+   L-F3:Y1:cara:11.750:-1@P7@esquina@sup          ref 29.0 antes -4.4% ahora -4.4%
+   L-F3:Y17:cara:0.250:1@P3@esquina@sup           ref 28.6 antes -2.0% ahora -2.0%
+   L-F3:Y17:cara:11.750:-1@P9@esquina@sup         ref 28.5 antes -1.4% ahora -1.4%
+   L-F2:X1:cara:0.300:1@P1@esquina@sup            ref 76.0 antes -9.9% ahora -9.9%
+   L-F2:X1:cara:11.700:-1@P3@esquina@sup          ref 76.7 antes -2.8% ahora -2.8%
+   L-F2:X17:cara:0.300:1@P7@esquina@sup           ref 76.6 antes -0.7% ahora -0.7%
+   L-F2:X17:cara:11.700:-1@P9@esquina@sup         ref 77.1 antes -11.0% ahora -11.0%
+   L-F2:Y1:cara:0.300:1@P1@esquina@sup            ref 76.3 antes -8.2% ahora -8.2%
+   L-F2:Y1:cara:11.700:-1@P7@esquina@sup          ref 77.6 antes -3.5% ahora -3.5%
+   L-F2:Y17:cara:0.300:1@P3@esquina@sup           ref 76.9 antes -3.3% ahora -3.3%
+   L-F2:Y17:cara:11.700:-1@P9@esquina@sup         ref 77.1 antes -8.2% ahora -8.2%
+   L-F1:X1:cara:0.400:1@P1@esquina@sup            ref 93.1 antes -84.5% ahora -10.4%
+   L-F1:X1:cara:11.600:-1@P3@esquina@sup          ref 94.0 antes -82.6% ahora -9.7%
+   L-F1:X17:cara:0.400:1@P7@esquina@sup           ref 93.0 antes -79.8% ahora -13.7%
+   L-F1:X17:cara:11.600:-1@P9@esquina@sup         ref 93.7 antes -84.7% ahora -10.4%
+   L-F1:Y1:cara:0.400:1@P1@esquina@sup            ref 94.2 antes -84.6% ahora -11.5%
+   L-F1:Y1:cara:11.600:-1@P7@esquina@sup          ref 96.0 antes -83.3% ahora -13.8%
+   L-F1:Y17:cara:0.400:1@P3@esquina@sup           ref 93.5 antes -80.8% ahora -13.7%
+   L-F1:Y17:cara:11.600:-1@P9@esquina@sup         ref 93.9 antes -84.2% ahora -12.4%
+  vigas que cambian 0
+0.5 estaciones de franja que cambian: 0 de 816
+   L-F3:X1:cara:0.250:1@P1@esquina@sup            ref 28.6 antes -3.7% ahora -3.7%
+   L-F3:X1:cara:11.750:-1@P3@esquina@sup          ref 28.8 antes -1.9% ahora -1.9%
+   L-F3:X17:cara:0.250:1@P7@esquina@sup           ref 28.8 antes -3.6% ahora -3.6%
+   L-F3:X17:cara:11.750:-1@P9@esquina@sup         ref 28.8 antes -6.1% ahora -6.1%
+   L-F3:Y1:cara:0.250:1@P1@esquina@sup            ref 28.6 antes -5.3% ahora -5.3%
+   L-F3:Y1:cara:11.750:-1@P7@esquina@sup          ref 29.0 antes -7.5% ahora -7.5%
+   L-F3:Y17:cara:0.250:1@P3@esquina@sup           ref 28.6 antes -2.2% ahora -2.2%
+   L-F3:Y17:cara:11.750:-1@P9@esquina@sup         ref 28.5 antes -5.2% ahora -5.2%
+   L-F2:X1:cara:0.300:1@P1@esquina@sup            ref 76.0 antes -7.5% ahora -7.5%
+   L-F2:X1:cara:11.700:-1@P3@esquina@sup          ref 76.7 antes -2.9% ahora -2.9%
+   L-F2:X17:cara:0.300:1@P7@esquina@sup           ref 76.6 antes -5.8% ahora -5.8%
+   L-F2:X17:cara:11.700:-1@P9@esquina@sup         ref 77.1 antes -12.9% ahora -12.9%
+   L-F2:Y1:cara:0.300:1@P1@esquina@sup            ref 76.3 antes -11.1% ahora -11.1%
+   L-F2:Y1:cara:11.700:-1@P7@esquina@sup          ref 77.6 antes 0.9% ahora 0.9%
+   L-F2:Y17:cara:0.300:1@P3@esquina@sup           ref 76.9 antes -3.6% ahora -3.6%
+   L-F2:Y17:cara:11.700:-1@P9@esquina@sup         ref 77.1 antes -12.0% ahora -12.0%
+   L-F1:X1:cara:0.400:1@P1@esquina@sup            ref 93.1 antes -8.0% ahora -8.0%
+   L-F1:X1:cara:11.600:-1@P3@esquina@sup          ref 94.0 antes -8.2% ahora -8.2%
+   L-F1:X17:cara:0.400:1@P7@esquina@sup           ref 93.0 antes -9.5% ahora -9.5%
+   L-F1:X17:cara:11.600:-1@P9@esquina@sup         ref 93.7 antes -9.9% ahora -9.9%
+   L-F1:Y1:cara:0.400:1@P1@esquina@sup            ref 94.2 antes -8.7% ahora -8.7%
+   L-F1:Y1:cara:11.600:-1@P7@esquina@sup          ref 96.0 antes -10.3% ahora -10.3%
+   L-F1:Y17:cara:0.400:1@P3@esquina@sup           ref 93.5 antes -8.8% ahora -8.8%
+   L-F1:Y17:cara:11.600:-1@P9@esquina@sup         ref 93.9 antes -10.7% ahora -10.7%
+  vigas que cambian 0

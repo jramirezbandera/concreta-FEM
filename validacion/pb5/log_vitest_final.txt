@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 D:/PROGRAMACION/Concreta FEM
+
+
+ Test Files  109 passed (109)
+      Tests  1260 passed (1260)
+   Start at  17:59:52
+   Duration  281.36s (transform 41.24s, setup 0ms, import 137.00s, tests 2496.87s, environment 19ms)
+

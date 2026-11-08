@@ -84,3 +84,23 @@ describe("pilares de borde en el eje de una viga de su ancho (PB)", () => {
     expect(dentro).toEqual([]);
   });
 });
+
+describe("pilares de esquina que asoman ε_snap de sus vigas (PB-5)", () => {
+  // Un 40 bajo vigas de 30 asoma justo ε_snap (5 cm) por cada lado. `tapada` (losas.ts) no siembra la
+  // huella si todo lo que asoma queda a ≤ ε_snap de los anchos o fuera de la losa, y su lado de fuera
+  // queda a ε_snap justo del borde: sin holgura lo decidía el redondeo de las coordenadas, y P0-0 salía
+  // tapado y las otras tres esquinas no. Tapado, la esquina del pilar sólo se une a la losa por un nudo
+  // (la viga en la cara, +31 %; el metro de su franja, −17 % con h = 0,75): ahora no lo es ninguna, y
+  // las cuatro van por la triangulación, con su aviso
+  const ESQUINAS = ["P0-0", "P0-2", "P2-0", "P2-2"];
+  for (const [nombre, pilar] of [
+    ["40 × 40", 0.4],
+    ["40 × 60", [0.4, 0.6]],
+  ] as const)
+    it(`${nombre}: las cuatro esquinas, iguales`, () => {
+      const { avisos } = avisosMalla(recuadros(2, 2, { pilar: pilar as number | [number, number] }));
+      const sin = avisos.filter((a) => a.startsWith("malla/esquina-sin-refinar"));
+      expect(sin.length).toBe(1);
+      for (const p of ESQUINAS) expect(sin[0]).toContain(p);
+    });
+});

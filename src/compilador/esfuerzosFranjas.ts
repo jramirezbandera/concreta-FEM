@@ -58,6 +58,11 @@
  * mide por un contorno en escalón, que siempre sigue la malla: la recta común a los lados de la
  * huella, con lo que transmite su enlace rígido a través de ella, y el momento trasladado a la cara
  * propia. Sólo difiere del corte recto por la cara propia en las tiras de losa entre las dos rectas.
+ * Del enlace cuentan sólo sus esclavos del lado del vano (`soloEsclavos` del corte): lo que la losa da
+ * al pilar por delante de la recta. Con su maestro también del lado del vano (un pilar con un punto
+ * fijo, cuyo eje queda más allá de la recta), la suma del enlace, equilibrado, sobre casi todos sus
+ * nudos daba casi cero: el metro del pilar de esquina de 40 × 40 con la esquina fija del ejemplo 11
+ * salía con h ≥ 0,6 un 80–90 % bajo, sin aviso (fase PB, PB-8).
  * Si no se puede (sin enlace), la estación queda en la cara común con el aviso
  * `franja/cara-comun-dentro`.
  *
@@ -400,11 +405,12 @@ export class EsfuerzosFranjas {
      * Fuerzas nodales por la recta s del lado `lado` (−1: s menores), de ta a tb, repartidas entre las
      * franjas por la parte del lado de cada lámina sobre la recta que cae en cada una. null si el corte
      * no sigue la malla. Con `escalon` (F3), entra también lo que transmite la huella de un pilar a
-     * través de la recta (`resto`, sin repartir), y los momentos se trasladan a la recta s + dx·x.
+     * través de la recta (`resto`, sin repartir: lo de sus esclavos del lado tomado, PB-8), y los
+     * momentos se trasladan a la recta s + dx·x.
      */
     const porNodales = (s: number, lado: -1 | 1, ta: number, tb: number, ventanas: readonly (readonly [number, number])[] = [], escalon?: { restriccion: string; dx: number }, excluir: readonly (readonly [number, number])[] = []): { r: PorFranja[]; rv: PorFranja[]; resto: Float64Array; diag: Diagnostico[] } | null => {
       const sx = lado === -1 ? 1 : -1;
-      const { corte: c, sigma } = corte(s, sx, ta, tb, { metodo: "fuerzas-nodales", porLamina: true, ...(escalon ? { restricciones: [escalon.restriccion] } : {}) });
+      const { corte: c, sigma } = corte(s, sx, ta, tb, { metodo: "fuerzas-nodales", porLamina: true, ...(escalon ? { restricciones: [escalon.restriccion], soloEsclavos: true } : {}) });
       const res: ResultadoCorte = this.cortes.cortar(c, this.casos);
       if (!res.valido || !res.porLamina || (escalon && res.restricciones.length > 1)) return null;
       // My en la recta trasladada, My − dx·Vz; lo de la huella, entero: el total menos las láminas.

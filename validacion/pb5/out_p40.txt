@@ -1,0 +1,11 @@
+Caso | nudos | ecuaciones | avisos de malla
+pb5-despues-p40:0.0625/0.025 | 37328 | 109014 | malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]
+pb5-antes-p40:0.75 | 880 | 1974 | malla/esquina-sin-refinar [L-N1,P0-2,P2-0,P2-2]; malla/pilar-tapado-sin-refinar [L-N1,P0-1,P1-0,P1-2,P2-1]
+tapadas-las-cuatro:0.75 | 784 | 1830 | malla/pilar-tapado-sin-refinar [L-N1,P0-1,P1-0,P1-2,P2-1]
+ahora:0.75 | 912 | 2022 | malla/esquina-sin-refinar [L-N1,P0-0,P0-2,P2-0,P2-2]; malla/pilar-tapado-sin-refinar [L-N1,P0-1,P1-0,P1-2,P2-1]
+viga cara esquina | pb5-antes-p40:0.75 | 8 | 1.0 % | 31.2 % (N1-Y0-0 P0-0) | 2 | 2
+viga cara esquina | tapadas-las-cuatro:0.75 | 8 | 30.8 % | 30.9 % (N1-Y0-1 P0-2) | 8 | 8
+viga cara esquina | ahora:0.75 | 8 | 0.9 % | 1.3 % (N1-X2-0 P0-2) | 0 | 0
+franja cara esquina sup | pb5-antes-p40:0.75 | 8 | 7.6 % | -16.6 % (L-N1:Y1:cara:0.200:1 P0-0) | 2 | 0
+franja cara esquina sup | tapadas-las-cuatro:0.75 | 8 | 16.6 % | -16.7 % (L-N1:Y13:cara:11.800:-1 P2-2) | 8 | 0
+franja cara esquina sup | ahora:0.75 | 8 | 6.0 % | -7.7 % (L-N1:X13:cara:11.800:-1 P2-2) | 0 | 0

@@ -84,6 +84,13 @@ export interface Corte {
    */
   restricciones?: readonly string[];
   /**
+   * Con `restricciones`, de cada una sólo sus esclavos: su maestro cuenta como del otro lado del plano,
+   * esté donde esté. Lo que transmite la huella de un pilar es lo que la losa da a sus nudos; con el
+   * maestro del lado A (el pilar con un punto fijo, cuyo eje queda más allá del plano), la suma de un
+   * enlace equilibrado sobre casi todos sus nudos daba casi cero (fase PB, PB-8).
+   */
+  soloEsclavos?: boolean;
+  /**
    * Método «campos»: coordenadas y en las que se parten los tramos de lámina antes de integrarlos
    * (los bordes de las franjas de una estación, F), para que cada punto de integración caiga entero
    * a un lado. Sin ellas, los tramos de siempre.
@@ -711,9 +718,10 @@ export class Cortes {
       let dentro = false;
       let fuera = false;
       const n = rs.esclavos.length;
+      const sinMaestro = soloEstas !== null && corte.soloEsclavos === true;
       for (let a = -1; a < n && !(otros && dentro && fuera); a++) {
         const v = a < 0 ? rs.maestro : rs.esclavos[a % 2 ? n - 1 - (a >> 1) : a >> 1]!;
-        if (lado(v) !== -1) otros = true;
+        if ((a < 0 && sinMaestro) || lado(v) !== -1) otros = true;
         else {
           enA = true;
           if (cp.dentroNudo(v)) dentro = true;
@@ -744,8 +752,9 @@ export class Cortes {
         for (const ir of incluidas) {
           const rs = lista[ir]!;
           const f = fr.get(ir)!;
+          const sinMaestro = soloEstas !== null && corte.soloEsclavos === true;
           [rs.maestro, ...rs.esclavos].forEach((v, a) => {
-            if (lado(v) !== -1) return;
+            if ((a === 0 && sinMaestro) || lado(v) !== -1) return;
             suma.agregar(k, X(v), f.subarray(6 * a, 6 * a + 3), f.subarray(6 * a + 3, 6 * a + 6));
             if (k === 0) extender(X(v));
           });

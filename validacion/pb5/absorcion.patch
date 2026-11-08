@@ -1,0 +1,314 @@
+diff --git a/src/compilador/rejilla.ts b/src/compilador/rejilla.ts
+index c3155d8..9fea648 100644
+--- a/src/compilador/rejilla.ts
++++ b/src/compilador/rejilla.ts
+@@ -568,14 +568,28 @@ function rectanguloHuella(W: readonly Vec2[], puntos: readonly number[], tol: nu
+  */
+ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
+   const excluidas = new Set<number>();
++  const noAbsorber = new Set<number>();
+   for (;;) {
+-    const r = montarRejilla(E, excluidas);
++    const r = montarRejilla(E, excluidas, noAbsorber);
+     if (!r || !("excluir" in r)) return r;
+     for (const k of r.excluir) excluidas.add(k);
++    for (const g of r.noAbsorber ?? []) noAbsorber.add(g);
+   }
+ }
+ 
+-function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejilla | { excluir: number[] } | null {
++/**
++ * Lo que un pilar asoma dentro de la esquina de un paño (fase PB, PB-5), que absorbe su plantilla de
++ * esquina: en los ejes de la celda desde la esquina (hacia dentro), el rectángulo [0, a] × [0, b] de la
++ * huella, con sus puntos en (a, 0), (0, b) y (a, b) (−1 si no hay: con b = 0, sólo el de la cara).
++ */
++interface Absorcion {
++  grupo: number;
++  a: number;
++  b: number;
++  puntos: [number, number, number];
++}
++
++function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>, noAbsorber: ReadonlySet<number>): Rejilla | { excluir: number[]; noAbsorber?: number[] } | null {
+   const plantillaE = E.plantillaEsquina ?? PLANTILLA_ESQUINA;
+   const umbralRefino = E.jacobianoRefino ?? JACOBIANO_REFINO;
+   const { P, lados, h, O, e } = E;
+@@ -646,9 +660,9 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+   // Las islas de losa junto a los pilares (fase PB, §8): sus rasgos sólo cuentan para las celdas que
+   // tocan, y para ellas siempre (`isla`)
+   const { islaPunto, islaLado } = islasJuntoAPilares(E, nudoPunto, tol);
+-  const ajenos: { A: Vec2; B: Vec2; huella: number; isla?: true }[] = [];
++  const ajenos: { A: Vec2; B: Vec2; huella: number; isla?: true; p?: number; absorbido?: true }[] = [];
+   P.forEach((_, p) => {
+-    if (E.puntoEnLosa[p] && nudoPunto[p]! < 0) ajenos.push({ A: W[p]!, B: W[p]!, huella: Math.max(-2, huellaDePunto[p]!), ...(islaPunto[p] ? { isla: true as const } : {}) });
++    if (E.puntoEnLosa[p] && nudoPunto[p]! < 0) ajenos.push({ A: W[p]!, B: W[p]!, huella: Math.max(-2, huellaDePunto[p]!), p, ...(islaPunto[p] ? { isla: true as const } : {}) });
+   });
+   const nudoEnLado = new Map<number, number>();
+   const enLinea: (LadoEnLinea | null)[] = lados.map((l, k) => {
+@@ -695,9 +709,124 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+     }
+   });
+ 
++  const losaCelda = new Int32Array(nc);
++  for (let j = 0; j < nv - 1; j++) for (let i = 0; i < nu - 1; i++) losaCelda[celda(i, j)] = E.enLosa(xy((U[i]! + U[i + 1]!) / 2, (V[j]! + V[j + 1]!) / 2));
++  const anillo = (i: number, j: number) => i <= 0 || j <= 0 || i >= nu - 2 || j >= nv - 2;
++  // Esquinas de los paños (fase LV2, §8): las líneas fuertes y, por celda, las esquinas [su, sv] con
++  // una línea fuerte en un lado u y otra en un lado v y fuera de las losas al otro lado de las dos
++  const fuerteEn = (cand: readonly { c: number; fuerte?: boolean }[], L: readonly number[]) => L.map((x) => cand.some((c) => c.fuerte === true && Math.abs(c.c - x) <= 2 * tol));
++  const fU = fuerteEn(candU, U);
++  const fV = fuerteEn(candV, V);
++  // (lo de fuera, por su centro: la celda del ancho de una viga junto a un rasgo es irregular)
++  const fueraDeLosas = (i: number, j: number) => i < 0 || j < 0 || i > nu - 2 || j > nv - 2 || losaCelda[celda(i, j)]! < 0;
++  const esquinasDe = (i: number, j: number): [number, number][] => {
++    const r: [number, number][] = [];
++    if (!E.esquinas || !E.fuertes) return r;
++    for (const su of [-1, 1])
++      for (const sv of [-1, 1]) if (fU[su < 0 ? i : i + 1] && fV[sv < 0 ? j : j + 1] && fueraDeLosas(i + su, j) && fueraDeLosas(i, j + sv)) r.push([su, sv]);
++    return r;
++  };
++
++  // Lo que un pilar asoma dentro de la esquina de un paño (fase PB, PB-5; §8 de la cabecera): un
++  // pilar de esquina mayor que sus vigas (45 × 45 o 30 × 50 en el cruce de dos de 30). Si todos los
++  // rasgos ajenos de su huella caen en celdas de esquina de paño, y en cada una son el rectángulo
++  // [0, a] × [0, b] desde la esquina (o sólo el punto de la huella en una cara, con b = 0), no dejan
++  // irregular ninguna celda: la plantilla de esquina lleva a ellos los nudos de su elemento más fino
++  // (`ajuste` de `plantillaEsquina`). Si alguna no la lleva, la rejilla se rehace sin absorber ese
++  // pilar (`noAbsorber`), y va por la triangulación, como antes
++  const absorcion = new Map<number, Absorcion>();
++  const gruposAbsorbidos = new Set<number>();
++  if (E.esquinas && E.fuertes) {
++    const porGrupo = new Map<number, number[]>();
++    ajenos.forEach((x, m) => {
++      if (x.isla || x.huella < 0 || noAbsorber.has(x.huella)) return;
++      const v = porGrupo.get(x.huella);
++      if (v) v.push(m);
++      else porGrupo.set(x.huella, [m]);
++    });
++    for (const [g, ms] of porGrupo) {
++      // Un pilar en tiras (LV-8) que puede llevar su plantilla, no: sólo el que no tiene ninguna que
++      // sea un rectángulo (la de la esquina de un pilar desplazado por su punto fijo, sin el punto del
++      // cruce de las caras), que iba entero por la triangulación
++      if (E.huellas.some((hh, k) => grupoDe(k) === g && hh.tira && rects[k])) continue;
++      // La celda de esquina de cada rasgo (una sola, que lo contenga entero)
++      const porCelda = new Map<number, number[]>();
++      const deCelda = (A: Vec2, B: Vec2): number => {
++        let r = -1;
++        const i0 = Math.max(0, tramo(U, Math.min(A[0], B[0]) - tol));
++        const i1 = Math.min(nu - 2, tramo(U, Math.max(A[0], B[0]) + tol));
++        const j0 = Math.max(0, tramo(V, Math.min(A[1], B[1]) - tol));
++        const j1 = Math.min(nv - 2, tramo(V, Math.max(A[1], B[1]) + tol));
++        for (let j = j0; j <= j1; j++)
++          for (let i = i0; i <= i1; i++) {
++            if (losaCelda[celda(i, j)]! < 0 || esquinasDe(i, j).length !== 1) continue;
++            const dentro = [A, B].every(([u, v]) => u >= U[i]! - tol && u <= U[i + 1]! + tol && v >= V[j]! - tol && v <= V[j + 1]! + tol);
++            if (!dentro) continue;
++            if (r >= 0) return -1;
++            r = celda(i, j);
++          }
++        return r;
++      };
++      let vale = true;
++      for (const m of ms) {
++        const c = deCelda(ajenos[m]!.A, ajenos[m]!.B);
++        if (c < 0) {
++          vale = false;
++          break;
++        }
++        const v = porCelda.get(c);
++        if (v) v.push(m);
++        else porCelda.set(c, [m]);
++      }
++      if (!vale) continue;
++      const nuevas: [number, Absorcion][] = [];
++      for (const [c, mc] of porCelda) {
++        const [i, j] = [c % (nu - 1), Math.floor(c / (nu - 1))];
++        const [su, sv] = esquinasDe(i, j)[0]!;
++        const [cu, cv] = [su < 0 ? U[i]! : U[i + 1]!, sv < 0 ? V[j]! : V[j + 1]!];
++        const loc = (X: Vec2): Vec2 => [(X[0] - cu) * -su, (X[1] - cv) * -sv];
++        let [a, b] = [0, 0];
++        for (const m of mc) for (const X of [ajenos[m]!.A, ajenos[m]!.B]) [a, b] = [Math.max(a, loc(X)[0]), Math.max(b, loc(X)[1])];
++        if (a <= tol) a = 0;
++        if (b <= tol) b = 0;
++        // Sus rasgos: los puntos (a, 0), (0, b) y (a, b), y los lados de dentro del rectángulo
++        const tipo = (X: Vec2): number => {
++          const [du, dv] = loc(X);
++          const [ea, e0u, eb, e0v] = [Math.abs(du - a) <= tol, Math.abs(du) <= tol, Math.abs(dv - b) <= tol, Math.abs(dv) <= tol];
++          if (a > 0 && b > 0 && ea && eb) return 2;
++          if (a > 0 && ea && e0v) return 0;
++          if (b > 0 && e0u && eb) return 1;
++          return -1;
++        };
++        const puntos: [number, number, number] = [-1, -1, -1];
++        for (const m of mc) {
++          const x = ajenos[m]!;
++          const [ta, tb] = [tipo(x.A), tipo(x.B)];
++          if (ta < 0 || tb < 0) vale = false;
++          else if (x.p !== undefined) puntos[ta] = x.p;
++          else if (!((ta === 2) !== (tb === 2))) vale = false;
++        }
++        if (!vale || (a === 0 && b === 0)) {
++          vale = false;
++          break;
++        }
++        if ((a > 0 && puntos[0] < 0) || (b > 0 && puntos[1] < 0) || (a > 0 && b > 0 && puntos[2] < 0)) {
++          vale = false;
++          break;
++        }
++        nuevas.push([c, { grupo: g, a, b, puntos }]);
++      }
++      if (!vale || !nuevas.length) continue;
++      for (const [c, x] of nuevas) absorcion.set(c, x);
++      for (const m of ms) ajenos[m]!.absorbido = true;
++      gruposAbsorbidos.add(g);
++    }
++  }
++
+   // Celdas con rasgos ajenos a menos de δ: −1 ninguno, g sólo del grupo de huellas g, −2 otros
+   const cerca = new Int32Array(nc).fill(-1);
+-  for (const { A, B, huella: h0, isla } of ajenos) {
++  for (const { A, B, huella: h0, isla, absorbido } of ajenos) {
++    if (absorbido) continue;
+     // Un rasgo de una isla, sólo las celdas que toca, y siempre (es otra losa: ni su huella la limpia)
+     const d = isla ? tol : delta;
+     const huella = isla ? -2 : h0;
+@@ -713,9 +842,6 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+         if (isla ? dist <= d : dist < d) cerca[c] = cerca[c] === -1 ? huella : -2;
+       }
+   }
+-  const losaCelda = new Int32Array(nc);
+-  for (let j = 0; j < nv - 1; j++) for (let i = 0; i < nu - 1; i++) losaCelda[celda(i, j)] = E.enLosa(xy((U[i]! + U[i + 1]!) / 2, (V[j]! + V[j + 1]!) / 2));
+-  const anillo = (i: number, j: number) => i <= 0 || j <= 0 || i >= nu - 2 || j >= nv - 2;
+ 
+   // 5. Plantillas de pilar
+   const ancho = h * (1 + HOLGURA);
+@@ -823,7 +949,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+   {
+     const vistos = new Set<number>();
+     E.huellas.forEach((hh, k) => {
+-      if (!hh.tira || vistos.has(grupoDe(k)) || elegidas.some((x) => x.k === k)) return;
++      if (!hh.tira || vistos.has(grupoDe(k)) || elegidas.some((x) => x.k === k) || gruposAbsorbidos.has(grupoDe(k))) return;
+       vistos.add(grupoDe(k));
+       tirasSinPlantilla.push(k);
+     });
+@@ -858,20 +984,6 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+         cubiertas++;
+       } else estado[c] = k < 0 && limpia ? FUERA : IRREGULAR;
+     }
+-  // Esquinas de los paños (fase LV2, §8): las líneas fuertes y, por celda, las esquinas [su, sv] con
+-  // una línea fuerte en un lado u y otra en un lado v y fuera de las losas al otro lado de las dos
+-  const fuerteEn = (cand: readonly { c: number; fuerte?: boolean }[], L: readonly number[]) => L.map((x) => cand.some((c) => c.fuerte === true && Math.abs(c.c - x) <= 2 * tol));
+-  const fU = fuerteEn(candU, U);
+-  const fV = fuerteEn(candV, V);
+-  // (lo de fuera, por su centro: la celda del ancho de una viga junto a un rasgo es irregular)
+-  const fueraDeLosas = (i: number, j: number) => i < 0 || j < 0 || i > nu - 2 || j > nv - 2 || losaCelda[celda(i, j)]! < 0;
+-  const esquinasDe = (i: number, j: number): [number, number][] => {
+-    const r: [number, number][] = [];
+-    if (!E.esquinas || !E.fuertes) return r;
+-    for (const su of [-1, 1])
+-      for (const sv of [-1, 1]) if (fU[su < 0 ? i : i + 1] && fV[sv < 0 ? j : j + 1] && fueraDeLosas(i + su, j) && fueraDeLosas(i, j + sv)) r.push([su, sv]);
+-    return r;
+-  };
+   // Los grupos de menos de GRUPO_MINIMO celdas regulares seguidas (sin plantilla) van por la CDT:
+   // ahorran poco y obligan a la CDT a coserse a sus aristas. Con el ancho de las vigas (fase LV), no
+   // el que no toca ninguna celda irregular: un recuadro de losa entre las caras de sus vigas (2 × 4
+@@ -1346,8 +1458,12 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+    * (`plantillaEsquina`), el subelemento de la esquina vuelve a ir en tercios, con sus transiciones.
+    * Sus lados hacia la losa son los de la celda partida (los puntos medios, como «medio»); por las
+    * caras, el primer tramo lleva sus nudos (`subdivididas`).
++   * Con `ajuste` (sólo la graduada; fase PB, PB-5), el elemento más fino, el de la esquina, es lo que
++   * asoma el pilar: sus nudos (1, 0), (0, 1) y (1, 1) van a los puntos de la huella (a, 0), (0, b) y
++   * (a, b), y el primer tramo de cada cara se parte en ellos. Si lo que asoma no cabe en ese elemento
++   * (más de dos veces su lado), null.
+    */
+-  const plantillaEsquina = (i: number, j: number, su: number, sv: number, niveles: number, pu: 1 | 2 = 2, pv: 1 | 2 = 2): Plantilla => {
++  const plantillaEsquina = (i: number, j: number, su: number, sv: number, niveles: number, pu: 1 | 2 = 2, pv: 1 | 2 = 2, ajuste?: Absorcion): Plantilla | null => {
+     const graduada = plantillaE.tipo === "graduada";
+     const dos = niveles > 1;
+     const D = graduada ? 2 ** (niveles + 1) : 36;
+@@ -1419,6 +1535,45 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+       // Por cada cara, sus nudos hasta el extremo del elemento de la esquina (si no es el de la celda)
+       const enX = enCara.map((x) => x * fx).filter((x) => x < D);
+       const enY = enCara.map((y) => y * fy).filter((y) => y < D);
++      if (ajuste) {
++        // Lo que asoma, en unidades de la red (D en la celda): como mucho el doble del elemento fino
++        const [Lu, Lv] = [Math.abs(U[i + 1]! - U[i]!), Math.abs(V[j + 1]! - V[j]!)];
++        const [au, bv] = [(ajuste.a / Lu) * D, (ajuste.b / Lv) * D];
++        if (!(au < 2 * fx * (1 - HOLGURA) && bv < 2 * fy * (1 - HOLGURA))) return null;
++        const [pa, pb, pab] = ajuste.puntos;
++        if (ajuste.a > 0) red[nudo(fx, 0)] = { tipo: "punto", p: pa };
++        if (ajuste.b > 0) red[nudo(0, fy)] = { tipo: "punto", p: pb };
++        if (ajuste.a > 0 && ajuste.b > 0) red[nudo(fx, fy)] = { tipo: "punto", p: pab };
++        const partir = (lado: 0 | 1) => {
++          const [en, f] = lado ? [enY, fy] : [enX, fx];
++          const N = (t: number) => (lado ? nudo(0, t) : nudo(t, 0));
++          return [
++            { a: nudo(0, 0), b: N(f), nudos: [] },
++            { a: N(f), b: N(D), nudos: en.filter((t) => t > f).map(N) },
++          ];
++        };
++        const sub = [
++          ...(ajuste.a > 0 ? partir(0) : [{ a: nudo(0, 0), b: nudo(D, 0), nudos: enX.map((x) => nudo(x, 0)) }]),
++          ...(ajuste.b > 0 ? partir(1) : [{ a: nudo(0, 0), b: nudo(0, D), nudos: enY.map((y) => nudo(0, y)) }]),
++          // Los lados de la huella dentro de la celda (de su esquina a las caras), aristas de la red
++          ...(ajuste.a > 0 && ajuste.b > 0
++            ? [
++                { a: nudo(fx, 0), b: nudo(fx, fy), nudos: [] },
++                { a: nudo(fx, fy), b: nudo(0, fy), nudos: [] },
++              ]
++            : []),
++        ];
++        return {
++          huella: -1,
++          red,
++          quads,
++          anillo: [],
++          bordes: [...(pv === 2 ? [{ n1: g(1, 0), n2: g(1, 1), losa: losaQ }] : []), ...(pu === 2 ? [{ n1: g(0, 1), n2: g(1, 1), losa: losaQ }] : [])],
++          subdivididas: sub,
++          huellaLados: [],
++          refinada: true,
++        };
++      }
+       return {
+         huella: -1,
+         red,
+@@ -1433,6 +1588,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+         refinada: true,
+       };
+     }
++    if (ajuste) return null;
+     const F = [0, 6, 12, 18];
+     for (let b = 0; b < 3; b++)
+       for (let a = 0; a < 3; a++) {
+@@ -1607,9 +1763,10 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+       // red estructurada en la esquina, con lo que asoma dentro: no impide refinar las demás
+       if (estado[c] === PLANTILLA) return huellaDeCelda[c]! >= 0 && E.huellas[huellaDeCelda[c]!]!.tira === true;
+       if (estado[c] !== REGULAR || (plantillaE.tipo !== "graduada" && (pu !== 2 || pv !== 2))) return false;
+-      // Ningún nudo nuevo que se haga rígido, y con calidad
+-      const pl = plantillaEsquina(i, j, su, sv, k, pu, pv);
+-      return lejosDeHuellas(pl) && jacobianoMin(pl) >= umbralRefino ? pl : false;
++      // Ningún nudo nuevo que se haga rígido, y con calidad (con lo que asome un pilar, en el elemento
++      // de la esquina: PB-5)
++      const pl = plantillaEsquina(i, j, su, sv, k, pu, pv, absorcion.get(c));
++      return pl && lejosDeHuellas(pl) && jacobianoMin(pl) >= umbralRefino ? pl : false;
+     };
+     const vistos = new Set<number>();
+     const sinEsquina = new Map<number, boolean>();
+@@ -1666,10 +1823,18 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
+           if (typeof pl === "boolean") return;
+           estado[celda(a, b)] = PLANTILLA;
+           plantillas.push(pl);
++          const ab = absorcion.get(celda(a, b));
++          if (ab) for (const p of ab.puntos) if (p >= 0) absorbidos[p] = 1;
+         });
+       }
+     for (const [huella, triangulacion] of [...sinEsquina].sort((a, b) => a[0] - b[0])) esquinasSinRefinar.push({ huella, triangulacion });
+   }
++  // Lo que asoma un pilar en una esquina sin su plantilla (PB-5): la rejilla, otra vez sin absorberlo
++  {
++    const sin = new Set<number>();
++    for (const [c, ab] of absorcion) if (estado[c] !== PLANTILLA) sin.add(ab.grupo);
++    if (sin.size) return { excluir: [], noAbsorber: [...sin].sort((a, b) => a - b) };
++  }
+ 
+   // 10. Caras de las vigas delante de un pilar tapado (fase LV2, LV-8, §10 de la cabecera): la primera
+   // fila de celdas a lo largo de la cara, en tercios hacia ella, con la transición en los extremos

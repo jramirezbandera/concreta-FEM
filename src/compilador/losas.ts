@@ -646,7 +646,11 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         const P1 = poli[(i + 1) % poli.length]!;
         return [0, 0.25, 0.5, 0.75].every((t) => {
           const q: Vec2 = [P0[0] + t * (P1[0] - P0[0]), P0[1] + t * (P1[1] - P0[1])];
-          if (!regionesK.some((rg) => distanciaARegion(q, rg) <= epsSnap)) return true;
+          // Con holgura, como la de los anchos: lo que queda a ε_snap justo de la losa (el lado de fuera
+          // de un 40 de esquina en la cara de fuera de vigas de 30) cuenta en todas las esquinas, no según
+          // el redondeo de sus coordenadas. Tapado, su esquina sólo se une a la losa por un nudo: la viga
+          // en la cara del pilar salía un 31 % alta y el metro de su franja, un 17 % bajo (fase PB, PB-5)
+          if (!regionesK.some((rg) => distanciaARegion(q, rg) <= epsSnap + 10 * epsGeom)) return true;
           return polisAnchoK.some((pa) => puntoEnPoligono(q, pa) || distanciaABorde(q, pa) <= epsSnap + 10 * epsGeom);
         });
       });
