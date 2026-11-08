@@ -116,16 +116,88 @@ const MODELOS: [string, () => ModeloFisico][] = [
 const rel = (a: number, b: number) => Math.abs(a - b) / Math.max(1e-12, Math.abs(b));
 
 /** Lo que tapa una planta (como el sólido): losas con su espesor y paños con el canto de su vigueta. */
-function tapasDe(f: ModeloFisico, planta: string): { region: Region; e: number }[] {
-  const r: { region: Region; e: number }[] = [];
+function tapasDe(f: ModeloFisico, planta: string): { region: Region; e: number; pano?: true }[] {
+  const r: { region: Region; e: number; pano?: true }[] = [];
   for (const l of f.losas ?? []) if (l.planta === planta) r.push({ region: { contorno: l.contorno, huecos: l.huecos ?? [] }, e: l.espesor });
   for (const p of f.panos ?? []) {
     if (p.planta !== planta) continue;
     const s = f.secciones.find((x) => x.id === p.seccion);
     const fs = s ? formaSeccion(s) : null;
-    if (fs && !fs.sinForma) r.push({ region: { contorno: p.contorno, huecos: p.huecos ?? [] }, e: fs.h });
+    if (fs && !fs.sinForma) r.push({ region: { contorno: p.contorno, huecos: p.huecos ?? [] }, e: fs.h, pano: true });
   }
   return r;
+}
+
+/** Una viga rectangular de hormigón: va entera bajo una losa, que se recorta por su huella. */
+function hormigonRect(f: ModeloFisico, seccion: string): boolean {
+  const s = f.secciones.find((x) => x.id === seccion)!;
+  return s.forma === "rectangular" && f.materiales.find((y) => y.id === s.material)!.tipo === "hormigon";
+}
+
+/** Recorte de Sutherland–Hodgman de `P` por el polígono convexo `C`. */
+function recortarConvexo(P: readonly Vec2[], C: readonly Vec2[]): Vec2[] {
+  const sg = Math.sign(areaConSigno(C as Vec2[])) || 1;
+  let r: Vec2[] = [...P];
+  for (let i = 0; i < C.length && r.length; i++) {
+    const [a, b] = [C[i]!, C[(i + 1) % C.length]!];
+    const lado = (q: Vec2) => sg * ((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]));
+    const e = r;
+    r = [];
+    for (let j = 0; j < e.length; j++) {
+      const [p, q] = [e[j]!, e[(j + 1) % e.length]!];
+      const [lp, lq] = [lado(p), lado(q)];
+      if (lp >= 0) r.push(p);
+      if ((lp >= 0) !== (lq >= 0)) {
+        const t = lp / (lp - lq);
+        r.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]);
+      }
+    }
+  }
+  return r;
+}
+
+/** Área de la región dentro de la unión de unos polígonos convexos, por inclusión–exclusión (en un nudo de tres o más vigas sus huellas se solapan). */
+function areaUnionEnRegion(region: Region, polis: readonly Vec2[][]): number {
+  const caja = (p: readonly Vec2[]) => [Math.min(...p.map((q) => q[0])), Math.min(...p.map((q) => q[1])), Math.max(...p.map((q) => q[0])), Math.max(...p.map((q) => q[1]))];
+  const cajas = polis.map(caja);
+  let total = 0;
+  const rec = (desde: number, actual: Vec2[], signo: number) => {
+    const c = caja(actual);
+    for (let i = desde; i < polis.length; i++) {
+      const k = cajas[i]!;
+      if (k[0]! > c[2]! || k[2]! < c[0]! || k[1]! > c[3]! || k[3]! < c[1]!) continue;
+      const x = recortarConvexo(actual, polis[i]!);
+      if (x.length < 3 || Math.abs(areaConSigno(x)) <= 1e-14) continue;
+      total += signo * momentosInterseccion(region, x).A;
+      rec(i + 1, x, -signo);
+    }
+  };
+  polis.forEach((p, i) => {
+    total += momentosInterseccion(region, p).A;
+    rec(i + 1, p, -1);
+  });
+  return total;
+}
+
+/**
+ * Lo que las vigas rectangulares de hormigón de su planta quitan a una losa (el solape de C2-g, que
+ * ahora pierde la losa): en cada punto, min(h, e) de la más alta que lo cubre, por capas de canto.
+ */
+function quitadoPorVigas(f: ModeloFisico, l: { planta: string; contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[]; espesor: number }): number {
+  const region: Region = { contorno: l.contorno, huecos: l.huecos ?? [] };
+  const hv = huellasVigasDe(f);
+  const vs: { h: number; huella: Vec2[] }[] = [];
+  for (const v of f.vigas ?? []) {
+    if (v.planta !== l.planta || !hormigonRect(f, v.seccion)) continue;
+    const w = Math.min(formaSeccion(f.secciones.find((x) => x.id === v.seccion)!)!.h, l.espesor);
+    for (const huella of hv.get(v.id)!) vs.push({ h: w, huella });
+  }
+  const ws = [...new Set(vs.map((v) => v.h))].sort((a, b) => a - b);
+  let q = 0;
+  ws.forEach((w, i) => {
+    q += (w - (i ? ws[i - 1]! : 0)) * areaUnionEnRegion(region, vs.filter((v) => v.h >= w).map((v) => v.huella));
+  });
+  return q;
 }
 
 const areaPol = (p: readonly Vec2[]) => Math.abs(p.reduce((s, a, i) => s + a[0] * p[(i + 1) % p.length]![1] - p[(i + 1) % p.length]![0] * a[1], 0)) / 2;
@@ -177,7 +249,8 @@ function esperado(f: ModeloFisico, p: PiezaSolida, compilado: CompiladoSolido | 
     let quitado = 0;
     if (s.forma === "rectangular" || s.forma === "general") {
       const hs = huellasVigasDe(f).get(v.id)!;
-      for (const h of hs) for (const x of tapas) quitado += momentosInterseccion(x.region, h).A * Math.min(fs.h, x.e);
+      const ts = hormigonRect(f, v.seccion) ? tapas.filter((x) => x.pano) : tapas;
+      for (const h of hs) for (const x of ts) quitado += momentosInterseccion(x.region, h).A * Math.min(fs.h, x.e);
     } else {
       const S = fs.poligono.map(([a, u]) => [a, u - fs.h / 2] as Vec2);
       for (const t of tr)
@@ -190,7 +263,7 @@ function esperado(f: ModeloFisico, p: PiezaSolida, compilado: CompiladoSolido | 
   }
   if (p.tipo === "losa") {
     const l = f.losas!.find((y) => y.id === p.id)!;
-    return l.reticular ? null : { nominal: l.espesor * areaRegion(l), quitado: 0 };
+    return l.reticular ? null : { nominal: l.espesor * areaRegion(l), quitado: quitadoPorVigas(f, l) };
   }
   if (p.tipo === "pano") {
     const x = f.panos!.find((y) => y.id === p.id)!;
@@ -282,7 +355,7 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
       const techos = hueco(zc - ret.capa).filter((c) => areaConSigno(c.p.map((q) => [q[0]!, q[1]!] as Vec2)) < 0);
       const Ac = techos.reduce((t, c) => t + area(c), 0);
       const A = areaRegion(l);
-      expect(rel(volumen(p.caras), l.espesor * A - (l.espesor - ret.capa) * Ac), l.id).toBeLessThan(1e-9);
+      expect(rel(volumen(p.caras), l.espesor * A - (l.espesor - ret.capa) * Ac - quitadoPorVigas(f, l)), l.id).toBeLessThan(1e-9);
       expect(Ac / A, `${l.id}: aligerado`).toBeGreaterThan(0.2);
       const R = { contorno: l.contorno, huecos: l.huecos ?? [] } as Region;
       const reg = [l.contorno, ...(l.huecos ?? [])] as Vec2[][];
@@ -344,8 +417,10 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
         else if (p.tipo === "viga") {
           suma.vigas += bruto;
           const s = f.secciones.find((y) => y.id === p.seccion)!;
-          if (s.forma === "rectangular" && f.materiales.find((y) => y.id === s.material)!.tipo === "hormigon") {
-            suma.quitadoVigas += esperado(f, p, comp, g)!.quitado * w;
+          if (hormigonRect(f, s.id)) {
+            // El solape con las losas: ahora lo pierde la losa, no la viga
+            const v0 = f.vigas!.find((y) => y.id === p.id)!;
+            for (const x of tapasDe(g, v0.planta)) for (const h of huellasV.get(v0.id)!) suma.quitadoVigas += momentosInterseccion(x.region, h).A * Math.min(formaSeccion(s)!.h, x.e) * w;
             // A3 no une las vigas entre sí: lo que cambia el solape por unirlas en sus extremos
             const v = f.vigas!.find((y) => y.id === p.id)!;
             const fs = formaSeccion(s)!;
@@ -430,12 +505,88 @@ describe("I3: las aristas", () => {
     expect(a.every(([u, v]) => Math.abs(u[2] - v[2]) < 1e-12)).toBe(true);
   });
 
-  it("una viga bajo una losa: el descuelgue, con su escalón donde acaba la losa", () => {
+  it("una viga no rectangular de hormigón bajo una losa: el descuelgue, con su escalón donde acaba la losa", () => {
     const f = piezasRaras();
-    const v1 = piezasSolido(f).piezas.find((x) => x.id === "V1")!;
-    // V1 va por el borde de la losa: media huella con el canto entero y media con el descuelgue
+    const v5 = piezasSolido(f).piezas.find((x) => x.id === "V5")!;
+    // V5 (general b × h = 0,25 × 0,40) sale de L1 por y = 0: con el canto entero fuera y con el descuelgue dentro
+    const z = new Set(aristasDe(v5.caras).flatMap(([a, b]) => [a[2], b[2]].map((x) => x.toFixed(6))));
+    expect([...z].sort()).toEqual(["2.600000", "2.750000", "3.000000"]);
+  });
+
+  it("una viga rectangular de hormigón por el borde de una losa: entera, y la losa sin su huella", () => {
+    const f = piezasRaras();
+    const { piezas } = piezasSolido(f);
+    const v1 = piezas.find((x) => x.id === "V1")!;
     const z = new Set(aristasDe(v1.caras).flatMap(([a, b]) => [a[2], b[2]].map((x) => x.toFixed(6))));
-    expect([...z].sort()).toEqual(["2.500000", "2.750000", "3.000000"]);
+    expect([...z].sort()).toEqual(["2.500000", "3.000000"]);
+    // L1 no tiene nada en la media huella de V1 que cae dentro (y de 0 a 0,15)
+    const l1 = piezas.find((x) => x.id === "L1")!;
+    for (const c of l1.caras) {
+      const m = c.p.reduce((s, q) => [s[0] + q[0] / c.p.length, s[1] + q[1] / c.p.length], [0, 0]);
+      expect(m[1] > 0.15 - 1e-9 || m[0] < -1e-9 || m[0] > 6 + 1e-9, `cara de L1 en V1 (${m})`).toBe(true);
+    }
+  });
+});
+
+describe("I3: viga plana en un reticular (la viga entera y el ábaco hasta su cara)", () => {
+  /** Un recuadro reticular 25+5 con la losa por los ejes de vigas planas de 40 × 30 y un ábaco en la esquina de P1, girado `giro` grados. */
+  const recuadro = (giro: number): ModeloFisico => {
+    const [c, s] = [Math.cos((giro * Math.PI) / 180), Math.sin((giro * Math.PI) / 180)];
+    const r = ([x, y]: Vec2): Vec2 => [x * c - y * s + 3, x * s + y * c - 2];
+    const P: Vec2[] = [r([0, 0]), r([6, 0]), r([6, 5]), r([0, 5])];
+    return {
+      plantas: [
+        { id: "N1", altura: null },
+        { id: "N0", altura: 3 },
+      ],
+      materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+      secciones: [
+        { id: "V40x30", material: "HA", forma: "rectangular", b: 0.4, h: 0.3 },
+        { id: "P30", material: "HA", forma: "rectangular", b: 0.3, h: 0.3 },
+      ],
+      pilares: P.map((q, i) => ({ id: `P${i + 1}`, x: q[0], y: q[1], desde: "N0", hasta: "N1", seccion: "P30", giro })),
+      vigas: P.map((q, i) => ({ id: `V${i + 1}`, planta: "N1", puntos: [q, P[(i + 1) % 4]!], seccion: "V40x30" })),
+      losas: [
+        {
+          id: "L1",
+          planta: "N1",
+          contorno: P,
+          espesor: 0.3,
+          material: "HA",
+          eje1: giro,
+          reticular: { intereje: 0.8, nervio: 0.12, capa: 0.05, abacos: [[r([0, 0]), r([1.5, 0]), r([1.5, 1.5]), r([0, 1.5])]] },
+        },
+      ],
+      casos: [],
+    };
+  };
+
+  it.each([0, 17])("girado %s°", (giro) => {
+    const f = recuadro(giro);
+    const { piezas } = piezasSolido(f);
+    const hv = huellasVigasDe(f);
+    const huellas = [...hv.values()].flat();
+    const dentro = (q: Vec2) => huellas.some((h) => puntoEnPoligono(q, h) && distanciaABorde(q, h) > 1e-7);
+    // Cada viga, entera: su huella por su canto
+    for (const v of f.vigas!) {
+      const p = piezas.find((x) => x.id === v.id)!;
+      const A = hv.get(v.id)!.reduce((t, h) => t + areaPol(h), 0);
+      expect(rel(volumen(p.caras), 0.3 * A), v.id).toBeLessThan(1e-9);
+    }
+    // La losa, sin nada en las huellas de las vigas: ni caras ni marcas
+    const l = piezas.find((x) => x.id === "L1")!;
+    for (const c of l.caras) {
+      const m: Vec2 = [c.p.reduce((t, q) => t + q[0], 0) / c.p.length, c.p.reduce((t, q) => t + q[1], 0) / c.p.length];
+      expect(dentro(m), `cara de la losa en una viga (${m})`).toBe(false);
+    }
+    expect(l.marcas!.length).toBeGreaterThan(0);
+    for (const [a, b] of l.marcas!) expect(dentro([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), "marca sobre una viga").toBe(false);
+    // El contorno del ábaco llega a la cara interior de V1 y de V4 (a 0,20 del eje): su lado x = 1,5 empieza en y = 0,2
+    const [cg, sg] = [Math.cos((giro * Math.PI) / 180), Math.sin((giro * Math.PI) / 180)];
+    const local = (q: number[]): Vec2 => [(q[0]! - 3) * cg + (q[1]! + 2) * sg, -(q[0]! - 3) * sg + (q[1]! + 2) * cg];
+    const extremos = l.marcas!.flatMap(([a, b]) => [local(a), local(b)]);
+    expect(extremos.some((q) => Math.abs(q[0] - 1.5) < 1e-9 && Math.abs(q[1] - 0.2) < 1e-9)).toBe(true);
+    expect(extremos.some((q) => Math.abs(q[1] - 1.5) < 1e-9 && Math.abs(q[0] - 0.2) < 1e-9)).toBe(true);
   });
 });
 

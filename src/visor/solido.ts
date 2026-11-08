@@ -9,14 +9,18 @@
  *   huellas de pilares, vigas y muros (su sitio es ilustrativo: el cálculo usa multiplicadores, D3).
  *   No lleva un zuncho que no esté en el modelo: un borde sin viga se ve abierto. Con un casetón
  *   que se queda en obra (todos menos el recuperable), su cara inferior aparte (`casetones`), que no cuenta en el volumen.
+ *   Sin la huella de las vigas rectangulares de hormigón de su planta, que se hormigonan con ella:
+ *   bajo una viga de menos canto que la losa, sólo lo que queda debajo.
  * - Paño: sus viguetas, las del compilador (C4-a), con su sección y la cara superior en c, y macizo
  *   del canto de la vigueta lo que no cae en la banda de un intereje de ninguna (junto a una viga
  *   o un muro paralelos, donde el compilador no pone vigueta, o el sobrante del ancho). Sin
  *   compilar, una placa del canto de la vigueta (y una nota).
  * - Viga: su sección a lo largo de cada tramo, con la cara superior en c y los tramos rectos unidos
- *   a inglete, también los de dos vigas que acaban en el mismo punto. Bajo una losa o un paño se dibuja sólo lo que queda bajo su cara inferior (C2-g): las
- *   rectangulares, por la parte de su huella que cubre la losa (como el peso de A3); las demás, por
- *   su eje.
+ *   a inglete, también los de dos vigas que acaban en el mismo punto. Las rectangulares de hormigón
+ *   van enteras bajo una losa (es la losa la que se recorta por su huella: una viga plana se ve
+ *   entera); bajo un paño, y las demás bajo una losa o un paño, sólo lo que queda bajo su cara
+ *   inferior (C2-g): las rectangulares, por la parte de su huella que cubre el paño o la losa (como
+ *   el peso de A3); las demás, por su eje.
  * - Pilar: la huella de su sección (la de cada tramo, con su giro) de la cota de su base a la de su
  *   cabeza, menos lo que ocupa la losa o el paño de su cabeza (por su huella).
  * - Muro: el eje con su espesor (a inglete en los quiebros), de forjado a forjado, sin sus huecos y
@@ -626,6 +630,14 @@ interface Tapa {
   id: string;
   anillos: Vec2[][];
   e: number;
+  /** Un paño (las vigas rectangulares de hormigón sólo se recortan por los paños). */
+  pano?: true;
+}
+
+/** Una viga rectangular de hormigón en la losa de su planta: la huella de un tramo y su canto. */
+interface VigaEnLosa {
+  huella: Vec2[];
+  h: number;
 }
 
 function cajaAnillos(an: readonly (readonly Vec2[])[]): [number, number, number, number] {
@@ -739,8 +751,33 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const k = indice.get(p.planta);
     const e = cantoPano(f, p.seccion);
     if (k === undefined || e === null) continue;
-    tapas.set(k, [...(tapas.get(k) ?? []), { id: p.id, anillos: [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])], e }]);
+    tapas.set(k, [...(tapas.get(k) ?? []), { id: p.id, anillos: [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])], e, pano: true }]);
   }
+  // Las vigas rectangulares de hormigón se hormigonan con la losa: su huella es de la viga en todo
+  // su canto y la losa (maciza o reticular) se recorta por ella. Si no, una viga plana quedaba
+  // entera dentro de la losa y no se veía, y el ábaco parecía no llegar a su cara
+  const huellasV = huellasVigasDe(f);
+  const hormigonRect = (s: Seccion | undefined): s is Extract<Seccion, { forma: "rectangular" }> => !!s && s.forma === "rectangular" && material.get(s.material)?.tipo === "hormigon";
+  const vigasLosa = new Map<number, VigaEnLosa[]>();
+  for (const v of porId(f.vigas)) {
+    const k = indice.get(v.planta);
+    const sec = seccion.get(v.seccion);
+    if (k === undefined || !hormigonRect(sec)) continue;
+    for (const huella of huellasV.get(v.id) ?? []) vigasLosa.set(k, [...(vigasLosa.get(k) ?? []), { huella, h: sec.h }]);
+  }
+  const vigasEn = (k: number, region: readonly (readonly Vec2[])[]): VigaEnLosa[] => {
+    const c = cajaAnillos(region);
+    return (vigasLosa.get(k) ?? []).filter((v) => tocan(cajaAnillos([v.huella]), c));
+  };
+  /** Lo que queda de la losa en una franja que está en alguna de las vigas `vs` (sus capas desde `i0`): bajo la más alta, o nada; null si no está en ninguna. */
+  const bajoVigas = (fr: Franja, i0: number, vs: readonly VigaEnLosa[], zc: number, e: number): Iv | null => {
+    let h = -Infinity;
+    vs.forEach((v, i) => {
+      if (fr.capas[i0 + i]) h = Math.max(h, v.h);
+    });
+    if (h === -Infinity) return null;
+    return h >= e - EPS ? [] : [[zc - e, zc - h]];
+  };
   const tapasCerca = (k: number, an: readonly (readonly Vec2[])[]): Tapa[] => {
     const c = cajaAnillos(an);
     return (tapas.get(k) ?? []).filter((t) => tocan(cajaAnillos(t.anillos), c));
@@ -788,8 +825,8 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     }
   }
 
-  // Vigas: con la cara superior en la cota; bajo una losa o un paño, sólo lo que queda debajo
-  const huellasV = huellasVigasDe(f);
+  // Vigas: con la cara superior en la cota; bajo una losa o un paño, sólo lo que queda debajo (las
+  // rectangulares de hormigón, enteras bajo una losa: es la losa la que se recorta)
   for (const v of porId(f.vigas)) {
     const k = indice.get(v.planta);
     const zc = cota(k);
@@ -802,8 +839,9 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const S = fs.poligono.map(([x, u]) => [x, u - fs.h / 2] as Vec2);
     if (esRectangular(sec)) {
       const hs = huellasV.get(v.id)!;
+      const soloPanos = hormigonRect(sec);
       tr.forEach((t, i) => {
-        const ts = tapasCerca(k, [hs[i]!]);
+        const ts = tapasCerca(k, [hs[i]!]).filter((x) => !soloPanos || x.pano);
         prismas(
           descomponer([hs[i]!], ts.map((x) => x.anillos), t.d),
           t.d,
@@ -891,8 +929,10 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const casetones: Cara[] = [];
     const ret = l.reticular;
     const e = l.espesor;
+    const vs = vigasEn(k, region);
+    const enViga = (q: Vec2) => vs.some((v) => dentroAnillos(q, [v.huella]));
     if (!ret || !(ret.capa > 0 && ret.capa < e && ret.nervio > 0 && ret.intereje > ret.nervio)) {
-      prismas(descomponer(region, [], d), d, () => [[zc - e, zc]], caras);
+      prismas(descomponer(region, vs.map((v) => [v.huella]), d), d, (fr) => bajoVigas(fr, 0, vs, zc, e) ?? [[zc - e, zc]], caras);
     } else {
       const { intereje: s, nervio: bw, capa: hf } = ret;
       const abacos = (ret.abacos ?? []) as Vec2[][];
@@ -917,9 +957,9 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
           celdas.push([g(x, y), g(x + c, y), g(x + c, y + c), g(x, y + c)]);
         }
       const macizos = [...abacos, ...macizosEn(k)].filter((m) => tocan(cajaAnillos([m]), cajaAnillos(region)));
-      const cols = descomponer(region, [celdas, ...macizos.map((m) => [m])], d);
+      const cols = descomponer(region, [celdas, ...macizos.map((m) => [m]), ...vs.map((v) => [v.huella])], d);
       const hueco = (fr: Franja) => fr.capas[0]! && !fr.capas.some((x, i) => i > 0 && x);
-      prismas(cols, d, (fr) => (hueco(fr) ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
+      prismas(cols, d, (fr) => bajoVigas(fr, 1 + macizos.length, vs, zc, e) ?? (hueco(fr) ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
       // Casetón que se queda en obra (todos menos el recuperable; el de hormigón por defecto desde el
       // 2026-10-28): su cara inferior, enrasada con la de los nervios
       if ((ret.caseton ?? "hormigon") !== "recuperable")
@@ -935,8 +975,9 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       const marca = (a: Vec2, b: Vec2) => marcas.push([[a[0], a[1], zc], [b[0], b[1], zc]]);
       const R = { contorno: l.contorno as Vec2[], huecos: (l.huecos ?? []) as Vec2[][] };
       const enLosa = (q: Vec2) => puntoEnRegion(q, R);
-      const aligerada = (q: Vec2) => enLosa(q) && !macizos.some((m) => dentroAnillos(q, [m]));
-      const todos = [...region, ...macizos];
+      // Sin pasar por encima de las vigas, que tapan la losa
+      const aligerada = (q: Vec2) => enLosa(q) && !macizos.some((m) => dentroAnillos(q, [m])) && !enViga(q);
+      const todos = [...region, ...macizos, ...vs.map((v) => v.huella)];
       for (let i = i0; i <= i1 + 1; i++) {
         const x = ax + i * s - bw / 2;
         if (x > X0 && x < X1) for (const [a, b] of trozosSegmento(g(x, Y0), g(x, Y1), todos, aligerada)) marca(a, b);
@@ -945,7 +986,8 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
         const y = ay + j * s - bw / 2;
         if (y > Y0 && y < Y1) for (const [a, b] of trozosSegmento(g(X0, y), g(X1, y), todos, aligerada)) marca(a, b);
       }
-      for (const ab of abacos) for (let i = 0; i < ab.length; i++) for (const [a, b] of trozosSegmento(ab[i]!, ab[(i + 1) % ab.length]!, region, enLosa)) marca(a, b);
+      const bordes = [...region, ...vs.map((v) => v.huella)];
+      for (const ab of abacos) for (let i = 0; i < ab.length; i++) for (const [a, b] of trozosSegmento(ab[i]!, ab[(i + 1) % ab.length]!, bordes, (q) => enLosa(q) && !enViga(q))) marca(a, b);
     }
     piezas.push({ id: l.id, tipo: "losa", planta: k, material: material.get(l.material)?.tipo ?? null, seccion: null, caras, ...(marcas.length ? { marcas } : {}), ...(casetones.length ? { casetones } : {}) });
   }
