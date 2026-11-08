@@ -45,6 +45,10 @@
         "$ref": "#/$defs/PlantillaDxf"
       },
       "description": "V2c-4: las plantillas DXF de las plantas (`docs/fem3d/dibujo.md` §10), para calcar. Sólo para\ndibujar: no entran en la huella ni en el cálculo."
+    },
+    "obra": {
+      "$ref": "#/$defs/ObraProyecto",
+      "description": "DO: los datos de la obra (`docs/fem3d/datos-obra.md`): el uso del edificio y el material por\ndefecto de cada tipo de elemento. Sólo para lo que se crea: no entran en la huella ni en el cálculo."
     }
   },
   "required": [
@@ -800,6 +804,17 @@
       ],
       "additionalProperties": false
     },
+    "CategoriaUso": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "G"
+      ],
+      "description": "Categorías de uso del DB SE-AE (tabla 3.1). F (cubiertas transitables) toma la del uso desde el que se accede."
+    },
     "Duracion": {
       "enum": [
         "corta",
@@ -1188,6 +1203,28 @@
         }
       ]
     },
+    "MaterialesObra": {
+      "type": "object",
+      "properties": {
+        "forjados": {
+          "type": "string",
+          "description": "Losas, paños (su vigueta) y vigas de hormigón."
+        },
+        "pilares": {
+          "type": "string",
+          "description": "Las secciones de los pilares de hormigón."
+        },
+        "muros": {
+          "type": "string"
+        },
+        "perfiles": {
+          "type": "string",
+          "description": "Las secciones de acero (perfiles laminados), de pilares, vigas y barras."
+        }
+      },
+      "additionalProperties": false,
+      "description": "El material por defecto de cada tipo de elemento: el id de un material del modelo."
+    },
     "ModeloFisico": {
       "type": "object",
       "properties": {
@@ -1487,6 +1524,21 @@
       },
       "additionalProperties": false,
       "description": "Lo que se fuerza de la nieve del emplazamiento (DB SE-AE art. 3.5 y Anejo E)."
+    },
+    "ObraProyecto": {
+      "type": "object",
+      "properties": {
+        "uso": {
+          "$ref": "#/$defs/CategoriaUso",
+          "description": "La categoría de uso del edificio (DB SE-AE tabla 3.1), para la Q de los casos típicos."
+        },
+        "materiales": {
+          "$ref": "#/$defs/MaterialesObra",
+          "description": "El material por defecto de cada tipo de elemento, para lo que se crea."
+        }
+      },
+      "additionalProperties": false,
+      "description": "DO: los datos de la obra. No entran en la huella ni en el cálculo."
     },
     "OpcionesCompilacion": {
       "type": "object",

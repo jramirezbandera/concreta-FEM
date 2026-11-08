@@ -28,7 +28,8 @@ import type { ResultadoCompilacion } from "../compilador/compilar.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
-import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
+import type { EmplazamientoEdificio, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
+import type { ObraProyecto } from "./obra.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { recorrerDiagrama, type DiagramaLeible } from "../motor/diagramaCompuesto.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
@@ -114,6 +115,8 @@ export interface ResumenPlanta {
 
 export interface Resumen {
   nombre?: string;
+  /** DO: los datos de la obra (uso y materiales por defecto) y el emplazamiento, si los tiene. */
+  obra?: ObraProyecto & { emplazamiento?: EmplazamientoEdificio };
   huella: string;
   objetos: Record<string, number>;
   analitico: { nudos: number; barras: number; laminas: number };
@@ -193,8 +196,11 @@ export function resumen(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: 
     const n = (f[clave] as readonly unknown[] | undefined)?.length ?? 0;
     if (n) objetos[clave] = n;
   }
+  const emplazamiento = f.acciones?.emplazamiento;
+  const obra = p.obra || emplazamiento ? { ...p.obra, ...(emplazamiento ? { emplazamiento } : {}) } : undefined;
   return si({
     ...(p.nombre ? { nombre: p.nombre } : {}),
+    ...(obra ? { obra } : {}),
     huella: c.huella,
     objetos,
     analitico: { nudos: c.estadisticas.nudos, barras: c.estadisticas.barras, laminas: c.estadisticas.laminas },

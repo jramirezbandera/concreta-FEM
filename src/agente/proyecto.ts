@@ -8,6 +8,7 @@
  */
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { ArmadoProyecto } from "./armaduraBase.ts";
+import type { ObraProyecto } from "./obra.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { validarEsquema, type EsquemaRaiz } from "../compilador/esquema.ts";
 import esquemaProyecto from "./proyecto.schema.json" with { type: "json" };
@@ -44,6 +45,11 @@ export interface Proyecto {
    * dibujar: no entran en la huella ni en el cálculo.
    */
   plantillas?: PlantillaDxf[];
+  /**
+   * DO: los datos de la obra (`docs/fem3d/datos-obra.md`): el uso del edificio y el material por
+   * defecto de cada tipo de elemento. Sólo para lo que se crea: no entran en la huella ni en el cálculo.
+   */
+  obra?: ObraProyecto;
 }
 
 /**

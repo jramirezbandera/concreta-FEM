@@ -1,6 +1,6 @@
 # DO: los datos de la obra en una pantalla (plan)
 
-> **Fecha:** 2026-11-08. **Estado:** propuesta, sin decidir (§6).
+> **Fecha:** 2026-11-08. **Estado:** decidido por el usuario el 2026-11-08, con las recomendaciones de §6. **DO1 hecho el 2026-11-08** (§7); sigue DO2.
 >
 > **Origen:** el usuario, con capturas de los «Datos generales» de CYPECAD (2026-11-08): «nosotros todavía no tenemos nada de esto, pero cosas como municipio, nombre proyecto y descripción, e información necesaria de configurar podrían estar en una pantalla inicial como esta, o ver si nos interesa y es más cómodo o no». Lo que se propone: una pantalla con los datos que decide la obra y no el dibujo, que sea el primer paso de una obra nueva y que se pueda abrir después. Sólo lo que cambia el cálculo FEM o lo que hace falta para modelar; lo que es de las comprobaciones se queda para Concreta (§3.7).
 
@@ -77,7 +77,7 @@ Lo que la pantalla no hace: dibujar ni calcular. Los bloques 4 a 6 son resúmene
 - **En el fichero:** `obra.materiales` del `proyecto.json`, fuera del modelo y de la huella (como `armado` y `vistas`): `{ forjados?, pilares?, muros?, perfiles? }`, cada uno el id de un material del modelo. Sólo deciden el material de lo que se cree; no cambian el cálculo.
 - **Quién los usa:** `materialPropuesto` y `materialPorDefecto` miran primero el de su tipo (el pilar, la sección de pilar; la viga y el forjado, `forjados`; el muro, `muros`; la sección de acero, `perfiles`) y, si no hay, siguen como hoy. Así un proyecto sin `obra` se comporta igual que ahora.
 - **Elegir un típico que no está** (HA-25 en una obra que sólo tiene HA-30) lo crea en el mismo paso, como `asegurarMaterial`.
-- **Cambiar uno con piezas ya hechas** (DO-c): la pantalla dice cuántas piezas de ese tipo llevan el anterior y ofrece «Cambiar también las N existentes». Como el material va en la sección, y una sección puede ser de pilares y vigas a la vez, se hace con una operación pura (`cambiarMaterialObra`, en `src/editor/`): las secciones que sólo usan piezas de ese tipo cambian de material; las compartidas se duplican con el material nuevo (id según `idSeccion`, que no choque) y las piezas de ese tipo pasan a la copia; las losas y muros cambian directamente. Un paso de deshacer, con el recuento de lo que cambia.
+- **Cambiar uno con piezas ya hechas** (DO-c): la pantalla dice cuántas piezas de ese tipo llevan otro material de su familia (otro hormigón; otro acero en los perfiles), no sólo el anterior por defecto, y ofrece «Cambiar también las N existentes»: como en CYPECAD, el hormigón de los pilares es el de todos los pilares. Como el material va en la sección, y una sección puede ser de pilares y vigas a la vez, se hace con una operación pura (`cambiarMaterialObra`, en `src/editor/`): las secciones que sólo usan piezas de ese tipo cambian de material; las compartidas se duplican con el material nuevo (id según `idSeccion`, que no choque) y las piezas de ese tipo pasan a la copia; las losas y muros cambian directamente. Un paso de deshacer, con el recuento de lo que cambia.
 - **Proyecto nuevo:** `proyectoNuevo` deja `obra.materiales` con el HA-30 que ya trae en los tres de hormigón, para que la pantalla los enseñe elegidos.
 
 ### 3.3 Obra nueva
@@ -133,6 +133,8 @@ La obra de Concreta (`lib/obra`, `concreta-obra`) tiene cinco campos: `denominac
 
 ## 6. Decisiones del usuario
 
+**Decididas el 2026-11-08:** todas como recomienda Claude.
+
 Con la recomendación de Claude:
 
 - **DO-a, la forma:** un diálogo de una página con bloques (recomendado), o un asistente de pasos, o un espacio de trabajo propio. El diálogo es lo que se reabre cómodo; el asistente sólo sirve la primera vez.
@@ -143,3 +145,23 @@ Con la recomendación de Claude:
 - **DO-f, el paso en una obra nueva:** recomendado **saltable** («Más tarde»), con todo opcional salvo el nombre.
 - **DO-g, nombre y descripción en el navegador:** quitarlos de allí y dejar sólo un resumen de la obra con el acceso a la pantalla (recomendado), o mantenerlos en los dos sitios.
 - **DO-h, los tipos de elemento:** forjados y vigas juntos, pilares, muros y acero de perfiles (recomendado, como los datos generales de CYPECAD sin la cimentación, que no hay todavía). La alternativa es separar vigas de forjados.
+
+## 7. DO1 hecho (2026-11-08)
+
+### 7.1 Qué hay
+
+- **`src/agente/obra.ts`** (puro): `ObraProyecto` (`uso`, la categoría del DB SE-AE; `materiales`, `{ forjados, pilares, muros, perfiles }`), `comprobarObra` (`obra/material-inexistente`), `limpiarObra`, `seguirMateriales` y `materialDeObra`. `Proyecto.obra`, en el esquema.
+- **Editor:** la operación `obra` (entera; `null` o vacía la quita), que no cambia la huella. Los materiales por defecto siguen a su material cuando se renombra o se reasigna al borrarlo, y se quitan si se borra (como la armadura base a sus losas).
+- **`materialPropuesto(m, familia, preferido)`**: el de la obra manda si está en el modelo y es de esa familia; si no, como antes.
+- **`src/editor/obra.ts`**: `aplicarObra(p, obra, existentes)` da el lote de la pantalla (los típicos que faltan, las piezas de los tipos de `existentes` y la operación `obra`), con el recuento de piezas, secciones cambiadas y copias; `piezasACambiar` da las piezas de un tipo que cambiarían. Una sección que sólo usan piezas del tipo cambia de material; una compartida (un 30 × 30 de un pilar y una viga) se copia, o se toma una igual que ya haya, y sólo las piezas del tipo pasan a ella. Un material de otra familia para un tipo es error.
+- **`proyectoNuevo`** trae `obra: { uso: "A", materiales: { forjados, pilares, muros: "HA-30" } }`.
+- **CLI:** `fem validar` comprueba la obra; `fem resumen` da `obra` con el emplazamiento.
+- **Skill:** el material por tipo en la lista del encargo y el bloque `obra` (también en `ejemplo.json`).
+
+### 7.2 Criterios
+
+- **1:** pasa. En las seis referencias de A2/A3 (1-022, retícula enrasada, retícula con núcleo, reticular, unidireccional y vivienda), con y sin `obra` la misma huella, y quitarla da los bytes de partida (`src/editor/obra.test.ts`).
+- **2:** pasa en lo puro (`materialPropuesto`); en el dibujo y en el gestor de secciones, con DO2.
+- **3:** pasa. En las seis referencias y en los cuatro tipos, las piezas de los otros tipos quedan con los mismos materiales efectivos, no queda ninguna del tipo con otro material y deshacer da los bytes; en un modelo hecho a mano, la sección compartida se copia y la propia cambia.
+- **4 a 6:** con DO2.
+

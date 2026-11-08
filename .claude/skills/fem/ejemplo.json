@@ -44,5 +44,6 @@
       { "tipo": "puntual", "id": "VX-P1", "caso": "VX", "planta": "P1", "x": 0, "y": 0, "F": [10, 0, 0] },
       { "tipo": "puntual", "id": "VX-P2", "caso": "VX", "planta": "P2", "x": 0, "y": 0, "F": [5, 0, 0] }
     ]
-  }
+  },
+  "obra": { "uso": "A", "materiales": { "forjados": "HA-25", "pilares": "HA-25", "muros": "HA-25" } }
 }

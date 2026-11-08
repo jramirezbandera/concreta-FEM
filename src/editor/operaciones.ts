@@ -21,6 +21,7 @@
  * Puro: sin IO, sin React ni DOM.
  */
 import { comprobarArmado, limpiarArmado, seguirLosas, type ArmadoProyecto } from "../agente/armaduraBase.ts";
+import { comprobarObra, limpiarObra, seguirMateriales, type ObraProyecto } from "../agente/obra.ts";
 import { comprobarProyecto, type PlantillaDxf, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import type { AccionesEdificio, ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -54,6 +55,8 @@ export type Operacion =
   | { op: "plantillas"; plantillas: readonly PlantillaDxf[] }
   /** VS4: las acciones del programa (viento y sismo), enteras; null o vacías, ninguna. Entran en la huella: lo que no vale lo dice el compilador. */
   | { op: "acciones"; acciones: AccionesEdificio | null }
+  /** DO: los datos de la obra (uso y materiales por defecto), enteros; null o vacíos, ninguno. No entran en la huella. Los materiales, del modelo. */
+  | { op: "obra"; obra: ObraProyecto | null }
   /** Varias operaciones como una sola: o entran todas o ninguna (y se deshacen de una vez). */
   | { op: "lote"; operaciones: readonly Operacion[] };
 
@@ -85,7 +88,7 @@ export const nombreColeccion = (c: Coleccion): string => NOMBRES[c];
 
 const conLista = (m: ModeloFisico, c: Coleccion, l: readonly Objeto[]): ModeloFisico => ({ ...m, [c]: l }) as ModeloFisico;
 
-type DatosProyecto = Partial<Pick<Proyecto, "nombre" | "descripcion" | "vistas" | "armado" | "plantillas">>;
+type DatosProyecto = Partial<Pick<Proyecto, "nombre" | "descripcion" | "vistas" | "armado" | "plantillas" | "obra">>;
 type Paso = { ok: true; modelo: ModeloFisico; proyecto?: DatosProyecto } | { ok: false; errores: Diagnostico[]; usos?: Uso[] };
 
 /** Las referencias de `o` que no apuntan a un objeto de su colección. */
@@ -287,7 +290,7 @@ function mover(m: ModeloFisico, o: Extract<Operacion, { op: "mover" }>): Paso {
 
 /**
  * AB: la armadura base sigue a sus losas cuando una operación las renombra o las borra; V2c-4: las
- * plantillas DXF, a sus plantas.
+ * plantillas DXF, a sus plantas; DO: los materiales por defecto de la obra, a sus materiales.
  */
 function conArmado(s: Paso, antes: ModeloFisico, datos: DatosProyecto, renombres: ReadonlyMap<string, string> = new Map()): Paso {
   if (!s.ok) return s;
@@ -310,6 +313,13 @@ function conArmado(s: Paso, antes: ModeloFisico, datos: DatosProyecto, renombres
     });
     if (cambia) d = { ...d, plantillas };
   }
+  if (d.obra?.materiales) {
+    const obra = seguirMateriales(d.obra, renombres, antes, s.modelo);
+    if (obra !== d.obra) {
+      const { obra: _o, ...resto } = d;
+      d = obra ? { ...resto, obra } : resto;
+    }
+  }
   return d === datos ? s : { ...s, proyecto: d };
 }
 
@@ -322,7 +332,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
     case "convertir":
       return conArmado(convertir(m, o), m, datos, new Map([[o.id, o.objeto.id]]));
     case "borrar":
-      return conArmado(borrar(m, o), m, datos);
+      return conArmado(borrar(m, o), m, datos, o.dependientes && o.dependientes !== "borrar" ? new Map(Object.entries(o.dependientes.reasignar)) : new Map());
     case "mover":
       return mover(m, o);
     case "renumerar": {
@@ -335,6 +345,13 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
       const { armado: _a, ...resto } = datos;
       const armado = limpiarArmado(o.armado ?? undefined);
       return { ok: true, modelo: m, proyecto: armado ? { ...resto, armado } : resto };
+    }
+    case "obra": {
+      const obra = limpiarObra(o.obra);
+      const errores = comprobarObra(obra, m);
+      if (errores.length) return { ok: false, errores };
+      const { obra: _o, ...resto } = datos;
+      return { ok: true, modelo: m, proyecto: obra ? { ...resto, obra } : resto };
     }
     case "datos":
       return { ok: true, modelo: m, proyecto: { ...datos, ...("nombre" in o ? { nombre: o.nombre } : {}), ...("descripcion" in o ? { descripcion: o.descripcion } : {}) } };
@@ -383,7 +400,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
 
 /** Aplica una operación. El proyecto que sale pasa el esquema; si no, no se aplica. */
 export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
-  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas, armado: p.armado, plantillas: p.plantillas }, p.opciones ?? {});
+  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas, armado: p.armado, plantillas: p.plantillas, obra: p.obra }, p.opciones ?? {});
   if (!s.ok) return s.usos ? { ok: false, errores: s.errores, usos: s.usos } : { ok: false, errores: s.errores };
   const q: Proyecto = { ...p, modelo: s.modelo };
   if (s.proyecto) {
@@ -400,6 +417,8 @@ export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
     }
     if (s.proyecto.armado) q.armado = s.proyecto.armado;
     else delete q.armado;
+    if (s.proyecto.obra) q.obra = s.proyecto.obra;
+    else delete q.obra;
     const ts = s.proyecto.plantillas;
     if (ts !== p.plantillas) {
       if (!ts?.length) delete q.plantillas;

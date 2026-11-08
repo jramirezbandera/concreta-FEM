@@ -162,11 +162,15 @@ export function materialPorId(m: ModeloFisico, id: string): { material: Material
 }
 
 /**
- * El material que se propone para una familia: el más usado de ese tipo por las secciones, las losas
- * y los muros; si no hay ninguno usado, el primero de ese tipo; si no hay, el típico (HA-30, S275).
- * Sin familia (una sección general), el más usado de todos, o el primero.
+ * El material que se propone para una familia: el de la obra (`preferido`, DO: el material por
+ * defecto de ese tipo de elemento) si está en el modelo y es de esa familia; si no, el más usado de
+ * ese tipo por las secciones, las losas y los muros; si no hay ninguno usado, el primero de ese tipo;
+ * si no hay, el típico (HA-30, S275). Sin familia (una sección general), el más usado de todos, o el
+ * primero.
  */
-export function materialPropuesto(m: ModeloFisico, familia: FamiliaMaterial | null): string {
+export function materialPropuesto(m: ModeloFisico, familia: FamiliaMaterial | null, preferido?: string): string {
+  const p = preferido === undefined ? undefined : m.materiales.find((x) => x.id === preferido);
+  if (p && (familia === null || p.tipo === familia)) return p.id;
   const n = new Map<string, number>();
   for (const o of [...m.secciones, ...(m.losas ?? []), ...(m.muros ?? [])] as { material?: string }[]) if (o.material) n.set(o.material, (n.get(o.material) ?? 0) + 1);
   const deFamilia = m.materiales.filter((x) => familia === null || x.tipo === familia);
