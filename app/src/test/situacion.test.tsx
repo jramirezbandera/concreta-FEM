@@ -13,6 +13,7 @@ import { huellaCompilacion } from "../../../src/compilador/compilar.ts";
 import { resolverOpciones } from "../../../src/compilador/fisico.ts";
 import type { Proyecto } from "../../../src/agente/proyecto.ts";
 import { App } from "../App.tsx";
+import { AlzadoEsquema } from "../armazon/Situacion.tsx";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
 
 vi.mock("../sesion/cliente.ts", async () => {
@@ -51,6 +52,28 @@ beforeAll(async () => {
   await iniciarNucleo(wasm);
   (globalThis as unknown as { __motor: string }).__motor = sha256(new Uint8Array(wasm));
 }, 120_000);
+
+describe("Situación · alzado esquemático", () => {
+  it("cada fila mide la altura de la planta de abajo (hasta la de encima), no la de la de arriba", () => {
+    // Cinco plantas de 3 m sobre la cimentación; la de arriba, con una altura que no se dibuja (nada encima)
+    const plantas = [
+      { id: "N5", cota: 15, altura: 0.5 },
+      { id: "N4", cota: 12, altura: 3 },
+      { id: "N3", cota: 9, altura: 3 },
+      { id: "N2", cota: 6, altura: 3 },
+      { id: "N1", cota: 3, altura: 3 },
+      { id: "Cim", cota: 0, altura: 3 },
+    ];
+    const { container } = render(<AlzadoEsquema plantas={plantas} activa={null} otras={new Set()} onPlanta={() => {}} />);
+    const ys = [...container.querySelectorAll(".sit-id")].map((t) => Number(t.getAttribute("y")));
+    const filas = ys.slice(1).map((y, i) => y - ys[i]!);
+    expect(filas).toHaveLength(5);
+    for (const f of filas) expect(f).toBeCloseTo(filas[0]!, 9);
+    expect(filas[0]).toBeGreaterThan(15);
+    // El tramo de debajo de cada planta, en su rótulo
+    expect(container.querySelector("title")!.textContent).toContain("tramo de debajo 3,00 m");
+  });
+});
 
 describe("Situación", () => {
   it("marca la planta de la vista; un clic en otra planta la enseña y uno en un eje enseña su alzado", async () => {

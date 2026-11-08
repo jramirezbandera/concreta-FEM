@@ -94,12 +94,13 @@ const X_PILARES = [60, 108, 156];
 const MIN_FILA = 15;
 const MAX_ALTO = 150;
 
-function AlzadoEsquema({ plantas, activa, otras, onPlanta }: { plantas: readonly { id: string; nombre?: string; cota: number | null; altura: number | null }[]; activa: string | null; otras: ReadonlySet<string>; onPlanta: (id: string) => void }) {
-  const total = plantas.reduce((s, p) => s + (p.altura ?? 0), 0);
+export function AlzadoEsquema({ plantas, activa, otras, onPlanta }: { plantas: readonly { id: string; nombre?: string; cota: number | null; altura: number | null }[]; activa: string | null; otras: ReadonlySet<string>; onPlanta: (id: string) => void }) {
+  // La altura de una planta es la que hay hasta la de encima (`Planta.altura`, como `cotasPlantas`):
+  // la fila entre dos forjados es la altura del de abajo, y la de la planta de arriba no se dibuja.
+  const total = plantas.reduce((s, p, i) => s + (i > 0 ? (p.altura ?? 0) : 0), 0);
   const k = total > 0 ? Math.min(28, MAX_ALTO / total) : 28;
   const ys: number[] = [];
-  // La altura de una planta es la del tramo de debajo: la fila va de su forjado al de la siguiente
-  plantas.forEach((_, i) => ys.push(i === 0 ? 9 : ys[i - 1]! + Math.max(MIN_FILA, (plantas[i - 1]!.altura ?? 0) * k)));
+  plantas.forEach((p, i) => ys.push(i === 0 ? 9 : ys[i - 1]! + Math.max(MIN_FILA, (p.altura ?? 0) * k)));
   const ultima = plantas.length - 1;
   const alto = ys[ultima]! + 12;
   return (
@@ -108,9 +109,11 @@ function AlzadoEsquema({ plantas, activa, otras, onPlanta }: { plantas: readonly
         const y = ys[i]!;
         const abajo = i < ultima ? ys[i + 1]! : null;
         const id = p.id.length > 6 ? `${p.id.slice(0, 5)}…` : p.id;
+        // El tramo bajo esta planta: la altura de la de debajo
+        const bajo = i < ultima ? plantas[i + 1]!.altura : null;
         return (
           <g key={p.id} className="sit-nivel" data-activa={p.id === activa || undefined} data-otra={(p.id !== activa && otras.has(p.id)) || undefined} aria-label={`Ver la planta ${p.id}`} aria-pressed={p.id === activa} {...alPulsar(() => onPlanta(p.id))}>
-            <title>{`${p.id}${p.nombre ? ` · ${p.nombre}` : ""} · cota ${cota(p.cota)}${p.altura ? ` · ${fmt(p.altura, 2)} m` : ""}`}</title>
+            <title>{`${p.id}${p.nombre ? ` · ${p.nombre}` : ""} · cota ${cota(p.cota)}${bajo ? ` · tramo de debajo ${fmt(bajo, 2)} m` : ""}`}</title>
             <rect className="sit-banda" x={0} y={y - 6.5} width={WA} height={13} rx={3} />
             {abajo !== null && X_PILARES.map((x) => <rect key={x} className="sit-pilar" x={x - 1.25} y={y + 2.5} width={2.5} height={Math.max(0, abajo - y - 5)} />)}
             {i === ultima ? (
