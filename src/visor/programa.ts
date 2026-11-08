@@ -5,9 +5,10 @@
  * - los casos del programa, para los selectores, con su familia (`casosPrograma`);
  * - el modelo físico con sus cargas, para dibujarlas en la planta, el alzado y el 3D con lo que ya
  *   hay (`fisicoConPrograma`): las del viento, las que resuelve el compilador; las del sismo, que no
- *   es un caso estático, sus fuerzas equivalentes de planta (la diferencia de los cortantes
- *   combinados, art. 3.7.4) en el centro de masas de cada planta, desplazadas ±e: dan el cortante y
- *   el par de la excentricidad accidental de cada caso. Sólo con resultados;
+ *   es un caso estático, sus fuerzas equivalentes de planta (la combinación de las fuerzas de la
+ *   planta en cada modo, como CYPECAD: VS3-d) en el centro de masas de cada planta, desplazadas ±e:
+ *   dan el par de la excentricidad accidental de cada caso; juntas suman más que el cortante en la
+ *   base, que es la combinación de sus sumas. Sólo con resultados;
  * - los datos de las fichas: el viento por plantas (`datosViento`, sin calcular), el espectro con su
  *   curva (`datosSismo`) y las masas y los modos (`datosModal`), con la forma de un modo para
  *   animarla como una deformada (`formaModo`).

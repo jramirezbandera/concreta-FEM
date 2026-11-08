@@ -23,7 +23,9 @@
  *   combinaciones;
  * - tᵢ, la parte lineal: el torsor de la excentricidad accidental (art. 3.2), que es un caso estático
  *   y, con todos los modos, se escribe exacto en ellos (un caso estático con fuerzas sólo en los GDL
- *   con masa es Σᵢ modoᵢ·(φᵢᵀ·f)/ωᵢ²);
+ *   con masa es Σᵢ modoᵢ·(φᵢᵀ·f)/ωᵢ²). Su par en cada planta es F·e, con F la fuerza equivalente de
+ *   la planta: la combinación, con la misma regla, de las fuerzas de esa planta en cada modo, como
+ *   CYPECAD (VS3-d, `viento-sismo.md` §14);
  * - en los desplazamientos, el valor del caso espectral va multiplicado por μ (3.6.2.2).
  *
  * **Quién resuelve.** Nadie aplica factores a mano: quien tiene un valor por caso base llama a
@@ -118,7 +120,7 @@ export interface DireccionEspectral {
   regla?: OpcionesRegla;
   /**
    * Excentricidad accidental de cada diafragma, m ≥ 0 (en el orden de `modal.diafragmas`). Con ella,
-   * el torsor de planta: un par Mz = +F·e en cada diafragma, con F su fuerza equivalente.
+   * el torsor de planta: un par Mz = +F·e en cada diafragma, con F su fuerza equivalente (`fuerzas`).
    */
   excentricidades?: ArrayLike<number>;
 }
@@ -132,7 +134,11 @@ export interface NivelEspectral {
   masa: number;
   /** Cortante combinado bajo el nivel (el de todo lo que hay en él y por encima), kN. */
   cortante: number;
-  /** Fuerza equivalente del nivel, kN: la diferencia de los cortantes combinados (puede salir negativa: la combinación destruye el signo). */
+  /**
+   * Fuerza equivalente del nivel, kN: la combinación de las fuerzas del nivel en cada modo (≥ 0), como
+   * CYPECAD (VS3-d). Las de todos los niveles suman más que el cortante en la base, que es la
+   * combinación de sus sumas.
+   */
   fuerza: number;
   /** Desplazamiento combinado del nivel en la dirección (el de su centro de masas), m, ya con μ. */
   desplazamiento: number;
@@ -155,7 +161,7 @@ export interface RespuestaEspectral {
   basalModos: Float64Array;
   basal: number;
   niveles: NivelEspectral[];
-  /** Fuerza equivalente y par del torsor de cada diafragma (en el orden de `modal.diafragmas`), kN y kN·m. */
+  /** Fuerza equivalente de cada diafragma (la combinación de las suyas en cada modo) y par de su torsor, en el orden de `modal.diafragmas`, kN y kN·m. */
   fuerzas: Float64Array;
   pares: Float64Array | null;
   /**
@@ -229,7 +235,11 @@ export function respuestaEspectral(modal: ResultadoModal, d: DireccionEspectral)
   niveles.forEach((nivel, n) => {
     for (let i = 0; i < nm; i++) for (const k of nivel.diafragmas) acumulado[i]! += fuerzaModo(i, k);
     nivel.cortante = combinarModos(acumulado, regla);
-    nivel.fuerza = nivel.cortante - (n > 0 ? niveles[n - 1]!.cortante : 0);
+    for (let i = 0; i < nm; i++) {
+      x[i] = 0;
+      for (const k of nivel.diafragmas) x[i]! += fuerzaModo(i, k);
+    }
+    nivel.fuerza = combinarModos(x, regla);
     for (let i = 0; i < nm; i++) x[i] = despNivel(i, nivel);
     nivel.desplazamiento = mu * combinarModos(x, regla);
     const debajo = niveles[n + 1];
@@ -239,19 +249,17 @@ export function respuestaEspectral(modal: ResultadoModal, d: DireccionEspectral)
   const basalModos = Float64Array.from(acumulado);
   const basal = niveles.length ? niveles[niveles.length - 1]!.cortante : 0;
 
-  // Fuerza equivalente de cada diafragma: la de su nivel; con varios en una cota, en proporción a la suya combinada
+  // Fuerza equivalente de cada diafragma: la combinación de las suyas en cada modo (con uno en la cota, la de su nivel)
   const fuerzas = new Float64Array(nd);
   for (const nivel of niveles) {
     if (nivel.diafragmas.length === 1) {
       fuerzas[nivel.diafragmas[0]!] = nivel.fuerza;
       continue;
     }
-    const propias = nivel.diafragmas.map((k) => {
+    for (const k of nivel.diafragmas) {
       for (let i = 0; i < nm; i++) x[i] = fuerzaModo(i, k);
-      return combinarModos(x, regla);
-    });
-    const suma = propias.reduce((s, v) => s + v, 0);
-    nivel.diafragmas.forEach((k, j) => (fuerzas[k] = suma > 0 ? (nivel.fuerza * propias[j]!) / suma : nivel.fuerza / nivel.diafragmas.length));
+      fuerzas[k] = combinarModos(x, regla);
+    }
   }
 
   // El torsor de la excentricidad accidental, en los modos

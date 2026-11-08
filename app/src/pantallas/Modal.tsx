@@ -208,7 +208,7 @@ export function ModoModal() {
           })}
         </tbody>
       </table>
-      <p className="nota">V: el cortante combinado bajo la planta; F equiv.: la diferencia de los cortantes combinados (puede salir negativa en las plantas altas); par: el de la excentricidad accidental (F·e); u·μ: el desplazamiento combinado del centro de masas, por la ductilidad; θ = P·d/(V·h), art. 3.8 (por encima de 0,10 hay que considerar el segundo orden).</p>
+      <p className="nota">V: el cortante combinado bajo la planta; F equiv.: la combinación de las fuerzas de la planta en cada modo (juntas suman más que el cortante en la base); par: el de la excentricidad accidental (F·e); u·μ: el desplazamiento combinado del centro de masas, por la ductilidad; θ = P·d/(V·h), art. 3.8 (por encima de 0,10 hay que considerar el segundo orden).</p>
     </Seccion>
   ) : (
     <p className="nota">{sismo.datos ? (sismo.datos.definido ? textoApp(sismo.datos.motivo ?? "…") : "Sin emplazamiento (municipio o ab) no hay espectro: sólo masas y modos. Se da en Cargas · Sismo.") : "…"}</p>

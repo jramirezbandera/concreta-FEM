@@ -177,7 +177,10 @@ export interface NivelSismo {
   cota: number;
   /** Masa, t. */
   masa: number;
-  /** Cortante combinado bajo el nivel y fuerza equivalente (la diferencia de los cortantes combinados), kN. */
+  /**
+   * Cortante combinado bajo el nivel y fuerza equivalente (la combinación de las fuerzas del nivel en
+   * cada modo, como CYPECAD: VS3-d; las de todos los niveles suman más que el cortante en la base), kN.
+   */
   cortante: number;
   fuerza: number;
   /** Excentricidad accidental, m, y par de su torsor, kN·m (sumados los de sus plantas). */

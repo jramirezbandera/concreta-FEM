@@ -148,7 +148,7 @@ describe("VS4 en el visor: las acciones del programa a la vista", () => {
     expect(sinCalcular.sesion.modal().modal).toBeNull();
   });
 
-  it("con resultados, las fuerzas equivalentes del sismo dibujadas dan el cortante en la base y el par de cada caso, y los modos salen", () => {
+  it("con resultados, las fuerzas equivalentes del sismo dibujadas son las de cada planta (suman más que el cortante en la base) con el par de cada caso, y los modos salen", () => {
     const q = s.q!;
     const sismo = valido(q.sismo());
     const fp = s.fisicoCargas;
@@ -160,8 +160,14 @@ describe("VS4 en el visor: las acciones del programa a la vista", () => {
     ] as const) {
       const cargas = (fp.cargas ?? []).filter((c) => c.caso === caso && c.tipo === "puntual");
       expect(cargas.length).toBe(sismo.direcciones[eje].niveles.filter((n) => n.fuerza !== 0).length);
+      // VS3-d: la de cada planta, la combinación de las suyas en cada modo (como CYPECAD); juntas, más que el cortante en la base
+      for (const c of cargas) {
+        if (c.tipo !== "puntual") continue;
+        const nivel = sismo.direcciones[eje].niveles.find((n) => n.plantas.includes(c.planta))!;
+        expect(c.F?.[eje]).toBe(nivel.fuerza);
+      }
       const F = cargas.reduce((t, c) => t + (c.tipo === "puntual" ? (c.F?.[eje] ?? 0) : 0), 0);
-      expect(Math.abs(F - sismo.direcciones[eje].basal) / sismo.direcciones[eje].basal).toBeLessThan(1e-12);
+      expect(F).toBeGreaterThan(sismo.direcciones[eje].basal);
       // el par respecto al centro de masas de cada planta: ±F·e, el del torsor de la excentricidad
       const md = valido(q.modos());
       for (const c of cargas) {

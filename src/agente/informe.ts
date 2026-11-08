@@ -210,7 +210,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
         filas: s.direcciones.map((x) => [x.eje, num(x.mu), num(x.beta, 3), String(x.dominante.modo), num(x.dominante.T, 3), pct(x.dominante.masaEfectiva), kN(x.cortanteBasal), num(x.coeficienteSismico, 4), num(1000 * x.desplazamientoMaximo, 1), num(x.thetaMaxima, 3)]),
       });
       for (const x of s.direcciones) {
-        parrafo(`Según ${x.eje}, de arriba abajo (V: cortante combinado bajo la planta; F: su fuerza equivalente; par: el de la excentricidad; θ del art. 3.8${x.mesetaLarga ? "; α = 2,5 por encima de TB, art. 2.4" : ""}):`);
+        parrafo(`Según ${x.eje}, de arriba abajo (V: cortante combinado bajo la planta; F: su fuerza equivalente, la combinación de las de cada modo; par: el de la excentricidad; θ del art. 3.8${x.mesetaLarga ? "; α = 2,5 por encima de TB, art. 2.4" : ""}):`);
         b.push({
           tipo: "tabla",
           cabecera: ["Planta", "Cota (m)", "Masa (t)", "V (kN)", "F (kN)", "e (m)", "Par (kN·m)", "u·μ (mm)", "Deriva·μ (mm)", "θ"],

@@ -209,10 +209,12 @@ describe("VS3: los casos del sismo del programa", () => {
       expect(d.mu).toBe(2);
       expect(d.beta).toBe(0.5);
       expect(d.plantas.map((p) => p.plantas)).toEqual([["N3"], ["N2"], ["N1"]]);
-      // el cortante crece hacia abajo y el de la base es el de la última planta; las fuerzas equivalentes lo suman
+      // el cortante crece hacia abajo y el de la base es el de la última planta; las fuerzas equivalentes, combinadas
+      // planta a planta (VS3-d, como CYPECAD), suman más que él, y la de arriba es su cortante
       expect(d.plantas[2]!.cortante).toBe(d.cortanteBasal);
       expect(d.plantas[0]!.cortante).toBeLessThan(d.plantas[1]!.cortante);
-      expect(rel(d.plantas.reduce((t, p) => t + p.fuerza, 0), d.cortanteBasal)).toBeLessThan(1e-12);
+      expect(d.plantas.reduce((t, p) => t + p.fuerza, 0)).toBeGreaterThan(d.cortanteBasal);
+      expect(rel(d.plantas[0]!.fuerza, d.plantas[0]!.cortante)).toBeLessThan(1e-12);
       // un edificio de tres plantas con T ≈ 0,3–0,5 s en la meseta: el cortante, del orden de 2,5·β·ac·peso (entre el 60 y el 100 %)
       const meseta = 2.5 * 0.5 * v.emplazamiento.ac * v.peso;
       expect(d.cortanteBasal / meseta).toBeGreaterThan(0.6);

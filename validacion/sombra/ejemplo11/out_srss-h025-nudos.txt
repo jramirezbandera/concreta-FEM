@@ -14,16 +14,16 @@ Modo | T CYPECAD | T motor | dif. | Mx CYPECAD | My CYPECAD | Mx motor | My moto
 7 | — | 0.1442 | — | — | — | 0.00 | 3.56
 8 | — | 0.1442 | — | — | — | 3.56 | 0.00
 9 | — | 0.1121 | — | — | — | 0.00 | 0.00
-Masa de los 5 primeros modos: CYPECAD 96,37 / 96,38 %; motor 96.44 / 96.43 %
+Masa de los 5 primeros modos: CYPECAD 96.37 / 96.38 %; motor 96.44 / 96.43 %
 
 Regla srss, excentricidad 0. Cortante en la base: X 349.7 kN (8.08 % de 4325.8); Y 349.5 kN (8.08 % de 4325.8). Cortante combinado por planta (kN):
-Dirección | Planta | Q CYPECAD | Q motor | dif. | F eq. CYPECAD | F motor (diferencia de cortantes)
+Dirección | Planta | Q CYPECAD | Q motor | dif. | F eq. CYPECAD | F eq. motor
 X | F3 | 182.6 | 186.5 | 2.1 % | 182.6 | 186.5
-X | F2 | 281.6 | 289.8 | 2.9 % | 135.0 | 103.3
-X | F1 | 341.4 | 349.7 | 2.4 % | 92.1 | 59.9
+X | F2 | 281.6 | 289.8 | 2.9 % | 135.0 | 143.3
+X | F1 | 341.4 | 349.7 | 2.4 % | 92.1 | 106.2
 Y | F3 | 182.7 | 186.4 | 2.0 % | 182.7 | 186.4
-Y | F2 | 281.7 | 289.6 | 2.8 % | 135.0 | 103.2
-Y | F1 | 341.5 | 349.5 | 2.3 % | 92.1 | 59.9
+Y | F2 | 281.7 | 289.6 | 2.8 % | 135.0 | 143.3
+Y | F1 | 341.5 | 349.5 | 2.3 % | 92.1 | 106.2
 
 ## Pilares: esfuerzos pésimos del listado (cabeza y pie de cada tramo)
 Los del motor en la cara inferior del forjado (cabeza) y en el arranque del tramo (pie), con la combinación de la nota. Ejes (comprobados con el viento y con el sismo en la dirección principal): N de compresión positivo; Mxx = −M3, Myy = M2, Qx = V3, Qy = −V2 del motor. Con excentricidad, de sus dos signos el de más |valor| en cada componente.

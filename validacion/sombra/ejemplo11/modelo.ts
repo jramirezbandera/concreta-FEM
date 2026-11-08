@@ -19,7 +19,13 @@
  * - `srss`: la regla por defecto del motor (art. 3.6.2.4) en lugar de la CQC;
  * - `viento-modelo`: el viento con el ancho y la profundidad que salen del modelo (12,3 m);
  * - `h0375`, `h025`: `cype` con la malla de 0,375 m o de 0,25 m (por defecto, 0,75); `<variante>-h025`, otra
- *   variante con esa malla.
+ *   variante con esa malla;
+ * - `pf`: el segundo ejemplo del usuario (2.pdf, `cype2.json`), el mismo modelo con los pilares de 40 × 40
+ *   en el primer tramo, 30 × 30 en el segundo y 25 × 25 en el tercero, y su punto fijo: en la esquina de
+ *   fuera los de esquina, en la mitad del lado de fuera los de borde y centrado P5. Su listado no trae
+ *   los nudos de los forjados, así que los ábacos son los del primero (su centro de masas es el mismo,
+ *   (6,00; 6,02), y contienen los ejes de todos los tramos); `pf-centro`, las mismas secciones centradas
+ *   (sin punto fijo), para separar lo que hace el punto fijo.
  *
  *   bun validacion/sombra/ejemplo11/modelo.ts [<variante> ...]
  */
@@ -56,11 +62,18 @@ const ABACOS_CYPE: Vec2[][] = [
 /** El cruce de los ejes de dos nervios, de la retícula de casetones del DWG (casetones de 60 a 72). */
 const PASO: Vec2 = [0.84, 1.11];
 const CONTORNO = R(-0.15, -0.15, 12.15, 12.15);
+/** El punto fijo de cada pilar en el segundo ejemplo (2.pdf, §1.8.1). */
+const FIJO: Record<string, string> = {
+  P1: "esquina-inferior-izquierda", P2: "mitad-inferior", P3: "esquina-inferior-derecha",
+  P4: "mitad-izquierda", P5: "centro", P6: "mitad-derecha",
+  P7: "esquina-superior-izquierda", P8: "mitad-superior", P9: "esquina-superior-derecha",
+};
 
 export function modelo(nombreVariante: string): { nombre: string; modelo: ModeloFisico; opciones?: Record<string, unknown> } {
   // «<variante>-h025» o «-h0375»: la variante con esa malla («h025» y «h0375» solos son `cype`)
   const malla = /(?:^|-)h(025|0375)$/.exec(nombreVariante);
   const variante = malla ? nombreVariante.slice(0, malla.index) || "cype" : nombreVariante;
+  const pf = variante === "pf" || variante === "pf-centro";
   const m: ModeloFisico = {
     plantas: [
       { id: "F3", nombre: "Forjado 3", altura: null },
@@ -72,8 +85,13 @@ export function modelo(nombreVariante: string): { nombre: string; modelo: Modelo
     secciones: [
       { id: "P30x30", material: "HA-25", forma: "rectangular", b: 0.3, h: 0.3 },
       { id: "V30x30", material: "HA-25", forma: "rectangular", b: 0.3, h: 0.3 },
+      ...(pf ? [{ id: "P40x40", material: "HA-25", forma: "rectangular", b: 0.4, h: 0.4 }, { id: "P25x25", material: "HA-25", forma: "rectangular", b: 0.25, h: 0.25 }] : []),
     ],
-    pilares: PILARES.map(([id, x, y]) => ({ id, x, y, desde: "CIM", hasta: "F3", seccion: "P30x30" })),
+    pilares: PILARES.map(([id, x, y]) =>
+      pf
+        ? { id, x, y, ...(variante === "pf" ? { fijo: FIJO[id] } : {}), desde: "CIM", hasta: "F3", seccion: "P40x40", tramos: [{ planta: "F2", seccion: "P30x30" }, { planta: "F3", seccion: "P25x25" }] }
+        : { id, x, y, desde: "CIM", hasta: "F3", seccion: "P30x30" },
+    ),
     vigas: PLANTAS.flatMap((p) => VIGAS.map(([id, a, b]) => ({ id: `${p}-V${id}`, planta: p, puntos: [a, b], seccion: "V30x30" }))),
     losas: PLANTAS.map((p) => ({
       id: `L-${p}`,
@@ -135,6 +153,7 @@ if (import.meta.main) {
     const texto = JSON.stringify(proyecto, null, 2) + "\n";
     writeFileSync(join(dir, "proyecto.json"), texto);
     if (v === "cype") writeFileSync(join(RAIZ, "ejemplos", "ejemplo 1 6x6", "proyecto.json"), texto);
+    if (v === "pf") writeFileSync(join(RAIZ, "ejemplos", "ejemplo 1 6x6", "proyecto-pf.json"), texto);
     console.log(`${v}: ${join(dir, "proyecto.json")}`);
   }
 }

@@ -24,6 +24,7 @@ import { envolventeCampo, type Campo } from "../../../src/agente/render/resultad
 import type { Vec2 } from "../../../src/compilador/fisico.ts";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
 import { Sesion } from "../../../src/visor/sesion.ts";
+import { correlacionCqc } from "../../../src/motor/espectral.ts";
 
 const AQUI = import.meta.dirname;
 const RAIZ = join(AQUI, "..", "..", "..");
@@ -32,7 +33,9 @@ await iniciarNucleo(WASM);
 const variante = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "cype";
 const conNudos = process.argv.includes("--nudos");
 const texto = readFileSync(join(AQUI, ".datos", variante, "proyecto.json"), "utf8");
-const cy = JSON.parse(readFileSync(join(AQUI, ".datos", "cype.json"), "utf8"));
+// El listado: el del primer ejemplo (1.pdf) o, en las variantes `pf`, el del segundo (2.pdf)
+const listado = variante.startsWith("pf") ? "cype2" : "cype";
+const cy = JSON.parse(readFileSync(join(AQUI, ".datos", `${listado}.json`), "utf8"));
 
 const a = Sesion.abrir(texto, sha256(new Uint8Array(WASM)));
 if (!a.valido) throw new Error(JSON.stringify(a.diagnosticos));
@@ -70,11 +73,12 @@ log();
     log(`${i + 1} | ${c ? c.T.toFixed(3) : "—"} | ${m.periodo.toFixed(4)} | ${c ? pc(m.periodo, c.T) : "—"} | ${c ? (100 * c.Mx).toFixed(2) : "—"} | ${c ? (100 * c.My).toFixed(2) : "—"} | ${(100 * m.masaEfectiva[0]!).toFixed(2)} | ${(100 * m.masaEfectiva[1]!).toFixed(2)}`);
   }
   const acu5 = M.modos.slice(0, 5).reduce((t, m) => [t[0]! + m.masaEfectiva[0]!, t[1]! + m.masaEfectiva[1]!], [0, 0]);
-  log(`Masa de los 5 primeros modos: CYPECAD 96,37 / 96,38 %; motor ${(100 * acu5[0]!).toFixed(2)} / ${(100 * acu5[1]!).toFixed(2)} %`);
+  const cy5 = (cy.sismo.modos as { Mx: number; My: number }[]).slice(0, 5).reduce((t, m) => [t[0]! + m.Mx, t[1]! + m.My], [0, 0]);
+  log(`Masa de los 5 primeros modos: CYPECAD ${(100 * cy5[0]!).toFixed(2)} / ${(100 * cy5[1]!).toFixed(2)} %; motor ${(100 * acu5[0]!).toFixed(2)} / ${(100 * acu5[1]!).toFixed(2)} %`);
   log();
   const sis = (JSON.parse(texto).modelo.acciones.sismo ?? {}) as { regla?: string; excentricidad?: number };
   log(`Regla ${sis.regla ?? "srss"}, excentricidad ${sis.excentricidad ?? 0.05}. Cortante en la base: ${si.valor.direcciones.map((d) => `${d.eje} ${f1(d.basal)} kN (${(100 * d.coeficiente).toFixed(2)} % de ${f1(d.peso)})`).join("; ")}. Cortante combinado por planta (kN):`);
-  log(`Dirección | Planta | Q CYPECAD | Q motor | dif. | F eq. CYPECAD | F motor (diferencia de cortantes)`);
+  log(`Dirección | Planta | Q CYPECAD | Q motor | dif. | F eq. CYPECAD | F eq. motor`);
   for (const d of si.valor.direcciones) {
     const nombre = d.eje === "X" ? "Sismo X1" : "Sismo Y1";
     for (const p of d.niveles) {
@@ -177,8 +181,8 @@ const med = (xs: number[]) => {
   log();
 }
 
-// ─── 4. Vigas del pórtico 1 (y = 0), frente a las capturas ──────────────────────────────────────
-{
+// ─── 4. Vigas del pórtico 1 (y = 0), frente a las capturas (sólo el primer ejemplo) ─────────────
+if (listado === "cype") {
   log(`## Vigas del pórtico 1 (P1–P2–P3), envolventes en las caras de los pilares (a 0,15 m de su eje) y máximo del vano`);
   log(`CYPECAD (capturas «combinaciones persistentes esfuerzos viga My planta 1» y «combinaciones sísmicas … planta 3»), con «Decalar las leyes de momentos flectores» marcado; su redistribución de negativos, si la hay, no está en el listado.`);
   const CAPTURAS: Record<string, { sit: "ELU-PT" | "ELU-SIS"; My: string; Vz?: string }> = {
@@ -223,6 +227,112 @@ const med = (xs: number[]) => {
     if (cap.Vz) {
       log(`  CYPECAD Vz: ${cap.Vz}`);
       log(`  motor Vz (el de más |valor|): caras ${resV[0]} / ${resV[1]} · ${resV[2]} / ${resV[3]}`);
+    }
+  }
+  log();
+}
+
+// ─── 5. Pilares por hipótesis y sumatorio por planta (el segundo listado) ───────────────────────
+if (cy.hipotesis && Object.keys(cy.hipotesis).length) {
+  log(`## Pilares por hipótesis (listado «Esfuerzos de pilares por hipótesis»)`);
+  log(`Base y cabeza de cada tramo, en los ejes locales de CYPECAD: N de compresión positivo, Mx = M2, My = −M3, Qx = V3, Qy = −V2 y T del motor (comprobados con el viento). El sismo, |valor| de la CQC de los 8 modos de CYPECAD con sus periodos (Ω = 5 %) frente a |EX| y |EY| del motor (sin excentricidad).`);
+  const COMP = ["N", "Mx", "My", "Qx", "Qy", "T"] as const;
+  const UMBRAL = [5, 2, 2, 1, 1, 0.5];
+  const nuestro = (v: ArrayLike<number>) => [-v[0]!, v[4]!, -v[5]!, v[2]!, -v[1]!, v[3]!];
+  const periodos = (cy.sismo.modos as { T: number }[]).map((m) => m.T);
+  const cqc = (xs: number[]) => {
+    let t = 0;
+    for (let i = 0; i < xs.length; i++) for (let j = 0; j < xs.length; j++) t += correlacionCqc(periodos[i]!, periodos[j]!, 0.05) * xs[i]! * xs[j]!;
+    return Math.sqrt(Math.max(0, t));
+  };
+  const caso = (h: string): Record<string, number> | null => {
+    if (h === "Peso propio") return { PP: 1 };
+    if (h === "Cargas muertas") return { CM: 1 };
+    if (h === "Sobrecarga de uso") return { Qa: 1 };
+    const w = /^Viento ([+-][XY]) exc\.([+-])$/.exec(h);
+    return w ? { [`W${w[1]}${w[2]}e`]: 1 } : null;
+  };
+  const grupos: Record<string, number[]> = {};
+  const signos: Record<string, [number, number]> = {};
+  const anota = (g: string, c: number, m: number, k: number) => {
+    if (Math.abs(c) < UMBRAL[k]!) return;
+    (grupos[g] ??= []).push(m / c - 1);
+    const sg = (signos[g] ??= [0, 0]);
+    sg[Math.sign(c) === Math.sign(m) ? 0 : 1]++;
+  };
+  const filas: string[] = [];
+  type Hip = Record<string, { base: number[]; cabeza: number[] }>;
+  for (const [pid, porTramo] of Object.entries(cy.hipotesis as Record<string, Record<string, Hip>>)) {
+    const t = q.pilar(pid);
+    if (!t.valido) throw new Error(JSON.stringify(t.diagnosticos));
+    for (const [tramo, hips] of Object.entries(porTramo)) {
+      const tr = t.valor.find((x) => x.planta === tramo)!;
+      for (const pos of ["base", "cabeza"] as const) {
+        const sec = pos === "base" ? tr.base : tr.cabeza;
+        const comb = (f: Record<string, number>) => {
+          const fac = new Float64Array(ids.length);
+          for (const [k, v] of Object.entries(f)) fac[ids.indexOf(k)] = v;
+          return nuestro(q.combinar(sec.esfuerzos, 6, fac));
+        };
+        for (const [h, v] of Object.entries(hips)) {
+          const f = caso(h);
+          if (!f) continue;
+          const m = comb(f);
+          const tipo = h.startsWith("Viento") ? "viento" : "gravitatorias";
+          COMP.forEach((c, k) => anota(`${tipo}, ${c}`, v[pos][k]!, m[k]!, k));
+          if (pid === "P1" || pid === "P2" || pid === "P5") filas.push(`${pid} | ${tramo} | ${pos} | ${h} | ${COMP.map((_, k) => `${f1(v[pos][k]!)} / ${f1(m[k]!)}`).join(" | ")}`);
+        }
+        for (const [eje, id] of [["X", "EX+e"], ["Y", "EY+e"]] as const) {
+          const modos = Object.keys(hips).filter((h) => h.startsWith(`Sismo ${eje} Modo`)).sort((a, b) => Number(a.split(" ").pop()) - Number(b.split(" ").pop()));
+          if (!modos.length) continue;
+          const c = COMP.map((_, k) => cqc(modos.map((h) => hips[h]![pos][k]!)));
+          const m = comb({ [id]: 1 }).map(Math.abs);
+          COMP.forEach((cc, k) => anota(`sismo ${eje}, ${cc}`, c[k]!, m[k]!, k));
+          if (pid === "P1" || pid === "P2" || pid === "P5") filas.push(`${pid} | ${tramo} | ${pos} | Sismo ${eje} (CQC) | ${COMP.map((_, k) => `${f1(c[k]!)} / ${f1(m[k]!)}`).join(" | ")}`);
+        }
+      }
+    }
+  }
+  log();
+  log(`Pilar | Tramo | Posición | Hipótesis | ${COMP.map((c) => `${c} CYPE / motor`).join(" | ")}`);
+  for (const l of filas) log(l);
+  log();
+  log(`Grupo | valores (|CYPE| ≥ 5 kN, 2 kN·m, 1 kN o 0,5 kN·m) | motor/CYPE − 1: mediana | |dif.|: mediana | máximo | signo igual / distinto`);
+  for (const [g, xs] of Object.entries(grupos).sort()) {
+    const ab = xs.map(Math.abs);
+    log(`${g} | ${xs.length} | ${(100 * med(xs)).toFixed(1)} % | ${(100 * med(ab)).toFixed(1)} % | ${(100 * Math.max(...ab)).toFixed(1)} % | ${signos[g]![0]} / ${signos[g]![1]}`);
+  }
+  log();
+  // El sumatorio por planta: la suma de N y del cortante de los tramos que arrancan de cada planta
+  log(`## Sumatorio por planta (los tramos que arrancan de cada planta: su base)`);
+  log(`Planta | hipótesis | N CYPE / motor | Qx CYPE / motor | Qy CYPE / motor`);
+  const tramoDe: Record<string, string> = { F2: "F3", F1: "F2", CIM: "F1" };
+  for (const [planta, hips] of Object.entries(cy.sumatorio as Record<string, Record<string, number[]>>)) {
+    const tramo = tramoDe[planta]!;
+    const suma = (f: Record<string, number> | null, eje?: "X" | "Y") => {
+      const r = [0, 0, 0, 0, 0, 0];
+      for (const pid of Object.keys(cy.hipotesis)) {
+        const t = q.pilar(pid);
+        if (!t.valido) continue;
+        const sec = t.valor.find((x) => x.planta === tramo)!.base;
+        const fac = new Float64Array(ids.length);
+        if (f) for (const [k, v] of Object.entries(f)) fac[ids.indexOf(k)] = v;
+        else fac[ids.indexOf(eje === "X" ? "EX+e" : "EY+e")] = 1;
+        nuestro(q.combinar(sec.esfuerzos, 6, fac)).forEach((v, k) => (r[k]! += v));
+      }
+      return r;
+    };
+    for (const h of ["Peso propio", "Cargas muertas", "Sobrecarga de uso", "Viento +X exc.+", "Viento +Y exc.+"]) {
+      const c = hips[h];
+      if (!c) continue;
+      const m = suma(caso(h));
+      log(`${planta} | ${h} | ${f1(c[0]!)} / ${f1(m[0]!)} | ${f1(c[3]!)} / ${f1(m[3]!)} | ${f1(c[4]!)} / ${f1(m[4]!)}`);
+    }
+    for (const eje of ["X", "Y"] as const) {
+      const modos = Object.keys(hips).filter((h) => h.startsWith(`Sismo ${eje} Modo`)).sort((a, b) => Number(a.split(" ").pop()) - Number(b.split(" ").pop()));
+      const k = eje === "X" ? 3 : 4;
+      const c = cqc(modos.map((h) => hips[h]![k]!));
+      log(`${planta} | Sismo ${eje} (CQC de sus modos) | — | cortante ${f1(c)} | (el del motor, en «Sismo»)`);
     }
   }
   log();

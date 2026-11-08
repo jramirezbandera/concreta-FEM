@@ -57,6 +57,10 @@ ejemplos/Proyectos/
 
 # Prueba en sombra: los datos derivados del modelo CYPECAD del cliente (CY4)
 validacion/sombra/*/.datos/
+# Prueba en sombra: los ficheros de CYPECAD de los ejemplos del usuario (listados, DWG y capturas) no se suben
+# (decisión del usuario, 2026-11-08); sí los proyecto*.json del motor
+ejemplos/ejemplo 1 6x6/*
+!ejemplos/ejemplo 1 6x6/proyecto*.json
 
 # Validación DW: las muestras de ACadSharp (se traen con validacion/dwg/muestras.ts)
 validacion/dwg/.muestras/

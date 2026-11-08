@@ -371,7 +371,7 @@ export function hipotesisEspectro(e: EspectroSismo): string {
       : "con la raíz de la suma de los cuadrados, sumando antes en valor absoluto los de cada par de modos con periodos a menos del 10 %. ") +
     `El signo de cada resultado es el del modo de más masa en esa dirección, el mismo para todos, y el ± lo ponen las combinaciones, con el 30 % de la otra dirección (art. 3.4). Los desplazamientos del sismo van multiplicados por μ. ` +
     (e.excentricidad > 0
-      ? `Excentricidad accidental (art. 3.2): un par en cada planta, el de su fuerza equivalente (la diferencia de los cortantes combinados) por el ${coma(100 * e.excentricidad, 2)} % de la dimensión de la planta perpendicular al sismo, a un lado (+e) y al otro (−e); es un caso estático, sumado al de los modos.`
+      ? `Excentricidad accidental (art. 3.2): un par en cada planta, el de su fuerza equivalente (la combinación de las fuerzas de la planta en cada modo) por el ${coma(100 * e.excentricidad, 2)} % de la dimensión de la planta perpendicular al sismo, a un lado (+e) y al otro (−e); es un caso estático, sumado al de los modos.`
       : "Sin excentricidad accidental (escrita 0).")
   );
 }

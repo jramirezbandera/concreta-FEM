@@ -141,8 +141,9 @@ describe("VS3, criterio 2: una ménsula de dos masas, a mano", () => {
     expect(rel(arriba!.cortante, cortanteArriba)).toBeLessThan(1e-10);
     expect(rel(abajo!.cortante, cortanteBase)).toBeLessThan(1e-10);
     expect(rel(r.basal, cortanteBase)).toBeLessThan(1e-10);
+    // La fuerza equivalente de cada planta, la combinación de las suyas en cada modo (VS3-d, como CYPECAD)
     expect(rel(arriba!.fuerza, cortanteArriba)).toBeLessThan(1e-10);
-    expect(rel(abajo!.fuerza, cortanteBase - cortanteArriba)).toBeLessThan(1e-10);
+    expect(rel(abajo!.fuerza, Math.hypot(F[0]![0]!, F[1]![0]!))).toBeLessThan(1e-10);
     const mu = 2.5;
     expect(rel(arriba!.desplazamiento, mu * Math.hypot(u[0]![1]!, u[1]![1]!))).toBeLessThan(1e-10);
     expect(rel(abajo!.desplazamiento, mu * Math.hypot(u[0]![0]!, u[1]![0]!))).toBeLessThan(1e-10);
@@ -308,7 +309,8 @@ describe("VS3, criterio 4: los modos como casos", () => {
     expect(r.residuoTorsor).toBeLessThan(TOL_TORSOR);
     // Los pares: la fuerza equivalente de cada planta por su excentricidad
     md.diafragmas.forEach((_, k) => expect(r.pares![k]).toBe(r.fuerzas[k]! * excentricidades[k]!));
-    expect(rel(r.fuerzas.reduce((s, v) => s + v, 0), r.basal)).toBeLessThan(1e-12);
+    // (combinadas modo a modo, suman más que el cortante en la base, que es la combinación de sus sumas)
+    expect(r.fuerzas.reduce((s, v) => s + v, 0)).toBeGreaterThan(r.basal);
     // Un cálculo aparte: los pares, como cargas en los maestros
     const base = ed.modelo;
     const { modal: _m, ...sinModal } = base;
