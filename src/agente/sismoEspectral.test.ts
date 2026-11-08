@@ -308,6 +308,11 @@ describe("VS3, criterio 6: cada consulta combina los modos en su variable", () =
     if (!p.valido) throw new Error("sin pieza");
     type Terna = { esfuerzos: number[]; pesimos?: true };
     const tramos = (p.valor as { tramos: { base: Record<string, Terna>; cabeza: Record<string, Terna> }[] }).tramos;
+    // la respuesta dice cómo leerse: el orden, el convenio y, con el sismo, que las filas no son simultáneas
+    const leyenda = (p.valor as { leyenda: { orden: string[]; convenio: string; pesimos?: string } }).leyenda;
+    expect(leyenda.orden).toEqual(["N", "Vy", "Vz", "T", "My", "Mz"]);
+    expect(leyenda.convenio).toContain("N > 0 es tracción");
+    expect(leyenda.pesimos).toContain("no es un error");
     t.valor.forEach((tramo, i) => {
       for (const donde of ["base", "cabeza"] as const) {
         const e = tramo[donde].esfuerzos;

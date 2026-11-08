@@ -633,6 +633,43 @@ export function esfuerzosPesimosBarra(partes: { estatica: ArrayLike<number>; sis
   return esfuerzosPesimos(partes, extremo === "N+" ? { 0: 1 } : extremo === "N-" ? { 0: -1 } : {});
 }
 
+/**
+ * Lo que dice cómo leer los `esfuerzos` de `fem consultar pieza`, en la propia respuesta: un agente que
+ * no ha leído la skill tomaba el orden por una suposición y, con el sismo del programa, la misma
+ * combinación como N− y con tracción en otra fila por un error del programa (VS-o).
+ */
+export interface LeyendaEsfuerzos {
+  orden: readonly ["N", "Vy", "Vz", "T", "My", "Mz"];
+  unidades: string;
+  convenio: string;
+  /** Sólo si algún extremo lleva `pesimos: true`. */
+  pesimos?: string;
+}
+
+const PESIMOS_COMUN =
+  "Con el sismo del programa (pesimos: true), la combinación de los modos no tiene signo: en cada combinación el sismo suma ±A a la parte estática S de cada esfuerzo, y cada fila da los esfuerzos con sus signos pésimos, no un estado simultáneo.";
+
+const PESIMOS: Record<"pilar" | "viga" | "barra", string> = {
+  pilar:
+    `${PESIMOS_COMUN} En un pilar, cada combinación da dos juegos, con N = S − A (más compresión) y N = S + A (menos compresión o tracción), y en los dos Vy, Vz, T, My y Mz con el signo que aumenta su valor absoluto. Por eso una misma combinación puede salir en N− con compresión y en otra fila (N+, My o Mz) con tracción y los mismos cortantes y momentos: no es un error. Se comprueba con todas las filas.`,
+  viga: `${PESIMOS_COMUN} En una viga: Vy, Vz, T y Mz con el signo que aumenta su valor absoluto; My con el del extremo (My+ el máximo, My− el mínimo); N con la menor compresión.`,
+  barra: `${PESIMOS_COMUN} En una barra: N+ y N− con el suyo; en los demás extremos, todos (también |N|) con el signo que aumenta su valor absoluto.`,
+};
+
+function leyendaEsfuerzos(tipo: "pilar" | "viga" | "barra", conPesimos: boolean): LeyendaEsfuerzos {
+  return {
+    orden: ["N", "Vy", "Vz", "T", "My", "Mz"],
+    unidades: "kN y kN·m",
+    convenio: "Ejes locales de la pieza, convenio de barras de la cabecera de modelo.ts (tipo CSI): N > 0 es tracción.",
+    ...(conPesimos ? { pesimos: PESIMOS[tipo] } : {}),
+  };
+}
+
+const algunoPesimo = (extremos: Iterable<{ pesimos?: true }>): boolean => {
+  for (const e of extremos) if (e.pesimos) return true;
+  return false;
+};
+
 export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string | undefined, o: { estaciones?: boolean } = {}): Respuesta<unknown> {
   if (!id) return no("consulta/sin-id", "La consulta «pieza» necesita el id de la pieza (fem consultar <proyecto> pieza <id>).");
   if (o.estaciones) {
@@ -663,7 +700,8 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
       return ext;
     };
     const tramos: TramoEnvolvente[] = r.valor.map((t) => ({ planta: t.planta, seccion: t.seccion, longitud: t.longitud, base: extremo(t.base.esfuerzos), cabeza: extremo(t.cabeza.esfuerzos) }));
-    return si({ pieza: id, tipo: "pilar", combinaciones: conjunto.descripcion, tramos }, r.diagnosticos);
+    const pesimos = algunoPesimo(tramos.flatMap((t) => [...Object.values(t.base), ...Object.values(t.cabeza)]));
+    return si({ pieza: id, tipo: "pilar", combinaciones: conjunto.descripcion, leyenda: leyendaEsfuerzos("pilar", pesimos), tramos }, r.diagnosticos);
   }
   if (q.fisico.barras?.some((b) => b.id === id)) {
     // Fase BN: los extremos a lo largo de la barra, desde su inicio (sin vanos), cada uno con sus esfuerzos:
@@ -694,7 +732,7 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
     }
     const bs = q.mapeo.piezas[id] ?? [];
     const longitud = bs.length ? q.mapeo.barras[bs[bs.length - 1]!]!.s[3] : 0;
-    return si({ pieza: id, tipo: "barra", combinaciones: conjunto.descripcion, longitud, extremos });
+    return si({ pieza: id, tipo: "barra", combinaciones: conjunto.descripcion, leyenda: leyendaEsfuerzos("barra", algunoPesimo(Object.values(extremos))), longitud, extremos });
   }
   const v = q.viga(id);
   if (!v.valido) return no("consulta/no-existe", `No hay ninguna pieza ${id} (ni pilar, ni viga, ni vigueta, ni barra).`, [id]);
@@ -724,7 +762,8 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
     }
     vanos.push({ desde: va.desde, hasta: va.hasta, apoyos: [va.apoyoInicio?.objeto ?? null, va.apoyoFin?.objeto ?? null], ...(va.torsionEquilibrio ? { torsionEquilibrio: true as const } : {}), extremos: ext });
   }
-  return si({ pieza: id, tipo: v.valor.tipo, combinaciones: conjunto.descripcion, ...(v.valor.axilSinValor ? { axilSinValor: true } : {}), vanos }, v.diagnosticos);
+  const pesimos = algunoPesimo(vanos.flatMap((va) => Object.values(va.extremos)));
+  return si({ pieza: id, tipo: v.valor.tipo, combinaciones: conjunto.descripcion, leyenda: leyendaEsfuerzos("viga", pesimos), ...(v.valor.axilSinValor ? { axilSinValor: true } : {}), vanos }, v.diagnosticos);
 }
 
 // ─── Una banda ──────────────────────────────────────────────────────────────────────────────────

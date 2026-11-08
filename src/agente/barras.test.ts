@@ -102,8 +102,11 @@ describe("BN2: barra/compresion y la consulta de una barra", () => {
     if (!cj.valido) throw new Error("sin conjunto");
     const r = pieza(M.q, cj.valor, "X1");
     if (!r.valido) throw new Error(r.diagnosticos[0]!.mensaje);
-    const v = r.valor as { tipo: string; extremos: Record<string, { v: number; comb: string }> };
+    const v = r.valor as { tipo: string; leyenda: { orden: string[]; pesimos?: string }; extremos: Record<string, { v: number; comb: string }> };
     expect(v.tipo).toBe("barra");
+    // sin el sismo del programa, la leyenda no habla de signos pésimos
+    expect(v.leyenda.orden).toEqual(["N", "Vy", "Vz", "T", "My", "Mz"]);
+    expect(v.leyenda.pesimos).toBeUndefined();
     expect(v.extremos["N+"]!.comb).toBe("W");
     // 3,7066 desde la fase PB (los pilares de esquina, enrasados con la cara de su viga, sin la plantilla de cara; antes 3,7060)
     expect(v.extremos["N+"]!.v).toBeCloseTo(3.707, 3);
