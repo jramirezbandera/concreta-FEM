@@ -170,10 +170,24 @@ describe("VS3: los casos del sismo del programa", () => {
   });
 
   it("entran en las combinaciones de la situación sísmica: ± la dirección principal, el 30 % de la otra y una excentricidad de cada familia", () => {
-    const sis = q.combinaciones({ situaciones: ["ELU-SIS"] });
-    if (!sis.valido) throw new Error("sin combinaciones");
+    // Las del generador (de primer orden): las que usan las consultas llevan además el γz del segundo orden (SO) en los casos del sismo
+    const sis = q.combinacionesGeneradas({ situaciones: ["ELU-SIS"] });
+    const amplificadas = q.combinaciones({ situaciones: ["ELU-SIS"] });
+    if (!sis.valido || !amplificadas.valido) throw new Error("sin combinaciones");
     // 2 direcciones × 2 excentricidades × 2 signos × (2 excentricidades × 2 signos de la otra) × Q presente o no
     expect(sis.valor.length).toBe(64);
+    expect(amplificadas.valor.length).toBe(64);
+    amplificadas.valor.forEach((a, i) => {
+      const g = sis.valor[i]!;
+      expect(a.amplificacion?.length).toBe(2);
+      g.factores.forEach((f, k) => {
+        const x = a.amplificacion!.find((y) => y.caso === q.fisico.casos[k]!.id);
+        if (x) {
+          expect(x.coeficiente).toBeGreaterThan(1);
+          expect(Math.abs(a.factores[k]! - f * x.coeficiente)).toBeLessThan(1e-12);
+        } else expect(a.factores[k]).toBe(f);
+      });
+    });
     for (const comb of sis.valor) {
       const e = Array.from(comb.factores.subarray(4));
       expect(comb.factores.length).toBe(8);

@@ -15,7 +15,8 @@
  *
  * Puro: todo sale del modelo físico, de la compilación y de las consultas.
  */
-import { modos as consultaModos, sismo as consultaSismo, type ModosAgente, type SismoAgente } from "../agente/consultas.ts";
+import { modos as consultaModos, segundoOrden as consultaSegundoOrden, sismo as consultaSismo, type ModosAgente, type SegundoOrdenAgente, type SismoAgente } from "../agente/consultas.ts";
+import { opcionesSegundoOrden } from "../compilador/segundoOrden.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { CargaFisica, CasoFisico, ModeloFisico } from "../compilador/fisico.ts";
 import { calcularSismo, CASOS_SISMO, casosSismo, tieneEspectro, type EspectroSismo } from "../compilador/sismo.ts";
@@ -147,6 +148,27 @@ export function datosSismo(f: ModeloFisico, q: Consultas | null): DatosSismo {
   }
   const mesetaLarga: [boolean, boolean] = resultado ? [!!resultado.direcciones[0]?.mesetaLarga, !!resultado.direcciones[1]?.mesetaLarga] : [false, false];
   return { definido, espectro, problemas, curva: espectro ? curvaEspectro(espectro, mesetaLarga) : null, resultado, ...(motivo ? { motivo } : {}), periodos };
+}
+
+/** SO: el segundo orden global, para la ficha y Resultados · Modal. */
+export interface DatosSegundoOrden {
+  /** Lo que dice el modelo de ahora (sin calcular): activado y multiplicador. */
+  amplificar: boolean;
+  multiplicador: number;
+  /** ¿Lo escribió el usuario (`acciones.segundoOrden`)? */
+  escrito: boolean;
+  /** Con resultados: la consulta `segundo-orden` (sus avisos, en `problemas`) o por qué no. */
+  resultado: SegundoOrdenAgente | null;
+  problemas: Diagnostico[];
+  motivo?: string;
+}
+
+export function datosSegundoOrden(f: ModeloFisico, q: Consultas | null): DatosSegundoOrden {
+  const o = opcionesSegundoOrden(f.acciones?.segundoOrden);
+  const base = { amplificar: o.amplificar, multiplicador: o.multiplicador, escrito: o.escrito };
+  if (!q) return { ...base, resultado: null, problemas: [], motivo: "El coeficiente de estabilidad global sale con el cálculo." };
+  const r = consultaSegundoOrden(q, { todos: true });
+  return r.valido ? { ...base, resultado: r.valor, problemas: r.diagnosticos } : { ...base, resultado: null, problemas: [], motivo: r.diagnosticos.map((d) => d.mensaje).join(" ") };
 }
 
 export interface DatosModal {

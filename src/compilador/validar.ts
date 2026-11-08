@@ -9,6 +9,7 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { ladosAbacos, resolverAbacos } from "./abacos.ts";
 import { problemaBorde, resolverBordes } from "./bordes.ts";
+import { erroresSegundoOrden } from "./segundoOrden.ts";
 import { calcularSismo } from "./sismo.ts";
 import { calcularViento, resolverViento } from "./viento.ts";
 import { erroresEmplazamiento } from "./emplazamiento.ts";
@@ -304,6 +305,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   if (fisico.acciones?.viento) for (const e of calcularViento(fisico)?.errores ?? []) diag.error(e.codigo, e.mensaje, e.ids);
   // VS2: las fracciones de masa del sismo que no se pueden saber
   if (fisico.acciones?.sismo !== undefined) for (const e of calcularSismo(fisico)?.errores ?? []) diag.error(e.codigo, e.mensaje, e.ids);
+  // SO: el segundo orden global
+  for (const e of erroresSegundoOrden(fisico.acciones?.segundoOrden)) diag.error(e.codigo, e.mensaje);
   if (!(num(op.epsGeom) && op.epsGeom > 0 && num(op.epsSnap) && op.epsSnap >= op.epsGeom && num(op.factorZonaRigida) && op.factorZonaRigida >= 0 && op.factorZonaRigida <= 1)) {
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
     return null;

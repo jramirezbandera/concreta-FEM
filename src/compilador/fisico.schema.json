@@ -118,6 +118,9 @@
         },
         "nieve": {
           "$ref": "#/$defs/NieveEdificio"
+        },
+        "segundoOrden": {
+          "$ref": "#/$defs/SegundoOrdenEdificio"
         }
       },
       "additionalProperties": false
@@ -1854,6 +1857,18 @@
           "additionalProperties": false
         }
       ]
+    },
+    "SegundoOrdenEdificio": {
+      "type": "object",
+      "properties": {
+        "amplificar": {
+          "type": "boolean"
+        },
+        "multiplicadorDesplazamientos": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
     },
     "SismoEdificio": {
       "type": "object",

@@ -304,7 +304,21 @@ describe("losa plana: plantas, flechas, reacciones, bandas y combinaciones (C5, 
     const k = c.combinaciones({ situaciones: ["ELU-PT"] });
     if (!k.valido) throw new Error(k.diagnosticos[0]?.mensaje);
     const directas = generarCombinaciones(fisico.casos.map((x) => ({ ...x.accion!, id: x.id }) as CasoCarga), { situaciones: ["ELU-PT"] });
-    expect(k.valor.map((x) => Array.from(x.factores))).toEqual(directas.map((x) => Array.from(x.factores)));
+    // las del generador, tal cual; las de las consultas llevan el factor del viento por su γz del segundo orden (SO)
+    const generadas = c.combinacionesGeneradas({ situaciones: ["ELU-PT"] });
+    if (!generadas.valido) throw new Error(generadas.diagnosticos[0]?.mensaje);
+    expect(generadas.valor.map((x) => Array.from(x.factores))).toEqual(directas.map((x) => Array.from(x.factores)));
+    const kV = fisico.casos.findIndex((x) => x.accion?.tipo === "W");
+    k.valor.forEach((x, i) => {
+      const d = directas[i]!;
+      d.factores.forEach((f, j) => {
+        if (j === kV && f) {
+          expect(x.amplificacion?.length).toBe(1);
+          expect(x.factores[j]!).toBeGreaterThan(f);
+          expect(Math.abs(x.factores[j]! - f * x.amplificacion![0]!.coeficiente)).toBeLessThan(1e-12);
+        } else expect(x.factores[j]).toBe(f);
+      });
+    });
     // envolvente de la base de un pilar de esquina frente a la fuerza bruta
     const t = c.pilar("P0-0");
     if (!t.valido) throw new Error();

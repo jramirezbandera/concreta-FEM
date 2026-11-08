@@ -22,7 +22,8 @@ import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, Mo
 import { avisarAbacosUnidos, errorPilaresSinAbaco, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
 import { resolverBordes } from "./bordes.ts";
-import { calcularSismo, hipotesisEspectro, hipotesisSismo } from "./sismo.ts";
+import { esHipotesisHorizontal, hipotesisSegundoOrden } from "./segundoOrden.ts";
+import { calcularSismo, CASOS_SISMO, hipotesisEspectro, hipotesisSismo } from "./sismo.ts";
 import { avisosNieve, hipotesisNieve } from "./nieve.ts";
 import { hipotesisViento, resolverViento } from "./viento.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
@@ -480,6 +481,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       ...(sismo ? [hipotesisSismo(sismo)] : []),
       ...(espectro ? [hipotesisEspectro(espectro)] : []),
       ...[hipotesisNieve(viento.modelo)].filter((h): h is string => h !== null),
+      // SO: el segundo orden global, con las hipótesis horizontales (las del sismo del programa las añaden las consultas)
+      ...[hipotesisSegundoOrden(viento.modelo.acciones?.segundoOrden, [...viento.modelo.casos.filter(esHipotesisHorizontal).map((c) => c.id), ...(espectro ? CASOS_SISMO.map((c) => c.id) : [])])].filter((h): h is string => h !== null),
     ],
     huella,
     estadisticas: {

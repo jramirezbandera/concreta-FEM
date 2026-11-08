@@ -175,6 +175,9 @@ export class Atendedor {
         return bien("modal", s.modal());
       case "modo":
         return de(s.modo(p.modo));
+      // SO: el segundo orden global
+      case "segundo-orden":
+        return bien("segundo-orden", s.segundoOrdenDatos());
     }
   }
 }

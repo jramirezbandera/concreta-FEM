@@ -17,7 +17,8 @@
  * el sismo o en el viento pasan al emplazamiento. Los textos no nombran programas comerciales.
  */
 import { useEffect, useMemo, useState } from "react";
-import type { AccionesEdificio, NieveEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
+import type { AccionesEdificio, NieveEdificio, SegundoOrdenEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
+import { MULTIPLICADOR_MAXIMO, MULTIPLICADOR_POR_DEFECTO, opcionesSegundoOrden } from "../../../src/compilador/segundoOrden.ts";
 import { leerNumero } from "../../../src/editor/celdas.ts";
 import { ASPEREZAS, ORDEN_ASPEREZAS, ZONAS_EOLICAS, type GradoAspereza, type ZonaEolica } from "../../../src/normas/cteViento.ts";
 import { provinciaPorIne } from "../../../src/normas/provincias.ts";
@@ -27,7 +28,7 @@ import { esCapitalDeProvincia } from "../../../src/normas/provincias.ts";
 import { nieveObra } from "../../../src/compilador/nieve.ts";
 import { propuestaCasoNieve } from "../../../src/editor/casos.ts";
 import { comoUna } from "../../../src/editor/gestores.ts";
-import type { DatosSismo, DatosViento } from "../../../src/visor/programa.ts";
+import type { DatosSegundoOrden, DatosSismo, DatosViento } from "../../../src/visor/programa.ts";
 import { useVisor } from "../contexto.ts";
 import { fmt, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -83,13 +84,17 @@ const AYUDA = {
   casoNieve:
     "La nieve va en un caso de acción S, con el ψ de la altitud de la obra (DB SE, tabla 4.2): hasta 1 000 m, ψ₀ 0,5, ψ₁ 0,2 y ψ₂ 0; por encima, 0,7, 0,5 y 0,2. Sus cargas las pone usted: el programa no sabe qué es cubierta ni dónde se acumula.",
   nieve: "Art. 3.2: la masa de la nieve cuenta la mitad si permanece más de 30 días al año; si no, no cuenta. Por defecto, sí por encima de 1 000 m.",
+  amplificar:
+    "Segundo orden global (P-Δ) por el coeficiente de estabilidad global: en cada combinación, el factor de cada hipótesis horizontal (viento y sismo, casos con acción W o E) va multiplicado por γz = 1 / (1 − Q), con Q = Σ γ_k·M_Pδ,k / M_H (M_H, el momento volcador de la hipótesis; M_Pδ,k, el de las cargas verticales del caso k en sus desplazamientos, los del sismo por μ). Es el método de la amplificación del CE Anejo 19 H.2. Con él, los pilares se comprueban como intraslacionales (β = 1). Desactivado, las combinaciones son de primer orden y una estructura traslacional pide β > 1.",
+  multiplicador:
+    "Los desplazamientos del cálculo son de secciones brutas; este factor los multiplica para tener en cuenta la fisuración en el P·δ. 1 es la rigidez bruta; 2, la rigidez al 50 % del Código Modelo CEB-FIP 1990 (por defecto); 3, la rigidez nominal del hormigón fisurado del CE Anejo 19 H.1.2(3), 0,4·Ecd·Ic (1,5 sin fisurar, 0,8·Ecd·Ic). Con 2, el coeficiente de estabilidad global no debería pasar de 1,5.",
 } as const;
 
 /** Un número escrito con coma, o nada; un texto que no es un número, con su error. */
 const numeroOpcional = (t: string): number | undefined | string => (t.trim() === "" ? undefined : leerNumero(t));
 const texto = (v: number | undefined): string => (v === undefined ? "" : String(v).replace(".", ","));
 
-type Pestana = "viento" | "nieve" | "sismo";
+type Pestana = "viento" | "nieve" | "sismo" | "segundoOrden";
 type OrigenSk = "auto" | "capital" | "e2" | "escrita";
 type ModoQb = "zona" | "simplificado" | "escrita";
 
@@ -140,6 +145,11 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
   const [skEscrita, setSkEscrita] = useState(texto(a.nieve?.sk));
   const [exposicion, setExposicion] = useState<ExposicionNieve>(a.nieve?.exposicion ?? "normal");
   const opcionesMu = [...new Set([1, 2, 3, 4, ...[muX, muY].filter(Boolean).map(Number)])].sort((x, y) => x - y);
+
+  // SO: el segundo orden global (por defecto activado, con los desplazamientos por 2)
+  const so0 = opcionesSegundoOrden(a.segundoOrden);
+  const [amplificar, setAmplificar] = useState(so0.amplificar);
+  const [multiplicador, setMultiplicador] = useState(texto(a.segundoOrden?.multiplicadorDesplazamientos));
 
   /** Lo que se escribirá, o por qué no. */
   const acciones = useMemo((): { valor: AccionesEdificio | null } | { error: string } => {
@@ -213,12 +223,23 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
     }
     if (exposicion !== "normal") nv.exposicion = exposicion;
     if (Object.keys(nv).length) r.nieve = nv;
-    return { valor: r.viento || r.sismo || r.emplazamiento || r.nieve ? r : null };
-  }, [emp.valor, municipio, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, zonaInv, origenSk, skEscrita, exposicion]);
+    // SO: sólo se escribe lo que no es lo de por defecto
+    const so: SegundoOrdenEdificio = {};
+    if (!amplificar) so.amplificar = false;
+    const nM = numeroOpcional(multiplicador);
+    if (typeof nM === "string") return { error: `El multiplicador de los desplazamientos: ${nM}.` };
+    if (nM !== undefined) {
+      if (!(nM > 0 && nM <= MULTIPLICADOR_MAXIMO)) return { error: `El multiplicador de los desplazamientos tiene que ser mayor que 0 y no mayor que ${MULTIPLICADOR_MAXIMO}.` };
+      if (nM !== MULTIPLICADOR_POR_DEFECTO) so.multiplicadorDesplazamientos = nM;
+    }
+    if (Object.keys(so).length) r.segundoOrden = so;
+    return { valor: r.viento || r.sismo || r.emplazamiento || r.nieve || r.segundoOrden ? r : null };
+  }, [emp.valor, municipio, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, zonaInv, origenSk, skEscrita, exposicion, amplificar, multiplicador]);
 
   // Lo que sale en el modelo aplicado (la sesión del worker tiene el proyecto guardado): lo escrito se ve al aplicar
   const viento = usePedido(proyecto.cliente, { tipo: "viento" });
   const sismo = usePedido(proyecto.cliente, { tipo: "sismo" });
+  const segundoOrden = usePedido(proyecto.cliente, { tipo: "segundo-orden" });
   const cambiado = JSON.stringify("valor" in acciones ? (acciones.valor ?? {}) : null) !== JSON.stringify(a);
 
   // La nieve de lo escrito, al momento (no pide nada al worker), y el caso que pide su altitud
@@ -267,13 +288,34 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
       <CampoEmplazamiento e={emp} />
 
       <div role="tablist" className="mb-3 mt-4 flex gap-1 border-b border-border-main">
-        {(["viento", "nieve", "sismo"] as const).map((p) => (
+        {(["viento", "nieve", "sismo", "segundoOrden"] as const).map((p) => (
           <button key={p} type="button" role="tab" aria-selected={pestana === p} className="dock-tab" data-on={pestana === p} onClick={() => setPestana(p)}>
-            {p === "viento" ? "Viento" : p === "nieve" ? "Nieve" : "Sismo"}
+            {p === "viento" ? "Viento" : p === "nieve" ? "Nieve" : p === "sismo" ? "Sismo" : "Segundo orden"}
           </button>
         ))}
       </div>
-      {pestana === "viento" ? (
+      {pestana === "segundoOrden" ? (
+        <div className="grid gap-3">
+          <label className="flex items-start gap-2">
+            <input type="checkbox" className="mt-[3px]" checked={amplificar} onChange={(e) => setAmplificar(e.target.checked)} />
+            <span>
+              Segundo orden global (P-Δ): amplificar las hipótesis horizontales por su coeficiente de estabilidad global
+              <span className="block text-[12px] text-text-secondary">En cada combinación, el factor del viento o del sismo va multiplicado por γz = 1 / (1 − Q). Con ello, los pilares se comprueban con β = 1 (intraslacionales).</span>
+            </span>
+            <Ayuda texto={AYUDA.amplificar} />
+          </label>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+            <Etiqueta htmlFor="so-m" ayuda={AYUDA.multiplicador}>
+              Multiplicador de los desplazamientos
+            </Etiqueta>
+            <span className="flex items-center gap-2">
+              <input id="so-m" className="sel mono w-[7rem]" value={multiplicador} inputMode="decimal" placeholder={String(MULTIPLICADOR_POR_DEFECTO)} onChange={(e) => setMultiplicador(e.target.value)} />
+              <span className="text-text-secondary">1 bruta · 2 Código Modelo · 3 nominal del CE (fisurado)</span>
+            </span>
+          </div>
+          <ResumenSegundoOrden d={segundoOrden.datos ?? null} aplicado={!cambiado} />
+        </div>
+      ) : pestana === "viento" ? (
         <div className="grid gap-3">
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-[3px]" checked={conViento} onChange={(e) => setConViento(e.target.checked)} />
@@ -558,6 +600,58 @@ function Cifra({ n, v, t }: { n: string; v: string; t?: string }) {
     <div title={t}>
       <dt>{n}</dt>
       <dd>{v}</dd>
+    </div>
+  );
+}
+
+/** SO: lo que el segundo orden global da en el modelo de la sesión (con resultados). */
+function ResumenSegundoOrden({ d, aplicado }: { d: DatosSegundoOrden | null; aplicado: boolean }) {
+  if (!d) return <p className="nota">…</p>;
+  const r = d.resultado;
+  return (
+    <div className="rounded border border-border-main p-2 text-[12px]">
+      <p className="mb-1 font-medium">
+        En el modelo {aplicado ? "aplicado" : "aplicado (lo de arriba, al aplicar)"}: {d.amplificar ? "amplificado" : "desactivado"}, desplazamientos × {String(d.multiplicador).replace(".", ",")}
+      </p>
+      {!r ? (
+        <p className="text-text-secondary">{d.motivo ? textoApp(d.motivo) : "…"}</p>
+      ) : !r.hipotesis.length ? (
+        <p className="text-text-secondary">El modelo no tiene hipótesis horizontales (viento o sismo): no hay segundo orden global que calcular.</p>
+      ) : (
+        <>
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="text-left">Hipótesis</th>
+                <th className="text-right">M_H (kN·m)</th>
+                <th className="text-right">Q máx.</th>
+                <th className="text-right">γz máx.</th>
+                <th className="text-left">En</th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.hipotesis.map((h) => {
+                const m = r.maximos.find((x) => x.caso === h.caso);
+                return (
+                  <tr key={h.caso}>
+                    <td>{h.caso}</td>
+                    <td className="mono text-right">{fmt(h.MH, 0)}</td>
+                    <td className="mono text-right">{m ? fmt(m.Q, 3) : "—"}</td>
+                    <td className="mono text-right">{m ? (m.coeficiente === null ? "∞" : fmt(m.coeficiente, 3)) : "—"}</td>
+                    <td>{m?.combinacion ?? "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {d.problemas.map((p) => (
+            <p key={p.codigo} className={`mt-1 ${p.severidad === "error" ? "text-state-bad" : p.severidad === "aviso" ? "text-state-warn" : "text-text-secondary"}`}>
+              {textoApp(p.mensaje)}
+            </p>
+          ))}
+          <p className="mt-1 text-text-secondary">Q = Σ γ_k·M_Pδ,k / M_H en cada combinación; lo peor de cada hipótesis. El detalle, en Resultados · Modal.</p>
+        </>
+      )}
     </div>
   );
 }

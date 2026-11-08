@@ -25,7 +25,7 @@
 import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import type { ResultadoCompilacion } from "../compilador/compilar.ts";
-import type { Consultas, ExtremoDiagrama } from "../compilador/consultas.ts";
+import type { Consultas, ExtremoDiagrama, SegundoOrdenConsulta } from "../compilador/consultas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
 import type { EmplazamientoEdificio, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
@@ -40,7 +40,7 @@ import { ARMADURAS, losasDe, refuerzosDe, type Armadura, type ZonaRefuerzo } fro
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
-export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "modos", "sismo", "combinaciones"] as const;
+export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "modos", "sismo", "segundo-orden", "combinaciones"] as const;
 export type NombreConsulta = (typeof CONSULTAS)[number];
 
 /** Elementos de una lista que se dan por defecto (los mayores); `todos` los da todos. */
@@ -1057,6 +1057,37 @@ export function sismo(q: Consultas, o: Pick<OpcionesConsulta, "top" | "todos"> =
 
 // ─── Entrada común ──────────────────────────────────────────────────────────────────────────────
 
+// ─── Segundo orden (SO) ─────────────────────────────────────────────────────────────────────────
+
+export interface SegundoOrdenAgente extends SegundoOrdenConsulta {
+  metodo: string;
+  /** Las combinaciones listadas son las de mayor Q; las demás se cuentan aquí. */
+  omitidas?: number;
+}
+
+/**
+ * El segundo orden global (`fem consultar segundo-orden`, `docs/fem3d/segundo-orden.md`): el
+ * coeficiente de estabilidad global de cada hipótesis horizontal en cada combinación del generador,
+ * con lo que lo compone. Las combinaciones salen de mayor a menor Q.
+ */
+export function segundoOrden(q: Consultas, o: Pick<OpcionesConsulta, "top" | "todos"> = {}): Respuesta<SegundoOrdenAgente> {
+  const r = q.segundoOrden();
+  if (!r.valido) return r;
+  const v = r.valor;
+  if (!v.hipotesis.length && !v.sinCarga.length) return no("consulta/sin-hipotesis-horizontales", "El modelo no tiene hipótesis horizontales (casos con acción de viento, W, o de sismo, E): no hay segundo orden global que calcular.");
+  const orden = [...v.combinaciones].sort((a, b) => b.Q - a.Q);
+  const n = o.todos ? orden.length : Math.min(orden.length, o.top ?? TOP_POR_DEFECTO);
+  return si(
+    {
+      ...v,
+      metodo: `coeficiente de estabilidad global γz = 1 / (1 − Q) por hipótesis horizontal y combinación, con Q = Σ γ_k·M_Pδ,k / M_H (el método de la amplificación del CE Anejo 19 H.2); los desplazamientos, por ${v.multiplicador}${v.amplificar ? "" : "; desactivado: las combinaciones son de primer orden"}`,
+      combinaciones: orden.slice(0, n),
+      ...(n < orden.length ? { omitidas: orden.length - n } : {}),
+    },
+    r.diagnosticos,
+  );
+}
+
 const PROPOSITO: Record<NombreConsulta, Proposito> = {
   envolventes: "esfuerzos",
   flechas: "desplazamientos",
@@ -1067,15 +1098,17 @@ const PROPOSITO: Record<NombreConsulta, Proposito> = {
   franjas: "esfuerzos",
   franja: "esfuerzos",
   refuerzos: "esfuerzos",
-  // los modos y el sismo no dependen de las combinaciones
+  // los modos y el sismo no dependen de las combinaciones; el segundo orden, de todas las del generador
   modos: "lineal",
   sismo: "lineal",
+  "segundo-orden": "esfuerzos",
   combinaciones: "esfuerzos",
 };
 
 export function consultar(q: Consultas, consulta: NombreConsulta, o: OpcionesConsulta): Respuesta<unknown> {
   if (consulta === "modos") return modos(q, o);
   if (consulta === "sismo") return sismo(q, o);
+  if (consulta === "segundo-orden") return segundoOrden(q, o);
   const c = o.combinaciones(PROPOSITO[consulta]);
   if (!c.valido) return c;
   const conjunto = c.valor;

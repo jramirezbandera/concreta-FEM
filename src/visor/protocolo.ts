@@ -22,7 +22,7 @@ import type { Cargas3D } from "./cargas3d.ts";
 import type { DatosArmado, DatosFranja } from "./franjas.ts";
 import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
-import type { DatosModal, DatosSismo, DatosViento } from "./programa.ts";
+import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
@@ -82,7 +82,9 @@ export type Pedido =
   | { tipo: "viento" }
   | { tipo: "sismo" }
   | { tipo: "modal" }
-  | { tipo: "modo"; modo: number };
+  | { tipo: "modo"; modo: number }
+  /** SO: el segundo orden global (con resultados). */
+  | { tipo: "segundo-orden" };
 
 /** Lo que devuelve cada pedido cuando sale bien. */
 export interface Respuestas {
@@ -126,6 +128,7 @@ export interface Respuestas {
   sismo: DatosSismo;
   modal: DatosModal;
   modo: DatosDeformada;
+  "segundo-orden": DatosSegundoOrden;
 }
 
 export type TipoPedido = Pedido["tipo"];

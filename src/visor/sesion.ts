@@ -47,7 +47,7 @@ import { pilares3D, type MagnitudPilares, type Pilares3D } from "./pilares3d.ts"
 import { reacciones3D, type Reacciones3D } from "./reacciones3d.ts";
 import { cargas3D, type Cargas3D } from "./cargas3d.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
-import { casosPrograma, datosModal, datosSismo, datosViento, fisicoConPrograma, formaModo, type CasoVisor, type DatosModal, type DatosSismo, type DatosViento } from "./programa.ts";
+import { casosPrograma, datosModal, datosSegundoOrden, datosSismo, datosViento, fisicoConPrograma, formaModo, type CasoVisor, type DatosModal, type DatosSegundoOrden, type DatosSismo, type DatosViento } from "./programa.ts";
 import type { DatosDeformada } from "./datos.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
@@ -549,6 +549,11 @@ export class Sesion {
   /** El sismo del programa: el espectro de ahora y, con resultados, la consulta `sismo`. */
   sismoDatos(): DatosSismo {
     return datosSismo(this.proyecto.modelo, this.casosR && this.compilacion.valido ? this.q : null);
+  }
+
+  /** SO: el segundo orden global (con resultados, la consulta `segundo-orden`). */
+  segundoOrdenDatos(): DatosSegundoOrden {
+    return datosSegundoOrden(this.proyecto.modelo, this.casosR && this.compilacion.valido ? this.q : null);
   }
 
   /** Las masas y los modos (con resultados). */

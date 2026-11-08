@@ -54,6 +54,7 @@ import { huellaPilar } from "./geometria2d.ts";
 import type { Mapeo } from "./mapeo.ts";
 import { diafragmaDe } from "./piezas.ts";
 import { EsfuerzosPiezas } from "./resultados.ts";
+import { amplificar, calcularSegundoOrden, coeficientes, diagnosticosSegundoOrden, maximos, opcionesSegundoOrden, type CoeficienteHipotesis, type MaximoHipotesis, type SegundoOrdenCalculado } from "./segundoOrden.ts";
 import { calcularSismo, sismoDelCalculo, tieneEspectro, type EspectroSismo, type SismoCalculado } from "./sismo.ts";
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 import { dimensionesPlanta, resolverViento } from "./viento.ts";
@@ -318,6 +319,8 @@ export class Consultas {
   private cortesC?: Cortes;
   private efimerosC?: CasosEfimeros | null;
   private murosC?: EsfuerzosMuros;
+  /** SO: el segundo orden global de este cálculo, una vez (`segundoOrdenCalculado`). */
+  private soC?: SegundoOrdenCalculado;
   private readonly flechasGeo = new Map<string, GeometriaFlechas>();
   /** VS3: de las últimas barras con diagramas de combinaciones con sismo, lo que no depende de la combinación (`diagramaBarra`). */
   private readonly combinacionesVistas = new WeakMap<object, { copia: Float64Array; partes: PartesCombinacion; clave: string }>();
@@ -1151,6 +1154,22 @@ export class Consultas {
    * los casos llevan su `accion`. Sus factores van en el orden de los casos del modelo.
    */
   combinaciones(opciones: OpcionesCombinaciones = {}): Respuesta<Combinacion[]> {
+    const g = this.combinacionesGeneradas(opciones);
+    if (!g.valido) return g;
+    // SO: las hipótesis horizontales, por su coeficiente de estabilidad global en cada combinación
+    const so = this.segundoOrdenCalculado();
+    if (!so.opciones.amplificar || !so.horizontales.length) return g;
+    const valor: Combinacion[] = [];
+    for (const c of g.valor) {
+      const a = amplificar(so, c);
+      if (!a) return { valido: false, diagnosticos: diagnosticosSegundoOrden(so, g.valor) };
+      valor.push(a);
+    }
+    return { valido: true, valor, diagnosticos: [] };
+  }
+
+  /** Las combinaciones del generador, sin el segundo orden (los factores de primer orden). */
+  combinacionesGeneradas(opciones: OpcionesCombinaciones = {}): Respuesta<Combinacion[]> {
     // Los casos lógicos: con el sismo del programa, también los suyos (VS3)
     const logicos = this.fisico.casos;
     const sin = logicos.filter((c) => !c.accion).map((c) => c.id);
@@ -1166,4 +1185,65 @@ export class Consultas {
       return this.no("consulta/combinaciones", `No se pueden generar las combinaciones: ${e instanceof Error ? e.message : String(e)}.`, logicos.map((c) => c.id));
     }
   }
+
+  // ─── Segundo orden (SO) ─────────────────────────────────────────────────────────────────────
+
+  /** SO: el segundo orden global de este cálculo (`segundoOrden.ts`), calculado una vez. */
+  segundoOrdenCalculado(): SegundoOrdenCalculado {
+    return (this.soC ??= calcularSegundoOrden(this.fisico.casos, this.modelo, this.casos, this.sup, opcionesSegundoOrden(this.fisico.acciones?.segundoOrden)));
+  }
+
+  /** SO: Q y γz de cada hipótesis horizontal con factor en una combinación (con los factores de primer orden). */
+  coeficientesSegundoOrden(factores: ArrayLike<number>): CoeficienteHipotesis[] {
+    return coeficientes(this.segundoOrdenCalculado(), factores);
+  }
+
+  /**
+   * SO: el segundo orden global sobre las combinaciones del generador (`fem consultar segundo-orden`):
+   * el nivel z₀, cada hipótesis horizontal con su momento volcador y sus índices C_k, y en cada
+   * combinación su Q y su γz; lo peor de cada hipótesis; y los diagnósticos (traslacional, fuera del
+   * método, inestable, o el recordatorio de β > 1 si está desactivado).
+   */
+  segundoOrden(opciones: OpcionesCombinaciones = {}): Respuesta<SegundoOrdenConsulta> {
+    const so = this.segundoOrdenCalculado();
+    const ids = this.fisico.casos.map((c) => c.id);
+    // Sin hipótesis horizontales no hay nada que calcular (ni hacen falta las combinaciones)
+    if (!so.horizontales.length) return { valido: true, valor: { amplificar: so.opciones.amplificar, multiplicador: so.opciones.multiplicador, z0: so.z0, gravitatorios: so.gravitatorios.map((k) => ids[k]!), hipotesis: [], sinCarga: so.sinCarga, combinaciones: [], maximos: [] }, diagnosticos: [] };
+    const g = this.combinacionesGeneradas(opciones);
+    if (!g.valido) return g;
+    const porCaso = (v: Float64Array) => Object.fromEntries(so.gravitatorios.map((k) => [ids[k]!, v[k]!]));
+    const combinaciones = g.valor.flatMap((c) => coeficientes(so, c.factores).map((x) => ({ combinacion: c.id, situacion: c.situacion, caso: x.caso, Q: x.Q, coeficiente: x.coeficiente })));
+    return {
+      valido: true,
+      valor: {
+        amplificar: so.opciones.amplificar,
+        multiplicador: so.opciones.multiplicador,
+        z0: so.z0,
+        gravitatorios: so.gravitatorios.map((k) => ids[k]!),
+        hipotesis: so.horizontales.map((h) => ({ caso: h.caso, direccion: h.direccion, V: h.V, MH: h.MH, MPdelta: porCaso(h.MPdelta), C: porCaso(h.C) })),
+        sinCarga: so.sinCarga,
+        combinaciones,
+        maximos: maximos(so, g.valor),
+      },
+      diagnosticos: diagnosticosSegundoOrden(so, g.valor),
+    };
+  }
+}
+
+/** SO: lo que da `Consultas.segundoOrden()`. */
+export interface SegundoOrdenConsulta {
+  amplificar: boolean;
+  multiplicador: number;
+  /** El nivel sin desplazamientos horizontales, m. */
+  z0: number;
+  /** Los casos gravitatorios (los que no son hipótesis horizontales), en su orden. */
+  gravitatorios: string[];
+  /** Cada hipótesis horizontal: dirección unitaria, cortante en la base (kN), momento volcador (kN·m) y, por caso gravitatorio, su M_Pδ (kN·m, ya por el multiplicador) y su C. */
+  hipotesis: { caso: string; direccion: [number, number]; V: number; MH: number; MPdelta: Record<string, number>; C: Record<string, number> }[];
+  /** Hipótesis horizontales sin carga horizontal (no se amplifican). */
+  sinCarga: string[];
+  /** Por combinación del generador e hipótesis con factor en ella: Q y γz (null si Q ≥ 1). */
+  combinaciones: { combinacion: string; situacion: string; caso: string; Q: number; coeficiente: number | null }[];
+  /** Lo peor de cada hipótesis. */
+  maximos: MaximoHipotesis[];
 }

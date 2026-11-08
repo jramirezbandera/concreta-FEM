@@ -42,6 +42,9 @@ export function ModoModal() {
   const [animada, setAnimada] = useState(true);
   const modal = usePedido(proyecto.cliente, { tipo: "modal" });
   const sismo = usePedido(proyecto.cliente, { tipo: "sismo" });
+  // SO: el segundo orden global de las hipótesis horizontales
+  const segundoOrden = usePedido(proyecto.cliente, { tipo: "segundo-orden" });
+  const so = segundoOrden.datos?.resultado ?? null;
   const md = modal.datos?.modal ?? null;
   const n = md?.numeroDeModos ?? 0;
   const forma = usePedido(proyecto.cliente, md && modo <= n ? { tipo: "modo", modo } : null);
@@ -315,6 +318,28 @@ export function ModoModal() {
           {s.direcciones.some((d) => d.thetaMaxima >= 0.1) && <p className="nota text-state-warn">θ llega a {fmt(Math.max(...s.direcciones.map((d) => d.thetaMaxima)), 2)}: hay que considerar los efectos de segundo orden (art. 3.8), y este cálculo es de primer orden.</p>}
           {sismo.datos?.curva && sismo.datos.espectro && <Espectro curva={sismo.datos.curva} periodos={sismo.datos.periodos} TA={sismo.datos.espectro.emplazamiento.TA} TB={sismo.datos.espectro.emplazamiento.TB} ac={sismo.datos.espectro.emplazamiento.ac} />}
           <p className="nota">El emplazamiento y la curva, en Cargas · Sismo. Los casos EX±e y EY±e entran en las combinaciones de la situación sísmica de todas las pantallas.</p>
+        </Seccion>
+      )}
+      {so && so.hipotesis.length > 0 && (
+        <Seccion titulo="Segundo orden global (P-Δ)" valor={so.amplificar ? "amplificado" : "desactivado"}>
+          {so.maximos.map((m) => (
+            <div className="fila" key={m.caso}>
+              <span>
+                {m.caso} · Q máx. {fmt(m.Q, 3)} en {m.combinacion}
+              </span>
+              <span className="v">γz = {m.coeficiente === null ? "∞" : fmt(m.coeficiente, 3)}</span>
+            </div>
+          ))}
+          {segundoOrden.datos?.problemas.map((d) => (
+            <p key={d.codigo} className={`nota ${d.severidad === "error" ? "text-state-bad" : d.severidad === "aviso" ? "text-state-warn" : ""}`}>
+              {textoApp(d.mensaje)}
+            </p>
+          ))}
+          <p className="nota">
+            Coeficiente de estabilidad global de cada hipótesis horizontal, γz = 1 / (1 − Q), con los desplazamientos del cálculo multiplicados por {fmt(so.multiplicador, 1)}.{" "}
+            {so.amplificar ? "En cada combinación, el factor de la hipótesis va multiplicado por su γz (esfuerzos y desplazamientos de todas las pantallas), y los pilares se comprueban con β = 1." : "Desactivado: las combinaciones son de primer orden; una estructura traslacional pide β > 1 en los pilares."}{" "}
+            Se cambia en Cargas · Viento y sismo · Segundo orden.
+          </p>
         </Seccion>
       )}
     </>

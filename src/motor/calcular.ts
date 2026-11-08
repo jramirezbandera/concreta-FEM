@@ -28,7 +28,7 @@ import { equilibrio, sumaResultantes } from "./equilibrio.ts";
 import { desplazamientosFisicos, fuerzasIndependientes, numerar, TipoGdl, type Numeracion } from "./gdl.ts";
 import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada } from "./laminas.ts";
 import { definicionModal, modosCondensados, prepararModal, type PlanModal } from "./modal.ts";
-import { NOMBRES_GDL, type CasoCarga, type EstadisticasCalculo, type ModeloAnalitico, type ModoVibracion, type ResultadoCalculo, type ResultadoCaso, type ResultadoModal } from "./modelo.ts";
+import { NOMBRES_GDL, type CargasCaso, type CasoCarga, type EstadisticasCalculo, type ModeloAnalitico, type ModoVibracion, type ResultadoCalculo, type ResultadoCaso, type ResultadoModal } from "./modelo.ts";
 import { ErrorSinMemoria } from "../nucleo/index.ts";
 import { ErrorLimiteMemoria, resolver, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
 
@@ -192,6 +192,9 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   const bCoartados = new Float64Array(nCoart * nc);
   /** VS2: masa de cada nudo, t: la componente vertical hacia abajo de las cargas de los casos que hacen de masa, entre g. */
   const masa = defModal ? new Float64Array(nn) : null;
+  /** SO: la carga vertical hacia abajo de cada caso en cada nudo (−Fz de sus fuerzas nodales equivalentes), kN, y su resultante. */
+  const pesos: Float64Array[] = [];
+  const resultantes: { F: [number, number, number]; zF: [number, number] }[] = [];
   casos.forEach((caso, k) => {
     const t = cargasNodales(caso, P);
     const porBarra = deBarras[k]!.porBarra;
@@ -210,6 +213,21 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
       const f = defModal!.fraccion[k]! / defModal!.g;
       for (let v = 0; v < nn; v++) masa[v]! -= f * t[6 * v + 2]!;
     }
+    const peso = new Float64Array(nn);
+    const F: [number, number, number] = [0, 0, 0];
+    const zF: [number, number] = [0, 0];
+    for (let v = 0; v < nn; v++) {
+      const [fx, fy, fz] = [t[6 * v]!, t[6 * v + 1]!, t[6 * v + 2]!];
+      peso[v] = -fz;
+      F[0] += fx;
+      F[1] += fy;
+      F[2] += fz;
+      const z = geo.xyz[3 * v + 2]!;
+      zF[0] += z * fx;
+      zF[1] += z * fy;
+    }
+    pesos.push(peso);
+    resultantes.push({ F, zF });
     const b = fuerzasIndependientes(num, t);
     for (let j = 0; j < n; j++) B[n * k + j] = b[num.gdlDeEcuacion[j]!]!;
     for (let i = 0; i < nCoart; i++) bCoartados[nCoart * k + i] = b[num.coartados[i]!]!;
@@ -333,6 +351,25 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   const kMuelles = muellesTierra.map((e) => rigidezGlobal(modelo, e));
   const resultados: ResultadoCaso[] = [];
   let equilibrioRoto = false;
+  /** SO: la resultante de las cargas de un caso (o de un modo) y el trabajo P·δ de cada caso del modelo con el desplazamiento u. */
+  const cargasCaso = (resultante: { F: readonly number[]; zF: readonly number[] }, u: Float64Array): CargasCaso => {
+    const pdelta = new Float64Array(2 * nc);
+    for (let k = 0; k < nc; k++) {
+      const peso = pesos[k]!;
+      let sx = 0;
+      let sy = 0;
+      for (let v = 0; v < nn; v++) {
+        const p = peso[v]!;
+        if (p !== 0) {
+          sx += p * u[6 * v]!;
+          sy += p * u[6 * v + 1]!;
+        }
+      }
+      pdelta[2 * k] = sx;
+      pdelta[2 * k + 1] = sy;
+    }
+    return { F: [resultante.F[0]!, resultante.F[1]!, resultante.F[2]!], zF: [resultante.zF[0]!, resultante.zF[1]!], pdelta };
+  };
   const magnitud = new Float64Array(P);
   /**
    * Reacciones de los apoyos y de los muelles a tierra con los desplazamientos û (por GDL físico
@@ -425,7 +462,7 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
       );
     }
     const esfuerzosLaminas = new Float64Array(8 * (modelo.laminas?.length ?? 0));
-    resultados.push({ id: caso.id, u, reacciones, esfuerzosBarras, esfuerzosLaminas, equilibrio: eq, residuo });
+    resultados.push({ id: caso.id, u, reacciones, esfuerzosBarras, esfuerzosLaminas, equilibrio: eq, residuo, cargas: cargasCaso(resultantes[k]!, u) });
   }
   // Resultantes de las láminas en su centroide: el operador de cada lámina se calcula una vez para todos los casos
   if (modelo.laminas?.length) {
@@ -504,7 +541,17 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
       forma[3 * d + 1] = u[6 * m + 1]! + (df.cm[0] - geo.xyz[3 * m]!) * rz;
       forma[3 * d + 2] = rz;
     });
-    modos.push({ omega2: md.omega2, periodo: (2 * Math.PI) / Math.sqrt(md.omega2), forma, fuerzas, participacion: md.participacion, masaEfectiva: md.masaEfectiva, u, reacciones, esfuerzosBarras, esfuerzosLaminas, equilibrio: eq });
+    // SO: la resultante de las fuerzas de inercia (sobre los maestros, a su cota) y el trabajo P·δ con la forma del modo
+    const F: [number, number, number] = [0, 0, 0];
+    const zF: [number, number] = [0, 0];
+    elPlan.diafragmas.forEach((df, d) => {
+      const z = geo.xyz[3 * df.maestro + 2]!;
+      F[0] += fuerzas[3 * d]!;
+      F[1] += fuerzas[3 * d + 1]!;
+      zF[0] += z * fuerzas[3 * d]!;
+      zF[1] += z * fuerzas[3 * d + 1]!;
+    });
+    modos.push({ omega2: md.omega2, periodo: (2 * Math.PI) / Math.sqrt(md.omega2), forma, fuerzas, participacion: md.participacion, masaEfectiva: md.masaEfectiva, u, reacciones, esfuerzosBarras, esfuerzosLaminas, equilibrio: eq, cargas: cargasCaso({ F, zF }, u) });
   });
   if (modelo.laminas?.length && modos.length) {
     resultantesEnCentroides(

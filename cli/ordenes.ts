@@ -324,7 +324,11 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if ("codigo" in r) return r;
       const est = r.cabecera.estadisticas;
       // VS3: con el espectro en el sismo de las acciones, sus casos y el cortante en la base (el detalle, con `fem consultar sismo`)
-      const sismo = tieneEspectro(l.proyecto.modelo) && r.modal ? new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal).sismo() : null;
+      const qc = new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal);
+      const sismo = tieneEspectro(l.proyecto.modelo) && r.modal ? qc.sismo() : null;
+      // SO: el coeficiente de estabilidad global de cada hipótesis horizontal (el detalle, con `fem consultar segundo-orden`)
+      const so = qc.segundoOrden();
+      const soValor = so.valido && so.valor.hipotesis.length ? so.valor : null;
       return {
         codigo: sismo && !sismo.valido ? CODIGO.errores : CODIGO.bien,
         json: {
@@ -337,9 +341,10 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           // VS2: con el sismo en las acciones, los modos (el detalle, con `fem consultar modos`)
           ...(r.modal ? { modos: { numero: r.modal.modos.length, T1: r.modal.modos[0]?.periodo ?? null, masa: r.modal.masas.diafragmas, equilibrio: Math.max(0, ...r.modal.modos.flatMap((m) => [m.equilibrio.fuerzas, m.equilibrio.momentos])) } } : {}),
           ...(sismo?.valido ? { sismo: { casos: sismo.valor.casos, periodo: sismo.valor.direcciones.map((d) => d.dominante.periodo), cortanteBasal: sismo.valor.direcciones.map((d) => d.basal), coeficiente: sismo.valor.direcciones.map((d) => d.coeficiente) } } : {}),
+          ...(soValor ? { segundoOrden: { amplificar: soValor.amplificar, multiplicador: soValor.multiplicador, maximos: soValor.maximos } } : {}),
           estadisticas: { nudos: est.nudos, ecuaciones: est.ecuaciones, barras: r.compilacion.estadisticas.barras, laminas: r.compilacion.estadisticas.laminas },
           segundos: r.tiempos,
-          ...listaDiagnosticos([...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos, ...(sismo?.diagnosticos ?? [])]),
+          ...listaDiagnosticos([...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos, ...(sismo?.diagnosticos ?? []), ...(soValor ? so.diagnosticos : [])]),
         },
       };
     }

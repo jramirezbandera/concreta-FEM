@@ -14,7 +14,7 @@
 import { resolverOpciones } from "../compilador/fisico.ts";
 import { sha256 } from "../compilador/huella.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { ModosAgente, Resumen, SismoAgente } from "./consultas.ts";
+import type { ModosAgente, Resumen, SegundoOrdenAgente, SismoAgente } from "./consultas.ts";
 import type { VientoCalculado } from "../compilador/viento.ts";
 import type { Proyecto } from "./proyecto.ts";
 import { num, separacion, type Comprobacion, type SensatezModelo } from "./sensatez.ts";
@@ -59,7 +59,7 @@ export interface DatosInforme {
   /** Figuras del render (A4): la planta del modelo y la uz de las losas de cada planta. */
   figuras?: readonly { titulo: string; svg: string }[];
   /** VS4: las acciones del programa, si las hay: el viento por plantas, las masas y los modos, y el sismo por espectros. */
-  programa?: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null };
+  programa?: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null; segundoOrden?: SegundoOrdenAgente | null };
 }
 
 const ESTADO: Record<Comprobacion["estado"], string> = { bien: "bien", avisos: "AVISOS", "no-aplica": "no aplica", pendiente: "pendiente" };
@@ -169,7 +169,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
 
   // ─── Viento y sismo del programa (VS4) ──────────────────────────────────────────────────────
   const pg = d.programa;
-  if (pg && (pg.viento || pg.modos || pg.sismo)) {
+  if (pg && (pg.viento || pg.modos || pg.sismo || pg.segundoOrden)) {
     titulo(2, "Viento y sismo del programa");
     if (pg.viento) {
       const v = pg.viento;
@@ -219,6 +219,24 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
         });
         if (x.simplificado.length) parrafo(`Para contrastar, el método simplificado (art. 3.7): ${x.simplificado.map((y) => `con ${y.periodo} (TF = ${num(y.TF, 3)} s, ${y.modos} ${y.modos === 1 ? "modo" : "modos"}), ${kN(y.cortanteBasal)} kN (el modal, ×${num(y.frente, 3)})`).join("; ")}.`);
       }
+    }
+    // SO: el segundo orden global
+    if (pg.segundoOrden) {
+      const so = pg.segundoOrden;
+      titulo(3, "Segundo orden global (P-Δ)");
+      parrafo(
+        `Coeficiente de estabilidad global de cada hipótesis horizontal en cada combinación, γz = 1 / (1 − Q), con Q = Σ γ_k·M_Pδ,k / M_H: M_H es el momento volcador de la hipótesis respecto al nivel sin desplazamientos horizontales (z₀ = ${num(so.z0)} m) y M_Pδ,k el de las cargas verticales del caso ${so.gravitatorios.join(", ")} en sus desplazamientos (los del sismo, por μ), con los desplazamientos del cálculo multiplicados por ${num(so.multiplicador, 1)}. ${so.amplificar ? "En cada combinación, el factor de la hipótesis va multiplicado por su γz (esfuerzos y desplazamientos), y los pilares se comprueban como intraslacionales (β = 1)." : "Desactivado: las combinaciones son de primer orden y, si la estructura es traslacional, los pilares necesitan β > 1."}`,
+      );
+      b.push({
+        tipo: "tabla",
+        cabecera: ["Hipótesis", "V en la base (kN)", "M_H (kN·m)", ...so.gravitatorios.map((g) => `C de ${g}`), "Q máx.", "γz máx.", "En"],
+        numericas: [1, 2, ...so.gravitatorios.map((_, i) => i + 3), so.gravitatorios.length + 3, so.gravitatorios.length + 4],
+        filas: so.hipotesis.map((h) => {
+          const m = so.maximos.find((x) => x.caso === h.caso);
+          return [h.caso, kN(h.V), kN(h.MH), ...so.gravitatorios.map((g) => num(h.C[g] ?? 0, 4)), m ? num(m.Q, 3) : "—", m ? (m.coeficiente === null ? "∞" : num(m.coeficiente, 3)) : "—", m?.combinacion ?? "—"];
+        }),
+      });
+      if (so.sinCarga.length) parrafo(`Sin carga horizontal (no se amplifican): ${so.sinCarga.join(", ")}.`);
     }
   }
 

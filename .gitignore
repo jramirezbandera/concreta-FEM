@@ -69,3 +69,6 @@ validacion/dwg/.muestras/
 validacion/vs2/opensees-modelos.json
 # VS3: los del oráculo del análisis por espectros (validacion/vs3/modelos-oraculo.ts)
 validacion/vs3/opensees-modelos.json
+
+# Validación SO: el edificio de 3 plantas para el oráculo del P-Δ (validacion/so/modelos.ts)
+validacion/so/opensees-modelos.json

@@ -683,7 +683,7 @@ export function casosModales(modal: ResultadoModal): { casos: CasoCarga[]; resul
       if (fx !== 0 || fy !== 0 || mz !== 0) nodales.push({ nudo: df.maestro, f: [fx, fy, 0, 0, 0, mz] });
     });
     casos.push({ id: idCasoModal(i), nodales });
-    resultados.push({ id: idCasoModal(i), u: m.u, reacciones: m.reacciones, esfuerzosBarras: m.esfuerzosBarras, esfuerzosLaminas: m.esfuerzosLaminas, equilibrio: m.equilibrio, residuo: modal.residuo });
+    resultados.push({ id: idCasoModal(i), u: m.u, reacciones: m.reacciones, esfuerzosBarras: m.esfuerzosBarras, esfuerzosLaminas: m.esfuerzosLaminas, equilibrio: m.equilibrio, residuo: modal.residuo, cargas: m.cargas });
   });
   return { casos, resultados };
 }

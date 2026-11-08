@@ -614,6 +614,36 @@ export interface AccionesEdificio {
    * salga sk: esto sólo hace falta para cambiar algo.
    */
   nieve?: NieveEdificio;
+  /**
+   * Fase SO (`docs/fem3d/segundo-orden.md`): el segundo orden global (P-Δ) por el coeficiente de
+   * estabilidad global de cada hipótesis horizontal (viento y sismo, casos con acción W o E) en cada
+   * combinación, γz = 1 / (1 − Q), que multiplica el factor de esa hipótesis en la combinación. Por
+   * defecto, activado en cuanto hay hipótesis horizontales. Basta con no escribirlo.
+   */
+  segundoOrden?: SegundoOrdenEdificio;
+}
+
+/**
+ * El segundo orden global (SO). Q = Σ_k γ_k·M_Pδ,k / M_H por hipótesis horizontal y combinación, con
+ * M_H = Σ H·z su momento volcador, M_Pδ,k = Σ P·δ el de las cargas verticales del caso gravitatorio k
+ * en los desplazamientos de la hipótesis (los del sismo, por μ) y γ_k el factor del caso k en la
+ * combinación. Es el método de la memoria de CYPECAD y el del CE Anejo 19 H.2. Con él, los pilares
+ * se comprueban como intraslacionales (β = 1).
+ */
+export interface SegundoOrdenEdificio {
+  /**
+   * ¿Se amplifican las hipótesis horizontales en las combinaciones? Por defecto, sí. Con false, las
+   * combinaciones son las de primer orden (y la estructura traslacional pide β > 1 en sus pilares).
+   */
+  amplificar?: boolean;
+  /**
+   * Multiplicador de los desplazamientos del cálculo (hecho con las secciones brutas) para tener en
+   * cuenta la fisuración: 1 es la rigidez bruta (lo que CYPECAD trae por defecto), 2 la rigidez al
+   * 50 % del Código Modelo CEB-FIP 1990 (lo que recomienda la memoria de CYPECAD) y 3 la rigidez
+   * nominal del hormigón fisurado del CE Anejo 19 H.1.2(3), 0,4·Ecd·Ic (1,5 sin fisurar, 0,8·Ecd·Ic).
+   * Por defecto, 2.
+   */
+  multiplicadorDesplazamientos?: number;
 }
 
 /** Lo que se fuerza de la nieve del emplazamiento (DB SE-AE art. 3.5 y Anejo E). */

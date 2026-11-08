@@ -61,6 +61,12 @@ export interface Combinacion {
   factores: Float64Array;
   etiqueta: string;
   duracion: Duracion;
+  /**
+   * Fase SO (`src/compilador/segundoOrden.ts`): las hipótesis horizontales cuyo factor va multiplicado
+   * por su coeficiente de estabilidad global γz = 1 / (1 − Q) en `factores`. El generador no lo pone;
+   * lo ponen las consultas.
+   */
+  amplificacion?: { caso: string; Q: number; coeficiente: number }[];
 }
 
 export interface OpcionesCombinaciones {

@@ -340,6 +340,26 @@ export interface ModoVibracion {
   esfuerzosLaminas: Float64Array;
   /** Regla de oro 2 en el modo: sus fuerzas de inercia contra las reacciones que dan. */
   equilibrio: { fuerzas: number; momentos: number };
+  /** SO: la resultante de sus fuerzas de inercia y su trabajo P·δ con cada caso del modelo (`CargasCaso`). */
+  cargas: CargasCaso;
+}
+
+/**
+ * Fase SO (`docs/fem3d/segundo-orden.md` §7): lo que el segundo orden global necesita de cada caso
+ * (o de cada modo), calculado con las fuerzas nodales equivalentes que ensambla el cálculo (las
+ * puntuales y el reparto de las cargas de barra y de lámina, con la resultante de las reales).
+ */
+export interface CargasCaso {
+  /** Resultante de las cargas del caso, [ΣFx, ΣFy, ΣFz], kN. */
+  F: [number, number, number];
+  /** [Σ z·Fx, Σ z·Fy], kN·m: el momento volcador de las fuerzas horizontales respecto a z = 0. */
+  zF: [number, number];
+  /**
+   * Trabajo P·δ: por cada caso k del modelo (en el orden de `casos`), [Σ_v P_v,k·ux_v, Σ_v P_v,k·uy_v],
+   * kN·m, con P_v,k = −Fz_v,k la carga vertical hacia abajo del caso k en el nudo v y u el
+   * desplazamiento de este caso (o de este modo): 2 números por caso del modelo.
+   */
+  pdelta: Float64Array;
 }
 
 export interface ResultadoModal {
@@ -395,6 +415,8 @@ export interface ResultadoCaso {
    * (Oettli–Prager): maxᵢ |K·x − b|ᵢ / (|K|·|x| + |b|)ᵢ. Mide el solver, no el condicionamiento.
    */
   residuo: number;
+  /** SO: la resultante de sus cargas y su trabajo P·δ con cada caso del modelo. */
+  cargas: CargasCaso;
 }
 
 export interface EstadisticasCalculo {

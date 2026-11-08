@@ -20,7 +20,7 @@
  */
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { EstadisticasCalculo, ModeloAnalitico, ModoVibracion, ResultadoCaso, ResultadoModal } from "../motor/modelo.ts";
+import type { CargasCaso, EstadisticasCalculo, ModeloAnalitico, ModoVibracion, ResultadoCaso, ResultadoModal } from "../motor/modelo.ts";
 
 export const FORMATO_RESULTADOS = "concreta-fem/resultados@1";
 
@@ -174,7 +174,7 @@ export interface CabeceraResultados {
   huella: string;
   /** Firma del modelo analítico calculado: unos resultados sólo valen para un modelo con la misma. */
   modelo: FirmaModelo;
-  casos: { id: string; equilibrio: { fuerzas: number; momentos: number }; residuo: number }[];
+  casos: { id: string; equilibrio: { fuerzas: number; momentos: number }; residuo: number; /** SO: la resultante de las cargas y el trabajo P·δ (`CargasCaso`, con listas). */ cargas: CargasCabecera }[];
   /** Longitud de cada vector de un caso; en el bloque, los de cada caso van seguidos en este orden. */
   longitudes: Record<(typeof CAMPOS)[number], number>;
   estadisticas: EstadisticasCalculo;
@@ -189,10 +189,27 @@ export interface CabeceraResultados {
  * (3 por diafragma) y los vectores de su caso (`CAMPOS`, con las `longitudes` de los casos), en este orden.
  */
 export type CabeceraModal = Omit<ResultadoModal, "modos"> & {
-  modos: Omit<ModoVibracion, "forma" | "fuerzas" | (typeof CAMPOS)[number]>[];
+  modos: (Omit<ModoVibracion, "forma" | "fuerzas" | "cargas" | (typeof CAMPOS)[number]> & { cargas: CargasCabecera })[];
   /** VS3: cada modo lleva los vectores de un caso. Unos resultados sin esto son de antes y no valen. */
   vectores: "caso";
 };
+
+/** SO: `CargasCaso` con su `pdelta` como lista, para la cabecera JSON. */
+export interface CargasCabecera {
+  F: number[];
+  zF: number[];
+  pdelta: number[];
+}
+
+const aCabecera = (c: CargasCaso): CargasCabecera => ({ F: [...c.F], zF: [...c.zF], pdelta: Array.from(c.pdelta) });
+
+/** Las cargas de una cabecera, o null si no tienen el formato (los guardó una versión anterior). */
+function deCabecera(c: unknown): CargasCaso | null {
+  if (!c || typeof c !== "object") return null;
+  const x = c as Partial<CargasCabecera>;
+  if (!Array.isArray(x.F) || x.F.length !== 3 || !Array.isArray(x.zF) || x.zF.length !== 2 || !Array.isArray(x.pdelta)) return null;
+  return { F: [x.F[0]!, x.F[1]!, x.F[2]!], zF: [x.zF[0]!, x.zF[1]!], pdelta: Float64Array.from(x.pdelta) };
+}
 
 const LITTLE_ENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
@@ -233,14 +250,14 @@ export function empaquetarResultados(
         o += longitudes[campo];
       }
     });
-    cabeceraModal = { ...modal, modos: modal.modos.map(({ forma: _f, fuerzas: _q, u: _u, reacciones: _r, esfuerzosBarras: _b, esfuerzosLaminas: _l, ...resto }) => resto), vectores: "caso" };
+    cabeceraModal = { ...modal, modos: modal.modos.map(({ forma: _f, fuerzas: _q, u: _u, reacciones: _r, esfuerzosBarras: _b, esfuerzosLaminas: _l, cargas, ...resto }) => ({ ...resto, cargas: aCabecera(cargas) })), vectores: "caso" };
   }
   return {
     cabecera: {
       formato: FORMATO_RESULTADOS,
       huella,
       modelo: firmaModelo(modelo),
-      casos: casos.map((c) => ({ id: c.id, equilibrio: c.equilibrio, residuo: c.residuo })),
+      casos: casos.map((c) => ({ id: c.id, equilibrio: c.equilibrio, residuo: c.residuo, cargas: aCabecera(c.cargas) })),
       longitudes,
       estadisticas,
       diagnosticos,
@@ -266,6 +283,10 @@ export function desempaquetarResultados(cabecera: CabeceraResultados, bytes: Uin
   const cm = cabecera.modal;
   if (!!modelo.modal !== !!cm) return { motivo: cm ? "llevan un análisis modal que el modelo no pide" : "no llevan los modos de vibración que pide el modelo" };
   if (cm && !(Array.isArray(cm.modos) && Array.isArray(cm.diafragmas) && cm.vectores === "caso")) return { motivo: "su análisis modal no tiene el formato de esta versión (cada modo lleva ahora los vectores de un caso)" };
+  // SO: la resultante de las cargas y el trabajo P·δ de cada caso y de cada modo
+  const cargasCasos = cabecera.casos.map((c) => deCabecera(c.cargas));
+  const cargasModos = (cm?.modos ?? []).map((m) => deCabecera(m.cargas));
+  if (cargasCasos.some((c) => c === null) || cargasModos.some((c) => c === null)) return { motivo: "no llevan la resultante de las cargas y el trabajo P·δ de cada caso (los guardó una versión anterior al segundo orden)" };
   const nd3 = 3 * (cm?.diafragmas.length ?? 0);
   const porModo = cm ? 2 * nd3 + porCaso : 0;
   if (bytes.byteLength !== 8 * (porCaso * cabecera.casos.length + porModo * (cm?.modos.length ?? 0))) return { motivo: "resultados.bin no casa con su cabecera" };
@@ -286,7 +307,7 @@ export function desempaquetarResultados(cabecera: CabeceraResultados, bytes: Uin
           r[campo] = datos.slice(o, o + cabecera.longitudes[campo]);
           o += cabecera.longitudes[campo];
         }
-        return { ...m, forma, fuerzas, ...r };
+        return { ...m, forma, fuerzas, ...r, cargas: cargasModos[i]! };
       }),
     };
   }
@@ -299,7 +320,7 @@ export function desempaquetarResultados(cabecera: CabeceraResultados, bytes: Uin
         r[campo] = datos.slice(o, o + cabecera.longitudes[campo]);
         o += cabecera.longitudes[campo];
       }
-      return { id: c.id, ...r, equilibrio: c.equilibrio, residuo: c.residuo };
+      return { id: c.id, ...r, equilibrio: c.equilibrio, residuo: c.residuo, cargas: cargasCasos[k]! };
     }),
   };
 }
