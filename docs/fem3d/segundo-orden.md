@@ -122,6 +122,12 @@ Propuestas el 2026-11-08, con la recomendación delante:
 - **SO-f, los umbrales de los avisos:** 1,10 (traslacional, info) y 1,33 (fuera del método, aviso), §7.3.
 - **SO-g, fuera:** las cargas nocionales de imperfección (A22 §5.3.2, que `fem2d` sí pone) y el segundo orden por planta (θ_i por planta como coeficiente, en vez del global): se apuntan en §10.
 
+**Confirmadas por el usuario el 2026-11-08, todas como se proponían:**
+
+- **SO-b:** el segundo orden va siempre activado por defecto.
+- **SO-c:** el 2 se queda. El pórtico 2D de Concreta (`fem2d`) no se va a integrar: era una versión menor anterior a este motor, así que no hay que alinear nada con su rigidez nominal (m = 3). El 3 estricto del CE sigue como opción nombrada.
+- **SO-g:** se aplazan, con una condición. La imperfección geométrica global del CE A19 §5.2 (θᵢ = 1/200·α_h·α_m) es obligatoria en ELU, y la excentricidad mínima de `rcColumns` sólo cubre la del pilar aislado. Por eso tiene que estar hecha (como casos N del generador, §10) antes de que se use el armado de pilares de la fase de comprobaciones (CO1).
+
 ## 9. Tramos y criterios
 
 | tramo | qué | criterio |
@@ -143,7 +149,7 @@ El coste de la fase en ecuaciones es cero (el modelo analítico no cambia). El t
 
 ## 11. Hecho (2026-11-08): SO1–SO4
 
-Implementado el mismo día con las decisiones de §8 tal como se proponían (**pendientes de confirmar por el usuario**: si cambia SO-b o SO-c, es un valor por defecto en `src/compilador/segundoOrden.ts`).
+Implementado el mismo día con las decisiones de §8 tal como se proponían (confirmadas por el usuario el 2026-11-08, §8).
 
 **Lo que hay en el repo:**
 - **Motor** (`src/motor/calcular.ts`, `modelo.ts`): cada caso lleva `cargas` (`CargasCaso`): la resultante de sus fuerzas nodales equivalentes, `F` = [ΣFx, ΣFy, ΣFz] y `zF` = [Σ z·Fx, Σ z·Fy], y `pdelta`, el trabajo P·δ con cada caso del modelo, Σ_v P_v,k·[ux_v, uy_v] (2 números por caso). Los modos también (con sus fuerzas de inercia en los maestros y su forma), y los casos base de los modos lo heredan (`casosModales`). Es un bucle más sobre los nudos por caso; los casos no cambian ni un bit (las referencias congeladas del motor, idénticas). En los resultados guardados va en la cabecera (`CargasCabecera`, con `pdelta` como lista); unos resultados sin ello se recalculan una vez, como con la firma.
