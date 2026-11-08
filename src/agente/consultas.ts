@@ -746,7 +746,7 @@ export interface EstacionFranjaEnvolvente {
   /** Wood–Armer de la armadura de su dirección (kN·m/m): inferior y superior, con su combinación. */
   inferior: [number, string];
   superior: [number, string];
-  /** En un reticular, la parte del ancho en ábacos (fuera de ellos, el momento por nervio es el medio por el intereje). */
+  /** En un reticular, la parte del ancho en ábacos (fuera de ellos, el momento del nervio de la franja es el medio por el ancho de la franja). */
   fraccionAbaco?: number;
   /** Sólo si la estación no vale. */
   valido?: false;

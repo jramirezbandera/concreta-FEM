@@ -73,8 +73,12 @@ describe("el aviso franja/esquina-entrante", () => {
   };
 
   it("lo lleva la franja que pasa por la esquina, con el tramo de cada una, y no una lejana", () => {
-    // L-N1:Y16 va de x = 12,27 a 13,09: pasa por las dos esquinas del hueco en x = 12,6
-    const a = avisos("L-N1:Y16");
+    // La franja Y que pasa por x = 12,6: pasa por las dos esquinas del hueco de ese lado (desde el
+    // 2026-11-08 las franjas del reticular van en sus nervios, así que no se nombra por su número)
+    const fs = q.franjas("L-N1");
+    if (!fs.valido) throw new Error("L-N1");
+    const y = fs.valor.find((f) => f.direccion === 2 && f.t0 < 12.6 && f.t1 > 12.6)!;
+    const a = avisos(y.id);
     expect(a.length).toBe(1);
     expect(a[0]!.mensaje).toContain("(12.60; 10.40)");
     expect(a[0]!.mensaje).toContain("(12.60; 14.60)");

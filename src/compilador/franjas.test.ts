@@ -17,6 +17,7 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { ResultadoCaso } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
+import { nerviosLosa } from "./abacos.ts";
 import { compilar } from "./compilar.ts";
 import { combinar } from "./envolventes.ts";
 import { EsfuerzosFranjas } from "./esfuerzosFranjas.ts";
@@ -94,10 +95,32 @@ describe("F: reparto de las franjas (§2.1)", () => {
     expect(franjasLosa({ ...l, contorno: rect(0, 0, 10, 1.6) }, 0.1).filter((f) => f.direccion === 1).length).toBe(16);
   });
 
-  it("en un reticular, el ancho es el intereje; con el eje 1 a 90°, X va según Y", () => {
+  it("en un reticular, una franja por nervio, centrada en él (también por el punto de paso y girado)", () => {
     const l = losaPlana().losas![0]!;
-    const r = franjasLosa({ ...l, reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05 } }, 1);
-    expect(r.every((f) => f.ancho <= 0.82 + 1e-12 && f.intereje === 0.82)).toBe(true);
+    const s = 0.82;
+    for (const [paso, eje1] of [[undefined, 0], [[1.37, -0.21], 0], [[2.1, 3.3], 30]] as [Vec2 | undefined, number][]) {
+      const ret = { intereje: s, nervio: 0.12, capa: 0.05, ...(paso ? { paso } : {}) };
+      const L = { ...l, eje1, reticular: ret };
+      const r = franjasLosa(L, 1);
+      const n = nerviosLosa(L);
+      for (const k of [1, 2] as const) {
+        const g = r.filter((f) => f.direccion === k);
+        // De borde a borde, seguidas
+        for (let i = 1; i < g.length; i++) expect(g[i]!.t0).toBe(g[i - 1]!.t1);
+        // Las de dentro, de un intereje; las de los extremos, de s/2 a 3s/2
+        for (const f of g.slice(1, -1)) expect(f.ancho).toBeCloseTo(s, 9);
+        for (const f of [g[0]!, g.at(-1)!]) expect(f.ancho > s / 2 - 1e-9 && f.ancho < 1.5 * s + 1e-9).toBe(true);
+        // Cada franja lleva un solo eje de nervio de su dirección, y en las de dentro, en su centro
+        const tsNervios = [...new Set(n.filter(([a, b]) => Math.abs((b[0] - a[0]) * g[0]!.n[0] + (b[1] - a[1]) * g[0]!.n[1]) < 1e-9).map(([a]) => Math.round((a[0] * g[0]!.n[0] + a[1] * g[0]!.n[1]) * 1e6) / 1e6))];
+        expect(tsNervios.length).toBe(g.length);
+        for (const [i, f] of g.entries()) {
+          const dentro = tsNervios.filter((t) => t > f.t0 && t < f.t1);
+          expect(dentro.length).toBe(1);
+          if (i > 0 && i < g.length - 1) expect(dentro[0]!).toBeCloseTo((f.t0 + f.t1) / 2, 6);
+        }
+        expect(g.every((f) => f.intereje === s)).toBe(true);
+      }
+    }
     const g = franjasLosa({ ...l, eje1: 90 }, 1);
     expect(g.filter((f) => f.direccion === 1).length).toBe(19);
     expect(g[0]!.d).toEqual([0, 1]);

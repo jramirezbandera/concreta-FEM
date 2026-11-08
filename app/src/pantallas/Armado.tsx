@@ -313,7 +313,11 @@ function DetalleFranja({ d, varias, base }: { d: DatosFranja; varias: boolean; b
             </tbody>
           </table>
         )}
-        {reticular && <p className="nota">Reticular: el momento por nervio es el medio por el intereje ({fmt(f.intereje!, 2)} m), fuera de los ábacos.</p>}
+        {reticular && (
+          <p className="nota">
+            Reticular: la franja va centrada en un nervio ({f.ancho > f.intereje! + 1e-9 || f.ancho < f.intereje! - 1e-9 ? `${fmt(f.ancho, 2)} m de ancho, hasta el borde del forjado` : `un intereje, ${fmt(f.intereje!, 2)} m`}). El momento de ese nervio es el medio por el ancho de la franja, fuera de los ábacos.
+          </p>
+        )}
       </Seccion>
       {d.diagnosticos.length > 0 && (
         <Seccion titulo="Avisos" valor={d.diagnosticos.length}>

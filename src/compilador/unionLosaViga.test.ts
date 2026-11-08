@@ -232,14 +232,22 @@ describe("fase LV, criterio 7: las franjas en la cara de una viga", () => {
     // La ventana de un pilar: el ancho nominal (en un reticular, el intereje) centrado en él (F-h)
     const bN = anchoNominal(fisico.losas!.find((l) => l.id === "L-N1")!);
     const ventanas = enViga.map((p): [number, number] => [p.x - bN / 2, p.x + bN / 2]);
+    const huellasX = enViga.map((p): [number, number] => {
+      const sc = fisico.secciones.find((x) => x.id === p.seccion)!;
+      const m = sc.forma === "rectangular" ? sc.b / 2 : NaN;
+      return [p.x - m, p.x + m];
+    });
     for (const lado of [-1, 1] as const) {
       const yf = 5 + (lado * b) / 2;
       const { suma, sin, franjas } = sumaApoyos(m40, yf, lado);
-      // Las franjas sin estación de apoyo: las que las ventanas dejan con menos de la mitad
+      // Las franjas sin estación de apoyo: las que tocan la huella de un pilar (entre sus caras es el
+      // apoyo, con su metro: F-h) y las que las ventanas dejan con menos de la mitad. Con las franjas
+      // del reticular en sus nervios (2026-11-08), un pilar puede tocar dos
       const fuera = (f: { t0: number; t1: number }) => ventanas.reduce((a, [v0, v1]) => a - Math.max(0, Math.min(f.t1, v1) - Math.max(f.t0, v0)), f.t1 - f.t0);
+      const tocaPilar = (f: { t0: number; t1: number }) => huellasX.some(([a, b]) => Math.min(f.t1, b) - Math.max(f.t0, a) > 1e-9);
       expect(sin.sort()).toEqual(
         franjas
-          .filter((f) => fuera(f) < 0.5 * (f.t1 - f.t0) - 1e-6)
+          .filter((f) => fuera(f) < 0.5 * (f.t1 - f.t0) - 1e-6 || tocaPilar(f))
           .map((f) => f.id)
           .sort(),
       );

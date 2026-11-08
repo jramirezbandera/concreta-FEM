@@ -10,6 +10,10 @@
  *   que las franjas se numeran por su coordenada transversal creciente. s = p·d, t = p·n.
  * - Ancho (F-a, F-b): `anchoFranja` (1 m por defecto) en una maciza; el intereje en un reticular.
  * - Reparto (F-c): con W la extensión de la losa en t, n = ⌈W/b⌉ franjas iguales de ancho W/n ≤ b.
+ *   En un reticular (desde el 2026-11-08), una franja por nervio, centrada en él y de un intereje,
+ *   con los bordes a mitad de casetón; los nervios, por el punto de paso (`Reticular.paso`, la
+ *   retícula del dibujo). Las dos de los extremos llegan al borde de la losa (de s/2 a 3s/2). Así el
+ *   momento de cada franja es el de un nervio real: el medio por el ancho de la franja.
  * - Nombre: `<losa>:X<i>` en la dirección 1 y `<losa>:Y<i>` en la 2, con i desde 1.
  *
  * Caras de los pilares (§2.2): el momento en una cara sólo es exacto si la cara está en la malla
@@ -21,6 +25,7 @@
  * las líneas de la rejilla, que la rompían (×4 nudos en el edificio objetivo, sin plantillas). Con la
  * opción `franjas: false` no se siembra nada.
  */
+import { ejesNervios } from "./abacos.ts";
 import { carasComunes, pilaresEnLosa, semiextension } from "./bandas.ts";
 import { radioHuella, type Huella } from "./geometria2d.ts";
 import { distanciaABorde, distanciaASegmento, puntoEnRegion } from "./poligonos.ts";
@@ -50,7 +55,7 @@ export interface Franja {
   /** Extensión de la losa a lo largo de la franja (s = p·d), m. */
   s0: number;
   s1: number;
-  /** Intereje, si la losa es reticular (el momento de la franja es el de un nervio). */
+  /** Intereje, si la losa es reticular: cada franja lleva un nervio, y su momento (el medio por el ancho) es el de ese nervio. */
   intereje: number | null;
 }
 
@@ -126,11 +131,26 @@ export function franjasLosa(losa: Losa, ancho = ANCHO_FRANJA, desfase = 0): Fran
     const tmax = Math.max(...ts);
     const W = tmax - tmin;
     if (!(W > 0) || !(b > 0)) continue;
-    // ⌈W/b⌉, sin que un redondeo de W = m·b añada una franja de ancho nulo
-    const nf = Math.max(1, Math.ceil(W / b - 1e-9));
+    const ret = losa.reticular;
     const bordes = [tmin];
-    for (let i = 1; i < nf; i++) bordes.push(tmin + (W * i) / nf);
-    if (desfase > 0) for (let i = 1; i <= nf; i++) bordes[i] = tmin + (W * (i - desfase)) / nf;
+    if (ret && ret.nervio > 0 && ret.nervio < ret.intereje) {
+      // Reticular (2026-11-08): una franja por nervio, centrada en él, con los bordes a mitad de los
+      // casetones de los lados (eje ± s/2). Los nervios de la dirección son los que van según d, en su
+      // coordenada transversal por el punto de paso (`ejesNervios`, la retícula del dibujo). Lo que
+      // queda entre el borde de la losa y la primera o la última franja (< s/2, sin nervio) va con ella
+      const s = ret.intereje;
+      const c = s - ret.nervio;
+      const P = ret.paso;
+      // Con `desfase` (sólo para medir), los nervios corridos desfase·s hacia t menores
+      const base = P ? P[0] * n[0] + P[1] * n[1] : desfase > 0 ? (ejesNervios(tmin, tmax, s, c)[0] ?? tmin) : undefined;
+      const nervios = ejesNervios(tmin, tmax, s, c, base === undefined ? undefined : base - desfase * s);
+      for (let i = 1; i < nervios.length; i++) bordes.push((nervios[i - 1]! + nervios[i]!) / 2);
+    } else {
+      // ⌈W/b⌉, sin que un redondeo de W = m·b añada una franja de ancho nulo
+      const nf = Math.max(1, Math.ceil(W / b - 1e-9));
+      for (let i = 1; i < nf; i++) bordes.push(tmin + (W * i) / nf);
+      if (desfase > 0) for (let i = 1; i <= nf; i++) bordes[i] = tmin + (W * (i - desfase)) / nf;
+    }
     bordes.push(tmax);
     for (let i = 0; i + 1 < bordes.length; i++) {
       const [t0, t1] = [bordes[i]!, bordes[i + 1]!];

@@ -32,30 +32,42 @@ function consultas(opciones: OpcionesCompilacion): Consultas {
   return new Consultas(fisico, c, k.casos, opciones);
 }
 
-/** La mayor superior de ELU en las estaciones de cara del pilar en la franja (NaN si no tiene ninguna). */
-function metro(q: Consultas, franja: string, pilar: string): number {
+/**
+ * La mayor superior de ELU en las estaciones de cara del pilar en las franjas de la losa en esa
+ * dirección (NaN si no tiene ninguna). Desde el 2026-11-08 las franjas de un reticular van en sus
+ * nervios: la que toca el pilar se busca, no se nombra (puede ser más de una; todas llevan su metro).
+ */
+function metro(q: Consultas, losa: string, dir: "X" | "Y", pilar: string): number {
   const comb = q.combinaciones({ situaciones: ["ELU-PT"] });
-  const e = q.franja(franja);
-  const a = q.armadoFranja(franja, comb.valido ? comb.valor.map((c) => c.factores) : []);
-  if (!e.valido || !a.valido) throw new Error(franja);
-  const vs = e.valor.estaciones.flatMap((x, i) => (x.tipo === "cara" && x.piezas.includes(pilar) ? [a.valor[i]!.superior] : []));
+  const fs = q.franjas(losa);
+  if (!fs.valido) throw new Error(losa);
+  const vs: number[] = [];
+  for (const f of fs.valor) {
+    if (f.direccion !== (dir === "X" ? 1 : 2)) continue;
+    const e = q.franja(f.id);
+    if (!e.valido) throw new Error(f.id);
+    if (!e.valor.estaciones.some((x) => x.tipo === "cara" && x.piezas.includes(pilar))) continue;
+    const a = q.armadoFranja(f.id, comb.valido ? comb.valor.map((c) => c.factores) : []);
+    if (!a.valido) throw new Error(f.id);
+    vs.push(...e.valor.estaciones.flatMap((x, i) => (x.tipo === "cara" && x.piezas.includes(pilar) ? [a.valor[i]!.superior] : [])));
+  }
   return vs.length ? Math.max(...vs) : NaN;
 }
 
 // Pilares de borde en la dirección de su zuncho, y P3 y P11 (los de los zunchos cercanos)
-const CARAS: [string, string][] = [
-  ["L-CUB:Y19", "P4"],
-  ["L-CUB:Y19", "P12"],
-  ["L-CUB:Y19", "P15"],
-  ["L-CUB:Y19", "P19"],
-  ["L-CUB:Y13", "P14"],
-  ["L-CUB:Y13", "P18"],
-  ["L-CUB:X21", "P2"],
-  ["L-CUB-S:Y14", "P6"],
-  ["L-CUB-S:Y14", "P9"],
-  ["L-CUB:X21", "P3"],
-  ["L-CUB:Y14", "P3"],
-  ["L-CUB:X13", "P11"],
+const CARAS: [string, "X" | "Y", string][] = [
+  ["L-CUB", "Y", "P4"],
+  ["L-CUB", "Y", "P12"],
+  ["L-CUB", "Y", "P15"],
+  ["L-CUB", "Y", "P19"],
+  ["L-CUB", "Y", "P14"],
+  ["L-CUB", "Y", "P18"],
+  ["L-CUB", "X", "P2"],
+  ["L-CUB-S", "Y", "P6"],
+  ["L-CUB-S", "Y", "P9"],
+  ["L-CUB", "X", "P3"],
+  ["L-CUB", "Y", "P3"],
+  ["L-CUB", "X", "P11"],
 ];
 
 describe("caras de franja de los pilares de borde (F3.3)", () => {
@@ -80,9 +92,10 @@ describe("caras de franja de los pilares de borde (F3.3)", () => {
   });
 
   it("su metro con h = 0,75, a ≤ 10 % del de h = 0,375 (antes, del −30 al −73 %, o sin estación)", () => {
-    for (const [franja, pilar] of CARAS) {
-      const g = metro(gruesa, franja, pilar);
-      const f = metro(fina, franja, pilar);
+    for (const [losa, dir, pilar] of CARAS) {
+      const franja = `${losa} ${dir}`;
+      const g = metro(gruesa, losa, dir, pilar);
+      const f = metro(fina, losa, dir, pilar);
       // Un valor que dimensiona, no ruido (P14 en Y13 da 19,7 desde LV2-h: su |mxy| ya no es el de la capa límite a δ)
       expect(f, `${franja} ${pilar} (fina)`).toBeGreaterThan(15);
       expect(Math.abs(g - f) / f, `${franja} ${pilar}: ${g} frente a ${f}`).toBeLessThan(0.1);

@@ -49,7 +49,8 @@
  * ventana del mismo ancho centrada en el pilar (F-h): el pico del momento está sobre el pilar, y con
  * el reparto fijo un pilar partido entre dos franjas daba en cada una hasta un 35 % menos que el
  * metro centrado (criterio 4). Así la demanda junto a un pilar no depende de dónde caen los bordes
- * de las franjas. En un reticular, el momento por nervio es mx·s (intereje), y
+ * de las franjas. En un reticular, cada franja va centrada en un nervio (`franjasLosa`): el momento
+ * de ese nervio es mx por el ancho de la franja (el intereje, salvo en las dos de los extremos), y
  * `fraccionAbaco` dice qué parte del ancho es maciza.
  *
  * El metro de un pilar va en su cara propia (F3). Si es mayor que el menor de su línea, la cara común

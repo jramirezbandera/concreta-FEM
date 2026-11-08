@@ -41,7 +41,7 @@ Cada franja se corta en perpendicular a su dirección, sólo por las láminas (F
 **Momentos medios** por metro, en los ejes de la franja:
 - mx = My/b_losa, con b_losa el ancho de la franja que cae en losa en esa estación (sin huecos ni lo que se sale). En una cara, My es exacto. Por campos, es la integral del campo SPR a lo ancho de la franja.
 - my y mxy son las medias de los campos a lo ancho de la franja. En una cara o un apoyo, a δ = 1 mm por fuera del apoyo, como en C5, salvo donde detrás de la recta hay un borde rígido de la losa (el ancho de una viga unida por sus caras, la huella de un pilar en la ventana de su metro, un apoyo lineal con algún giro coartado): ahí, a un canto de la losa de la cara, o a la mitad de lo libre hasta el siguiente apoyo, porque junto a un borde así el torsor tiene una capa límite que la malla gruesa no ve y la fina resuelve despacio (LV2-h, `refinamiento-vigas.md` §11–§12, 2026-10-16). Cada estación dice a qué distancia se tomaron (`distanciaMuestras`).
-- En un reticular, fuera de los ábacos, también el momento por nervio: mx·s.
+- En un reticular, fuera de los ábacos, también el momento por nervio: mx por el ancho de la franja. Desde el 2026-11-08 cada franja va centrada en un nervio (§2.8), así que es el intereje salvo en las dos de los extremos; antes eran ⌈W/s⌉ franjas iguales que no coincidían con los nervios, y era mx·s.
 
 ### 2.4 Wood–Armer y envolventes
 
@@ -80,6 +80,16 @@ Cada franja se corta en perpendicular a su dirección, sólo por las láminas (F
 - **La armadura en cm²/m** (F-e): necesita el recubrimiento, el acero y el canto útil, que no están en el modelo. Por defecto, F da los momentos de diseño por metro; el paso a armadura es del módulo de Concreta o de una decisión del usuario.
 - **El punzonamiento, el cortante y las longitudes de anclaje y solape.**
 - **Elegir solo la armadura base y los refuerzos:** lo decide el ingeniero con los mapas y los diagramas.
+
+### 2.8 Las franjas de un reticular, en sus nervios (2026-11-08)
+
+A petición del usuario, tras dar a los reticulares su punto de paso de los nervios (`Reticular.paso`, como CYPECAD; los nervios ya se dibujan en planta):
+
+- **Una franja por nervio**, centrada en su eje, con los bordes a mitad de los casetones de los lados (eje ± s/2). Los nervios de la dirección 1 (las franjas según el `eje1`) son los que van según el `eje1`, en su coordenada transversal; los de la 2, los perpendiculares. Su posición es la de la retícula del dibujo y del sólido (`ejesNervios`, por el punto de paso o centrada en la losa).
+- **Los extremos:** lo que queda entre el borde de la losa y el medio casetón del primer o el último nervio (menos de s/2, sin nervio) va con esa franja, que mide de s/2 a 3s/2. Así toda la losa sigue cubierta de borde a borde y cada franja tiene un solo nervio.
+- **Momento del nervio:** el medio de la franja por su ancho (fuera de los ábacos, que son macizos).
+- **No cambia:** la malla (los bordes de las franjas no se siembran, sólo las caras de los pilares), el metro centrado en un pilar (la ventana es de un intereje centrada en él, F-h) ni las losas macizas. Se mueven sólo las franjas de los reticulares (cuántas, sus bordes y sus medios) y con ellas la referencia congelada de F, regenerada a sabiendas (`validacion/f/out_cambiosNervios.txt`).
+- `desfase` (criterio 4) corre los nervios desfase·s.
 
 ## 3. Decisiones por defecto
 
