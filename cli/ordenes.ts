@@ -10,6 +10,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { comprobarArmado } from "../src/agente/armaduraBase.ts";
 import { comprobarObra } from "../src/agente/obra.ts";
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito, type Seleccion } from "../src/agente/combinaciones.ts";
@@ -41,7 +42,10 @@ import type { ResultadoCaso, ResultadoModal } from "../src/motor/modelo.ts";
 import { iniciarNucleo } from "../src/nucleo/index.ts";
 import { svgAPng } from "./png.ts";
 
-export const RAIZ = resolve(import.meta.dirname, "..");
+// La raíz del repo, o la del paquete de Claude Desktop (`scripts/paquete-mcpb.ts`), que copia los
+// ficheros que se leen aquí en las mismas rutas relativas. Con `import.meta.url` y no
+// `import.meta.dirname`, que el Node de Claude Desktop puede no tener.
+export const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const WASM = join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm");
 export const RUTA_ESQUEMA = join(RAIZ, "src", "agente", "proyecto.schema.json");
 

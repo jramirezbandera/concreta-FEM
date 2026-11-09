@@ -31,6 +31,8 @@ import { VISTAS } from "../src/agente/render/index.ts";
 import { SITUACIONES } from "../src/combinaciones/generador.ts";
 import { aplicar, type Operacion } from "../src/editor/operaciones.ts";
 import { serializar } from "../src/editor/serializar.ts";
+import { proyectoNuevo } from "../src/editor/plantilla.ts";
+import { abrirVisorEstatico } from "../app/visorEstatico.ts";
 import { ejecutar, RAIZ, RUTA_ESQUEMA, textoSalida } from "./ordenes.ts";
 
 export const VERSIONES_PROTOCOLO = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
@@ -225,20 +227,22 @@ async function orden(argumentos: string[], carpeta: string): Promise<{ codigo: n
   });
 }
 
-const visores = new Map<string, { proceso: ChildProcess; url: string }>();
+/** Un visor abierto: el de Vite (en el repo) o el de la app construida (en el paquete de Claude Desktop). */
+interface Visor {
+  url: string;
+  vivo(): boolean;
+  cerrar(): void;
+}
+const visores = new Map<string, Visor>();
 
 function abrirNavegador(url: string): void {
   const [c, args] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
   spawn(c, args as string[], { stdio: "ignore", detached: true }).unref();
 }
 
-async function visor(f: string, nuevo: boolean, abrir: boolean): Promise<ResultadoHerramienta> {
-  const ya = visores.get(f);
-  if (ya && ya.proceso.exitCode === null) {
-    if (abrir) abrirNavegador(ya.url);
-    return { content: [texto({ ok: true, url: ya.url, yaAbierto: true })] };
-  }
-  const p = spawn(process.execPath, [join(RAIZ, "app", "visor.ts"), f, ...(nuevo ? ["--nuevo"] : [])], { cwd: dirname(f), stdio: ["ignore", "pipe", "pipe"] });
+/** El visor de Vite del repo (`app/visor.ts`), en un proceso aparte. */
+async function visorVite(f: string, nuevo: boolean): Promise<Visor | { error: string }> {
+  const p: ChildProcess = spawn(process.execPath, [join(RAIZ, "app", "visor.ts"), f, ...(nuevo ? ["--nuevo"] : [])], { cwd: dirname(f), stdio: ["ignore", "pipe", "pipe"] });
   const url = await new Promise<string | { error: string }>((res) => {
     let salida = "";
     const t = setTimeout(() => res({ error: `El visor no arrancó en 60 s: ${salida.slice(-500)}` }), 60_000);
@@ -257,10 +261,38 @@ async function visor(f: string, nuevo: boolean, abrir: boolean): Promise<Resulta
       res({ error: `El visor se cerró (código ${c}): ${salida.slice(-500)}` });
     });
   });
-  if (typeof url !== "string") return { content: [texto({ ok: false, diagnosticos: [{ codigo: "mcp/visor", severidad: "error", mensaje: url.error }] })], isError: true };
-  visores.set(f, { proceso: p, url });
-  if (abrir) abrirNavegador(url);
-  return { content: [texto({ ok: true, url, nota: "La app vigila el fichero: lo que cambies se ve allí solo. Se cierra con este servidor." })] };
+  if (typeof url !== "string") return url;
+  return { url, vivo: () => p.exitCode === null, cerrar: () => p.kill() };
+}
+
+/** La app ya construida (`app/dist`), servida en este proceso: el paquete no lleva Vite (§13.4). */
+async function visorEstatico(f: string, nuevo: boolean): Promise<Visor | { error: string }> {
+  if (nuevo) {
+    if (existsSync(f)) return { error: `Ya existe ${f}: no se sobrescribe. Ábralo sin «nuevo».` };
+    if (!existsSync(dirname(f))) return { error: `No existe la carpeta ${dirname(f)}.` };
+    writeFileSync(f, serializar(proyectoNuevo(basename(f).replace(/\.json$/i, ""))), "utf8");
+  }
+  try {
+    const v = await abrirVisorEstatico(join(RAIZ, "app", "dist"), f, nuevo);
+    let abierto = true;
+    v.servidor.on("close", () => (abierto = false));
+    return { url: v.url, vivo: () => abierto, cerrar: () => v.cerrar() };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+async function visor(f: string, nuevo: boolean, abrir: boolean): Promise<ResultadoHerramienta> {
+  const ya = visores.get(f);
+  if (ya && ya.vivo()) {
+    if (abrir) abrirNavegador(ya.url);
+    return { content: [texto({ ok: true, url: ya.url, yaAbierto: true })] };
+  }
+  const v = existsSync(join(RAIZ, "app", "visor.ts")) ? await visorVite(f, nuevo) : await visorEstatico(f, nuevo);
+  if ("error" in v) return { content: [texto({ ok: false, diagnosticos: [{ codigo: "mcp/visor", severidad: "error", mensaje: v.error }] })], isError: true };
+  visores.set(f, v);
+  if (abrir) abrirNavegador(v.url);
+  return { content: [texto({ ok: true, url: v.url, nota: "La app vigila el fichero: lo que cambies se ve allí solo. Se cierra con este servidor." })] };
 }
 
 export async function llamar(nombre: string, a: Record<string, unknown> = {}): Promise<ResultadoHerramienta> {
@@ -423,10 +455,18 @@ export async function atender(m: Peticion): Promise<Record<string, unknown> | nu
 }
 
 function cerrarVisores(): void {
-  for (const v of visores.values()) v.proceso.kill();
+  for (const v of visores.values()) v.cerrar();
 }
 
-if (import.meta.main) {
+let sirviendo = false;
+
+/**
+ * Atiende por stdio hasta que se cierra la entrada. Idempotente: el punto de entrada del paquete
+ * (`cli/mcpPaquete.ts`) la llama, y en un Node con `import.meta.main` también la de abajo.
+ */
+export function servir(): void {
+  if (sirviendo) return;
+  sirviendo = true;
   let resto = "";
   const escribir = (x: unknown) => process.stdout.write(`${JSON.stringify(x)}\n`);
   process.stdin.on("data", (d: Buffer) => {
@@ -452,3 +492,5 @@ if (import.meta.main) {
   });
   process.on("exit", cerrarVisores);
 }
+
+if (import.meta.main) servir();

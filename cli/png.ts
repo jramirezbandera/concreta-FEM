@@ -8,7 +8,8 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 
 export const FUENTES: Record<string, string> = {
@@ -23,7 +24,7 @@ function iniciar(): Promise<Uint8Array[]> {
     const wasm = readFileSync(createRequire(import.meta.url).resolve("@resvg/resvg-wasm/index_bg.wasm"));
     await initWasm(wasm);
     return Object.entries(FUENTES).map(([nombre, sha]) => {
-      const b = new Uint8Array(readFileSync(join(import.meta.dirname, "fuentes", nombre)));
+      const b = new Uint8Array(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fuentes", nombre)));
       const h = createHash("sha256").update(b).digest("hex");
       if (h !== sha) throw new Error(`cli/fuentes/${nombre} no es la versionada (sha256 ${h})`);
       return b;

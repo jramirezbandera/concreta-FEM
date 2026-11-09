@@ -35,6 +35,9 @@ export const EJEMPLOS: Record<string, { titulo: string; detalle: string; etiquet
 /** El orden de la lista: `Object.entries` pondría «1022» delante (las claves numéricas van primero). */
 const ORDEN_EJEMPLOS = ["ejemplo", "vivienda", "muestrario", "nucleo", "1022", "edificio"] as const;
 
+/** La extensión de Claude Desktop (`scripts/paquete-mcpb.ts`), publicada junto a la app en GitHub Pages. */
+export const URL_EXTENSION = "https://jramirezbandera.github.io/concreta-FEM/concreta-fem.mcpb";
+
 export async function abrirDesdeUrl(p: ProyectoAbierto): Promise<void> {
   const q = new URLSearchParams(location.search);
   // DO: `fem visor --nuevo` abre la obra nueva con sus datos y sus plantas, como «Proyecto nuevo»;
@@ -411,9 +414,21 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
             <h2 className={`flex items-center gap-2 ${titulo}`}>
               <Terminal size={15} className="text-text-secondary" aria-hidden="true" /> Trabajar con el agente
             </h2>
-            <p className="mt-1 text-[12px] leading-snug text-text-secondary">
-              El agente y la CLI leen el proyecto.json del disco. Ábralo desde su carpeta y la app se recargará sola cuando el agente lo cambie (o use <span className="mono whitespace-nowrap">bun run visor proyecto.json</span>).
-            </p>
+            <p className="mt-1 text-[12px] leading-snug text-text-secondary">Con Claude Desktop, el agente valida, calcula, consulta y revisa los proyectos de una carpeta de su equipo, y abre esta app sobre ellos.</p>
+            {/* agente.md §13.4: el paquete se publica con la web (pages.yml); con la dirección entera, para que
+                también valga en el visor local y en desarrollo, donde no está */}
+            <a className="btn mt-2" href={URL_EXTENSION} download>
+              <Download size={15} /> Extensión para Claude Desktop
+            </a>
+            <details className="mt-1 text-[12px] text-text-secondary">
+              <summary className="cursor-pointer text-text-muted hover:text-text-primary">¿Cómo se instala?</summary>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-4 leading-snug">
+                <li>Abra el fichero descargado con Claude Desktop (doble clic, o arrástrelo a Configuración → Extensiones) y pulse «Instalar». No hace falta nada más.</li>
+                <li>Pase el proyecto a una carpeta («Pasar a una carpeta», en la barra de la app) y dé a Claude la ruta de su proyecto.json.</li>
+                <li>Cuando haya una versión nueva de la app, descargue e instale otra vez la extensión.</li>
+              </ol>
+            </details>
+            <p className="mt-2 text-[12px] leading-snug text-text-secondary">El agente lee el proyecto.json del disco. Ábralo aquí desde su carpeta y la app se recargará sola cuando el agente lo cambie.</p>
             {/* P-28: lo exportado lleva el nombre del proyecto (varios en Descargas no se pisan) */}
             <details className="mt-1 text-[12px] text-text-secondary">
               <summary className="cursor-pointer text-text-muted hover:text-text-primary">¿Y un proyecto exportado?</summary>
