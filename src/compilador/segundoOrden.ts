@@ -140,11 +140,13 @@ export function calcularSegundoOrden(casosLogicos: readonly CasoFisico[], modelo
     const f = sup.factoresCaso(k);
     const Fx = sup.valor(f, (b) => casos[b]!.cargas.F[0]);
     const Fy = sup.valor(f, (b) => casos[b]!.cargas.F[1]);
+    // La dirección: la de la resultante horizontal (A2-22: un viento a 45° declarado «X» contaba sólo su
+    // componente en X, y uno sólo en Y declarado «X» no se amplificaba). La declarada, sólo en un caso
+    // del sismo, cuya resultante combinada no tiene signo
     let e: [number, number];
-    if (c.accion?.direccion === "X") e = [1, 0];
-    else if (c.accion?.direccion === "Y") e = [0, 1];
+    const n = Math.hypot(Fx, Fy);
+    if (sup.logicos[k]!.espectral && (c.accion?.direccion === "X" || c.accion?.direccion === "Y")) e = c.accion.direccion === "X" ? [1, 0] : [0, 1];
     else {
-      const n = Math.hypot(Fx, Fy);
       if (!(n > 0)) {
         sinCarga.push(c.id);
         continue;
@@ -188,7 +190,7 @@ export interface CoeficienteHipotesis {
   indice: number;
   /** Q = Σ_k γ_k·C_k de la combinación. */
   Q: number;
-  /** γz = 1 / (1 − Q); null con Q ≥ 1 (inestable). */
+  /** γz = 1 / (1 − Q), y 1 con Q < 0 (A2-23); null con Q ≥ 1 (inestable). */
   coeficiente: number | null;
 }
 
@@ -202,7 +204,8 @@ export function coeficientes(so: SegundoOrdenCalculado, factores: ArrayLike<numb
       const g = factores[kg]!;
       if (g) Q += g * h.C[kg]!;
     }
-    r.push({ caso: h.caso, indice: h.indice, Q, coeficiente: Q < 1 ? 1 / (1 - Q) : null });
+    // A2-23: un Q negativo (la gravedad de la combinación hacia arriba) no desamplifica: γz = 1
+    r.push({ caso: h.caso, indice: h.indice, Q, coeficiente: Q < 1 ? 1 / (1 - Math.max(0, Q)) : null });
   }
   return r;
 }

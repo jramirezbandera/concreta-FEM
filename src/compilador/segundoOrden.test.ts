@@ -323,3 +323,47 @@ describe("SO con un sótano sujeto en horizontal (A2-4)", () => {
     expect(sin.valor.hipotesis.find((h) => h.caso === "W+")!.z0).toBe(sin.valor.z0);
   });
 });
+
+describe("A2-22 y A2-23: la dirección de una hipótesis estática y un Q negativo", () => {
+  /** El edificio con el viento en otra dirección (W+ y W−) y la dirección declarada que se quiera. */
+  function conViento(F: [number, number], direccion: "X" | "Y", G = 100) {
+    const f = edificio({ G });
+    for (const c of f.cargas ?? []) if (c.tipo === "puntual" && (c.caso === "W+" || c.caso === "W-")) c.F = [(c.caso === "W+" ? 1 : -1) * F[0], (c.caso === "W+" ? 1 : -1) * F[1], 0];
+    for (const c of f.casos) if (c.accion?.tipo === "W") (c.accion as { direccion: string }).direccion = direccion;
+    const cc = valido(compilar(f));
+    const r = calcular(cc.modelo);
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join(" "));
+    const so = new Consultas(f, cc, r.casos, {}, r.modal).segundoOrden();
+    if (!so.valido) throw new Error("segundo orden");
+    return so.valor;
+  }
+
+  it("un viento a 45° da lo mismo declarado «X» que «Y», y su dirección es la de la carga", () => {
+    const w = 30 / Math.SQRT2;
+    const [x, y] = [conViento([w, w], "X"), conViento([w, w], "Y")];
+    const h = x.hipotesis.find((p) => p.caso === "W+")!;
+    expect(h.direccion[0]).toBeCloseTo(Math.SQRT1_2, 12);
+    expect(h.direccion[1]).toBeCloseTo(Math.SQRT1_2, 12);
+    // Σ H·z con |H| = 30 kN en las tres plantas (z = 3, 6 y 9)
+    expect(h.MH).toBeCloseTo(30 * (3 + 6 + 9), 9);
+    for (const c of x.combinaciones) {
+      const o = y.combinaciones.find((d) => d.combinacion === c.combinacion && d.caso === c.caso)!;
+      expect(c.Q).toBeCloseTo(o.Q, 12);
+    }
+  });
+
+  it("un viento sólo en Y declarado «X» se amplifica (antes, sin carga en X, no)", () => {
+    const so = conViento([0, 30], "X");
+    expect(so.sinCarga).toEqual([]);
+    const h = so.hipotesis.find((p) => p.caso === "W+")!;
+    expect(h.direccion).toEqual([0, 1]);
+    expect(Math.max(...so.combinaciones.map((c) => c.coeficiente ?? 0))).toBeGreaterThan(1);
+  });
+
+  it("con la gravedad hacia arriba (Q < 0), γz = 1: no desamplifica", () => {
+    const so = conViento([30, 0], "X", -100);
+    const negativos = so.combinaciones.filter((c) => c.Q < 0);
+    expect(negativos.length).toBeGreaterThan(0);
+    for (const c of negativos) expect(c.coeficiente).toBe(1);
+  });
+});
