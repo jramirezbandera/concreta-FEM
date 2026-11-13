@@ -221,7 +221,9 @@ export function amplificar(so: SegundoOrdenCalculado, c: Combinacion): Combinaci
   if (cs.some((x) => x.coeficiente === null)) return null;
   const factores = Float64Array.from(c.factores);
   for (const x of cs) factores[x.indice] = factores[x.indice]! * x.coeficiente!;
-  return { ...c, factores, amplificacion: cs.map((x) => ({ caso: x.caso, Q: x.Q, coeficiente: x.coeficiente! })) };
+  // La etiqueta lleva los factores de primer orden; con el γz de cada hipótesis detrás (A2-65)
+  const etiqueta = `${c.etiqueta} (×γz: ${cs.map((x) => `${x.caso} ${String(Math.round(x.coeficiente! * 1e4) / 1e4)}`).join(", ")})`;
+  return { ...c, factores, etiqueta, amplificacion: cs.map((x) => ({ caso: x.caso, Q: x.Q, coeficiente: x.coeficiente! })) };
 }
 
 /** Lo peor de cada hipótesis horizontal en un conjunto de combinaciones. */

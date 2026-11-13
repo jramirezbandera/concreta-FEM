@@ -16,8 +16,10 @@
  * - Dintel: el trozo de muro sobre un hueco y bajo la cota de encima. Se corta en vertical en sus
  *   extremos (las caras del hueco, por fuerzas nodales) y en su centro (por campos). Ejes como una
  *   viga: x a lo largo del tramo, z hacia arriba e y = z × x. Vz es el cortante y My el momento de
- *   su plano. El corte queda DELTA_BORDE por debajo de la cota, sin la losa ni la viga de esa cota;
- *   con diafragma rígido, N, Vy y Mz no se pueden atribuir y quedan en NaN (E5-1).
+ *   su plano. El corte queda DELTA_BORDE por debajo de la cota, sin la losa ni la viga de esa cota.
+ *   Con diafragma rígido, N, Vy y Mz son los de las láminas del dintel, sin lo que el diafragma
+ *   transmite por la cota (la acción de tirante o de biela entre los machones, E5-1): salen finitos
+ *   y mucho menores que sin diafragma (A2-59: N = 0,21 frente a −12,16 kN), no en NaN.
  *
  * Las posiciones se ajustan a los nudos reales de la malla del muro (el compilador mueve sus
  * vértices y los bordes de sus huecos hasta ε_snap para unirlos a lo cercano, C3-b).

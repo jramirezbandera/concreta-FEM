@@ -1048,7 +1048,7 @@ export class Consultas {
         diags.push({
           codigo: "sismo/segundo-orden",
           severidad: "aviso",
-          mensaje: `Con el sismo según ${d.eje}, el desplazamiento máximo (${(1000 * d.desplazamientoMaximo).toFixed(1)} mm) pasa del 2 ‰ de la altura y en ${altos.length === 1 ? "la planta" : "las plantas"} ${altos.map((n) => n.plantas.join("/")).join(", ")} P·d/(V·h) llega a ${Math.max(...altos.map((n) => n.theta)).toFixed(2)}, por encima de 0,10 (NCSE-02, art. 3.8): hay que considerar los efectos de segundo orden, y este cálculo es de primer orden.`,
+          mensaje: `Con el sismo según ${d.eje}, el desplazamiento máximo (${(1000 * d.desplazamientoMaximo).toFixed(1)} mm) pasa del 2 ‰ de la altura y en ${altos.length === 1 ? "la planta" : "las plantas"} ${altos.map((n) => n.plantas.join("/")).join(", ")} P·d/(V·h) llega a ${Math.max(...altos.map((n) => n.theta)).toFixed(2)}, por encima de 0,10 (NCSE-02, art. 3.8): hay que considerar los efectos de segundo orden${opcionesSegundoOrden(this.fisico.acciones?.segundoOrden).amplificar ? ": el cálculo los considera con el coeficiente de estabilidad global de cada hipótesis horizontal (segundo orden global, P-Δ), que no es el método de la norma sismorresistente; compruebe que el γz del sismo cubre lo que pide el art. 3.8." : ", y el segundo orden global del cálculo está desactivado: las combinaciones son de primer orden."}`,
           ids: altos.flatMap((n) => n.plantas),
         });
     }
