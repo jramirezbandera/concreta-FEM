@@ -1,0 +1,6 @@
+== X: θ máx 0.0143, desplazamiento máx 7.23 mm
+  CUB-S    z 4.30  P   952 kN(nivel)  V  132.8  d 7.231 mm  h 4.30  d/h 1.682e-3  θ 0.0121
+  CUB      z 3.40  P  1151 kN(nivel)  V  271.6  d 6.256 mm  h 3.40  d/h 1.840e-3  θ 0.0143
+== Y: θ máx 0.0307, desplazamiento máx 7.86 mm
+  CUB-S    z 4.30  P   952 kN(nivel)  V  142.2  d 4.129 mm  h 0.90  d/h 4.587e-3  θ 0.0307
+  CUB      z 3.40  P  1151 kN(nivel)  V  253.4  d 4.975 mm  h 3.40  d/h 1.463e-3  θ 0.0121

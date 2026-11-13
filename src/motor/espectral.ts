@@ -145,6 +145,11 @@ export interface NivelEspectral {
   desplazamiento: number;
   /** Desplazamiento combinado respecto al nivel de debajo (el del más bajo, absoluto), m, ya con μ. */
   deriva: number;
+  /**
+   * Desplazamiento del nivel en cada modo, sin μ ni combinar (A2-24: la deriva respecto a otro nivel
+   * es μ·combinarModos de la diferencia, con la regla de la respuesta).
+   */
+  modos: Float64Array;
 }
 
 export interface RespuestaEspectral {
@@ -213,7 +218,7 @@ export function respuestaEspectral(modal: ResultadoModal, d: DireccionEspectral)
   for (const k of orden) {
     const z = diafragmas[k]!.z;
     let nivel = niveles[niveles.length - 1];
-    if (!nivel || nivel.z - z > TOL_NIVEL * Math.max(1, Math.abs(z))) niveles.push((nivel = { z, diafragmas: [], masa: 0, cortante: 0, fuerza: 0, desplazamiento: 0, deriva: 0 }));
+    if (!nivel || nivel.z - z > TOL_NIVEL * Math.max(1, Math.abs(z))) niveles.push((nivel = { z, diafragmas: [], masa: 0, cortante: 0, fuerza: 0, desplazamiento: 0, deriva: 0, modos: new Float64Array(nm) }));
     nivel.diafragmas.push(k);
     nivel.masa += diafragmas[k]!.masa;
   }
@@ -242,6 +247,7 @@ export function respuestaEspectral(modal: ResultadoModal, d: DireccionEspectral)
     }
     nivel.fuerza = combinarModos(x, regla);
     for (let i = 0; i < nm; i++) x[i] = despNivel(i, nivel);
+    nivel.modos.set(x);
     nivel.desplazamiento = mu * combinarModos(x, regla);
     const debajo = niveles[n + 1];
     if (debajo) for (let i = 0; i < nm; i++) x[i]! -= despNivel(i, debajo);

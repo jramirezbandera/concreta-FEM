@@ -42,7 +42,7 @@ import { CasosEfimeros } from "../motor/casosEfimeros.ts";
 import { Cortes } from "../motor/cortes.ts";
 import { DiagramaCompuesto, EspectralBarra, esfuerzosPartidos, type DiagramaLeible, type EsfuerzosPartidos } from "../motor/diagramaCompuesto.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
-import { modeloConModos, Superposicion, type CasoEspectral, type PartesCombinacion } from "../motor/espectral.ts";
+import { combinarModos, modeloConModos, Superposicion, type CasoEspectral, type PartesCombinacion } from "../motor/espectral.ts";
 import type { ModeloAnalitico, ModoVibracion, ResultadoCaso, ResultadoModal, Vec3 } from "../motor/modelo.ts";
 import { alineacionesLosa, semiextension } from "./bandas.ts";
 import { EsfuerzosBandas, type EstacionResultado, type LineaReparto } from "./esfuerzosBandas.ts";
@@ -965,6 +965,48 @@ export class Consultas {
   }
 
   /**
+   * A2-24: las bases de cada nivel espectral (índices en `niveles`; −1, la cimentación), las de los
+   * tramos de pilar que llegan a él: bajando por el pilar desde su nudo en el nivel, el primer nudo que
+   * es de un diafragma, o su arranque si ninguno lo es y arranca de la cimentación. Un pilar que pasa
+   * junto a una planta más baja sin unirse a su diafragma (la cubierta de una planta `escalon`) tiene la
+   * base más abajo. Un nivel sin pilares no tiene más base que la de debajo.
+   */
+  private basesNiveles(niveles: readonly { diafragmas: readonly number[] }[]): number[][] {
+    const md = this.modal!;
+    const nivelDe = new Map<number, number>();
+    const enlace = new Map<number, number>();
+    for (const r of this.modelo.restricciones ?? []) if (r.tipo === "enlace-rigido") for (const e of r.esclavos) enlace.set(e, r.maestro);
+    niveles.forEach((nv, i) => {
+      for (const k of nv.diafragmas) {
+        const r = this.modelo.restricciones![md.diafragmas[k]!.restriccion]!;
+        nivelDe.set(r.maestro, i);
+        for (const e of r.esclavos) nivelDe.set(e, i);
+      }
+    });
+    const nivelNudo = (n: number | undefined): number | undefined => {
+      for (let paso = 0; n !== undefined && paso < 8; paso++) {
+        const v = nivelDe.get(n);
+        if (v !== undefined) return v;
+        n = enlace.get(n);
+      }
+      return undefined;
+    };
+    const bases = niveles.map(() => new Set<number>());
+    for (const p of this.ctx.pilares) {
+      const [ka, kb] = [this.ctx.planta.get(p.hasta)!, this.ctx.planta.get(p.desde)!];
+      let arriba: number | undefined;
+      for (let k = ka; k <= kb; k++) {
+        const v = nivelNudo(this.mapeo.nudosPilar[`${p.id}@${this.ctx.plantas[k]!.id}`]);
+        if (v === undefined) continue;
+        if (arriba !== undefined && v !== arriba) bases[arriba]!.add(v);
+        arriba = v;
+      }
+      if (arriba !== undefined && kb === this.ctx.plantaBaja && (p.base ?? "empotrado") !== "ninguno") bases[arriba]!.add(-1);
+    }
+    return bases.map((b) => [...b].sort((a, c) => a - c));
+  }
+
+  /**
    * El sismo del programa (VS3): el emplazamiento y el espectro, y en cada dirección, los modos con
    * su aceleración y su cortante en la base, los cortantes combinados de planta, las fuerzas
    * equivalentes y los pares de la excentricidad accidental, los desplazamientos (por μ), el índice θ
@@ -991,15 +1033,30 @@ export class Consultas {
     const z0 = this.ctx.cotas[this.ctx.plantas.length - 1]!;
     const plantaDe = (k: number) => this.mapeo.restricciones[md.diafragmas[k]!.restriccion]!.planta;
     const diags: Diagnostico[] = [...sc.diagnosticos];
+    const bases = this.basesNiveles(sc.respuestas[0].niveles);
     const direcciones = ([0, 1] as const).map((eje): DireccionSismo => {
       const r = sc.respuestas[eje];
       const peso = md.masas.diafragmas * md.g;
       let encima = 0;
+      const x = new Float64Array(md.modos.length);
       const niveles = r.niveles.map((n, i): NivelSismo => {
         encima += n.masa;
+        // A2-24: la θ con el nivel de debajo y con cada otra base de la que le llega un tramo de pilar
+        // (la cimentación, −1, o un nivel más bajo: la cubierta de una planta `escalon` junto a otra
+        // más baja), y la mayor. Con el nivel de debajo, lo de siempre.
         const debajo = r.niveles[i + 1];
-        const altura = n.z - (debajo ? debajo.z : z0);
-        const theta = n.cortante > 0 && altura > 0 ? (encima * md.g * n.deriva) / (n.cortante * altura) : 0;
+        let altura = n.z - (debajo ? debajo.z : z0);
+        let deriva = n.deriva;
+        let theta = n.cortante > 0 && altura > 0 ? (encima * md.g * deriva) / (n.cortante * altura) : 0;
+        for (const b of bases[i]!) {
+          if (b === i + 1 || (b === -1 && !debajo)) continue;
+          const nb = b === -1 ? null : r.niveles[b]!;
+          const h = n.z - (nb ? nb.z : z0);
+          for (let m = 0; m < x.length; m++) x[m] = n.modos[m]! - (nb ? nb.modos[m]! : 0);
+          const d = r.ductilidad * combinarModos(x, r.regla);
+          const t = n.cortante > 0 && h > 0 ? (encima * md.g * d) / (n.cortante * h) : 0;
+          if (t > theta) [theta, altura, deriva] = [t, h, d];
+        }
         return {
           plantas: n.diafragmas.map(plantaDe),
           cota: n.z,
@@ -1009,7 +1066,7 @@ export class Consultas {
           excentricidad: Math.max(0, ...n.diafragmas.map((k) => sc.excentricidades[eje][k]!)),
           par: n.diafragmas.reduce((s, k) => s + (r.pares?.[k] ?? 0), 0),
           desplazamiento: n.desplazamiento,
-          deriva: n.deriva,
+          deriva,
           altura,
           theta,
         };
