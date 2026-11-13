@@ -122,7 +122,9 @@ export function calcularSegundoOrden(casosLogicos: readonly CasoFisico[], modelo
       e = [Fx / n, Fy / n];
     }
     let V = sup.valor(f, (b) => e[0] * casos[b]!.cargas.F[0] + e[1] * casos[b]!.cargas.F[1]);
-    let MH = sup.valor(f, (b) => e[0] * casos[b]!.cargas.zF[0] + e[1] * casos[b]!.cargas.zF[1]) - z0 * V;
+    // El momento respecto a z0 de cada caso base, y luego combinado: con el sismo la combinación de los
+    // modos no es lineal, y combinar Σ z·F y ΣF por separado hacía depender M_H del origen de cotas (A2-5)
+    let MH = sup.valor(f, (b) => e[0] * (casos[b]!.cargas.zF[0] - z0 * casos[b]!.cargas.F[0]) + e[1] * (casos[b]!.cargas.zF[1] - z0 * casos[b]!.cargas.F[1]));
     if (!(Math.abs(V) > 0) || !(Math.abs(MH) > 0)) {
       sinCarga.push(c.id);
       continue;

@@ -262,6 +262,26 @@ describe("SO en las consultas: Q y γz de cada hipótesis horizontal", () => {
     }
   });
 
+  it("Q no depende del origen de cotas: con la ±0,00 en la primera planta (z₀ = −3), lo mismo, también con el sismo (A2-5)", () => {
+    const a = calculado({ sismo: true }).q.segundoOrden();
+    const f = edificio({ sismo: true });
+    // La cimentación como sótano: la ±0,00 pasa a la primera planta y todo baja 3 m
+    (f.plantas[f.plantas.length - 1] as { tipo?: string }).tipo = "sotano";
+    const c = valido(compilar(f));
+    const r = calcular(c.modelo);
+    if (!r.valido) throw new Error("no calcula");
+    const b = new Consultas(f, c, r.casos, {}, r.modal).segundoOrden();
+    if (!a.valido || !b.valido) throw new Error("sin segundo orden");
+    expect(b.valor.z0).toBeCloseTo(a.valor.z0 - 3, 12);
+    a.valor.hipotesis.forEach((h, i) => {
+      const o = b.valor.hipotesis[i]!;
+      expect(o.caso).toBe(h.caso);
+      // Antes, con el sismo, M_H salía un 1,5 % alto y Q un 1,5 % bajo
+      expect(Math.abs(o.MH / h.MH - 1), h.caso).toBeLessThan(1e-9);
+      expect(Math.abs(o.C.G! / h.C.G! - 1), h.caso).toBeLessThan(1e-9);
+    });
+  });
+
   it("el multiplicador fuera de rango es un error de validación, y la hipótesis del cálculo lo cuenta", () => {
     for (const m of [0, -1, 20, Number.NaN]) {
       const r = compilar(edificio({ segundoOrden: { multiplicadorDesplazamientos: m } }));
