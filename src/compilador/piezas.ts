@@ -257,11 +257,11 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
         const ppA = topo.nudos[na.nudo]!.pilar;
         const ppB = topo.nudos[nb.nudo]!.pilar;
         if (ppA) {
-          const cu = cuerdaEnTramo(tv, ppA);
+          const cu = cuerdaEnTramo(tv, ppA, epsGeom);
           if (cu) si += f * Math.max(0, cu[1] - na.sigma);
         }
         if (ppB) {
-          const cu = cuerdaEnTramo(tv, ppB);
+          const cu = cuerdaEnTramo(tv, ppB, epsGeom);
           if (cu) sj -= f * Math.max(0, nb.sigma - cu[0]);
         }
         if (!(sj - si > epsGeom)) {

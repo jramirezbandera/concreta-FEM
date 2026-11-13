@@ -984,7 +984,8 @@
     - **A2-53:** las láminas no cambian con un ruido de ε_geom/3 (holgura de 10·ε_geom en las caras comunes de C5-g y en el paralelismo de las tiras de borde); queda alguna viga partida en un nudo más;
     - **A2-16:** una losa entera en el ancho de su viga y sus tiras compila (el control sin pérdidas contaba sólo el peso de las losas con láminas);
     - **A2-15:** el control sin pérdidas, respecto al centro del modelo (de fallo a 1,5 km a ≤ 4e-15 a cualquier distancia), y `fisico/lejos-del-origen` a más de 5 km.
-  - **Siguen abiertos:** la decisión de A2-51 (zona rígida con el eje de la viga en la cara del pilar), A2-14 y A2-17 (cortes por campos) y los leves.
+    - **A2-51 (decisión del usuario):** el eje de una viga por la cara de un pilar (a ≤ ε_geom) cuenta como dentro de su huella; la zona rígida ya no depende del redondeo.
+  - **Siguen abiertos:** A2-14 y A2-17 (cortes por campos), lo que queda de A2-53 (una viga partida en un nudo más con ruido) y los leves.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

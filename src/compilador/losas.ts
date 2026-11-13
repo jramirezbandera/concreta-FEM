@@ -894,7 +894,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     const f = ctx.op.factorZonaRigida;
     return tv.cadena.find((c) => {
       const pp = topo.nudos[c.nudo]!.pilar;
-      const cu = pp ? cuerdaEnTramo(tv, pp) : null;
+      const cu = pp ? cuerdaEnTramo(tv, pp, ctx.op.epsGeom) : null;
       return cu !== null && sg >= c.sigma - f * Math.max(0, c.sigma - cu[0]) - epsGeom && sg <= c.sigma + f * Math.max(0, cu[1] - c.sigma) + epsGeom;
     });
   };

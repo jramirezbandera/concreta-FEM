@@ -549,7 +549,12 @@ export function ordenarCadena(ctx: Contexto, nudos: NudoT[], tv: TramoViga, diag
   for (const { nudo } of tv.cadena) nudos[nudo]!.fisicos.add(tv.viga.id);
 }
 
-/** Cuerda de la recta de un tramo dentro de la huella de un pilar, en σ del tramo. */
-export function cuerdaEnTramo(tv: TramoViga, pp: PuntoPilar): [number, number] | null {
-  return cuerdaHuella(tv.t.A, tv.t.u, pp.huella);
+/**
+ * Cuerda de la recta de un tramo dentro de la huella de un pilar, en σ del tramo. Con el eje por la cara
+ * del pilar (a ≤ ε_geom), dentro (A2-51, decisión del usuario): antes, la zona rígida de ese extremo era
+ * 0 o la de la cara según el redondeo (en un 40 × 40 con el punto fijo en la mitad de un lado, el
+ * momento de la viga en el apoyo cambiaba un 3,9 % al trasladar la planta).
+ */
+export function cuerdaEnTramo(tv: TramoViga, pp: PuntoPilar, epsGeom: number): [number, number] | null {
+  return cuerdaHuella(tv.t.A, tv.t.u, pp.huella, epsGeom, true);
 }

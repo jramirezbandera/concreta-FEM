@@ -63,9 +63,12 @@ export function radioHuella(h: Huella): number {
 /**
  * Cuerda de la recta P(σ) = A + σ·u (u unitario) dentro de la huella: [σ entrada, σ salida], o
  * null si no la corta (o no hay forma). Una recta paralela a una cara a ≤ `tol` de ella no entra:
- * así una vigueta que va justo por la cara de un pilar (C4) no depende del último bit.
+ * así una vigueta que va justo por la cara de un pilar (C4) no depende del último bit. Con
+ * `enCaraDentro` (A2-51, decisión del usuario), al revés: la que va a ≤ `tol` de la cara, por dentro o
+ * por fuera, entra (la cuerda es la cara entera): una viga cuyo eje va por la cara de un pilar tiene la
+ * mitad sobre él, y su zona rígida no depende del redondeo.
  */
-export function cuerdaHuella(A: Vec2, u: Vec2, h: Huella, tol = 0): [number, number] | null {
+export function cuerdaHuella(A: Vec2, u: Vec2, h: Huella, tol = 0, enCaraDentro = false): [number, number] | null {
   const f = h.forma;
   if (!f) return null;
   const ax = A[0] - h.c[0];
@@ -89,7 +92,7 @@ export function cuerdaHuella(A: Vec2, u: Vec2, h: Huella, tol = 0): [number, num
     const p = ax * e[0] + ay * e[1];
     const d = u[0] * e[0] + u[1] * e[1];
     if (Math.abs(d) < 1e-15) {
-      if (Math.abs(p) >= semi - tol) return null;
+      if (enCaraDentro ? Math.abs(p) > semi + tol : Math.abs(p) >= semi - tol) return null;
       continue;
     }
     let a = (-semi - p) / d;

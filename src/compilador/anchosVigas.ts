@@ -208,7 +208,7 @@ export function anchosPlanta(ctx: Contexto, topo: Topologia, k: number, e1: Vec2
     const carasPilares: number[] = [];
     for (const c of tv.cadena) {
       const pp = topo.nudos[c.nudo]!.pilar;
-      const cu = pp ? cuerdaEnTramo(tv, pp) : null;
+      const cu = pp ? cuerdaEnTramo(tv, pp, ctx.op.epsGeom) : null;
       if (cu) carasPilares.push(cu[0], cu[1]);
     }
     // Sólo hacia el muro (el ancho crece hasta la cara, nunca se acorta hacia la losa)
