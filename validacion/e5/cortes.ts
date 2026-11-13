@@ -263,7 +263,20 @@ export function cortesCompletos(): [string, () => ModeloAnalitico, Corte[]][] {
         vertical(5, "x = 5 (por los pilares)"),
       ],
     ],
-    ["pórtico", portico, [vertical(1.3, "x = 1,3 (por la viga)"), { id: "z = 1,5 (por los pilares)", origen: [2, 0, 1.5], x: [0, 0, -1], vz: [1, 0, 0], y: grande, z: grande }]],
+    [
+      "pórtico",
+      portico,
+      [
+        vertical(1.3, "x = 1,3 (por la viga)"),
+        { id: "z = 1,5 (por los pilares)", origen: [2, 0, 1.5], x: [0, 0, -1], vz: [1, 0, 0], y: grande, z: grande },
+        // A2-13: por los offsets de la viga cargada (i' en x = 0,2 y j' en 4,8), con las dos normales: en
+        // el del nudo del lado B, todo el tramo flexible queda del lado A
+        vertical(4.9, "x = 4,9 (por el offset de j)"),
+        { ...vertical(0.1, "x = 0,1, hacia −X (por el offset de i)"), x: [-1, 0, 0] },
+        { ...vertical(4.9, "x = 4,9, hacia −X (por el offset de j)"), x: [-1, 0, 0] },
+        vertical(0.1, "x = 0,1 (por el offset de i)"),
+      ],
+    ],
   ];
 }
 

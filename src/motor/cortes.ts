@@ -641,6 +641,8 @@ export class Cortes {
       const aEsI = si === -1;
       const flexible = ladoDe(dIp) * ladoDe(dJp) === -1;
       let p: number[];
+      /** Tramo del polígono i → i' → j' → j que cambia de lado (0: offset de i; 2: offset de j). */
+      let tramoCruce = 0;
       if (flexible) {
         const t = dIp / (dIp - dJp);
         p = [0, 1, 2].map((q) => pb.ip[q]! + t * (pb.jp[q]! - pb.ip[q]!));
@@ -653,6 +655,7 @@ export class Cortes {
           if (d[s]! === 0 || d[s]! * d[s + 1]! <= 0) {
             const t = d[s]! === d[s + 1]! ? 0 : d[s]! / (d[s]! - d[s + 1]!);
             p = [0, 1, 2].map((q) => puntos[s]![q]! + t * (puntos[s + 1]![q]! - puntos[s]![q]!));
+            tramoCruce = s;
             break;
           }
         }
@@ -675,9 +678,15 @@ export class Cortes {
           suma.agregar(k, p, F, m, aEsI ? 1 : -1);
         });
       } else {
-        const [nA, aA] = aEsI ? [i, 0] : [j, 1];
+        // En el offset del nudo del lado A, lo que la barra hace sobre ese nudo (−g_A). En el del nudo
+        // del lado B, todo el tramo flexible (con sus cargas) queda del lado A, y lo que cruza es lo
+        // que el nudo B hace sobre la barra (+g_B) (A2-13: antes, siempre −g_A, que con cargas en la
+        // barra no es lo mismo)
+        const offsetDeI = tramoCruce === 0;
+        const delLadoA = offsetDeI === aEsI;
+        const [n, a] = delLadoA ? (aEsI ? [i, 0] : [j, 1]) : aEsI ? [j, 1] : [i, 0];
         this.guardado(casos).barra(e.indice).forEach((g, k) => {
-          suma.agregar(k, X(nA), g.subarray(6 * aA, 6 * aA + 3), g.subarray(6 * aA + 3, 6 * aA + 6), -1);
+          suma.agregar(k, X(n), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6), delLadoA ? -1 : 1);
         });
       }
     }
