@@ -290,6 +290,57 @@ describe("BN: zona rígida (criterio 4)", () => {
     expect(s[1]).toBe(0);
     expect(s[3] - s[2]).toBeCloseTo(0.15 * Math.SQRT2, 14);
   });
+
+  // A2-9: la huella del tramo de pilar del lado por el que sale la barra
+  const tres: ModeloFisico["plantas"] = [{ id: "P2", altura: null }, { id: "P1", altura: 3 }, { id: "C", tipo: "sotano", altura: 3 }];
+  const secciones: ModeloFisico["secciones"] = [
+    { id: "p40", material: "HA", forma: "rectangular", b: 0.4, h: 0.4 },
+    { id: "heb", material: "S", forma: "rectangular", b: 0.2, h: 0.2 },
+    { id: "v", material: "HA", forma: "rectangular", b: 0.3, h: 0.5 },
+    { id: "d", material: "S", forma: "circular", D: 0.05 },
+  ];
+  it("una barra que sube desde la cabeza de un pilar que acaba ahí no tiene zona rígida (no hay pilar encima)", () => {
+    // Antes, 1,22 m rígidos de 3,04: la huella del nudo se tomaba como un prisma sin fin
+    const r = valido(
+      compilar({
+        plantas: tres,
+        materiales: MATERIALES,
+        secciones,
+        pilares: [
+          { id: "A", x: 0, y: 0, desde: "C", hasta: "P1", seccion: "p40" },
+          { id: "B", x: 4, y: 0, desde: "C", hasta: "P2", seccion: "p40" },
+          { id: "E", x: -4, y: 0, desde: "C", hasta: "P2", seccion: "p40" },
+        ],
+        vigas: [{ id: "V2", planta: "P2", puntos: [[-4, 0], [4, 0]], seccion: "v" }],
+        barras: [{ id: "T", inicio: { planta: "P1", x: 0, y: 0 }, fin: { planta: "P2", x: 0.5, y: 0 }, seccion: "d" }],
+        casos: [{ id: "Q" }],
+      }),
+    );
+    expect(r.mapeo.barras[r.mapeo.piezas.T![0]!]!.s[1]).toBe(0);
+  });
+  it("con un pilar de hormigón abajo y uno de acero arriba en el mismo nudo, cuenta el del lado de la barra, con cualquier id", () => {
+    const con = (abajo: string, arriba: string) =>
+      valido(
+        compilar({
+          plantas: tres,
+          materiales: MATERIALES,
+          secciones,
+          pilares: [
+            { id: abajo, x: 4, y: 0, desde: "C", hasta: "P1", seccion: "p40" },
+            { id: arriba, x: 4, y: 0, desde: "P1", hasta: "P2", seccion: "heb", base: "ninguno" },
+            { id: "O", x: 0, y: 0, desde: "C", hasta: "P1", seccion: "p40" },
+          ],
+          barras: [{ id: "D", inicio: { planta: "C", x: 0, y: 0 }, fin: { planta: "P1", x: 4, y: 0 }, seccion: "d" }],
+          casos: [{ id: "Q" }],
+        }),
+      ).mapeo.barras;
+    // La diagonal llega a P1 desde abajo: la zona rígida del pilar de hormigón de 40 (0,2 m en planta)
+    for (const ids of [["A", "Z"], ["Z", "A"]] as const) {
+      const bs = con(...ids);
+      const s = bs.find((x) => x.tipo === "barra")!.s;
+      expect(s[3] - s[2], ids.join("/")).toBeCloseTo(0.2 * Math.hypot(4, 3) / 4, 12);
+    }
+  });
 });
 
 describe("BN: metamórficas (criterio 5)", () => {

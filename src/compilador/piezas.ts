@@ -35,7 +35,7 @@ import type { Seis, Vec3 } from "../motor/modelo.ts";
 import type { Liberacion, Pilar } from "./fisico.ts";
 import type { Losas } from "./losas.ts";
 import type { SeccionCompilada } from "./secciones.ts";
-import { cuerdaHuella, proyectar } from "./geometria2d.ts";
+import { cuerdaHuella, huellaPilar, proyectar } from "./geometria2d.ts";
 import { cuerdaEnTramo, distanciaARegion, ejeTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { PanosU } from "./unidireccional.ts";
 import { ejesBarra } from "./barras.ts";
@@ -422,21 +422,39 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       continue;
     }
     const { ex, ey, ez } = ejesBarra(A, B, b.giro ?? 0);
-    // CB-f: hasta la cara de un pilar de hormigón, por lo que el eje recorre dentro de su huella
+    // CB-f: hasta la cara de un pilar de hormigón, por lo que el eje recorre dentro de su huella. La
+    // del tramo de pilar del lado por el que sale la barra (A2-9): una que sube desde la cabeza de un
+    // pilar que acaba ahí no tiene pilar encima, y en un nudo con un pilar de hormigón abajo y uno de
+    // acero arriba cuenta el del lado de la barra, no el primero por id
     const horiz = Math.hypot(ex[0], ex[1]);
-    const dentro = (n: number): [number, number] | null => {
+    const dentro = (n: number, dz: number): [number, number] | null => {
       const pp = topo.nudos[n]!.pilar;
       if (!pp?.huella.forma || !(horiz > 1e-9)) return null;
       const k = topo.nudos[n]!.k;
-      const p = ctx.pilarDe.get(pp.pilares[0]!)!;
-      const kt = k < ctx.planta.get(p.desde)! ? k : k - 1;
-      if (ctx.secciones.get(seccionTramo(ctx, p, kt))!.material !== "hormigon") return null;
+      // Los tramos de pilar del lado de la barra: el de encima (k − 1) si sube, el de debajo (k) si baja,
+      // y los dos si es horizontal; con dos (un pilar sobre otro), el primero según las cotas
+      const lados = dz > epsGeom ? [k - 1] : dz < -epsGeom ? [k] : [k, k - 1];
+      let huella = null as typeof pp.huella | null;
+      for (const kt of lados)
+        for (const id of [...pp.pilares].sort()) {
+          if (huella) break;
+          const p = ctx.pilarDe.get(id)!;
+          if (!(kt >= ctx.planta.get(p.hasta)! && kt < ctx.planta.get(p.desde)!)) continue;
+          const s = ctx.secciones.get(seccionTramo(ctx, p, kt))!;
+          if (s.material !== "hormigon") {
+            if (lados.length === 1) return null;
+            continue;
+          }
+          const [x, y] = ejeTramo(ctx, p, kt);
+          huella = huellaPilar(x, y, p.giro ?? 0, s.huella);
+        }
+      if (!huella?.forma) return null;
       const u: [number, number] = [ex[0] / horiz, ex[1] / horiz];
-      const cu = cuerdaHuella([A[0], A[1]], u, pp.huella, epsGeom);
+      const cu = cuerdaHuella([A[0], A[1]], u, huella, epsGeom);
       return cu ? [cu[0] / horiz, cu[1] / horiz] : null;
     };
-    const ci = dentro(ni);
-    const cj = dentro(nj);
+    const ci = dentro(ni, B[2] - A[2]);
+    const cj = dentro(nj, A[2] - B[2]);
     const si = ci ? Math.max(0, ci[1]) : 0;
     const sj = cj ? Math.min(L, cj[0]) : L;
     if (!(sj - si > epsGeom)) {
