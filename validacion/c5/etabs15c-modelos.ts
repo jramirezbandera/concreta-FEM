@@ -33,6 +33,8 @@ export interface CorteMuro {
   pieza: string;
   corte: EsfuerzosCorte["corte"];
   invertido: boolean;
+  /** El nudo de la cota que el corte de un dintel reparte a medias (A2-48), con sus láminas. */
+  medioNudo?: EsfuerzosCorte["medioNudo"];
   /** Del motor: [N, Vy, Vz, T, My, Mz] por caso. */
   esfuerzos: number[];
 }
@@ -45,7 +47,7 @@ export function cortes15c(id: string, h: number): { fisico: ModeloFisico; modelo
   const casos = casosValidos(calcular(r.modelo));
   const em = new EsfuerzosMuros(fisico, r, casos);
   const cortes: CorteMuro[] = [];
-  const poner = (pieza: string, idc: string, e: EsfuerzosCorte) => cortes.push({ id: idc, pieza, corte: e.corte, invertido: e.invertido, esfuerzos: Array.from(e.esfuerzos) });
+  const poner = (pieza: string, idc: string, e: EsfuerzosCorte) => cortes.push({ id: idc, pieza, corte: e.corte, invertido: e.invertido, ...(e.medioNudo ? { medioNudo: e.medioNudo } : {}), esfuerzos: Array.from(e.esfuerzos) });
   for (const w of fisico.muros ?? []) {
     for (const m of em.machones(w.id)!) {
       poner("machon", `${m.id}:base`, m.base);

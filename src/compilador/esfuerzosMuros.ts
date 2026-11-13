@@ -49,6 +49,12 @@ export interface EsfuerzosCorte {
    */
   corte: Corte;
   invertido: boolean;
+  /**
+   * El nudo de la cota que el corte de un dintel reparte a medias (A2-48) y las láminas del muro
+   * que lo tocan: a los esfuerzos del corte se les quita la mitad de lo que ese nudo da
+   * a esas láminas. Sin él, el corte tal cual.
+   */
+  medioNudo?: { nudo: number; laminas: readonly number[] };
 }
 
 export interface Machon {
@@ -85,8 +91,8 @@ interface Tramo {
   u: Vec2;
   s0: number;
   largo: number;
-  /** Nudos del muro en el tramo: s (a lo largo del muro), z y su punto en planta. */
-  nudos: { s: number; z: number; p: Vec2 }[];
+  /** Nudos del muro en el tramo: su índice, s (a lo largo del muro), z y su punto en planta. */
+  nudos: { n: number; s: number; z: number; p: Vec2 }[];
 }
 
 export class EsfuerzosMuros {
@@ -124,7 +130,7 @@ export class EsfuerzosMuros {
         const n = this.modelo.nudos[v]!;
         const [dx, dy] = [n.x - A[0], n.y - A[1]];
         const s = dx * u[0] + dy * u[1];
-        if (Math.abs(-dx * u[1] + dy * u[0]) <= eps && s >= -eps && s <= L + eps) ns.push({ s: m.s0[i]! + s, z: n.z, p: [n.x, n.y] });
+        if (Math.abs(-dx * u[1] + dy * u[0]) <= eps && s >= -eps && s <= L + eps) ns.push({ n: v, s: m.s0[i]! + s, z: n.z, p: [n.x, n.y] });
       }
       return { A, u, s0: m.s0[i]!, largo, nudos: ns };
     });
@@ -150,12 +156,50 @@ export class EsfuerzosMuros {
    * completa). Con la normal invertida y el mismo z, el resultado se pasa al convenio de `x`:
    * [N, Vy, −Vz, T, My, −Mz].
    */
-  private cortar(c: Corte, invertido = false): EsfuerzosCorte {
+  private cortar(c: Corte, invertido = false, cabeza?: { nudo: number; laminas: readonly number[] }): EsfuerzosCorte {
     const corte: Corte = invertido ? { ...c, x: [-c.x[0], -c.x[1], -c.x[2]], y: c.y ? [-c.y[1], -c.y[0]] : c.y } : c;
     const r: ResultadoCorte = this.cortes.cortar(corte, this.casos, this.campos);
     const esfuerzos = Float64Array.from(r.esfuerzos);
+    const medio = cabeza && r.valido && corte.metodo !== "campos" ? cabeza : undefined;
+    if (medio) this.medioNudo(r, medio, esfuerzos);
     if (invertido) for (let k = 0; k < esfuerzos.length / 6; k++) for (const q of [2, 5]) esfuerzos[6 * k + q] = -esfuerzos[6 * k + q]!;
-    return { esfuerzos, origen: c.origen, barras: r.barras.map((i) => this.modelo.barras![i]!.id), valido: r.valido, corte, invertido };
+    return { esfuerzos, origen: c.origen, barras: r.barras.map((i) => this.modelo.barras![i]!.id), valido: r.valido, corte, invertido, ...(medio ? { medioNudo: medio } : {}) };
+  }
+
+  /**
+   * El centro de un dintel, por campos. Si hay un nudo en la cota en su recta, la recta sigue la malla
+   * del muro y el corte por campos es el de fuerzas nodales (cortes.ts): entonces va por fuerzas
+   * nodales, con la mitad del nudo de la cota (A2-48); si no sigue la malla, por campos, sin él.
+   */
+  private centro(c: Corte, cabeza: { nudo: number; laminas: readonly number[] } | undefined): EsfuerzosCorte {
+    if (cabeza) {
+      const r = this.cortar({ ...c, metodo: "fuerzas-nodales" }, false, cabeza);
+      if (r.valido) return r;
+    }
+    return this.cortar(c);
+  }
+
+  /**
+   * A2-48: el corte vertical de un dintel acaba por debajo de la cota (sin la losa ni la viga), y la
+   * carga vertical que entra en el muro por el nudo de la cota del corte (una carga lineal, la losa,
+   * la viga) quedaba entera del otro lado: el cortante de la cara salía corto en q·(ancho de
+   * columna)/2 (−25 % con la malla de obra) y el del centro, con carga simétrica, distinto de 0. Ese
+   * nudo se reparte a medias en Vz: se le quita la mitad de la componente según el z del corte de lo
+   * que el nudo da a las láminas `laminas` (las del muro, de todas sus plantas: lo que baja por el
+   * muro no entra de fuera). Sólo Vz: una fuerza vertical en el nudo de la recta del corte no da
+   * momento respecto a su origen, y lo horizontal que entra por ese nudo es del diafragma o de la
+   * losa, que el dintel no lleva (E5-1).
+   */
+  private medioNudo(r: ResultadoCorte, cabeza: { nudo: number; laminas: readonly number[] }, esfuerzos: Float64Array): void {
+    const e = r.ejes;
+    const fn = this.cortes.fuerzas;
+    for (const l of cabeza.laminas) {
+      const i = this.modelo.laminas![l]!.nudos.indexOf(cabeza.nudo);
+      if (i < 0) continue;
+      fn.laminaCasos(l, this.casos).forEach((g, k) => {
+        esfuerzos[6 * k + 2]! -= 0.5 * (g[6 * i]! * e[6]! + g[6 * i + 1]! * e[7]! + g[6 * i + 2]! * e[8]!);
+      });
+    }
   }
 
   /** Machones del muro, por tramo y planta (de arriba abajo); null si el muro no existe. */
@@ -217,6 +261,14 @@ export class EsfuerzosMuros {
       const mitad = (z1 - z0) / 2 - Math.min(DELTA_BORDE, (z1 - z0) / 4);
       const corte = (P: Vec2, metodo: Corte["metodo"], cual: string): Corte => ({ id: `${id}:H${nh + 1}:${cual}`, origen: [P[0], P[1], zc], x: [t.u[0], t.u[1], 0], vz: [0, 0, 1], y: [0, 0], z: [-mitad, mitad], metodo });
       const C: Vec2 = [(A.p[0] + B.p[0]) / 2, (A.p[1] + B.p[1]) / 2];
+      // A2-48: el nudo de la cota en cada corte (si lo hay) y las láminas del muro que lo tocan, también
+      // las de la planta de encima: lo que baja por el muro no entra de fuera (en un muro acoplado con
+      // carga horizontal, contarlo rompía el cortante constante del dintel)
+      const delMuro = this.mapeo.muros?.[id] ?? [];
+      const cabeza = (s: number) => {
+        const n = t.nudos.find((x) => Math.abs(x.s - s) <= 1e-9 && Math.abs(x.z - z1) <= 1e-9)?.n;
+        return n === undefined ? undefined : { nudo: n, laminas: delMuro.filter((l) => this.modelo.laminas![l]!.nudos.includes(n)) };
+      };
       r.push({
         id: `${id}:H${nh + 1}`,
         muro: id,
@@ -226,9 +278,9 @@ export class EsfuerzosMuros {
         hasta: B.s,
         z0,
         z1,
-        inicio: this.cortar(corte(A.p, "fuerzas-nodales", "inicio"), true),
-        centro: this.cortar(corte(C, "campos", "centro")),
-        fin: this.cortar(corte(B.p, "fuerzas-nodales", "fin")),
+        inicio: this.cortar(corte(A.p, "fuerzas-nodales", "inicio"), true, cabeza(A.s)),
+        centro: this.centro(corte(C, "campos", "centro"), cabeza((A.s + B.s) / 2)),
+        fin: this.cortar(corte(B.p, "fuerzas-nodales", "fin"), false, cabeza(B.s)),
       });
     });
     return r;

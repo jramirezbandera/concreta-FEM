@@ -8,7 +8,10 @@ elementos de OpenSees (eleResponse «forces», globales) y la misma definición 
 - láminas que tocan el plano desde el lado A con el centroide dentro del rectángulo: la suma de sus
   fuerzas en sus nudos del plano (una que lo atraviese es un error);
 - una restricción con nudos a los dos lados y alguno del lado A dentro del rectángulo no se puede
-  calcular aquí: el corte se marca y no se compara.
+  calcular aquí: el corte se marca y no se compara;
+- con `medioNudo` (los extremos y el centro de un dintel, A2-48), se quita de Vz la mitad de la
+  componente según el z del corte de lo que ese nudo de la cota da a esas láminas (las del muro, de
+  todas sus plantas), con las fuerzas de OpenSees.
 Los esfuerzos son [N, Vy, Vz, T, My, Mz] con el convenio de las barras (My = −m_y); con `invertido`,
 Vz y Mz cambian de signo, como en esfuerzosMuros.ts.
 
@@ -43,7 +46,7 @@ def ejes(corte):
     return ex, ey, ez
 
 
-def cortar(modelo, corte, invertido, fuerzas):
+def cortar(modelo, corte, invertido, fuerzas, medio=None):
     """Esfuerzos del corte con las fuerzas de los elementos (por lámina, 24 globales)."""
     O = corte["origen"]
     ex, ey, ez = ejes(corte)
@@ -95,7 +98,13 @@ def cortar(modelo, corte, invertido, fuerzas):
         if any(dentro(X[v]) for v in en_a):
             return None, f"restricción {r['id']}"
     pr = lambda v, e: sum(v[i] * e[i] for i in range(3))  # noqa: E731
-    s = [pr(F, ex), pr(F, ey), pr(F, ez), pr(M, ex), -pr(M, ey), pr(M, ez)]
+    dvz = 0.0
+    if medio:
+        v = medio["nudo"]
+        for k in medio["laminas"]:
+            a = modelo["laminas"][k]["nudos"].index(v)
+            dvz -= 0.5 * pr(fuerzas[k][6 * a : 6 * a + 3], ez)
+    s = [pr(F, ex), pr(F, ey), pr(F, ez) + dvz, pr(M, ex), -pr(M, ey), pr(M, ez)]
     if invertido:
         s[2] = -s[2]
         s[5] = -s[5]
@@ -114,7 +123,7 @@ def main():
             resolver(modelo, caso)
             fuerzas = [ops.eleResponse(k + 1, "forces") for k in range(len(modelo.get("laminas", [])))]
             for c in e["cortes"]:
-                s, nota = cortar(modelo, c["corte"], c["invertido"], fuerzas)
+                s, nota = cortar(modelo, c["corte"], c["invertido"], fuerzas, c.get("medioNudo"))
                 if s is None:
                     notas[c["id"]] = nota
                     res[c["id"]].extend([None] * 6)
