@@ -299,3 +299,27 @@ describe("SO en las consultas: Q y γz de cada hipótesis horizontal", () => {
     expect(off.hipotesis.find((x) => x.includes("Segundo orden"))).toContain("desactivado");
   });
 });
+
+describe("SO con un sótano sujeto en horizontal (A2-4)", () => {
+  it("M_H de cada hipótesis se mide desde el nivel más alto bajo el que no se desplaza: el techo del sótano", () => {
+    // El edificio de SO con la planta F1 sujeta en ux y uy en los 9 pilares (como los muros perimetrales
+    // de un sótano): W+ (30 kN en F1, F2 y F3) da M_H = 30·3 + 30·6 = 270 kN·m respecto a F1. Antes se
+    // medía desde la cimentación, 540, y Q salía la mitad
+    const f = edificio();
+    (f.plantas[2] as { diafragma?: string }).diafragma = "ninguno";
+    f.apoyos = [0, 6, 12].flatMap((x) => [0, 6, 12].map((y) => ({ id: `S${x}-${y}`, planta: "F1", x, y, coartados: [true, true, false, false, false, false] as const })));
+    const c = valido(compilar(f));
+    const r = calcular(c.modelo);
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join(" "));
+    const so = new Consultas(f, c, r.casos, {}, r.modal).segundoOrden();
+    if (!so.valido) throw new Error("sin segundo orden");
+    const cotaF1 = c.modelo.nudos.find((n) => Math.abs(n.x - 6) < 1e-9 && Math.abs(n.y - 6) < 1e-9 && n.z > so.valor.z0 + 1)!.z;
+    const w = so.valor.hipotesis.find((h) => h.caso === "W+")!;
+    expect(w.z0).toBeCloseTo(cotaF1, 9);
+    expect(w.MH).toBeCloseTo(270, 9);
+    // Sin el sótano, el de siempre: la cimentación
+    const sin = calculado().q.segundoOrden();
+    if (!sin.valido) throw new Error("sin segundo orden");
+    expect(sin.valor.hipotesis.find((h) => h.caso === "W+")!.z0).toBe(sin.valor.z0);
+  });
+});

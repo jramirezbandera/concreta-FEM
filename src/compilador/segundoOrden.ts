@@ -73,17 +73,26 @@ export interface HipotesisHorizontal {
   indice: number;
   /** Dirección unitaria e en planta (con el sentido de su cortante en la base). */
   direccion: [number, number];
-  /** Cortante en la base en e, kN, y momento volcador M_H respecto a z₀, kN·m. */
+  /** Cortante en la base en e, kN, y momento volcador M_H respecto a z0, kN·m. */
   V: number;
   MH: number;
+  /**
+   * A2-4: el nivel sin desplazamientos de esta hipótesis, m: el más alto bajo el cual su desplazamiento
+   * según e no pasa de FRACCION_SIN_DESPLAZAMIENTO de su máximo (con un sótano sujeto, su techo), y
+   * nunca por debajo del de los apoyos horizontales más bajos (`SegundoOrdenCalculado.z0`).
+   */
+  z0: number;
   /** Por caso lógico (0 en los que no son gravitatorios): M_Pδ,k ya por m, kN·m, y C_k = M_Pδ,k / M_H. */
   MPdelta: Float64Array;
   C: Float64Array;
 }
 
+/** A2-4: por debajo de esta fracción del máximo, el desplazamiento de un nivel es despreciable. */
+export const FRACCION_SIN_DESPLAZAMIENTO = 0.01;
+
 export interface SegundoOrdenCalculado {
   opciones: OpcionesSegundoOrden;
-  /** El nivel sin desplazamientos horizontales, m. */
+  /** La cota de los apoyos horizontales más bajos, m (el z0 de cada hipótesis no baja de ella). */
   z0: number;
   horizontales: HipotesisHorizontal[];
   /** Índices lógicos de los casos gravitatorios (los que no son hipótesis horizontales). */
@@ -107,6 +116,25 @@ export function calcularSegundoOrden(casosLogicos: readonly CasoFisico[], modelo
   const horizontales: HipotesisHorizontal[] = [];
   const sinCarga: string[] = [];
   const nl = casosLogicos.length;
+  // A2-4: los nudos por niveles (cota), de abajo arriba
+  const porNivel = new Map<number, number[]>();
+  modelo.nudos.forEach((n, i) => {
+    const z = Math.round(n.z * 1e6) / 1e6;
+    porNivel.set(z, [...(porNivel.get(z) ?? []), i]);
+  });
+  const niveles = [...porNivel.keys()].sort((a, b) => a - b);
+  /** El nivel sin desplazamientos de la hipótesis de factores f en la dirección e (A2-4). */
+  const z0De = (f: ArrayLike<number>, e: readonly [number, number]): number => {
+    const maximo = niveles.map((z) => {
+      let m = 0;
+      for (const n of porNivel.get(z)!) m = Math.max(m, Math.abs(sup.valor(f, (b) => e[0] * casos[b]!.u[6 * n]! + e[1] * casos[b]!.u[6 * n + 1]!, true)));
+      return m;
+    });
+    const tope = FRACCION_SIN_DESPLAZAMIENTO * Math.max(0, ...maximo);
+    let r = z0;
+    for (let i = 0; i < niveles.length && maximo[i]! <= tope; i++) r = Math.max(r, niveles[i]!);
+    return r;
+  };
   for (const k of indicesH) {
     const c = casosLogicos[k]!;
     const f = sup.factoresCaso(k);
@@ -124,9 +152,12 @@ export function calcularSegundoOrden(casosLogicos: readonly CasoFisico[], modelo
       e = [Fx / n, Fy / n];
     }
     let V = sup.valor(f, (b) => e[0] * casos[b]!.cargas.F[0] + e[1] * casos[b]!.cargas.F[1]);
+    // A2-4: desde el nivel sin desplazamientos de esta hipótesis (con un sótano sujeto en horizontal,
+    // su techo: medido desde la base de sus muros, Q salía ×0,61 con viento y ×0,64 con sismo)
+    const zh = z0De(f, e);
     // El momento respecto a z0 de cada caso base, y luego combinado: con el sismo la combinación de los
     // modos no es lineal, y combinar Σ z·F y ΣF por separado hacía depender M_H del origen de cotas (A2-5)
-    let MH = sup.valor(f, (b) => e[0] * (casos[b]!.cargas.zF[0] - z0 * casos[b]!.cargas.F[0]) + e[1] * (casos[b]!.cargas.zF[1] - z0 * casos[b]!.cargas.F[1]));
+    let MH = sup.valor(f, (b) => e[0] * (casos[b]!.cargas.zF[0] - zh * casos[b]!.cargas.F[0]) + e[1] * (casos[b]!.cargas.zF[1] - zh * casos[b]!.cargas.F[1]));
     if (!(Math.abs(V) > 0) || !(Math.abs(MH) > 0)) {
       sinCarga.push(c.id);
       continue;
@@ -147,7 +178,7 @@ export function calcularSegundoOrden(casosLogicos: readonly CasoFisico[], modelo
       MPdelta[kg] = w;
       C[kg] = w / MH;
     }
-    horizontales.push({ caso: c.id, indice: k, direccion: e, V, MH, MPdelta, C });
+    horizontales.push({ caso: c.id, indice: k, direccion: e, V, MH, z0: zh, MPdelta, C });
   }
   return { opciones, z0, horizontales, gravitatorios, sinCarga };
 }

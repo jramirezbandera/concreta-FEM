@@ -1269,7 +1269,7 @@ export class Consultas {
         multiplicador: so.opciones.multiplicador,
         z0: so.z0,
         gravitatorios: so.gravitatorios.map((k) => ids[k]!),
-        hipotesis: so.horizontales.map((h) => ({ caso: h.caso, direccion: h.direccion, V: h.V, MH: h.MH, MPdelta: porCaso(h.MPdelta), C: porCaso(h.C) })),
+        hipotesis: so.horizontales.map((h) => ({ caso: h.caso, direccion: h.direccion, V: h.V, MH: h.MH, z0: h.z0, MPdelta: porCaso(h.MPdelta), C: porCaso(h.C) })),
         sinCarga: so.sinCarga,
         combinaciones,
         maximos: maximos(so, g.valor),
@@ -1283,12 +1283,12 @@ export class Consultas {
 export interface SegundoOrdenConsulta {
   amplificar: boolean;
   multiplicador: number;
-  /** El nivel sin desplazamientos horizontales, m. */
+  /** La cota de los apoyos horizontales más bajos, m (el z0 de cada hipótesis no baja de ella). */
   z0: number;
   /** Los casos gravitatorios (los que no son hipótesis horizontales), en su orden. */
   gravitatorios: string[];
-  /** Cada hipótesis horizontal: dirección unitaria, cortante en la base (kN), momento volcador (kN·m) y, por caso gravitatorio, su M_Pδ (kN·m, ya por el multiplicador) y su C. */
-  hipotesis: { caso: string; direccion: [number, number]; V: number; MH: number; MPdelta: Record<string, number>; C: Record<string, number> }[];
+  /** Cada hipótesis horizontal: dirección unitaria, cortante en la base (kN), momento volcador (kN·m) respecto a su nivel sin desplazamientos z0 (m, A2-4) y, por caso gravitatorio, su M_Pδ (kN·m, ya por el multiplicador) y su C. */
+  hipotesis: { caso: string; direccion: [number, number]; V: number; MH: number; z0: number; MPdelta: Record<string, number>; C: Record<string, number> }[];
   /** Hipótesis horizontales sin carga horizontal (no se amplifican). */
   sinCarga: string[];
   /** Por combinación del generador e hipótesis con factor en ella: Q y γz (null si Q ≥ 1). */
