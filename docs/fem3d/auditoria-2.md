@@ -430,6 +430,7 @@ Hechos los puntos 1 a 3 de §10.6 (A2-1, A2-7, A2-8 y A2-47). Ni la malla ni los
   - **Medido:** el barrido al milímetro, 0 de 45 ángulos sin compilar con la losa enrasada, a 0,20 y a 0,27 m del eje; el del auditor sin redondear (91 ángulos, 15 variantes), 0, salvo `unionLosaViga: "eje"` con la losa enrasada, que es el error de modelo de C2-c. A2-18 (`tirasBorde: false`, 37 de 91), también 0.
   - **Referencias congeladas:** sólo cambia `aleatorio-5-mixto-lv2` de C4, y sólo en el reparto de las cargas de una viga: desaparece una astilla de 0,35 mm del ancho junto a una huella (2 397 → 2 395 cargas de barra); la malla y el mapeo, idénticos; la resultante, a 6e-15, y los resultados, a ≤ 7,8e-13 (`validacion/au2/out_cambiosA252.txt`). Regenerada a sabiendas.
   - **Prueba:** `giradoMm.test.ts`, un ángulo por causa (fallan los cuatro con el código de antes).
+- **A2-54, hecho.** No era el apoyo lineal sino un empate: su extremo (9; 2) queda a δ justo (0,45·2h = 0,675 m con h = 0,75) de la línea y = 1,325 de la rejilla, y `rejilla.ts` marcaba la celda como irregular con `dist < δ`; trasladada la planta, el redondeo la dejaba a un lado o al otro, y con ella la plantilla del pilar apeado AV de al lado (838, 860, 866 u 872 nudos). Ahora, `dist < δ − ε_geom`: a δ justo, lejos. En las nueve traslaciones del auditor, 838 nudos y la misma malla. Ninguna referencia congelada cambia (las de C1–C5, F, BN y la precisión local pasan). Prueba en `trasladar.test.ts` (falla con el código de antes: 715 frente a 681 nudos).
 
 ### 11.1 Decisiones del usuario (2026-11-13)
 

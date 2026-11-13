@@ -710,7 +710,10 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
         const c = celda(i, j);
         if (cerca[c] === -2 || cerca[c] === huella) continue;
         const dist = distanciaSegmentoRect(A, B, U[i]!, V[j]!, U[i + 1]!, V[j + 1]!);
-        if (isla ? dist <= d : dist < d) cerca[c] = cerca[c] === -1 ? huella : -2;
+        // A2-54: a δ justo (con ε_geom de holgura), lejos: un rasgo a δ de una línea de la rejilla
+        // (el extremo de un apoyo lineal a 0,675 m de la línea de un bloque, con h = 0,75) no dejaba
+        // la celda irregular o no según el redondeo de una traslación de la planta
+        if (isla ? dist <= d : dist < d - E.epsGeom) cerca[c] = cerca[c] === -1 ? huella : -2;
       }
   }
   const losaCelda = new Int32Array(nc);
