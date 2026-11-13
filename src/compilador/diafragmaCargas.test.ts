@@ -92,6 +92,7 @@ describe("puntuales horizontales al diafragma (SP-5)", () => {
     const otra = compilar(base([puntual("N2", 9, 6, F, [0, 0, 0 * F[1] + 1 * F[0]])]));
     if (!otra.valido) throw new Error("no compila");
     const ko = calcular(otra.modelo);
+    if (!ko.valido) throw new Error("no calcula");
     const a = k.casos[iH]!.u;
     const b = ko.casos.find((x) => x.id === "H")!.u;
     const maxU = Math.max(...Array.from(a, Math.abs));

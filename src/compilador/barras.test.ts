@@ -336,7 +336,7 @@ describe("BN: zona rígida (criterio 4)", () => {
       ).mapeo.barras;
     // La diagonal llega a P1 desde abajo: la zona rígida del pilar de hormigón de 40 (0,2 m en planta)
     for (const ids of [["A", "Z"], ["Z", "A"]] as const) {
-      const bs = con(...ids);
+      const bs = con(ids[0], ids[1]);
       const s = bs.find((x) => x.tipo === "barra")!.s;
       expect(s[3] - s[2], ids.join("/")).toBeCloseTo(0.2 * Math.hypot(4, 3) / 4, 12);
     }

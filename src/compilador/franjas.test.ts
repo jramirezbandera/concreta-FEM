@@ -375,7 +375,7 @@ describe("estaciones de apoyo en las caras de unas vigas dibujadas por vanos (A2
     // frente a −5,5 en su simétrica
     const xs = [0, 5, 10, 15];
     const pilares: Pilar[] = xs.flatMap((x) => xs.map((y) => ({ id: `P${x}-${y}`, x, y, desde: "C", hasta: "P1", seccion: "p" })));
-    const vigas: NonNullable<ModeloFisico["vigas"]> = [];
+    const vigas: { id: string; planta: string; puntos: Vec2[]; seccion: string }[] = [];
     for (const y of [0, 15]) for (let i = 0; i < 3; i++) vigas.push({ id: `VX${y}-${i}`, planta: "P1", puntos: [[xs[i]!, y], [xs[i + 1]!, y]], seccion: "v" });
     for (const x of [0, 15]) for (let i = 0; i < 3; i++) vigas.push({ id: `VY${x}-${i}`, planta: "P1", puntos: [[x, xs[i]!], [x, xs[i + 1]!]], seccion: "v" });
     const f: ModeloFisico = {
