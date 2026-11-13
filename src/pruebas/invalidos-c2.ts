@@ -106,6 +106,13 @@ export const CATALOGO: Caso[] = [
   ["superficie con una zona que no es simple", (f) => (carga(f, "z").zona = [[1, 1], [2, 2], [2, 1], [1, 2]]), "fisico/valor-no-valido", "z"],
   ["superficie con q que no es un vector", (f) => (carga(f, "z").q = m([0, -3])), "fisico/valor-no-valido", "z"],
   ["superficie con una zona fuera de las losas", (f) => (carga(f, "z").zona = rect(8, 8, 9, 9)), "carga/fuera-de-losa", "z"],
+  // A2-7: la intersección sin área común daba un resto de redondeo > 0 y la carga se perdía con un aviso
+  ["superficie con la zona entera en el hueco", (f) => (carga(f, "z").zona = rect(3.7, 3.2, 4.5, 4.0)), "carga/fuera-de-losa", "z"],
+  ["superficie con la zona pegada por fuera al borde de la losa", (f) => (carga(f, "z").zona = rect(6, 1.2, 7, 2.2)), "carga/fuera-de-losa", "z"],
+  ["superficie con la zona en el hueco de una losa junto a otra", (f) => {
+    (f.losas as unknown as object[]).push({ id: "L2", planta: "P1", contorno: rect(6, 0, 9, 5), espesor: 0.25, material: "HA" });
+    carga(f, "z").zona = rect(3.7, 3.2, 4.5, 4.0);
+  }, "carga/fuera-de-losa", "z"],
   ["superficie en un caso que no existe", (f) => (carga(f, "z").caso = "X"), "fisico/referencia", "z"],
   // Cargas lineales
   ["lineal de un punto", (f) => (carga(f, "t").puntos = [[1, 1]]), "fisico/valor-no-valido", "t"],

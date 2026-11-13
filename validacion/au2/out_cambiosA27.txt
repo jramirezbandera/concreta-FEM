@@ -1,0 +1,14 @@
+pano-oblicuo: igual (resultantes a 2.6e-14)
+dos-vanos-voladizo: igual (resultantes a 0.0e+0)
+pano-hueco: igual (resultantes a 0.0e+0)
+aleatorio-7-unidireccional: cambia (resultantes a 1.6e-14)
+  caso Q: cargas de barra 255 → 158, nodales 17 → 12; resultante, diferencia relativa 3.9e-15
+aleatorio-6-reticular: igual (resultantes a 2.8e-14)
+aleatorio-5-mixto: cambia (resultantes a 1.1e-14)
+  caso Q: cargas de barra 602 → 512, nodales 29 → 25; resultante, diferencia relativa 1.1e-14
+aleatorio-5-mixto-lv: cambia (resultantes a 1.5e-14)
+  caso Q: cargas de barra 674 → 584, nodales 29 → 25; resultante, diferencia relativa 1.5e-14
+aleatorio-5-mixto-lv2: cambia (resultantes a 1.0e-14)
+  caso Q: cargas de barra 682 → 592, nodales 29 → 25; resultante, diferencia relativa 1.0e-14
+
+Cambian 4 de 8 modelos, sólo en el número de cargas.

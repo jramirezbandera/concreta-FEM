@@ -862,6 +862,10 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       for (const l of losas.superficies.get(carga.id) ?? []) lamina(c, l, carga.q);
       for (const j of losas.superficiesAncho.get(carga.id) ?? []) piezaAViga(c, losas.piezasAncho[j]!.ancho, losas.piezasAncho[j]!.v, carga.q);
       const zona = losas.zonasUnidas.get(carga.id) ?? (carga.zona && panosDe(carga.planta).length ? carga.zona.map((x) => [x[0], x[1]] as Vec2) : undefined);
+      // La intersección de dos polígonos sin área común no da 0 exacto sino un resto de redondeo
+      // (hasta 1e-12 m²): con «> 0», una zona entera fuera de las losas perdía su carga con sólo un
+      // aviso (A2-7). El umbral es relativo al área de la zona
+      const umbral = zona ? 1e-9 * Math.abs(areaConSigno(zona)) : 0;
       let A = 0;
       ctx.losas.forEach((l, i) => {
         if (l.losa.planta !== carga.planta || carga.pano !== undefined || (carga.losa !== undefined && l.losa.id !== carga.losa)) return;
@@ -873,14 +877,14 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       for (const i of panosDe(carga.planta)) {
         if (carga.losa !== undefined || (carga.pano !== undefined && ctx.panos[i]!.pano.id !== carga.pano)) continue;
         const m = zona ? momentosInterseccion(panos!.regiones[i]!, zona) : momentosRegion(panos!.regiones[i]!);
-        if (!(m.A > 0)) continue;
+        if (!(m.A > umbral)) continue;
         A += m.A;
         reparto(i).superficie(carga.q, zona ?? null, emisor(c, i));
         sumarSuperficie(fisicas[c]!, desplazar(m), cota(carga.planta), carga.q);
       }
       const Az = zona ? Math.abs(areaConSigno(zona)) : A;
       const conPanos = ctx.panos.some((p) => p.pano.planta === carga.planta);
-      if (!(A > 0)) diag.error("carga/fuera-de-losa", `La carga ${carga.id} no cae sobre ninguna losa${conPanos ? " ni ningún paño" : ""} de la planta ${carga.planta}.`, [carga.id]);
+      if (!(A > umbral)) diag.error("carga/fuera-de-losa", `La carga ${carga.id} no cae sobre ninguna losa${conPanos ? " ni ningún paño" : ""} de la planta ${carga.planta}.`, [carga.id]);
       else if (Az - A > 1e-6 * Az)
         diag.aviso(
           "carga/zona-fuera-de-losa",
