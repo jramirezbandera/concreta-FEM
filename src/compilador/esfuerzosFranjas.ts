@@ -468,9 +468,20 @@ export class EsfuerzosFranjas {
             else for (let kc = 0; kc < nc; kc++) q.m[3 * kc]! += f * z.e[6 * kc + 4]!;
           }
         };
-        const im = franjaDe(m);
+        if (!(largo > EPS)) {
+          // A2-63: un nudo suelto (una lámina que toca la recta en un solo nudo) en el borde de dos
+          // franjas, a medias entre ellas; antes iba entero a la que daba el último bit de su t, y al
+          // trasladar la planta la estación de apoyo cambiaba (0,497 ↔ 0,554 kN·m/m)
+          if (!excluir.some(([lo, hi]) => m > lo + EPS && m < hi - EPS)) {
+            const j = bordes.findIndex((x, q) => q > 0 && q < fr.length && Math.abs(x - m) <= EPS);
+            const pesos: [number, number][] = j > 0 ? [[j - 1, 0.5], [j, 0.5]] : franjaDe(m) >= 0 ? [[franjaDe(m), 1]] : [];
+            for (const [i, w] of pesos) for (const z of trozos) for (let kc = 0; kc < nc; kc++) r[i]!.m[3 * kc]! += w * (escalon ? z.e[6 * kc + 4]! - dx * z.e[6 * kc + 2]! : z.e[6 * kc + 4]!);
+          }
+          ventanas.forEach(([lo, hi], v) => sumar(rv[v]!, lo, hi, m > lo && m < hi));
+          continue;
+        }
         // Lo de las franjas, sin los tramos de `excluir` (las ventanas de los pilares en una estación de apoyo)
-        for (let i = Math.max(0, franjaDe(a)); i < fr.length && bordes[i]! < b + EPS; i++) for (const [lo, hi] of menos(bordes[i]!, bordes[i + 1]!, excluir)) sumar(r[i]!, lo, hi, i === im && m > lo - EPS && m < hi + EPS);
+        for (let i = Math.max(0, franjaDe(a)); i < fr.length && bordes[i]! < b + EPS; i++) for (const [lo, hi] of menos(bordes[i]!, bordes[i + 1]!, excluir)) sumar(r[i]!, lo, hi, false);
         ventanas.forEach(([lo, hi], v) => sumar(rv[v]!, lo, hi, m > lo && m < hi));
       }
       return { r, rv, resto, diag: res.diagnosticos.filter((x) => x.codigo !== "corte/borde-no-sigue-malla" && x.codigo !== "corte/vacio") };
@@ -873,11 +884,18 @@ export class EsfuerzosFranjas {
         const t = -(q[0] - A[0]) * u[1] + (q[1] - A[1]) * u[0];
         return s >= -EPS && s <= L + EPS && Math.abs(t) + ed <= b / 2 + EPS;
       });
+    // A2-56: los pilares que se dan por apoyados en una viga según n, para comprobar después que la
+    // franja que los toca tiene estación de apoyo junto a ellos
+    const apoyados: { id: string; sc: number; ed: number; t0: number; t1: number }[] = [];
     for (const p of huellas.values()) {
       if (porPilar.has(p.id) || !enlace.has(p.id) || !p.huella.forma) continue;
       const ed = semiextension(p.huella, d);
       const en = semiextension(p.huella, n);
-      if (anchosL.length && enVigaSegunN(p.p, ed)) continue;
+      if (anchosL.length && enVigaSegunN(p.p, ed)) {
+        const tc = p.p[0] * n[0] + p.p[1] * n[1];
+        apoyados.push({ id: p.id, sc: p.p[0] * d[0] + p.p[1] * d[1], ed, t0: tc - en, t1: tc + en });
+        continue;
+      }
       const sc = p.p[0] * d[0] + p.p[1] * d[1];
       const tc = p.p[0] * n[0] + p.p[1] * n[1];
       const pz = { id: p.id, t0: tc - en, t1: tc + en };
@@ -988,6 +1006,23 @@ export class EsfuerzosFranjas {
       }
       for (let i = 0; i < fr.length; i++) if (est[i]!.some((e) => e.tipo === "apoyo" && e.s === s)) exactas[i]!.push(s);
     }
+    // A2-56: un pilar que se da por apoyado en una viga según n, con losa a un lado, y una franja que lo
+    // toca sin estación de apoyo (ni de cara) de ese lado junto a él: se avisa. Pasa en el pilar del
+    // extremo de una viga que acaba en su centro con la losa siguiendo más allá (un vuelo): la cara de la
+    // viga sólo cubre parte de la franja y la estación de apoyo no pasa la cobertura. Antes, sin aviso
+    const bMax = Math.max(0, ...anchosL.filter((a) => !a.tira).map((a) => a.b));
+    const sinEstacionFranja = new Map<number, { id: string; girado: boolean }[]>();
+    for (const p of apoyados)
+      for (let i = 0; i < fr.length; i++) {
+        const f = fr[i]!;
+        if (!toca(i, p.t0, p.t1)) continue;
+        const [a, b] = [Math.max(f.t0, p.t0), Math.min(f.t1, p.t1)];
+        const falta = ([-1, 1] as const).some((lado) => {
+          const conLosa = tramosLosa(p.sc + lado * (p.ed + this.ctx.op.tamanoMalla)).some(([x, y]) => Math.min(y, b) - Math.max(x, a) > EPS);
+          return conLosa && !est[i]!.some((e) => (e.tipo === "apoyo" || e.tipo === "cara") && e.valido && e.lado === lado && Math.abs(e.s - p.sc) <= p.ed + bMax + EPS);
+        });
+        if (falta) sinEstacionFranja.set(i, [...(sinEstacionFranja.get(i) ?? []), { id: p.id, girado: false }]);
+      }
 
     // Paso: una recta por campos cada PASO_ESTACIONES. Lo de los modos (VS4), soltado al empezar (lo
     // de las caras y los apoyos está repartido por toda la losa) y cada RECTAS_POR_SUELTA rectas
@@ -1010,7 +1045,7 @@ export class EsfuerzosFranjas {
           cuenta.set(sv, (cuenta.get(sv) ?? 0) + 1);
         }
       }
-      return [...cuenta].filter(([, c]) => c >= 4).map(([sv]) => sv).sort((a, b) => a - b);
+      return new Map([...cuenta].filter(([, c]) => c >= 4));
     })();
     const cocientes = new Map<number, Float64Array | null>();
     const cocienteEn = (sm: number): Float64Array | null => {
@@ -1038,10 +1073,22 @@ export class EsfuerzosFranjas {
     const hMalla = this.ctx.op.tamanoMalla;
     const cocientePaso = (s: number): Float64Array | null => {
       // Las rectas de la malla a menos de h, de la más cercana a la más lejana: la primera con corte exacto
-      const cerca = lineasMalla.filter((x) => Math.abs(x - s) <= hMalla + EPS).sort((a, b) => Math.abs(a - s) - Math.abs(b - s));
-      for (const sm of cerca) {
-        const q = cocienteEn(sm);
-        if (q) return q;
+      // A2-63: a igual distancia (a EPS; una estación de paso a mitad de dos rectas), el mayor de los
+      // cocientes de las dos, caso a caso (del lado de la seguridad). Antes decidía el último bit de la
+      // distancia, y al trasladar la planta la estación tomaba el cociente de la otra recta (hasta un
+      // 7 % de su mx; junto a un punto de inflexión, la mitad)
+      const cerca = [...lineasMalla.keys()].filter((x) => Math.abs(x - s) <= hMalla + EPS).sort((a, b) => Math.abs(a - s) - Math.abs(b - s) || a - b);
+      for (let j = 0; j < cerca.length; j++) {
+        const dj = Math.abs(cerca[j]! - s);
+        // Las de la misma distancia que la primera con corte exacto
+        const iguales = cerca.slice(j).filter((x) => Math.abs(Math.abs(x - s) - dj) <= EPS);
+        const qs = iguales.map(cocienteEn).filter((q): q is Float64Array => q !== null);
+        if (!qs.length) {
+          j += iguales.length - 1;
+          continue;
+        }
+        if (qs.length === 1) return qs[0]!;
+        return Float64Array.from(qs[0]!, (_, kc) => Math.max(...qs.map((q) => q[kc]!)));
       }
       return null;
     };
@@ -1088,7 +1135,7 @@ export class EsfuerzosFranjas {
           [f.id, l.losa.id],
         );
       }
-      const sin = sinEstacion.filter((p) => toca(i, p.t0, p.t1));
+      const sin = [...sinEstacion.filter((p) => toca(i, p.t0, p.t1)), ...(sinEstacionFranja.get(i) ?? []).filter((p) => !sinEstacion.some((q) => q.id === p.id && toca(i, q.t0, q.t1)))];
       if (sin.length) {
         const causa = (g: boolean) => (g ? "circular o girado respecto a los ejes de la losa" : "su cara no sigue la malla ni hay una recta de la malla por su huella desde la que medirla");
         const causas = [...new Set(sin.map((p) => p.girado))];

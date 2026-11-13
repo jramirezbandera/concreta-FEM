@@ -1,0 +1,42 @@
+
+== h25-plana (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== h25-reticular (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== pilares-mezclados (malla idéntica): caras y apoyos que se mueven: 2; estaciones de paso que cambian: 6
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana -0.0 %, de -0.0 % a 0.0 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de 0.0 % a 0.0 %; las tres que más:
+    L-N1:X3          inferior 26.78 → 26.78 (0.0 %); superior 15.39 → 15.40 (0.0 %)
+    L-N1:X4          inferior 28.56 → 28.56 (0.0 %); superior 30.53 → 30.54 (0.0 %)
+
+== aleatorio-3 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== losa-3x3-refinada (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== h25-plana-sin-refinar (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== losa-3x3-mezclada (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== reticular-2x2-abacos (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== aleatorio-3-lv (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== reticular-2x2-abacos-lv (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== aleatorio-3-lv2 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== reticular-2x2-abacos-lv2 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== edificio-2x2-lv2 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== edificio-2x2-lvd (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== edificio-2x2-rvb (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== reticular-2x2-planas-rva (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== edificio-2x2-tb (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+== reticular-2x2-abacos-tb (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 0
+
+En total: 6 estaciones de paso cambian (mediana -0.0 %); el máximo de la inferior de cada franja, mediana 0.0 %, de 0.0 % a 0.0 %.

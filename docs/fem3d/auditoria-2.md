@@ -487,6 +487,14 @@ Hechos, cada uno con su prueba (que falla con el código de antes salvo los text
 - **A2-60:** `machones` y `dinteles` avisan (`muro/corte-no-valido`) de los cortes que no valen, con su nombre; antes, `valido: true` y sin diagnósticos. No se ha logrado un corte así (la prueba es de la función).
 - **A2-59:** la cabecera de `esfuerzosMuros.ts` dice lo que dan los dinteles con diafragma rígido (los de sus láminas, finitos, sin lo que el diafragma transmite por la cota), no NaN.
 - **A2-65:** la etiqueta de una combinación amplificada lleva detrás el γz de cada hipótesis («… (×γz: W+X+e 1,048)»); los factores escritos siguen siendo los de primer orden.
+- **A2-56:** una franja que toca un pilar que se da por apoyado en una viga según su dirección, con losa a un lado y sin estación de apoyo (ni de cara) de ese lado junto a él, lleva `franja/pilar-sin-cara`. Es el pilar del extremo de una viga que acaba en su centro con un vuelo detrás: la cara de la viga sólo cubre parte de la franja y la estación de apoyo no pasa la cobertura. No se le mide un metro: la recta de su cara no sigue la malla en el vuelo y no hay otra por su huella. Se probó antes no darlo por apoyado cuando lo que asoma de la viga tiene losa delante, y no valía: en la esquina de la retícula 22, con estaciones de apoyo válidas en las dos caras de la viga, el metro caía en el ancho de la otra viga y salía NaN. En las 24 retículas al azar, el aviso aparece en dos franjas (la del auditor, retícula 8, P3-3, y la retícula 9, P3-4, del mismo tipo) y ningún valor cambia.
+- **A2-63, dos causas:**
+  - **La del auditor:** una lámina que toca la recta de una estación de apoyo en un solo nudo (largo nulo), con ese nudo en el borde de dos franjas, iba entera a la que daba el último bit de su t. Ahora va a medias (la suma de las dos franjas no cambia).
+  - **Otra de A2-2, hallada al repetir la prueba:** una estación de paso a mitad de dos rectas de la malla tomaba el cociente de una o de la otra según el último bit de la distancia (−14,1 ↔ −15,1 kN·m/m en el mismo reticular). Ahora toma el mayor de los dos, caso a caso, del lado de la seguridad: así nunca da menos que antes. Se probó la media y no valía: junto a un apoyo bajaba un negativo de −31,0 a −26,1.
+  - **Resultado:** el reticular del auditor trasladado da las mismas estaciones a 2e-12 (antes, 1,6 % del mayor mx), y los otros tres modelos de su prueba siguen a ≤ 3e-11.
+  - **En las 24 retículas al azar:** cambian 240 estaciones de paso (mediana 1,2 % del mayor |mx| de su franja, hasta el 11 %) y las dos de apoyo de la causa del auditor en la retícula 8.
+  - **Referencia de F regenerada a sabiendas** (`validacion/au2/out_cambiosA263.txt`): sólo `pilares-mezclados`, con 6 estaciones de paso y 2 de apoyo, por debajo del 0,1 %.
+  - **Prueba:** `franjasInvariancia.test.ts`, con A2-56; falla con el código de antes.
 
 Sin tocar, con su motivo:
 
@@ -494,7 +502,7 @@ Sin tocar, con su motivo:
 - **Sólo el aviso, sin medir:** A2-24 (la θ de una planta `escalon` toma d y h del mismo intervalo de 0,90 m, así que su cociente no cambia mucho; no está medido).
 - **Del mallador, junto con el pendiente de las astillas** (`malla/astillas-junto-a-pilar`): A2-37, A2-38, A2-39 y A2-46.
 - **Que piden una decisión:** A2-32 (la unión encadenada de ábacos), A2-34 y A2-36 (dónde poner el umbral de dos pilares apilados a 5 cm y de una barra casi vertical) y A2-31 (el lado de C2-g a b/4, que habría que integrar con el área en vez de con un punto).
-- **De las franjas, por investigar con el caso del auditor:** A2-56, A2-57 y A2-63.
+- **De las franjas, por investigar con el caso del auditor:** A2-57.
 - **Por cotejar con una fuente:** A2-44 (el It de los HEA).
 - **Notas:** A2-43 (con sismo, el máximo de My por estaciones ≤ 0,69 % bajo), A2-64 y A2-66 (conservador).
 
