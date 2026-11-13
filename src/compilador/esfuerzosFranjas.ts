@@ -610,7 +610,10 @@ export class EsfuerzosFranjas {
     const libre = (s: number, lado: -1 | 1, t0: number, t1: number): number => {
       let r = Infinity;
       for (const o of obstaculos) {
-        if (o.t1 <= t0 + EPS || o.t0 >= t1 - EPS) continue;
+        // A2-57: uno que tapa menos de la mitad del rango (lo que asoma de un pilar más ancho que su viga,
+        // unos cm de la franja) no acerca la recta: sus muestras ya no cuentan (fuera de la losa) y las
+        // demás quedan a un canto. Antes la llevaba a 2,5–5 cm de la cara, dentro de la capa límite
+        if (Math.min(o.t1, t1) - Math.max(o.t0, t0) < 0.5 * (t1 - t0)) continue;
         for (const b of [o.s0, o.s1]) {
           const x = lado * (b - s);
           if (x > EPS && x < r) r = x;

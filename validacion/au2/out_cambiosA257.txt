@@ -1,0 +1,73 @@
+
+== h25-plana (malla idéntica): caras y apoyos 64; con otro mx 0; con otro my o mxy 0
+
+== h25-reticular (malla idéntica): caras y apoyos 72; con otro mx 0; con otro my o mxy 0
+
+== pilares-mezclados (malla idéntica): caras y apoyos 78; con otro mx 0; con otro my o mxy 0
+
+== aleatorio-3 (malla idéntica): caras y apoyos 55; con otro mx 0; con otro my o mxy 0
+
+== losa-3x3-refinada (malla idéntica): caras y apoyos 210; con otro mx 0; con otro my o mxy 0
+
+== h25-plana-sin-refinar (malla idéntica): caras y apoyos 64; con otro mx 0; con otro my o mxy 0
+
+== losa-3x3-mezclada (malla idéntica): caras y apoyos 210; con otro mx 0; con otro my o mxy 0
+
+== reticular-2x2-abacos (malla idéntica): caras y apoyos 110; con otro mx 0; con otro my o mxy 0
+
+== aleatorio-3-lv (malla idéntica): caras y apoyos 46; con otro mx 0; con otro my o mxy 4
+    L-N1:Y11         apoyo s = 0.125: hasta 53.4 % del mayor de la franja
+    L-N1:Y11         apoyo s = 9.875: hasta 45.2 % del mayor de la franja
+    L-N1:X1          apoyo s = 0.175: hasta 42.1 % del mayor de la franja
+
+== reticular-2x2-abacos-lv (malla idéntica): caras y apoyos 154; con otro mx 0; con otro my o mxy 6
+    L-N1:X1          apoyo s = 0.150: hasta 48.3 % del mayor de la franja
+    L-N1:X1          apoyo s = 11.850: hasta 43.1 % del mayor de la franja
+    L-N1:X13         apoyo s = 11.850: hasta 42.1 % del mayor de la franja
+
+== aleatorio-3-lv2 (malla idéntica): caras y apoyos 96; con otro mx 0; con otro my o mxy 15
+    L-N1:Y11         apoyo s = 5.475: hasta 86.1 % del mayor de la franja
+    L-N1:Y5          apoyo s = 5.475: hasta 65.6 % del mayor de la franja
+    L-N1:Y11         apoyo s = 0.125: hasta 64.5 % del mayor de la franja
+    máximo de Wood–Armer L-N1:Y5          inferior 20.46 → 20.46 (0.0 %); superior 44.76 → 47.63 (6.4 %)
+    máximo de Wood–Armer L-N1:Y11         inferior 18.55 → 18.55 (0.0 %); superior 34.55 → 33.43 (-3.2 %)
+    máximo de Wood–Armer L-N1:Y6          inferior 22.03 → 22.03 (0.0 %); superior 47.22 → 48.53 (2.8 %)
+
+== reticular-2x2-abacos-lv2 (malla idéntica): caras y apoyos 154; con otro mx 0; con otro my o mxy 6
+    L-N1:X13         apoyo s = 0.150: hasta 84.3 % del mayor de la franja
+    L-N1:X1          apoyo s = 0.150: hasta 82.0 % del mayor de la franja
+    L-N1:X1          apoyo s = 11.850: hasta 58.6 % del mayor de la franja
+
+== edificio-2x2-lv2 (malla idéntica): caras y apoyos 122; con otro mx 0; con otro my o mxy 8
+    L-N1:X1          apoyo s = 11.850: hasta 45.8 % del mayor de la franja
+    L-N1:X10         apoyo s = 0.150: hasta 26.3 % del mayor de la franja
+    L-N1:X1          apoyo s = 0.150: hasta 18.0 % del mayor de la franja
+
+== edificio-2x2-lvd (malla idéntica): caras y apoyos 122; con otro mx 0; con otro my o mxy 8
+    L-N1:X1          apoyo s = 11.850: hasta 45.8 % del mayor de la franja
+    L-N1:X10         apoyo s = 0.150: hasta 26.3 % del mayor de la franja
+    L-N1:X1          apoyo s = 0.150: hasta 18.0 % del mayor de la franja
+
+== edificio-2x2-rvb (malla idéntica): caras y apoyos 122; con otro mx 0; con otro my o mxy 8
+    L-N1:X1          apoyo s = 11.850: hasta 45.4 % del mayor de la franja
+    L-N1:X10         apoyo s = 0.150: hasta 27.1 % del mayor de la franja
+    L-N1:Y6          apoyo s = 0.150: hasta 19.9 % del mayor de la franja
+
+== reticular-2x2-planas-rva (malla idéntica): caras y apoyos 154; con otro mx 0; con otro my o mxy 6
+    L-N1:X13         apoyo s = 0.200: hasta 89.5 % del mayor de la franja
+    L-N1:X1          apoyo s = 0.200: hasta 82.1 % del mayor de la franja
+    L-N1:X1          apoyo s = 11.800: hasta 80.0 % del mayor de la franja
+
+== edificio-2x2-tb (malla idéntica): caras y apoyos 110; con otro mx 0; con otro my o mxy 14
+    L-N1:X1          apoyo s = 11.850: hasta 45.1 % del mayor de la franja
+    L-N1:X10         apoyo s = 0.150: hasta 27.2 % del mayor de la franja
+    L-N1:Y6          apoyo s = 0.150: hasta 20.9 % del mayor de la franja
+
+== reticular-2x2-abacos-tb (malla idéntica): caras y apoyos 142; con otro mx 0; con otro my o mxy 9
+    L-N1:X13         apoyo s = 0.150: hasta 110.9 % del mayor de la franja
+    L-N1:X1          apoyo s = 11.850: hasta 55.7 % del mayor de la franja
+    L-N1:X1          apoyo s = 0.150: hasta 43.6 % del mayor de la franja
+    máximo de Wood–Armer L-N1:X1          inferior 16.12 → 15.52 (-3.7 %); superior 28.84 → 28.84 (0.0 %)
+    máximo de Wood–Armer L-N1:X7          inferior 33.34 → 33.34 (0.0 %); superior 36.45 → 35.52 (-2.6 %)
+
+En total: el máximo de Wood–Armer (inferior y superior) de las franjas que cambian, mediana 0.0 %, de -3.7 % a 6.4 %.

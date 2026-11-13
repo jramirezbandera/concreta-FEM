@@ -6,6 +6,8 @@
  *   a mitad de dos rectas de la malla tomaba el cociente de A2-2 de la una o de la otra (−14,1 ↔ −15,1).
  * - A2-56: una franja que toca un pilar que se da por apoyado en una viga, sin estación de apoyo junto a
  *   él, lleva `franja/pilar-sin-cara`. Antes callaba.
+ * - A2-57: lo que asoma de un pilar más ancho que su viga (unos cm de la franja) no acerca a la cara la
+ *   recta de my y mxy de la estación de apoyo (LV2-h): va a un canto, no a 2,5 cm.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -122,5 +124,18 @@ describe("A2-56: el pilar apoyado en una viga, sin estación junto a él", () =>
     expect(r.valor.diagnosticos.some((x) => x.codigo === "franja/pilar-sin-cara" && x.ids?.includes("P0-4"))).toBe(false);
     // Y su franja no pierde ninguna estación válida
     expect(r.valor.estaciones.every((e) => e.valido)).toBe(true);
+  }, 300_000);
+});
+
+describe("A2-57: un obstáculo que tapa poco de la franja no acerca la recta de muestras", () => {
+  it("retícula 8: la estación de apoyo de L-N1:X1 en la cara de Y0, junto a P0-0, toma my y mxy a un canto", () => {
+    const f = reticulaAleatoria(8);
+    const q = consultas(f);
+    const r = q.franja("L-N1:X1");
+    if (!r.valido) throw new Error("franja");
+    const e = r.valor.estaciones.find((x) => x.tipo === "apoyo" && x.lado === 1 && Math.abs(x.s - 0.15) < 1e-9);
+    expect(e?.valido).toBe(true);
+    const canto = f.losas!.find((l) => l.id === "L-N1")!.espesor;
+    expect(e!.distanciaMuestras).toBeCloseTo(canto, 12);
   }, 300_000);
 });
