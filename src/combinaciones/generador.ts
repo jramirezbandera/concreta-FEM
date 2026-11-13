@@ -171,12 +171,20 @@ const DURACION_POR_TIPO: Record<Exclude<TipoAccion, "N">, Duracion> = {
 
 const esVariable = (c: CasoCarga) => c.tipo === "Q" || c.tipo === "S" || c.tipo === "W" || c.tipo === "T";
 
+const TIPOS: readonly TipoAccion[] = ["G", "Q", "S", "W", "T", "E", "A", "N"];
+
 function validar(casos: readonly CasoCarga[]): void {
   const ids = new Set<string>();
   for (const c of casos) {
     if (ids.has(c.id)) throw new Error(`caso de carga repetido: ${c.id}`);
     ids.add(c.id);
+    // A2-30: llamado directamente (sin el compilador), un tipo, un ψ, una dirección o un signo que no
+    // valen eran un silencio o un TypeError opaco
+    if (!TIPOS.includes(c.tipo)) throw new Error(`el caso ${c.id} tiene un tipo de acción desconocido (${String(c.tipo)}): ${TIPOS.join(", ")}`);
     if (esVariable(c) && !c.psi) throw new Error(`la variable ${c.id} no tiene ψ`);
+    if (c.psi && !(["psi0", "psi1", "psi2"] as const).every((k) => typeof c.psi![k] === "number" && c.psi![k] >= 0 && c.psi![k] <= 1)) throw new Error(`el ψ del caso ${c.id} no vale: psi0, psi1 y psi2, números entre 0 y 1`);
+    if (c.direccion !== undefined && c.direccion !== "X" && c.direccion !== "Y") throw new Error(`la dirección del caso ${c.id} es "X" o "Y" (es ${JSON.stringify(c.direccion)})`);
+    if (c.signo !== undefined && c.signo !== 1 && c.signo !== -1) throw new Error(`el signo del caso ${c.id} es 1 o −1 (es ${JSON.stringify(c.signo)})`);
     if (c.tipo === "E" && !c.direccion) throw new Error(`el sismo ${c.id} no tiene dirección`);
     if (c.tipo === "N") {
       if (!c.direccion || !c.signo) throw new Error(`la nocional ${c.id} no tiene dirección y signo`);

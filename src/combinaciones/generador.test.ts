@@ -314,3 +314,13 @@ describe("casos de una misma acción variable (A2-6)", () => {
     expect(elu).not.toContain("1.35·G + 1.5·Q1 + 1.5·Q2");
   });
 });
+
+describe("A2-30: el generador llamado directamente rechaza lo que no vale", () => {
+  const G: CasoCarga = { id: "G", tipo: "G" };
+  it("un tipo desconocido, un ψ NaN, una dirección Z o un signo 2: error con el caso", () => {
+    expect(() => generarCombinaciones([G, { id: "X", tipo: "Z" as never }])).toThrow(/X.*tipo de acción desconocido/);
+    expect(() => generarCombinaciones([G, { id: "Q", tipo: "Q", psi: { psi0: NaN, psi1: 0.5, psi2: 0.3 } }])).toThrow(/ψ del caso Q/);
+    expect(() => generarCombinaciones([G, { id: "W", tipo: "W", psi: { psi0: 0.6, psi1: 0.5, psi2: 0 }, direccion: "Z" as never, signo: 1 }])).toThrow(/dirección del caso W/);
+    expect(() => generarCombinaciones([G, { id: "W", tipo: "W", psi: { psi0: 0.6, psi1: 0.5, psi2: 0 }, direccion: "X", signo: 2 as never }])).toThrow(/signo del caso W/);
+  });
+});
