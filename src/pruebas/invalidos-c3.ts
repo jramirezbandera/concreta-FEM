@@ -96,6 +96,8 @@ export const CATALOGO: Caso[] = [
   ["empuje sobre un muro que no existe", (f) => (carga(f, "E").muro = "X"), "fisico/referencia", "E"],
   ["empuje con un lado desconocido", (f) => (carga(f, "E").lado = "arriba"), "fisico/valor-no-valido", "E"],
   ["empuje sin números", (f) => (carga(f, "E").p0 = m("30")), "fisico/valor-no-valido", "E"],
+  // A2-55: las cotas del empuje son sobre la base del muro; entero fuera de su altura cargaba 0 kN, válido
+  ["empuje entero por debajo de la base del muro (cotas absolutas en un sótano)", (f) => Object.assign(carga(f, "E"), { z0: -5, z1: -1 }), "muro/empuje-fuera", "E"],
   ["empuje con z1 por debajo de z0", (f) => Object.assign(carga(f, "E"), { z0: 2, z1: 1 }), "fisico/valor-no-valido", "E"],
   ["empuje en un caso que no existe", (f) => (carga(f, "E").caso = "X"), "fisico/referencia", "E"],
   // Cargas y apoyos sobre muros

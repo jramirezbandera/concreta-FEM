@@ -319,6 +319,17 @@ describe("cargas (C3-g, C3-h)", () => {
     const momento = 6 * ((30 * 2.5 * 2.5) / 6) - 17;
     expect(Math.abs((Mx - 3 * Fy) / momento - 1)).toBeLessThan(1e-9);
   });
+
+  it("un empuje que sobresale de la altura del muro avisa de lo que queda fuera (A2-55)", () => {
+    // Muro de 3 m: de z = −1 a 3, el metro de debajo de la base no carga; antes, sin aviso
+    const empuje: CargaFisica = { tipo: "empuje", id: "E", caso: "Q", muro: "M", lado: "derecho", z0: -1, z1: 3, p0: 20, p1: 0 };
+    const r = valido(compilar(modelo({ muros: [muro("M", [[0, 0], [6, 0]], "C", "P1")], cargas: [empuje] }), { tamanoMalla: 0.5 }));
+    const d = r.diagnosticos.find((x) => x.codigo === "muro/empuje-recortado")!;
+    expect(d.ids).toEqual(["E", "M"]);
+    expect(d.detalles!.fuera).toBeCloseTo(1, 12);
+    const dentro = valido(compilar(modelo({ muros: [muro("M", [[0, 0], [6, 0]], "C", "P1")], cargas: [{ ...empuje, z0: 0, z1: 3 }] }), { tamanoMalla: 0.5 }));
+    expect(dentro.diagnosticos.some((x) => x.codigo === "muro/empuje-recortado")).toBe(false);
+  });
 });
 
 describe("baterías al azar (criterios 3 y 5)", () => {

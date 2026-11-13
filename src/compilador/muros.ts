@@ -578,6 +578,15 @@ export function planMuros(ctx: Contexto, plantas: ReadonlyMap<number, PlantaMuro
     const m = ctx.muros[w]!;
     const base = ctx.cotas[m.kb]!;
     const [a, b] = [base + c.z0, base + c.z1];
+    // A2-55: z0 y z1 son sobre la base del muro. Entero fuera de su altura, el empuje no carga nada (un
+    // error, no un 0); si sobresale, lo de fuera se pierde: se avisa con lo que queda fuera
+    const cabeza = ctx.cotas[m.kh]!;
+    if (!(b > base + epsGeom && a < cabeza - epsGeom)) {
+      diag.error("muro/empuje-fuera", `El empuje ${c.id} (de z0 = ${c.z0} a z1 = ${c.z1} m sobre la base del muro ${m.muro.id}) cae entero fuera de su altura (0 a ${(cabeza - base).toFixed(3)} m): no carga nada. Las cotas del empuje son sobre la base del muro, no absolutas.`, [c.id, m.muro.id]);
+      continue;
+    }
+    if (a < base - epsGeom || b > cabeza + epsGeom)
+      diag.aviso("muro/empuje-recortado", `El empuje ${c.id} sobresale de la altura del muro ${m.muro.id} (0 a ${(cabeza - base).toFixed(3)} m sobre su base): ${cm(Math.max(0, base - a) + Math.max(0, b - cabeza))} de su ley quedan fuera y no cargan.`, [c.id, m.muro.id], { fuera: Math.max(0, base - a) + Math.max(0, b - cabeza) });
     // Cada extremo, en el tramo 0 (las filas de un grupo son las mismas en todos sus tramos)
     const z0 = unir(w, 0, Math.max(a, base));
     const z1 = unir(w, 0, Math.min(b, ctx.cotas[m.kh]!));
