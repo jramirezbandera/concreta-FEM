@@ -985,7 +985,10 @@
     - **A2-16:** una losa entera en el ancho de su viga y sus tiras compila (el control sin pérdidas contaba sólo el peso de las losas con láminas);
     - **A2-15:** el control sin pérdidas, respecto al centro del modelo (de fallo a 1,5 km a ≤ 4e-15 a cualquier distancia), y `fisico/lejos-del-origen` a más de 5 km.
     - **A2-51 (decisión del usuario):** el eje de una viga por la cara de un pilar (a ≤ ε_geom) cuenta como dentro de su huella; la zona rígida ya no depende del redondeo.
-  - **Siguen abiertos:** A2-14 y A2-17 (cortes por campos), lo que queda de A2-53 (una viga partida en un nudo más con ruido) y los leves.
+  - **Hechos también el 2026-11-13** (decisiones de Claude, por confirmar; §11):
+    - **A2-17:** un nudo del plano sólo transmite si el corte sigue la malla por él dentro del rectángulo (un contacto en un punto no transmite nada, como en la integral de campos), y por campos un lado sobre el plano partido por un extremo hace el corte mixto. Los complementarios al azar, de 6 de 372 que no sumaban a 0 de 377;
+    - **A2-14 (y AU-18):** la fuerza de borde de Kirchhoff de los cortes por campos, también en un borde apoyado sólo en uz y en todos con un peso según h⊥/t (`pesoKirchhoff`, ajustado en placas apoyadas y sobre esquinas: ≤ 2,5 % de la carga, antes hasta +135 %). El apoyo simple «duro» queda abierto. Referencia de C5 regenerada a sabiendas (sólo Vz y T de 12 estaciones de vano de bandas).
+  - **Siguen abiertos:** lo que queda de A2-14 (el apoyo «duro», el borde sobre una viga), lo que queda de A2-53 (una viga partida en un nudo más con ruido) y los leves.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
