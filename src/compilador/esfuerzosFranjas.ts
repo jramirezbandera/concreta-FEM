@@ -943,22 +943,50 @@ export class EsfuerzosFranjas {
       }
       return r;
     };
+    // A2-3: las líneas de la misma recta y lado (una viga dibujada por vanos da una por vano) van juntas
+    // en una estación por franja; antes, la primera tapaba a las demás (`cercaDeExacta`) y la franja que
+    // pasa por el pilar donde se unen dos vigas salía con una astilla de su ancho
+    const grupos: LineaApoyo[][] = [];
     for (const ln of lineas) {
-      const tramos = tramosLosa(ln.s);
-      for (const lado of ln.lado ? [ln.lado] : ([-1, 1] as const)) {
-        const nod = porNodales(ln.s, lado, ln.ta, ln.tb, [], undefined, ln.cara ? ventanasEnCara(ln) : []);
-        if (!nod) continue;
-        const cam = muestrasCara(ln.s, lado);
+      const g = grupos.find((x) => Math.abs(x[0]!.s - ln.s) <= EPS && x[0]!.lado === ln.lado && !!x[0]!.cara === !!ln.cara);
+      if (g) g.push(ln);
+      else grupos.push([ln]);
+    }
+    for (const g of grupos) {
+      const s = g[0]!.s;
+      for (const lado of g[0]!.lado ? [g[0]!.lado] : ([-1, 1] as const)) {
+        const nods = g.flatMap((ln) => {
+          const nod = porNodales(ln.s, lado, ln.ta, ln.tb, [], undefined, ln.cara ? ventanasEnCara(ln) : []);
+          return nod ? [{ ln, nod }] : [];
+        });
+        if (!nods.length) continue;
+        // El ancho en losa de la franja, un poco dentro del lado tomado: en la recta misma de la cara de
+        // una viga, su ancho se restaba entero en una de las dos caras y la cobertura no se aplicaba (A2-3)
+        const tramos = tramosLosa(s + lado * 10 * EPS);
+        const cam = muestrasCara(s, lado);
         for (let i = 0; i < fr.length; i++) {
           const f = fr[i]!;
-          if (!(ln.s > f.s0 + EPS && ln.s < f.s1 - EPS) || enApoyo(i, ln.s) || cercaDeExacta(i, ln.s)) continue;
-          // El ancho en losa de la franja en la recta, y lo que cubre la línea
+          if (!(s > f.s0 + EPS && s < f.s1 - EPS) || enApoyo(i, s) || cercaDeExacta(i, s)) continue;
+          // Lo de todas las líneas del grupo en la franja (con una sola, la suya tal cual)
+          const usadas = nods.filter((x) => x.nod.r[i]!.w > EPS);
+          if (!usadas.length) continue;
+          let suma: PorFranja = usadas[0]!.nod.r[i]!;
+          if (usadas.length > 1) {
+            suma = vacio();
+            for (const { nod } of usadas) {
+              const q = nod.r[i]!;
+              suma.w += q.w;
+              suma.wAbaco += q.wAbaco;
+              for (let a = 0; a < suma.m.length; a++) suma.m[a]! += q.m[a]!;
+            }
+          }
           const enLosaF = tramos.reduce((a, [p, q]) => a + Math.max(0, Math.min(q, f.t1) - Math.max(p, f.t0)), 0);
-          if (!(nod.r[i]!.w >= COBERTURA_APOYO * enLosaF - EPS) || !(nod.r[i]!.w > EPS)) continue;
-          est[i]!.push(estacion(i, ln.s, "apoyo", lado, nod.r[i]!, cam.r[i]!, "fuerzas-nodales", [ln.id], [...nod.diag, ...(cam.valido ? [] : cam.diag)]));
+          if (!(suma.w >= COBERTURA_APOYO * enLosaF - EPS)) continue;
+          const piezas = [...new Set(usadas.map((x) => x.ln.id))];
+          est[i]!.push(estacion(i, s, "apoyo", lado, suma, cam.r[i]!, "fuerzas-nodales", piezas, [...usadas.flatMap((x) => x.nod.diag), ...(cam.valido ? [] : cam.diag)]));
         }
       }
-      for (let i = 0; i < fr.length; i++) if (est[i]!.some((e) => e.tipo === "apoyo" && e.s === ln.s)) exactas[i]!.push(ln.s);
+      for (let i = 0; i < fr.length; i++) if (est[i]!.some((e) => e.tipo === "apoyo" && e.s === s)) exactas[i]!.push(s);
     }
 
     // Paso: una recta por campos cada PASO_ESTACIONES. Lo de los modos (VS4), soltado al empezar (lo

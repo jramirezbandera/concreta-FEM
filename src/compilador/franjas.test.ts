@@ -367,3 +367,46 @@ describe("F: la opción franjas: false", () => {
     expect(con.huella).not.toBe(sin.huella);
   });
 });
+
+describe("estaciones de apoyo en las caras de unas vigas dibujadas por vanos (A2-3)", () => {
+  it("en un reticular simétrico con vigas de borde una por vano, las estaciones de las dos caras son simétricas y ninguna sale de una astilla", () => {
+    // Antes, en la cara de s mayor la cobertura no se aplicaba (el ancho de la viga se restaba entero) y
+    // la primera viga tapaba a la segunda en la misma recta: L:X14 salía con 0,10 m de 0,80 y −29,3 kN·m/m
+    // frente a −5,5 en su simétrica
+    const xs = [0, 5, 10, 15];
+    const pilares: Pilar[] = xs.flatMap((x) => xs.map((y) => ({ id: `P${x}-${y}`, x, y, desde: "C", hasta: "P1", seccion: "p" })));
+    const vigas: NonNullable<ModeloFisico["vigas"]> = [];
+    for (const y of [0, 15]) for (let i = 0; i < 3; i++) vigas.push({ id: `VX${y}-${i}`, planta: "P1", puntos: [[xs[i]!, y], [xs[i + 1]!, y]], seccion: "v" });
+    for (const x of [0, 15]) for (let i = 0; i < 3; i++) vigas.push({ id: `VY${x}-${i}`, planta: "P1", puntos: [[x, xs[i]!], [x, xs[i + 1]!]], seccion: "v" });
+    const f: ModeloFisico = {
+      plantas: [{ id: "P1", altura: null }, { id: "C", tipo: "sotano", altura: 3 }],
+      materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+      secciones: [
+        { id: "p", material: "HA", forma: "rectangular", b: 0.3, h: 0.3 },
+        { id: "v", material: "HA", forma: "rectangular", b: 0.3, h: 0.5 },
+      ],
+      pilares,
+      vigas,
+      losas: [{ id: "L", planta: "P1", contorno: [[-0.15, -0.15], [15.15, -0.15], [15.15, 15.15], [-0.15, 15.15]], espesor: 0.3, material: "HA", reticular: { intereje: 0.8, nervio: 0.12, capa: 0.05, abacosPilares: { lado: 2 } } }],
+      casos: [{ id: "G", pesoPropio: true }, { id: "Q" }],
+      cargas: [{ tipo: "superficie", id: "q", caso: "Q", planta: "P1", losa: "L", q: [0, 0, -10] }],
+    };
+    const c = calculado(f);
+    const X = c.ef.franjas("L").filter((x) => x.direccion === 1);
+    let pares = 0;
+    for (const x of X) {
+      const est = c.ef.estaciones(x.id)!.estaciones.filter((e) => e.tipo === "apoyo");
+      for (const e of est) {
+        // Ninguna estación de apoyo de menos de la mitad de lo que la franja tiene en losa en esa recta (sin
+        // los anchos de las vigas de borde perpendiculares, de −0,15 a 0,15 y de 14,85 a 15,15)
+        expect(e.anchoEnLosa, `${x.id} s = ${e.s}`).toBeGreaterThan(0.5 * (Math.min(x.t1, 14.85) - Math.max(x.t0, 0.15)) - 1e-6);
+        // Y su simétrica respecto a x = 7,5, en la misma franja
+        const o = est.find((q) => Math.abs(q.s - (15 - e.s)) < 1e-6 && q.lado === -e.lado);
+        expect(o, `${x.id} s = ${e.s}`).toBeDefined();
+        expect(Math.abs(o!.medios[3]! - e.medios[3]!)).toBeLessThan(0.01 * Math.max(1, Math.abs(e.medios[3]!)));
+        pares++;
+      }
+    }
+    expect(pares).toBeGreaterThan(20);
+  }, 120_000);
+});

@@ -1,0 +1,97 @@
+
+== h25-plana (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 64; cambian: 0; nuevas: 0; desaparecen: 0
+
+== h25-reticular (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 72; cambian: 0; nuevas: 0; desaparecen: 0
+
+== pilares-mezclados (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 78; cambian: 0; nuevas: 0; desaparecen: 0
+
+== aleatorio-3 (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 53; cambian: 0; nuevas: 2; desaparecen: 0
+    nueva: L-N1:X6 apoyo5.150000:-1: superior 29.78
+    nueva: L-N1:X6 apoyo5.150000:1: superior 32.08
+
+== losa-3x3-refinada (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 210; cambian: 0; nuevas: 0; desaparecen: 0
+
+== h25-plana-sin-refinar (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 64; cambian: 0; nuevas: 0; desaparecen: 0
+
+== losa-3x3-mezclada (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 210; cambian: 0; nuevas: 0; desaparecen: 0
+
+== reticular-2x2-abacos (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 110; cambian: 4; nuevas: 0; desaparecen: 0
+  superior: mediana 0.0 %, de 0.0 % a 0.0 %; |cambio| > 5 %: 0, > 10 %: 0
+  inferior: mediana 10.6 %, de -0.5 % a 14.8 %
+  las cinco que más cambian la superior:
+    L-N1:X7            apoyo3.000000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo3.000000:1              0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo9.000000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo9.000000:1              0.00 →     0.00      0.0 %
+
+== aleatorio-3-lv (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 46; cambian: 0; nuevas: 0; desaparecen: 0
+
+== reticular-2x2-abacos-lv (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 154; cambian: 4; nuevas: 0; desaparecen: 0
+  superior: mediana 0.0 %, de 0.0 % a 0.0 %; |cambio| > 5 %: 0, > 10 %: 0
+  inferior: mediana 10.3 %, de 1.2 % a 12.6 %
+  las cinco que más cambian la superior:
+    L-N1:X7            apoyo2.875000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo3.125000:1              0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo8.875000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo9.125000:1              0.00 →     0.00      0.0 %
+
+== aleatorio-3-lv2 (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 96; cambian: 3; nuevas: 0; desaparecen: 0
+  superior: mediana 2.8 %, de -0.8 % a 16.4 %; |cambio| > 5 %: 1, > 10 %: 1
+  inferior: mediana 0.0 %, de 0.0 % a 0.0 %
+  las cinco que más cambian la superior:
+    L-N1:Y6            apoyo5.825000:1             37.38 →    45.11     16.4 %
+    L-N1:X6            apoyo10.775000:-1           14.94 →    17.07      2.8 %
+    L-N1:X6            apoyo0.175000:1             27.30 →    26.71     -0.8 %
+
+== reticular-2x2-abacos-lv2 (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 154; cambian: 4; nuevas: 0; desaparecen: 0
+  superior: mediana 0.0 %, de 0.0 % a 0.0 %; |cambio| > 5 %: 0, > 10 %: 0
+  inferior: mediana -1.2 %, de -8.7 % a 0.3 %
+  las cinco que más cambian la superior:
+    L-N1:X7            apoyo2.875000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo3.125000:1              0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo8.875000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo9.125000:1              0.00 →     0.00      0.0 %
+
+== edificio-2x2-lv2 (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 122; cambian: 0; nuevas: 0; desaparecen: 0
+
+== edificio-2x2-lvd (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 122; cambian: 0; nuevas: 0; desaparecen: 0
+
+== edificio-2x2-rvb (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 122; cambian: 0; nuevas: 0; desaparecen: 0
+
+== reticular-2x2-planas-rva (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 154; cambian: 4; nuevas: 0; desaparecen: 0
+  superior: mediana 0.0 %, de 0.0 % a 0.0 %; |cambio| > 5 %: 0, > 10 %: 0
+  inferior: mediana 30.7 %, de -0.3 % a 30.9 %
+  las cinco que más cambian la superior:
+    L-N1:X7            apoyo2.800000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo3.200000:1              0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo8.800000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo9.200000:1              0.00 →     0.00      0.0 %
+
+== edificio-2x2-tb (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 110; cambian: 0; nuevas: 0; desaparecen: 0
+
+== reticular-2x2-abacos-tb (malla idéntica): mx de cara y paso que se mueven: 0; estaciones de paso que se mueven: 0
+  estaciones de cara y apoyo que siguen: 142; cambian: 2; nuevas: 0; desaparecen: 0
+  superior: mediana 0.0 %, de 0.0 % a 0.0 %; |cambio| > 5 %: 0, > 10 %: 0
+  inferior: mediana -0.2 %, de -0.6 % a -0.2 %
+  las cinco que más cambian la superior:
+    L-N1:X7            apoyo2.875000:-1             0.00 →     0.00      0.0 %
+    L-N1:X7            apoyo3.125000:1              0.00 →     0.00      0.0 %
+
+En total: 21 de 2083 estaciones de cara y apoyo que siguen cambian; 2 nuevas y 0 desaparecen.
