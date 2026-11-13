@@ -196,6 +196,37 @@ function poligonoHuella(nd: NudoT): Vec2[] | null {
 }
 
 /**
+ * A2-35: en una planta sin losas, dos pilares cuyas huellas se solapan (en una con losa ya es
+ * `losa/huellas-solapadas`, con ε_snap): error `pilar/huellas-solapadas`. Antes, dos pilares de 30 a
+ * 6 cm compilaban sin aviso (a 4 cm se unían en un nudo).
+ */
+export function pilaresSolapadosSinLosa(ctx: Contexto, topo: Topologia, diag: Diagnosticos): void {
+  const conLosa = new Set(ctx.losas.map((l) => l.losa.planta));
+  const porPlanta = new Map<number, [number, Vec2[]][]>();
+  topo.nudos.forEach((nd, n) => {
+    if (conLosa.has(ctx.plantas[nd.k]!.id)) return;
+    const poli = poligonoHuella(nd);
+    if (!poli) return;
+    let l = porPlanta.get(nd.k);
+    if (!l) porPlanta.set(nd.k, (l = []));
+    l.push([n, poli]);
+  });
+  const pares = new Map<string, { ids: [string, string]; plantas: string[] }>();
+  for (const [k, lista] of porPlanta)
+    for (let i = 0; i < lista.length; i++)
+      for (let j = i + 1; j < lista.length; j++) {
+        if (!huellasSolapadas(lista[i]![1], lista[j]![1], 0)) continue;
+        const ids = [topo.nudos[lista[i]![0]]!.pilar!.pilares[0]!, topo.nudos[lista[j]![0]]!.pilar!.pilares[0]!].sort() as [string, string];
+        const c = ids.join("|");
+        const p = pares.get(c) ?? { ids, plantas: [] };
+        p.plantas.push(ctx.plantas[k]!.id);
+        pares.set(c, p);
+      }
+  for (const { ids: [id1, id2], plantas } of pares.values())
+    diag.error("pilar/huellas-solapadas", `Las huellas de los pilares ${id1} y ${id2} se solapan en ${plantas.length > 1 ? "las plantas" : "la planta"} ${plantas.join(", ")}: dos pilares no pueden ocupar el mismo sitio. Únalos en uno o sepárelos.`, [id1, id2]);
+}
+
+/**
  * ¿Dos huellas (polígonos convexos) se solapan o quedan a ≤ tol? Con un vértice de una dentro de la
  * otra, dos lados que se cortan, o un vértice a ≤ tol del borde de la otra (en dos convexos, la
  * distancia mínima entre bordes se da en un vértice de uno frente a un lado del otro).

@@ -32,7 +32,7 @@ import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PE
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type OpcionesResueltas } from "./fisico.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import { huellaDe } from "./huella.ts";
-import { construirLosas, direccionEje1, type Losas } from "./losas.ts";
+import { construirLosas, direccionEje1, pilaresSolapadosSinLosa, type Losas } from "./losas.ts";
 import { VERSIONES_MALLADOR } from "./mallado.ts";
 import type { Mapeo, NudoMapeado } from "./mapeo.ts";
 import { ajustarMuros } from "./muros.ts";
@@ -243,6 +243,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   if (diag.hayErrores) return fallo();
   const piezas = construirPiezas(ctx, topo, losas, diag, panos);
   marca("piezas");
+  // A2-35: al final, lo que no ha parado antes otro error (en una planta con losa ya lo es)
+  if (!diag.hayErrores) pilaresSolapadosSinLosa(ctx, topo, diag);
   if (diag.hayErrores) return fallo();
   avisarDintelesEnDiafragma(ctx, diag);
 
