@@ -995,15 +995,71 @@ export class EsfuerzosFranjas {
     const S1 = Math.max(...fr.map((f) => f.s1));
     const nPasos = Math.floor((S1 - S0) / PASO_ESTACIONES - 1e-9);
     let rectas = 0;
+    // A2-2 (decisión del usuario): por campos, las estaciones de paso de una recta suman menos momento
+    // que el equilibrio (−7…−8 % en el centro de vano con h = 0,75; −2 % con 0,375). Su mx se escala,
+    // por caso, con el cociente entre el corte exacto (fuerzas nodales) y el de campos en la recta de la
+    // malla más cercana (a menos de h): la que pasa por más nudos de la losa. Sin una recta así, o con
+    // un cociente fuera de [1/2, 2] (un momento casi nulo, cerca de un punto de inflexión), como antes
+    const lineasMalla = (() => {
+      const cuenta = new Map<number, number>();
+      for (let li = 0; li < lam.length; li++) {
+        if (!enLosa(li)) continue;
+        for (const v of this.modelo.laminas![li]!.nudos) {
+          const nd = this.modelo.nudos[v]!;
+          const sv = Math.round((nd.x * d[0] + nd.y * d[1]) * 1e6) / 1e6;
+          cuenta.set(sv, (cuenta.get(sv) ?? 0) + 1);
+        }
+      }
+      return [...cuenta].filter(([, c]) => c >= 4).map(([sv]) => sv).sort((a, b) => a - b);
+    })();
+    const cocientes = new Map<number, Float64Array | null>();
+    const cocienteEn = (sm: number): Float64Array | null => {
+      if (cocientes.has(sm)) return cocientes.get(sm)!;
+      let q: Float64Array | null = null;
+      const nod = porNodales(sm, -1, T0, T1);
+      if (nod) {
+        const cam = porCampos(sm);
+        if (cam.valido) {
+          q = new Float64Array(nc);
+          for (let kc = 0; kc < nc; kc++) {
+            let [ex, cp] = [0, 0];
+            for (let i = 0; i < fr.length; i++) {
+              ex += nod.r[i]!.m[3 * kc]!;
+              cp += cam.r[i]!.m[3 * kc]!;
+            }
+            const c = ex / cp;
+            q[kc] = Number.isFinite(c) && c >= 0.5 && c <= 2 ? c : 1;
+          }
+        }
+      }
+      cocientes.set(sm, q);
+      return q;
+    };
+    const hMalla = this.ctx.op.tamanoMalla;
+    const cocientePaso = (s: number): Float64Array | null => {
+      // Las rectas de la malla a menos de h, de la más cercana a la más lejana: la primera con corte exacto
+      const cerca = lineasMalla.filter((x) => Math.abs(x - s) <= hMalla + EPS).sort((a, b) => Math.abs(a - s) - Math.abs(b - s));
+      for (const sm of cerca) {
+        const q = cocienteEn(sm);
+        if (q) return q;
+      }
+      return null;
+    };
     for (let j = 1; j <= nPasos; j++) {
       const s = S0 + j * PASO_ESTACIONES;
       const quien = fr.map((f, i) => s > f.s0 + EPS && s < f.s1 - EPS && !enApoyo(i, s) && !cercaDeExacta(i, s));
       if (!quien.some(Boolean)) continue;
       if (rectas++ % RECTAS_POR_SUELTA === 0) this.efimeros?.soltar();
       const cam = porCampos(s);
+      const q = cam.valido ? cocientePaso(s) : null;
       fr.forEach((_, i) => {
         if (!quien[i] || !(cam.r[i]!.w > EPS)) return;
-        est[i]!.push(estacion(i, s, "paso", 0, cam.r[i]!, cam.r[i]!, "campos", [], cam.valido ? [] : cam.diag));
+        let p = cam.r[i]!;
+        if (q) {
+          p = { ...p, m: Float64Array.from(p.m) };
+          for (let kc = 0; kc < nc; kc++) p.m[3 * kc]! *= q[kc]!;
+        }
+        est[i]!.push(estacion(i, s, "paso", 0, p, cam.r[i]!, "campos", [], cam.valido ? [] : cam.diag));
       });
     }
 

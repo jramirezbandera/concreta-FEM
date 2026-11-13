@@ -201,19 +201,23 @@ describe("F: esfuerzos de las franjas (criterio 1, simetría y Wood–Armer)", (
     expect(e.anchoEnLosa).toBeCloseTo(1, 12);
   });
 
-  it("por campos, la suma de las franjas de una estación es el corte por campos de la recta entera (malla de rectángulos: ≤ 1e-9)", () => {
-    const s = 3 + PASO_ESTACIONES / 2 + 0.003;
-    // Una estación de paso cualquiera: la de s más próximo
+  it("en una recta de paso que sigue la malla, la suma de las franjas es el corte exacto por fuerzas nodales, no el de campos (A2-2, ≤ 1e-9)", () => {
+    // Antes era el corte por campos de la recta, que en el centro de vano se queda un 7–8 % corto con h = 0,75
     const fs = c.ef.franjas("L").filter((x) => x.direccion === 1);
-    const e0 = c.ef.estaciones(fs[5]!.id)!.estaciones.filter((q) => q.tipo === "paso").sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s))[0]!;
-    let suma = [0, 0];
-    for (const f of fs) {
-      const e = c.ef.estaciones(f.id)!.estaciones.find((q) => q.tipo === "paso" && q.s === e0.s)!;
-      suma = suma.map((v, k) => v + e.medios[3 * k]! * e.anchoEnLosa);
+    const pasos = [...new Set(fs.flatMap((f) => c.ef.estaciones(f.id)!.estaciones.filter((q) => q.tipo === "paso").map((q) => q.s)))].sort((a, b) => a - b);
+    let vistas = 0;
+    for (const s of pasos) {
+      const exacto = c.cortes.cortar({ origen: [s, -0.5, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, 16], soloLaminas: true }, c.casos);
+      if (!exacto.valido) continue;
+      let suma = [0, 0];
+      for (const f of fs) {
+        const e = c.ef.estaciones(f.id)!.estaciones.find((q) => q.tipo === "paso" && q.s === s);
+        if (e) suma = suma.map((v, k) => v + e.medios[3 * k]! * e.anchoEnLosa);
+      }
+      for (let k = 0; k < 2; k++) expect(Math.abs(suma[k]! - exacto.esfuerzos[6 * k + 4]!), `s = ${s}`).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(exacto.esfuerzos[6 * k + 4]!)));
+      vistas++;
     }
-    const r = c.cortes.cortar({ origen: [e0.s, -0.5, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, 16], soloLaminas: true, metodo: "campos" }, c.casos, c.ef["campos"]);
-    expect(r.valido).toBe(true);
-    for (let k = 0; k < 2; k++) expect(Math.abs(suma[k]! - r.esfuerzos[6 * k + 4]!)).toBeLessThanOrEqual(1e-9 * Math.abs(r.esfuerzos[6 * k + 4]!));
+    expect(vistas).toBeGreaterThanOrEqual(3);
   });
 
   it("la losa es simétrica: las franjas simétricas dan lo mismo en las estaciones simétricas", () => {

@@ -1,0 +1,128 @@
+
+== h25-plana (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 1088
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 1.8 %, de -22.6 % a 32.1 %
+  máximo de la armadura inferior de cada franja: mediana 2.2 %, de 2.1 % a 2.3 %; las tres que más:
+    LOSA:X4          inferior 23.17 → 23.70 (2.3 %); superior 16.42 → 19.95 (21.5 %)
+    LOSA:X9          inferior 23.17 → 23.70 (2.3 %); superior 16.42 → 19.95 (21.5 %)
+    LOSA:Y4          inferior 23.17 → 23.70 (2.3 %); superior 16.42 → 19.95 (21.5 %)
+
+== h25-reticular (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 1380
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 1.2 %, de -20.3 % a 29.7 %
+  máximo de la armadura inferior de cada franja: mediana 1.4 %, de 1.1 % a 1.6 %; las tres que más:
+    LOSA:X7          inferior 32.12 → 32.63 (1.6 %); superior 45.03 → 53.67 (19.2 %)
+    LOSA:X9          inferior 32.12 → 32.63 (1.6 %); superior 45.03 → 53.67 (19.2 %)
+    LOSA:Y7          inferior 32.12 → 32.63 (1.6 %); superior 45.03 → 53.67 (19.2 %)
+
+== pilares-mezclados (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 708
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 1.1 %, de -22.3 % a 28.9 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de 0.0 % a 3.8 %; las tres que más:
+    L-N1:Y18         inferior 27.13 → 28.16 (3.8 %); superior 56.59 → 56.59 (0.0 %)
+    L-N1:X9          inferior 20.87 → 21.47 (2.9 %); superior 19.11 → 20.43 (6.9 %)
+    L-N1:X8          inferior 21.07 → 21.67 (2.8 %); superior 16.13 → 17.40 (7.9 %)
+
+== aleatorio-3 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 158
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana -2.0 %, de -6.7 % a 3.3 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de 0.0 % a 0.0 %; las tres que más:
+    L-N1:X1          inferior 19.35 → 19.35 (0.0 %); superior 24.96 → 25.08 (0.5 %)
+    L-N1:X4          inferior 17.90 → 17.90 (0.0 %); superior 7.96 → 8.02 (0.8 %)
+    L-N1:X5          inferior 19.16 → 19.16 (0.0 %); superior 20.21 → 20.88 (3.3 %)
+
+== losa-3x3-refinada (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 2129
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 1.9 %, de -19.1 % a 28.3 %
+  máximo de la armadura inferior de cada franja: mediana 2.2 %, de 1.9 % a 2.3 %; las tres que más:
+    L:X6             inferior 27.91 → 28.56 (2.3 %); superior 73.10 → 73.10 (0.0 %)
+    L:X11            inferior 27.91 → 28.56 (2.3 %); superior 73.10 → 73.10 (0.0 %)
+    L:X14            inferior 23.88 → 24.43 (2.3 %); superior 10.48 → 12.33 (17.7 %)
+
+== h25-plana-sin-refinar (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 1088
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 1.8 %, de -31.4 % a 31.3 %
+  máximo de la armadura inferior de cada franja: mediana 2.2 %, de 2.1 % a 2.3 %; las tres que más:
+    LOSA:X4          inferior 23.13 → 23.67 (2.3 %); superior 16.95 → 21.05 (24.2 %)
+    LOSA:Y4          inferior 23.13 → 23.67 (2.3 %); superior 16.95 → 21.05 (24.2 %)
+    LOSA:Y9          inferior 23.13 → 23.67 (2.3 %); superior 16.95 → 21.05 (24.2 %)
+
+== losa-3x3-mezclada (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 2095
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 1.8 %, de -20.6 % a 27.2 %
+  máximo de la armadura inferior de cada franja: mediana 2.2 %, de 1.9 % a 2.3 %; las tres que más:
+    L:X1             inferior 28.95 → 29.63 (2.3 %); superior 52.86 → 52.86 (0.0 %)
+    L:X6             inferior 27.94 → 28.59 (2.3 %); superior 75.01 → 75.01 (0.0 %)
+    L:X14            inferior 23.90 → 24.46 (2.3 %); superior 10.48 → 11.75 (12.1 %)
+
+== reticular-2x2-abacos (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 598
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 0.4 %, de -7.2 % a 29.2 %
+  máximo de la armadura inferior de cada franja: mediana 0.7 %, de 0.0 % a 3.5 %; las tres que más:
+    L-N1:Y4          inferior 9.59 → 9.92 (3.5 %); superior 7.80 → 7.80 (0.0 %)
+    L-N1:Y2          inferior 10.59 → 10.90 (3.0 %); superior 10.50 → 10.50 (0.0 %)
+    L-N1:Y15         inferior 12.68 → 13.05 (2.9 %); superior 30.58 → 30.58 (0.0 %)
+
+== aleatorio-3-lv (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 97
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana -0.6 %, de -10.3 % a 11.4 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de 0.0 % a 0.0 %; las tres que más:
+    L-N1:X2          inferior 18.21 → 18.21 (0.0 %); superior 11.97 → 10.82 (-9.6 %)
+    L-N1:X3          inferior 16.94 → 16.94 (0.0 %); superior 7.15 → 6.36 (-11.1 %)
+    L-N1:X4          inferior 18.57 → 18.57 (0.0 %); superior 10.59 → 9.40 (-11.3 %)
+
+== reticular-2x2-abacos-lv (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 447
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana -0.1 %, de -11.7 % a 30.1 %
+  máximo de la armadura inferior de cada franja: mediana -0.5 %, de -2.0 % a 0.0 %; las tres que más:
+    L-N1:X11         inferior 12.65 → 12.39 (-2.0 %); superior 3.94 → 4.01 (1.9 %)
+    L-N1:X7          inferior 23.02 → 22.64 (-1.6 %); superior 37.27 → 37.27 (0.0 %)
+    L-N1:X1          inferior 15.72 → 15.50 (-1.4 %); superior 23.31 → 23.31 (0.0 %)
+
+== aleatorio-3-lv2 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 120
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 3.4 %, de -3.9 % a 14.9 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de 0.0 % a 0.0 %; las tres que más:
+    L-N1:X3          inferior 16.92 → 16.92 (0.0 %); superior 6.68 → 5.96 (-10.7 %)
+    L-N1:X4          inferior 18.61 → 18.61 (0.0 %); superior 8.99 → 8.01 (-10.9 %)
+    L-N1:X6          inferior 20.54 → 20.54 (0.0 %); superior 74.66 → 67.49 (-9.6 %)
+
+== reticular-2x2-abacos-lv2 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 552
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 0.3 %, de -23.8 % a 27.1 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de -2.2 % a 4.2 %; las tres que más:
+    L-N1:Y3          inferior 10.33 → 10.76 (4.2 %); superior 8.40 → 8.40 (0.0 %)
+    L-N1:Y4          inferior 10.96 → 11.41 (4.1 %); superior 8.22 → 8.22 (0.0 %)
+    L-N1:Y2          inferior 10.63 → 11.04 (3.9 %); superior 12.67 → 12.67 (0.0 %)
+
+== edificio-2x2-lv2 (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 326
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 0.7 %, de -11.2 % a 7.4 %
+  máximo de la armadura inferior de cada franja: mediana 1.7 %, de 0.0 % a 6.0 %; las tres que más:
+    L-N1:Y2          inferior 13.46 → 14.26 (6.0 %); superior 10.48 → 10.72 (2.3 %)
+    L-N1:Y12         inferior 14.24 → 15.05 (5.7 %); superior 22.79 → 22.79 (0.0 %)
+    L-N1:Y1          inferior 11.88 → 12.49 (5.1 %); superior 19.58 → 19.58 (0.0 %)
+
+== edificio-2x2-lvd (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 326
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 0.7 %, de -11.2 % a 7.4 %
+  máximo de la armadura inferior de cada franja: mediana 1.7 %, de 0.0 % a 6.0 %; las tres que más:
+    L-N1:Y2          inferior 13.46 → 14.26 (6.0 %); superior 10.48 → 10.72 (2.3 %)
+    L-N1:Y12         inferior 14.24 → 15.05 (5.7 %); superior 22.79 → 22.79 (0.0 %)
+    L-N1:Y1          inferior 11.88 → 12.49 (5.1 %); superior 19.58 → 19.58 (0.0 %)
+
+== edificio-2x2-rvb (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 326
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 0.6 %, de -4.4 % a 10.5 %
+  máximo de la armadura inferior de cada franja: mediana 2.0 %, de 0.0 % a 7.7 %; las tres que más:
+    L-N1:Y2          inferior 12.65 → 13.63 (7.7 %); superior 12.95 → 13.20 (1.9 %)
+    L-N1:Y12         inferior 13.04 → 13.95 (7.0 %); superior 28.09 → 28.09 (0.0 %)
+    L-N1:Y1          inferior 10.72 → 11.41 (6.4 %); superior 23.29 → 23.29 (0.0 %)
+
+== reticular-2x2-planas-rva (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 522
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 1.0 %, de -20.2 % a 14.7 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de -2.6 % a 2.1 %; las tres que más:
+    L-N1:X10         inferior 19.80 → 19.28 (-2.6 %); superior 2.87 → 2.66 (-7.4 %)
+    L-N1:X11         inferior 19.94 → 19.43 (-2.6 %); superior 5.25 → 4.87 (-7.4 %)
+    L-N1:X12         inferior 24.80 → 24.19 (-2.5 %); superior 22.25 → 22.25 (0.0 %)
+
+== edificio-2x2-tb (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 314
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 0.6 %, de -5.6 % a 10.6 %
+  máximo de la armadura inferior de cada franja: mediana 1.3 %, de 0.0 % a 7.7 %; las tres que más:
+    L-N1:Y2          inferior 12.65 → 13.62 (7.7 %); superior 12.96 → 13.36 (3.1 %)
+    L-N1:Y12         inferior 13.27 → 14.19 (6.9 %); superior 29.76 → 29.76 (0.0 %)
+    L-N1:Y1          inferior 10.72 → 11.41 (6.4 %); superior 23.31 → 23.31 (0.0 %)
+
+== reticular-2x2-abacos-tb (malla idéntica): caras y apoyos que se mueven: 0; estaciones de paso que cambian: 543
+  mx de paso (suma de casos, sobre el mayor |mx| de su franja): mediana 0.1 %, de -14.9 % a 15.2 %
+  máximo de la armadura inferior de cada franja: mediana 0.0 %, de -1.7 % a 5.7 %; las tres que más:
+    L-N1:Y3          inferior 9.83 → 10.39 (5.7 %); superior 9.48 → 9.48 (0.0 %)
+    L-N1:Y2          inferior 9.96 → 10.51 (5.6 %); superior 14.38 → 14.38 (0.0 %)
+    L-N1:Y15         inferior 12.43 → 13.02 (4.8 %); superior 24.91 → 24.91 (0.0 %)
+
+En total: 12817 estaciones de paso cambian (mediana 1.3 %); el máximo de la inferior de cada franja, mediana 1.9 %, de -2.6 % a 7.7 %.
