@@ -833,8 +833,29 @@ export class Cortes {
     }
     if (incluidas.length) {
       info.restricciones.push(...incluidas);
+      // A2-40: sin los maestros, una cadena (el maestro de R es esclavo de otra incluida R′) contaría
+      // dos veces lo de R: la fuerza de R′ sobre ese nudo ya lleva lo que R transmite a sus esclavos.
+      // R no cuenta si su maestro cuenta como esclavo de R′, o si R′ tampoco cuenta (cadenas más
+      // largas). Con los maestros no pasa: lo de R se anula entre su maestro y sus esclavos
+      const enCadena = new Set<number>();
+      if (sinMaestro && incluidas.length > 1) {
+        const esclavoDe = new Map<number, number[]>();
+        for (const ir of incluidas) for (const v of lista[ir]!.esclavos) esclavoDe.set(v, [...(esclavoDe.get(v) ?? []), ir]);
+        for (let cambio = true; cambio; ) {
+          cambio = false;
+          for (const ir of incluidas) {
+            if (enCadena.has(ir)) continue;
+            const m = lista[ir]!.maestro;
+            if ((esclavoDe.get(m) ?? []).some((o) => o !== ir && (cuenta(m, false) || enCadena.has(o)))) {
+              enCadena.add(ir);
+              cambio = true;
+            }
+          }
+        }
+      }
       this.guardado(casos).restricciones(incluidas).forEach((fr, k) => {
         for (const ir of incluidas) {
+          if (enCadena.has(ir)) continue;
           const rs = lista[ir]!;
           const f = fr.get(ir)!;
           [rs.maestro, ...rs.esclavos].forEach((v, a) => {

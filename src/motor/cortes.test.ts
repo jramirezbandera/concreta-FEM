@@ -129,6 +129,37 @@ describe("F3: con soloLaminas, las restricciones nombradas sí entran", () => {
     expect(cambian.sort()).toEqual([false, true]);
   });
 
+  it("con soloEsclavos y una cadena de enlaces (A2-40), lo mismo que con el enlace único: lo del segundo no cuenta dos veces", () => {
+    const [L, b, F] = [3, 1.5, 4];
+    const base = mensulaPlaca(12, 6, L, b, F);
+    const en = (x: number, y: number) => base.nudos.findIndex((n) => Math.abs(n.x - x) < 1e-9 && Math.abs(n.y - y) < 1e-9);
+    const enHuella = base.nudos.flatMap((n, i) => (n.x >= 1 - 1e-9 && n.x <= 2 + 1e-9 && n.y >= 0.5 - 1e-9 && n.y <= 1 + 1e-9 ? [i] : []));
+    const maestro = en(1, 0.5);
+    // La cadena: H2 (maestro en (1,25; 0,75), del lado A) cuelga de H1, con tres nudos del lado A
+    const m2 = en(1.25, 0.75);
+    const de2 = [en(1, 0.75), en(1, 1), en(1.25, 1)];
+    const unico = { ...base, restricciones: [{ tipo: "enlace-rigido" as const, id: "H", maestro, esclavos: enHuella.filter((i) => i !== maestro) }] };
+    const cadena = {
+      ...base,
+      restricciones: [
+        { tipo: "enlace-rigido" as const, id: "H1", maestro, esclavos: enHuella.filter((i) => i !== maestro && !de2.includes(i)) },
+        { tipo: "enlace-rigido" as const, id: "H2", maestro: m2, esclavos: de2 },
+      ],
+    };
+    const corte: Corte = { origen: [1.5, 0, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, b], soloLaminas: true, soloEsclavos: true };
+    const ru = new Cortes(unico).cortar({ ...corte, restricciones: ["H"] }, casosValidos(calcular(unico)));
+    const rc = new Cortes(cadena).cortar({ ...corte, restricciones: ["H1", "H2"] }, casosValidos(calcular(cadena)));
+    expect(ru.valido && rc.valido).toBe(true);
+    expect(rc.restricciones).toHaveLength(2);
+    const escala = Math.max(...[...ru.esfuerzos].map(Math.abs));
+    expect(escala).toBeGreaterThan(1);
+    ru.esfuerzos.forEach((v, k) => expect(Math.abs(rc.esfuerzos[k]! - v)).toBeLessThan(1e-9 * escala));
+    // Con los maestros (sin soloEsclavos), la cadena tampoco cuenta dos veces
+    const cu = new Cortes(unico).cortar({ ...corte, soloEsclavos: undefined, restricciones: ["H"] }, casosValidos(calcular(unico)));
+    const cc = new Cortes(cadena).cortar({ ...corte, soloEsclavos: undefined, restricciones: ["H1", "H2"] }, casosValidos(calcular(cadena)));
+    cu.esfuerzos.forEach((v, k) => expect(Math.abs(cc.esfuerzos[k]! - v)).toBeLessThan(1e-9 * escala));
+  });
+
   it("con esclavos (PB-11), sólo esos nudos: todos, lo de soloEsclavos bit a bit; ninguno, sin la restricción; dos grupos, la suma", () => {
     const [L, b, F] = [3, 1.5, 4];
     const base = mensulaPlaca(6, 3, L, b, F);
