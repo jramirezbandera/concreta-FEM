@@ -147,3 +147,24 @@ describe("MA2: ábacos en los pilares y unidos", () => {
     }
   });
 });
+
+describe("A2-32: el aviso de la unión dice cuánta losa maciza que no es de ningún ábaco", () => {
+  const aviso = (abacos: Vec2[][]) => compilar(reticular({ abacos })).diagnosticos.find((d) => d.codigo === "reticular/abacos-unidos")!;
+
+  it("dos en diagonal: la envolvente maciza más de la mitad de lo que une, y lo destaca", () => {
+    // Dos de 2 × 2 solapados 0,5 × 0,5 en una esquina: unión 7,75 m², envolvente 3,5 × 3,5 = 12,25
+    const a = aviso([rect(4.5, 0.5, 6.5, 2.5), rect(6, 2, 8, 4)]);
+    expect(a.detalles!.areaEnvolvente).toBeCloseTo(12.25, 9);
+    expect(a.detalles!.areaUnidos).toBeCloseTo(7.75, 9);
+    expect(a.detalles!.macizadoDeMas).toBeCloseTo(4.5, 9);
+    expect(a.mensaje).toContain("4,5 m² no son de ningún ábaco");
+    expect(a.mensaje).toContain("maciza mucha losa aligerada");
+  });
+
+  it("dos alineados a 20 cm: casi nada de más, sin destacarlo", () => {
+    const a = aviso([rect(5, 1, 7, 3), rect(7.2, 1, 9.2, 3)]);
+    expect(a.detalles!.macizadoDeMas).toBeCloseTo(0.4, 9);
+    expect(a.mensaje).toContain("0,4 m² no son de ningún ábaco");
+    expect(a.mensaje).not.toContain("maciza mucha losa aligerada");
+  });
+});

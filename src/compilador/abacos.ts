@@ -43,6 +43,8 @@ export const idAbaco = (losa: string, i: number): string => `${losa}/A${i + 1}`;
 export interface AbacoOrigen {
   poligono: Vec2[];
   origen: string[];
+  /** De una unión (A2-32): el área de lo que se unió (sin contar dos veces lo que se solapa), m². */
+  areaUnidos?: number;
 }
 
 export interface AbacosResueltos {
@@ -279,7 +281,7 @@ export function abacosLosa(m: ModeloFisico, l: Losa, tolerancia = TOLERANCIA_ABA
   return {
     abacos: grupos.map((g) => g.poligono),
     enPilares,
-    unidos: grupos.filter((g) => g.origen.length > 1).map((g) => ({ poligono: g.poligono, origen: g.origen })),
+    unidos: grupos.filter((g) => g.origen.length > 1).map((g) => ({ poligono: g.poligono, origen: g.origen, areaUnidos: areaUnion(g.miembros) })),
   };
 }
 
@@ -354,6 +356,22 @@ export function errorPilaresSinAbaco(m: ModeloFisico, porLosa: ReadonlyMap<strin
     );
 }
 
+/**
+ * A2-32: el área de la unión de los ábacos de un grupo, por inclusión y exclusión hasta las parejas (exacta
+ * si no se solapan tres en un punto, lo normal), sin pasar de la suma.
+ */
+function areaUnion(miembros: readonly (readonly Vec2[])[]): number {
+  let a = 0;
+  for (let i = 0; i < miembros.length; i++) {
+    a += Math.abs(areaConSigno(miembros[i]!));
+    for (let j = i + 1; j < miembros.length; j++) a -= areaInterseccionRegiones(region(miembros[i]!), region(miembros[j]!));
+  }
+  return Math.max(0, a);
+}
+
+/** A2-32: con más de la mitad de lo que une macizado de más, el aviso lo destaca. */
+export const MACIZADO_DE_MAS = 0.5;
+
 const lista = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}` : (xs[0] ?? ""));
 const coma = (x: number) => String(Number(x.toFixed(3))).replace(".", ",");
 
@@ -366,11 +384,18 @@ export function avisarAbacosUnidos(porLosa: ReadonlyMap<string, AbacosResueltos>
       const pilares = u.origen.filter((o) => !o.startsWith("ábaco "));
       const dados = u.origen.filter((o) => o.startsWith("ábaco "));
       const que = [pilares.length ? `los de ${pilares.length > 1 ? "los pilares" : "el pilar"} ${lista(pilares)}` : "", dados.length ? `${dados.length > 1 ? "los ábacos dados" : "el ábaco dado"} ${lista(dados.map((d) => d.slice(6)))}` : ""].filter(Boolean).join(" y ");
+      // A2-32: lo que la envolvente maciza que no es de ningún ábaco (la unión se encadena: dos en
+      // diagonal y los de esquina pueden macizar un recuadro entero)
+      const area = la * lb;
+      const unidos = Math.min(area, u.areaUnidos ?? area);
+      const deMas = area - unidos;
+      const mucho = deMas > MACIZADO_DE_MAS * unidos;
+      const cuanto = deMas > 1e-6 ? ` Cubre ${coma(area)} m², de los que ${coma(deMas)} m² no son de ningún ábaco (${Math.round((100 * deMas) / Math.max(unidos, 1e-9))} % más que los que une)${mucho ? ": la unión maciza mucha losa aligerada; revise si es lo que quiere" : ""}.` : "";
       diag.aviso(
         "reticular/abacos-unidos",
-        `${losa}: ${que} se solapan o quedan a menos de ${coma(tolerancia)} m y van unidos en un ábaco de ${coma(la)} × ${coma(lb)} m, su rectángulo envolvente según los nervios (MA2). Si no es eso, dé los ábacos a mano en reticular.abacos.`,
+        `${losa}: ${que} se solapan o quedan a menos de ${coma(tolerancia)} m y van unidos en un ábaco de ${coma(la)} × ${coma(lb)} m, su rectángulo envolvente según los nervios (MA2).${cuanto} Si no es eso, dé los ábacos a mano en reticular.abacos.`,
         [losa, ...pilares],
-        { poligono: u.poligono, origen: u.origen },
+        { poligono: u.poligono, origen: u.origen, areaEnvolvente: area, areaUnidos: unidos, macizadoDeMas: deMas },
       );
     }
 }
