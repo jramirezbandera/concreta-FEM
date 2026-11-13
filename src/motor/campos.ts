@@ -109,6 +109,19 @@ export function pesoKirchhoff(r: number): number {
 }
 
 /**
+ * Peso de la fuerza de borde en un lado de lámina que comparte una barra (una viga de borde por su
+ * eje; A2-14, lo que quedaba): la losa pasa a la viga el salto de su Mxy como torsión, y la capa
+ * límite es más débil que en un borde libre. Medido en `validacion/au2/kirchhoffVigas.ts` frente al
+ * cortante exacto del cuerpo libre (la placa sólo apoya en las esquinas de sus vigas, así que no
+ * depende de la malla): vigas de borde de 30 × 30 a 60 × 120 con la torsión a ×0,1 y ×1, h de 0,1 a
+ * 0,75, ≤ 3,9 % del cortante del corte (sin ella, hasta −23 % con h = 0,75 y la viga de 30 × 30;
+ * entera, hasta +21 %).
+ */
+export function pesoKirchhoffDuro(r: number): number {
+  return (r * r) / (r * r + 3);
+}
+
+/**
  * Espesor equivalente de la capa límite de una sección de flexión: el de una lámina isótropa con el
  * mismo cociente entre la rigidez a torsión (Hb₃₃ = D·(1 − ν)/2) y la de cortante (κ·G·t, κ = 5/6),
  * t = √(10·Hb₃₃/S) (con multiplicadores, t·√(m12/v)).
@@ -832,11 +845,14 @@ export class CamposLaminas implements IntegradorCampos {
 
   /**
    * Lados de lámina en los que el corte por campos lleva la fuerza de borde de Kirchhoff, con su
-   * peso (A2-14): en el borde de su región, sin otra lámina ni barra que los comparta, y sin muelle,
-   * enlace rígido ni apoyo que coarte en sus nudos el giro alrededor de la normal al lado en el plano
-   * de la lámina (un apoyo sólo en uz, o en traslaciones, deja el lado «blando»: el Mxy real se anula
-   * en él en una capa límite, como en un borde libre). El peso es `pesoKirchhoff(h⊥/t)`, con h⊥ el
-   * ancho de la lámina a través del lado. Claves «u,v» con u < v.
+   * peso (A2-14): en el borde de su región, sin otra lámina que los comparta, sin muelle ni enlace
+   * rígido en sus nudos (la unión por la cara de LV sale a ≤ 3,2 % sin ella; `kirchhoffEnlaces.ts`) y
+   * sin un apoyo que coarte el giro alrededor de la normal al lado en el plano de la lámina (un apoyo
+   * «duro» o empotrado):
+   * - con una barra por el lado (una viga de borde por su eje): `pesoKirchhoffDuro(h⊥/t)`;
+   * - si no (libres, o con un apoyo sólo en uz o en traslaciones: el Mxy real se anula en una capa
+   *   límite): `pesoKirchhoff(h⊥/t)`;
+   * con h⊥ el ancho de la lámina a través del lado. Claves «u,v» con u < v.
    */
   private bordesLibres(): Map<string, number> {
     if (this.libres) return this.libres;
@@ -869,7 +885,7 @@ export class CamposLaminas implements IntegradorCampos {
     const { xyz } = this.geo;
     this.libres = new Map<string, number>();
     for (const [c, n] of enRegion) {
-      if (n !== 1 || usos.get(c) !== 1 || barras.has(c)) continue;
+      if (n !== 1 || usos.get(c) !== 1) continue;
       const [u, v] = c.split(",").map(Number) as [number, number];
       if (atados.has(u) || atados.has(v)) continue;
       const [k] = deLamina.get(c)!;
@@ -880,10 +896,12 @@ export class CamposLaminas implements IntegradorCampos {
       const e3 = pl.R.subarray(6, 9);
       const nn = [e3[1]! * s[2]! - e3[2]! * s[1]!, e3[2]! * s[0]! - e3[0]! * s[2]!, e3[0]! * s[1]! - e3[1]! * s[0]!].map((q) => q / L);
       const duro = (p: number) => giros.get(p)?.some((g, q) => g && Math.abs(nn[q]!) > 1e-6) ?? false;
-      // Un borde «duro» (con el giro coartado) no la lleva: su capa límite es más débil y no se ajusta
-      // a una sola curva (en la placa empotrada el peso exacto va de −0,5 a 1,5; `kirchhoff.ts`)
+      // Un apoyo «duro» (con el giro alrededor de la normal coartado, también empotrado) no la lleva:
+      // su Mxy no cae a cero en el borde, y la placa de Navier (apoyo «duro», solución cerrada de
+      // Mindlin) da ∫Qx a ≤ 0,5 % sin ella con h de 0,3·t a 8·t (`bandas.test.ts`)
       if (duro(u) || duro(v)) continue;
-      this.libres.set(c, pesoKirchhoff(pl.area / L / espesorCapaLimite(pl.seccion.flexion)));
+      const r = pl.area / L / espesorCapaLimite(pl.seccion.flexion);
+      this.libres.set(c, barras.has(c) ? pesoKirchhoffDuro(r) : pesoKirchhoff(r));
     }
     return this.libres;
   }

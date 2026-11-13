@@ -1,0 +1,22 @@
+== pilares-mezclados: lo demás idéntico; estaciones iguales 87 de 87
+== reticular-h25: lo demás idéntico; estaciones iguales 60 de 60
+== etabs-15c-3-60: lo demás idéntico; estaciones iguales 0 de 0
+== aleatorio-3: lo demás idéntico; estaciones iguales 49 de 52
+  L-N1:1:P1[1] (vano, s = 2.6125) caso 0 Vz: 4.339285760381 → 4.362032095644 (2.08e-4 del mayor)
+  L-N1:1:P1[1] (vano, s = 2.6125) caso 0 T: -1.822610711674 → -1.837253664999 (-7.48e-4 del mayor)
+  L-N1:1:P1[1] (vano, s = 2.6125) caso 1 Vz: 2.825936175854 → 2.83556338145 (8.81e-5 del mayor)
+  L-N1:1:P1[1] (vano, s = 2.6125) caso 1 T: -1.252426639981 → -1.258624153584 (-3.17e-4 del mayor)
+  L-N1:1:P1[1] (vano, s = 2.6125) caso 2 Vz: 0.1442568559881 → 0.146337381091 (1.90e-5 del mayor)
+  L-N1:1:P1[1] (vano, s = 2.6125) caso 2 T: -0.1206320234534 → -0.1219713614884 (-6.84e-5 del mayor)
+  L-N1:2:P1[1] (vano, s = 2.825) caso 0 Vz: 1.162172035007 → 1.232555087276 (6.44e-4 del mayor)
+  L-N1:2:P1[1] (vano, s = 2.825) caso 0 T: 1.365756190108 → 1.411065280006 (2.31e-3 del mayor)
+  L-N1:2:P1[1] (vano, s = 2.825) caso 1 Vz: 3.269040540624 → 3.220772996757 (-4.42e-4 del mayor)
+  L-N1:2:P1[1] (vano, s = 2.825) caso 1 T: 0.6461089101182 → 0.6150366787539 (-1.59e-3 del mayor)
+  L-N1:2:P1[1] (vano, s = 2.825) caso 2 Vz: 0.2899037852318 → 0.2988444168158 (8.18e-5 del mayor)
+  L-N1:2:P1[1] (vano, s = 2.825) caso 2 T: 0.2347926987211 → 0.2405482303033 (2.94e-4 del mayor)
+  L-N1:2:P3[4] (vano, s = 7.7875) caso 0 Vz: -5.810678084899 → -5.900081007154 (-8.18e-4 del mayor)
+  L-N1:2:P3[4] (vano, s = 7.7875) caso 0 T: 4.383551724753 → 4.432164563729 (2.48e-3 del mayor)
+  L-N1:2:P3[4] (vano, s = 7.7875) caso 1 Vz: -0.7160033260671 → -0.7946228280466 (-7.19e-4 del mayor)
+  L-N1:2:P3[4] (vano, s = 7.7875) caso 1 T: 2.624467617578 → 2.667216971779 (2.18e-3 del mayor)
+  L-N1:2:P3[4] (vano, s = 7.7875) caso 2 Vz: 0.3280788153843 → 0.3415026646446 (1.23e-4 del mayor)
+  L-N1:2:P3[4] (vano, s = 7.7875) caso 2 T: -0.4867011771094 → -0.4940003951447 (-3.73e-4 del mayor)

@@ -2,17 +2,20 @@
  * A2-14 y AU-18: la fuerza de borde de Kirchhoff de los cortes por campos. Placa de 6 × 6 con carga
  * uniforme, corte de borde a borde, frente al cortante exacto del modelo (la carga y las reacciones de
  * un lado). Antes, un borde apoyado en uz no la llevaba (+88 % con h = 0,75) y uno libre la llevaba
- * entera también con h < t (+6 %). Medida completa en `validacion/au2/kirchhoff.ts`.
+ * entera también con h < t (+6 %). Medida completa en `validacion/au2/kirchhoff.ts`. Lo que quedaba: un
+ * lado sobre una viga no la llevaba (−23 % con una de 30 × 30 y h = 0,75); ahora, con
+ * `pesoKirchhoffDuro` (`kirchhoffVigas.ts`). Siguen sin ella los enlaces de la unión por la cara
+ * (`kirchhoffEnlaces.ts`) y el apoyo «duro» (la placa de Navier de `bandas.test.ts`, solución cerrada).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
-import { Constructor } from "../pruebas/constructor.ts";
+import { Constructor, seccionRectangularTimoshenko } from "../pruebas/constructor.ts";
 import { mallaRectangular } from "../pruebas/placa.ts";
 import { calcular } from "./calcular.ts";
-import { CamposLaminas, pesoKirchhoff } from "./campos.ts";
+import { CamposLaminas, pesoKirchhoff, pesoKirchhoffDuro } from "./campos.ts";
 import { Cortes } from "./cortes.ts";
 import type { CargaLamina } from "./modelo.ts";
 
@@ -22,7 +25,7 @@ beforeAll(async () => {
 
 const q = -10;
 /** Error relativo del Vz de un corte por campos en x ≈ x0 de la placa. */
-function errorVz(tipo: "apoyada" | "esquinas", t: number, h: number, x0: number, giroCoartado = false): number {
+function errorVz(tipo: "apoyada" | "esquinas" | "vigas", t: number, h: number, x0: number, giroCoartado = false): number {
   const n = Math.round(6 / h);
   const m = new Constructor();
   const g = mallaRectangular(m, { a: 6, b: 6, nx: n, ny: n, material: { E: 3e7, nu: 0.2, t } });
@@ -30,8 +33,16 @@ function errorVz(tipo: "apoyada" | "esquinas", t: number, h: number, x0: number,
     for (let j = 0; j <= n; j++) {
       const borde = i === 0 || j === 0 || i === n || j === n;
       const esquina = (i === 0 || i === n) && (j === 0 || j === n);
-      // Con `giroCoartado`, empotrada (uz, rx y ry en los cuatro lados)
+      // Con `giroCoartado`, empotrada (uz, rx y ry en los cuatro lados); «vigas», sobre cuatro vigas de
+      // borde de 30 × 30 (torsión ×0,1) apoyadas en las esquinas (sólo ahí: el cortante exacto del
+      // cuerpo libre no depende de la malla)
       if (tipo === "apoyada" ? borde : esquina) m.apoyo(g.nudos[i]![j]!, [i === 0 && j === 0, (i === 0 && j === 0) || (i === n && j === 0), true, giroCoartado, giroCoartado, false]);
+      if (tipo === "vigas") {
+        const s = seccionRectangularTimoshenko(0.3, 0.3);
+        const sv = { ...s, J: 0.1 * s.J };
+        if (i < n && (j === 0 || j === n)) m.barra(g.nudos[i]![j]!, g.nudos[i + 1]![j]!, sv, [0, 0, 1]);
+        if (j < n && (i === 0 || i === n)) m.barra(g.nudos[i]![j]!, g.nudos[i]![j + 1]!, sv, [0, 0, 1]);
+      }
     }
   m.caso("q", [], [], [], g.laminas.flat().map((l): CargaLamina => ({ tipo: "superficie", lamina: l, ejes: "global", q: [0, 0, q] })));
   const modelo = m.modelo();
@@ -42,11 +53,11 @@ function errorVz(tipo: "apoyada" | "esquinas", t: number, h: number, x0: number,
   modelo.nudos.forEach((nd, v) => {
     if (nd.x < x) Fz += R[6 * v + 2]!;
   });
-  const r = new Cortes(modelo).cortar({ origen: [x, 3, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [-3, 3], metodo: "campos" }, casos, new CamposLaminas(modelo));
+  const r = new Cortes(modelo).cortar({ origen: [x, 3, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [-3.01, 3.01], metodo: "campos" }, casos, new CamposLaminas(modelo));
   return r.esfuerzos[2]! / -Fz - 1;
 }
 
-describe("A2-14: la fuerza de borde de Kirchhoff, también en un borde apoyado sólo en uz, con su peso", () => {
+describe("A2-14: la fuerza de borde de Kirchhoff, también en un borde apoyado sólo en uz, en uno «duro» y sobre una viga, con su peso", () => {
   it("el peso: 0 hasta h = 0,4·t y casi 1 desde h = 2·t", () => {
     expect(pesoKirchhoff(0.3)).toBe(0);
     expect(pesoKirchhoff(0.5)).toBeCloseTo(0.26, 2);
@@ -66,5 +77,15 @@ describe("A2-14: la fuerza de borde de Kirchhoff, también en un borde apoyado s
     // Sin ella, a ≤ 2 % con h ≤ 2·t; con ella entera, −3…−8 % (`validacion/au2/kirchhoff.ts`)
     expect(Math.abs(errorVz("apoyada", 0.25, 0.5, 1.2, true))).toBeLessThan(0.03);
     expect(Math.abs(errorVz("apoyada", 0.25, 0.25, 1.2, true))).toBeLessThan(0.03);
+  });
+
+  it("el peso de un lado sobre una barra: r²/(r² + 3)", () => {
+    expect(pesoKirchhoffDuro(0.5)).toBeCloseTo(0.077, 3);
+    expect(pesoKirchhoffDuro(1)).toBe(0.25);
+    expect(pesoKirchhoffDuro(3)).toBe(0.75);
+  });
+
+  it.each([0.75, 0.5, 0.25])("sobre vigas de borde de 30 × 30 por los lados de la losa, h = %f: Vz a ≤ 4 % (antes −23 % con 0,75)", (h) => {
+    for (const x0 of [1.2, 2.2]) expect(Math.abs(errorVz("vigas", 0.25, h, x0)), `x ≈ ${x0}`).toBeLessThan(0.04);
   });
 });
