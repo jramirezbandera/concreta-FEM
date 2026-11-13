@@ -60,6 +60,12 @@ import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 import { dimensionesPlanta, resolverViento } from "./viento.ts";
 import { DESPLAZAMIENTO_SIN_SEGUNDO_ORDEN, LIMITE_SEGUNDO_ORDEN, periodoFundamental, simplificado } from "../normas/ncse02.ts";
 
+/** A2-60: los cortes de machones o dinteles que no valen (sus esfuerzos son NaN), en un aviso. */
+export function cortesNoValidos(muro: string, cortes: readonly (readonly [string, { valido: boolean }])[]): Diagnostico[] {
+  const malos = cortes.filter(([, c]) => !c.valido).map(([n]) => n);
+  return malos.length ? [{ codigo: "muro/corte-no-valido", severidad: "aviso", mensaje: `En el muro ${muro}, ${malos.length === 1 ? "el corte" : "los cortes"} ${malos.join(", ")} no ${malos.length === 1 ? "vale" : "valen"}: sus esfuerzos van sin valor (NaN).`, ids: [muro] }] : [];
+}
+
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
 /** Barras de las que se guarda lo que no depende de la combinación en los diagramas con sismo (`Consultas.diagramaBarra`). */
@@ -801,13 +807,13 @@ export class Consultas {
   /** Machones del muro (C5.3). */
   machones(muro: string): Respuesta<Machon[]> {
     const r = this.muros().machones(muro);
-    return r ? { valido: true, valor: r, diagnosticos: [] } : this.noExiste("El muro", muro);
+    return r ? { valido: true, valor: r, diagnosticos: cortesNoValidos(muro, r.flatMap((m) => [[`${m.id} (base)`, m.base], [`${m.id} (cabeza)`, m.cabeza]] as const)) } : this.noExiste("El muro", muro);
   }
 
   /** Dinteles del muro (C5.3). */
   dinteles(muro: string): Respuesta<Dintel[]> {
     const r = this.muros().dinteles(muro);
-    return r ? { valido: true, valor: r, diagnosticos: [] } : this.noExiste("El muro", muro);
+    return r ? { valido: true, valor: r, diagnosticos: cortesNoValidos(muro, r.flatMap((d) => [[`${d.id} (inicio)`, d.inicio], [`${d.id} (centro)`, d.centro], [`${d.id} (fin)`, d.fin]] as const)) } : this.noExiste("El muro", muro);
   }
 
   // ─── Reacciones ─────────────────────────────────────────────────────────────────────────────

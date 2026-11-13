@@ -11,6 +11,7 @@ import type { ResultadoCaso } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
 import { compilar, type ResultadoCompilacion } from "./compilar.ts";
+import { cortesNoValidos } from "./consultas.ts";
 import { EsfuerzosMuros } from "./esfuerzosMuros.ts";
 import type { ModeloFisico } from "./fisico.ts";
 
@@ -187,5 +188,14 @@ describe("dinteles: el nudo de la cota, a medias (A2-48)", () => {
     const casosD = casosValidos(calcular(c.modelo));
     const r = cortes.cortar(d.fin.corte, casosD);
     for (const q of [0, 1, 3, 4, 5]) expect(d.fin.esfuerzos[q]).toBe(r.esfuerzos[q]);
+  });
+});
+
+describe("A2-60: los cortes de machones y dinteles que no valen, avisados", () => {
+  it("un aviso con los cortes sin valor; sin ellos, nada", () => {
+    expect(cortesNoValidos("M", [["M:1 (base)", { valido: true }]])).toEqual([]);
+    const d = cortesNoValidos("M", [["M:1 (base)", { valido: false }], ["M:1 (cabeza)", { valido: true }]]);
+    expect(d.map((x) => [x.codigo, x.severidad, x.ids])).toEqual([["muro/corte-no-valido", "aviso", ["M"]]]);
+    expect(d[0]!.mensaje).toContain("M:1 (base)");
   });
 });
