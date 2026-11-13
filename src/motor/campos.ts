@@ -970,7 +970,11 @@ export class CamposLaminas implements IntegradorCampos {
       const tb = Math.min(1, t1);
       const partes = [ta];
       const qs = cp.corte.quiebres;
-      if (qs?.length && Math.abs(yb - ya) > 1e-15) partes.push(...qs.map((q) => (q - ya) / (yb - ya)).filter((t) => (t - ta) * L > 10 * TOL_CORTE && (tb - t) * L > 10 * TOL_CORTE).sort((x, y) => x - y));
+      // Un quiebre repetido (el borde de una franja que coincide con el de una ventana) no da un
+      // tramo de largo nulo: sus muestras tendrían peso 0 y M = NaN (A2-1)
+      if (qs?.length && Math.abs(yb - ya) > 1e-15)
+        for (const t of qs.map((q) => (q - ya) / (yb - ya)).filter((t) => (t - ta) * L > 10 * TOL_CORTE && (tb - t) * L > 10 * TOL_CORTE).sort((x, y) => x - y))
+          if ((t - partes.at(-1)!) * L > 10 * TOL_CORTE) partes.push(t);
       partes.push(tb);
       const primero = tramos.length;
       for (let i = 0; i + 1 < partes.length; i++) {

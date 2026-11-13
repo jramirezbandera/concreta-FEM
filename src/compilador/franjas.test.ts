@@ -263,6 +263,33 @@ describe("F: esfuerzos de las franjas (criterio 1, simetría y Wood–Armer)", (
       if (sup > 0) expect(w[env[i]!.combSuperior]!.superiorX).toBe(sup);
     });
   });
+
+  it("ninguna estación válida tiene un momento que no sea un número, ni una demanda 0 por un NaN (A2-1)", () => {
+    // En esta losa los bordes de las franjas que tocan un pilar coinciden con los de su ventana (centro
+    // ± 0,5): el quiebre repetido daba un tramo de largo nulo, my y mxy NaN y Wood–Armer 0/0 en 36 caras
+    let caras = 0;
+    for (const fr of c.ef.franjas("L")) {
+      const est = c.ef.estaciones(fr.id)!.estaciones;
+      const env = c.ef.envolvente(fr.id, [[1.35, 1.5]])!;
+      est.forEach((e, i) => {
+        if (!e.valido) return;
+        if (e.tipo === "cara") caras++;
+        expect(e.medios.every(Number.isFinite)).toBe(true);
+        expect(Number.isFinite(env[i]!.inferior) && Number.isFinite(env[i]!.superior)).toBe(true);
+        if (Math.abs(env[i]!.mxMin) > 1) expect(env[i]!.superior + env[i]!.inferior).toBeGreaterThan(0);
+      });
+    }
+    expect(caras).toBeGreaterThan(100);
+  });
+
+  it("un corte por campos con un quiebre repetido da lo mismo que sin repetirlo (A2-1)", () => {
+    const corte = (quiebres: number[]) => c.cortes.cortar({ origen: [5.85 - 0.001, -0.5, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, 16], soloLaminas: true, metodo: "campos", cuadratura: 2, quiebres }, c.casos, c.ef["campos"]);
+    const a = corte([1, 2, 3]);
+    const b = corte([1, 1, 2, 2, 3]);
+    expect(b.valido).toBe(true);
+    expect(Array.from(b.esfuerzos)).toEqual(Array.from(a.esfuerzos));
+    expect(b.muestras!.pesos.length).toBe(a.muestras!.pesos.length);
+  });
 });
 
 describe("F: flexión cilíndrica (criterio 2)", () => {

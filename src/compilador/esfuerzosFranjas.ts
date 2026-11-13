@@ -326,7 +326,10 @@ export class EsfuerzosFranjas {
         if (w.superiorX > v.superior) [v.superior, v.combSuperior] = [w.superiorX, c];
         if (mx! > v.mxMax) [v.mxMax, v.combMax] = [mx!, c];
         if (mx! < v.mxMin) [v.mxMin, v.combMin] = [mx!, c];
+        // Un NaN no gana ninguna comparación: sin esto, la estación saldría con demanda 0 (A2-1)
+        if (!Number.isFinite(w.inferiorX) || !Number.isFinite(w.superiorX) || !Number.isFinite(mx!)) v.inferior = NaN;
       });
+      if (Number.isNaN(v.inferior)) return { ...v, inferior: NaN, superior: NaN, combInferior: -1, combSuperior: -1, mxMax: NaN, mxMin: NaN, combMax: -1, combMin: -1 };
       return v;
     });
   }
@@ -478,11 +481,17 @@ export class EsfuerzosFranjas {
       const f = fr[i]!;
       const b = principal.w;
       const medios = new Float64Array(3 * nc);
-      const valido = b > EPS && muestras.w > EPS;
+      let valido = b > EPS && muestras.w > EPS;
       for (let kc = 0; kc < nc; kc++) {
         medios[3 * kc] = valido ? principal.m[3 * kc]! / b : NaN;
         medios[3 * kc + 1] = valido ? muestras.m[3 * kc + 1]! / muestras.w : NaN;
         medios[3 * kc + 2] = valido ? muestras.m[3 * kc + 2]! / muestras.w : NaN;
+      }
+      // Regla de oro 2: una estación con un momento que no es un número no se presenta como válida (A2-1)
+      if (valido && !medios.every(Number.isFinite)) {
+        valido = false;
+        medios.fill(NaN);
+        diag = [...diag, { codigo: "franja/no-finito", severidad: "error", mensaje: `La estación s = ${s.toFixed(3)} m de la franja ${f.id} da un momento que no es un número: no es válida. Es un fallo del programa.`, ids: [f.id] }];
       }
       return { s, tipo, lado, punto: punto(s, (f.t0 + f.t1) / 2), anchoEnLosa: b, medios, metodo, distanciaMuestras: muestras.d ?? 0, piezas, ...(ventana ? { ventana } : {}), fraccionAbaco: reticular ? (b > EPS ? Math.min(1, principal.wAbaco / b) : NaN) : null, valido, diagnosticos: diag };
     };
