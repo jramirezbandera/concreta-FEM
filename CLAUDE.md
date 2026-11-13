@@ -966,6 +966,13 @@
   - **Para Node:** `RAIZ` y las fuentes desde `import.meta.url`; `servir()` exportado en `cli/mcp.ts`. **`visor` sin Vite** (`app/visorEstatico.ts`): la app construida en el mismo proceso, sin service worker.
   - **Validación:** `validacion/mcpb/probar.ts` (el paquete desempaquetado fuera del repo con `node`: la vivienda validada, calculada, consultada y dibujada, y la app en Chrome con `--chrome`), con Node 24 y 20; también en el CI. `app/src/test/visorEstatico.test.ts`.
   - **Pendiente del usuario:** instalarlo en Claude Desktop (`dist/mcpb/concreta-fem.mcpb`) y probarlo; sin firmar.
+- **2026-11-12/13: segunda auditoría del motor y el compilador** (`docs/fem3d/auditoria-2.md`, a petición del usuario). Quince auditores en dos rondas, cada sospecha reproducida con un script; las graves y medias, repetidas por el coordinador. **1 grave, 26 medios y 39 leves**; el motor, la dinámica, las combinaciones y la conformidad de la malla (1 696 combinaciones con un comprobador independiente) cuadran con cuentas propias. El orden de corrección, en §10.6.
+  - **Corregidos el 2026-11-13** (§11):
+    - **A2-1 (el grave):** estaciones de cara de las franjas con my y mxy NaN dadas por válidas y Wood–Armer 0/0 (un pilar centrado en su franja: un quiebre repetido del corte por campos daba un tramo de largo nulo). Arreglado en el motor y con la regla de oro 2 en la lectura (`franja/no-finito`). Referencia de F: 74 estaciones pasan de 0 a su valor (en `h25-reticular`, al 98 % del máximo de su franja);
+    - **A2-7:** una zona de carga entera fuera de las losas se perdía con sólo un aviso (umbral relativo; referencia de C4 sin cargas nulas);
+    - **A2-8:** una viga a 1–4 cm de la cara de un pilar se unía a él sin aviso;
+    - **A2-47:** las reacciones por objeto contaban dos veces los nudos compartidos (núcleo en U: +22 % con viento). Ahora cada nudo entra con su parte.
+  - **Siguen abiertos**, en el orden de §10.6: el segundo orden con sótano o z₀ ≠ 0 (A2-4, A2-5), el recuadro girado con zunchos que no compila (A2-52), dinteles y machones (A2-48, A2-49), y las decisiones del usuario sobre las franjas de paso frente al equilibrio (A2-2, −7…−8 % con h = 0,75) y dos sobrecargas de la misma categoría (A2-6).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
