@@ -17,7 +17,12 @@ import { compilar } from "../compilador/compilar.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { valido } from "../pruebas/metamorficasFisicas.ts";
 import { navierMindlin } from "../pruebas/navier.ts";
-import type { Corte } from "./cortes.ts";
+import { generador, modeloAleatorio } from "../pruebas/aleatorio.ts";
+import { casosValidos } from "../pruebas/comparar.ts";
+import { calcular } from "./calcular.ts";
+import { CamposLaminas } from "./campos.ts";
+import { Cortes, type Corte } from "./cortes.ts";
+import type { ModeloAnalitico } from "./modelo.ts";
 
 beforeAll(async () => {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
@@ -78,5 +83,66 @@ describe("AU-7: una lámina atravesada con el centroide fuera del rectángulo", 
     // Antes, el de abajo sumaba fuerzas nodales con la integral de la lámina atravesada: 1,7e-3.
     const escala = Math.max(...[...todo!.esfuerzos].map(Math.abs));
     for (let q = 0; q < 6; q++) expect(Math.abs(a!.esfuerzos[q]! + b!.esfuerzos[q]! - todo!.esfuerzos[q]!) / escala, `componente ${q}`).toBeLessThan(1e-5);
+  });
+});
+
+describe("A2-17: los nudos del plano que el corte sólo toca en un punto", () => {
+  /**
+   * Cortes al azar por campos (los del auditor de A2-17) en modelos aleatorios: dos rectángulos
+   * complementarios suman el entero. Antes, una parte que no atravesaba nada iba por fuerzas nodales y
+   * contaba la lámina que toca el plano sólo en un vértice (en el extremo del rectángulo o justo
+   * pasado él), que la integral de campos del entero no ve: hasta 24 veces el mayor esfuerzo.
+   */
+  function cortesAlAzar(modelo: ModeloAnalitico, r: () => number, n: number): Corte[] {
+    const nd = modelo.nudos;
+    const cs: Corte[] = [];
+    for (let i = 0; i < n; i++) {
+      const v = nd[Math.floor(r() * nd.length)]!;
+      const porNudo = r() < 0.6;
+      const O: [number, number, number] = porNudo ? [v.x, v.y, v.z] : [v.x + (r() - 0.5), v.y + (r() - 0.5), v.z + (r() < 0.5 ? 0 : r() - 0.5)];
+      const tipo = r();
+      let x: [number, number, number];
+      let vz: [number, number, number] = [0, 0, 1];
+      if (tipo < 0.35) x = r() < 0.5 ? [1, 0, 0] : [0, 1, 0];
+      else if (tipo < 0.55) {
+        x = [0, 0, r() < 0.5 ? 1 : -1];
+        vz = [1, 0, 0];
+      } else if (tipo < 0.75) {
+        const w = nd[Math.floor(r() * nd.length)]!;
+        const d = [w.x - v.x, w.y - v.y];
+        x = Math.hypot(d[0]!, d[1]!) > 1e-6 ? [-d[1]!, d[0]!, 0] : [1, 0, 0];
+      } else {
+        const a = r() * 6.28;
+        x = [Math.cos(a), Math.sin(a), (r() - 0.5) * 0.4];
+      }
+      const L = r() < 0.2 ? 0 : r() * 4;
+      const y: [number, number] = r() < 0.5 ? [-L, L] : [0, L];
+      const z: [number, number] = r() < 0.6 ? [0, 0] : [-r() * 3, r() * 3];
+      cs.push({ id: `c${i}`, origen: O, x, vz, y, z, metodo: r() < 0.5 ? "campos" : "fuerzas-nodales", soloLaminas: r() < 0.3, cuadratura: r() < 0.3 ? 2 : 4 });
+    }
+    return cs.filter((c) => c.metodo === "campos");
+  }
+
+  it.each([1, 5, 34, 55])("modelo aleatorio %i: los complementarios por campos suman el entero", (semilla) => {
+    const modelo = modeloAleatorio(semilla).modelo;
+    const casos = casosValidos(calcular(modelo));
+    const ct = new Cortes(modelo);
+    const cl = new CamposLaminas(modelo);
+    const r = generador(77);
+    const rm = generador(5);
+    let comparados = 0;
+    for (const c of cortesAlAzar(modelo, r, 400)) {
+      const a = ct.cortar(c, casos, cl);
+      if (!a.valido || c.y![1] - c.y![0] < 0.5 || a.esfuerzos.some(Number.isNaN)) continue;
+      const ym = c.y![0] + (0.2 + 0.6 * rm()) * (c.y![1] - c.y![0]);
+      const p1 = ct.cortar({ ...c, y: [c.y![0], ym] }, casos, cl);
+      const p2 = ct.cortar({ ...c, y: [ym, c.y![1]] }, casos, cl);
+      if (!p1.valido || !p2.valido || [...p1.esfuerzos, ...p2.esfuerzos].some(Number.isNaN)) continue;
+      const esc = Math.max(...[...a.esfuerzos].map(Math.abs));
+      if (esc < 1e-9) continue;
+      comparados++;
+      for (let q = 0; q < a.esfuerzos.length; q++) expect(Math.abs(p1.esfuerzos[q]! + p2.esfuerzos[q]! - a.esfuerzos[q]!) / esc, `${c.id}, componente ${q}`).toBeLessThan(1e-3);
+    }
+    expect(comparados).toBeGreaterThan(20);
   });
 });

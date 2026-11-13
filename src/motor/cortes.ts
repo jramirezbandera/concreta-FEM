@@ -215,6 +215,33 @@ function atraviesaDentro(cp: CortePreparado, X: readonly ArrayLike<number>[]): b
   return (t1 - t0) * dm > 10 * TOL_CORTE;
 }
 
+/**
+ * Largo del segmento PQ (sobre el plano) que cae en el rectángulo de cp, con el recorte de
+ * `atraviesaDentro`, y su largo total.
+ */
+function solapeLado(cp: CortePreparado, P: ArrayLike<number>, Q: ArrayLike<number>): { dentro: number; total: number } {
+  const [, ya, za] = cp.coordenadas(P);
+  const [, yb, zb] = cp.coordenadas(Q);
+  const total = Math.hypot(yb - ya, zb - za);
+  let [t0, t1] = [0, 1];
+  for (const [va, vb, [lo, hi]] of [
+    [ya, yb, cp.y],
+    [za, zb, cp.z],
+  ] as const) {
+    const dv = vb - va;
+    if (Math.abs(dv) < 1e-15) {
+      if (va < lo - TOL_CORTE || va > hi + TOL_CORTE) return { dentro: 0, total };
+      continue;
+    }
+    let ta = (lo - TOL_CORTE - va) / dv;
+    let tb = (hi + TOL_CORTE - va) / dv;
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta);
+    t1 = Math.min(t1, tb);
+  }
+  return { dentro: Math.max(0, t1 - t0) * total, total };
+}
+
 export interface InfoCorte {
   laminas: number[];
   barras: number[];
@@ -519,6 +546,9 @@ export class Cortes {
       const bordes: string[] = [];
       const enExtremos: string[] = [];
       const tocan: ElementoMotor[] = [];
+      /** Del lado A, tocando el plano, con el centroide fuera del rectángulo (no se cuentan). */
+      const tocanFuera = new Set<number>();
+      const ladosFuera: string[] = [];
       const rigida = corte.soloLaminas ? this.laminaRigida() : null;
       for (const e of cerca) {
         if (e.tipo !== "lamina" || rigida?.(e.nudos)) continue;
@@ -541,6 +571,7 @@ export class Cortes {
             if (metodo === "fuerzas-nodales") enExtremos.push(e.id);
             else mixto = true;
           }
+          if (mas === 0) tocanFuera.add(e.indice);
           continue;
         }
         if (mas > 0) {
@@ -550,8 +581,32 @@ export class Cortes {
         }
         tocan.push(e);
       }
+      // A2-17: un nudo del plano sólo transmite si el corte sigue la malla por él dentro del
+      // rectángulo: si es extremo de un lado de lámina sobre el plano que entra en él más de
+      // 10·TOL_CORTE. Un contacto en un punto (el plano tangente a una esquina de la losa, o un vértice
+      // que queda justo pasado el extremo del rectángulo) no transmite nada, como en la integral de
+      // campos. Y un lado sobre el plano partido por un extremo del rectángulo no se puede repartir por
+      // fuerzas nodales: con el método «campos», el corte es mixto
+      const enMalla = new Set<number>();
+      const partidos: string[] = [];
+      for (const e of cerca) {
+        if (e.tipo !== "lamina") continue;
+        const n = e.nudos.length;
+        for (let a = 0; a < n; a++) {
+          const u = e.nudos[a]!;
+          const v = e.nudos[(a + 1) % n]!;
+          if (lado(u) !== 0 || lado(v) !== 0) continue;
+          const s = solapeLado(cp, X(u), X(v));
+          if (!(s.dentro > 10 * TOL_CORTE)) continue;
+          enMalla.add(u);
+          enMalla.add(v);
+          if (s.total - s.dentro > 10 * TOL_CORTE && !rigida?.(e.nudos)) partidos.push(e.id);
+          if (tocanFuera.has(e.indice) && ladosFuera.at(-1) !== e.id) ladosFuera.push(e.id);
+        }
+      }
+      if (metodo === "campos" && partidos.length) mixto = true;
       for (const e of mixto ? [] : tocan) {
-        const enCorte = e.nudos.map((v, a) => [v, a] as const).filter(([v]) => lado(v) === 0);
+        const enCorte = e.nudos.map((v, a) => [v, a] as const).filter(([v]) => lado(v) === 0 && enMalla.has(v));
         if (enCorte.length === 0) continue;
         info.laminas.push(e.indice);
         if (enCorte.some(([v]) => !cp.dentro(X(v)))) bordes.push(e.id);
@@ -582,6 +637,13 @@ export class Cortes {
           "corte/borde-no-sigue-malla",
           `El corte ${id} atraviesa ${enExtremos.length} láminas junto a los extremos de su rectángulo, con el centroide fuera (${listaIds(enExtremos)}): no las cuenta, así que le falta lo que pasa por ellas hasta el extremo. Lleve los extremos a nudos de la malla o use el método "campos".`,
           [id, ...enExtremos],
+        );
+      }
+      if (ladosFuera.length && !mixto) {
+        diag.aviso(
+          "corte/borde-no-sigue-malla",
+          `Los bordes del corte ${id} no siguen la malla: ${ladosFuera.length} láminas (${listaIds(ladosFuera)}) tienen parte de su lado sobre el plano dentro del rectángulo pero el centroide fuera, y no se cuentan. Lleve los extremos a nudos de la malla o use el método "campos".`,
+          [id, ...ladosFuera],
         );
       }
       if (bordes.length) {
