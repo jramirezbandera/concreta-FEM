@@ -1,0 +1,16 @@
+  lo demás de pilares-mezclados (malla, casos, bandas, consultas): idéntico
+  lo demás de reticular-h25 (malla, casos, bandas, consultas): ¡cambia!
+
+== etabs-15c-3-60, muro M: machones cambian
+  M:N3:T1:M1 cabeza: [N, Vy, Mz] (caso 0) 12.05, 205.16, -36.69 → 119.17, 312.93, -136.67
+  M:N3:T1:M2 cabeza: [N, Vy, Mz] (caso 0) -11.67, 25.89, -17.75 → -119.17, 131.90, -137.86
+  M:N2:T1:M1 cabeza: [N, Vy, Mz] (caso 0) 150.46, 205.48, 402.97 → 252.58, 325.00, 323.67
+  M:N2:T1:M2 cabeza: [N, Vy, Mz] (caso 0) -145.29, -6.44, 89.64 → -252.58, 119.83, -55.61
+  M:N1:T1:M1 cabeza: [N, Vy, Mz] (caso 0) 283.38, 230.62, 889.27 → 354.98, 315.85, 922.38
+  M:N1:T1:M2 cabeza: [N, Vy, Mz] (caso 0) -272.88, 23.16, 156.37 → -354.98, 128.97, 77.25
+  M:H1: Vz (caso 0) inicio 102.402 → 102.402, centro 102.402 → 102.402, fin 102.402 → 102.402
+  M:H2: Vz (caso 0) inicio 133.404 → 133.404, centro 133.404 → 133.404, fin 133.404 → 133.404
+  M:H3: Vz (caso 0) inicio 119.171 → 119.171, centro 119.171 → 119.171, fin 119.171 → 119.171
+  mayor cambio por componente (relativo al mayor de los dinteles): N 0.0 %, Vy 0.0 %, Vz 0.0 %, T 0.0 %, My 0.0 %, Mz 0.0 %
+  lo demás de etabs-15c-3-60 (malla, casos, bandas, consultas): idéntico
+  lo demás de aleatorio-3 (malla, casos, bandas, consultas): idéntico

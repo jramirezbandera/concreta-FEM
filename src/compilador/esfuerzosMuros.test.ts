@@ -98,6 +98,35 @@ describe("machones (C5, criterio 4)", () => {
       for (let q = 0; q < 3; q++) expect(Math.abs(s[q]! - t[q]!)).toBeLessThan(1e-9 * (QV * 6 + QH * 6));
     }
   });
+
+  it("junto a una ventana, el machón va del alféizar a lo alto del hueco, y allí suman la estática (A2-49)", () => {
+    // Antes se cortaban en las cotas, donde el muro sigue por el antepecho: en la base, ΣN −187,4 frente
+    // a −220 y ΣVy 34,1 frente a 60, sin aviso
+    const f: ModeloFisico = { ...muroConPuerta(), muros: [{ id: "M", puntos: [[0, 0], [6, 0]], desde: "C", hasta: "P1", espesor: 0.25, material: "HA", huecos: [{ desde: 2, hasta: 4, z0: 1, z1: 2 }] }] };
+    const c = compilar(f, { tamanoMalla: 0.5 });
+    if (!c.valido) throw new Error(c.diagnosticos.map((d) => d.mensaje).join("\n"));
+    const cs = casosValidos(calcular(c.modelo));
+    const ms = new EsfuerzosMuros(f, c, cs).machones("M")!;
+    const zb = ms[0]!.base.origen[2];
+    expect(ms.map((m) => [m.z0 - (zb - 1), m.z1 - (zb - 1)])).toEqual([
+      [1, 2],
+      [1, 2],
+    ]);
+    // Peso nulo (material sin peso): lo de encima del alféizar es la carga de la viga, QV·6 y QH·6
+    for (const [k, N, Vy] of [
+      [0, -QV * 6, 0],
+      [1, 0, QH * 6],
+    ] as const) {
+      const n = ms.reduce((a, m) => a + m.base.esfuerzos[6 * k]!, 0);
+      const vy = ms.reduce((a, m) => a + m.base.esfuerzos[6 * k + 1]!, 0);
+      expect(rel(n, N, QV * 6 + QH * 6)).toBeLessThan(1e-9);
+      expect(rel(vy, Vy, QV * 6 + QH * 6)).toBeLessThan(1e-9);
+      const nc = ms.reduce((a, m) => a + m.cabeza.esfuerzos[6 * k]!, 0);
+      const vc = ms.reduce((a, m) => a + m.cabeza.esfuerzos[6 * k + 1]!, 0);
+      expect(rel(nc, N, QV * 6 + QH * 6)).toBeLessThan(1e-9);
+      expect(rel(vc, Vy, QV * 6 + QH * 6)).toBeLessThan(1e-9);
+    }
+  });
 });
 
 describe("dinteles (C5, criterio 4)", () => {

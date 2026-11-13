@@ -4,10 +4,10 @@
  *
  * - Machón: en cada tramo del muro y cada planta (de la cota de abajo a la de arriba), cada trozo
  *   entre huecos que cruzan esa altura, o entre un hueco y el extremo del tramo. Se corta en
- *   horizontal en su base y en su cabeza (las filas de la malla en las cotas), por fuerzas nodales,
- *   siempre con las láminas del propio machón en el lado A. En la cabeza, junto a un dintel, es la
- *   suma de las fuerzas nodales de las láminas del machón (como el «pier» de ETABS): lo que el
- *   dintel transmite va por su cara.
+ *   horizontal en su base y en su cabeza, por fuerzas nodales, siempre con las láminas del propio
+ *   machón en el lado A: en las cotas de la planta o, junto a un hueco que no llega a ellas, en su
+ *   alféizar y en lo alto del hueco, como un «pier» (A2-49, decisión del usuario): allí los machones
+ *   son todo el muro, y su suma, la estática; en la cota, el muro sigue por el antepecho o el dintel.
  *   Ejes como un pilar: x hacia arriba, y a lo largo del tramo (del primer punto al segundo) y z su
  *   normal (y × z = x). N > 0 es tracción; Vy, el cortante en su plano; Mz, el momento en su plano;
  *   My y Vz, los de fuera de su plano. Los extremos del corte quedan DELTA_BORDE dentro del machón:
@@ -66,6 +66,12 @@ export interface Machon {
   /** Estaciones de sus bordes a lo largo del eje del muro (desde su primer punto), m. */
   desde: number;
   hasta: number;
+  /**
+   * Cotas de su base y su cabeza, m: las de la planta o, junto a un hueco que no llega a ellas, el
+   * alféizar y lo alto del hueco (A2-49).
+   */
+  z0: number;
+  z1: number;
   base: EsfuerzosCorte;
   cabeza: EsfuerzosCorte;
 }
@@ -217,21 +223,31 @@ export class EsfuerzosMuros {
         // Huecos del tramo que cruzan la altura de la planta
         const tapan = m.huecos
           .filter((h) => h.tramo === i && base + h.z0 < arriba - eps && base + h.z1 > abajo + eps)
-          .map((h) => [Math.min(h.desde, h.hasta), Math.max(h.desde, h.hasta)] as const)
-          .sort((a, b) => a[0] - b[0]);
-        const trozos: [number, number][] = [];
+          .map((h) => ({ a: Math.min(h.desde, h.hasta), b: Math.max(h.desde, h.hasta), z0: base + h.z0, z1: base + h.z1 }))
+          .sort((x, y) => x.a - y.a);
+        // Cada trozo con los huecos que lo bordean (A2-49: su base y su cabeza van en ellos)
+        const trozos: { a: number; b: number; junto: (typeof tapan)[number][] }[] = [];
         let desde = t.s0;
-        for (const [a, b] of tapan) {
-          if (a - desde > eps) trozos.push([desde, a]);
-          desde = Math.max(desde, b);
+        let previo: (typeof tapan)[number] | null = null;
+        for (const h of tapan) {
+          if (h.a - desde > eps) trozos.push({ a: desde, b: h.a, junto: [...(previo ? [previo] : []), h] });
+          if (h.b >= desde) previo = h;
+          desde = Math.max(desde, h.b);
         }
-        if (t.s0 + t.largo - desde > eps) trozos.push([desde, t.s0 + t.largo]);
-        trozos.forEach(([a, b], n) => {
+        if (t.s0 + t.largo - desde > eps) trozos.push({ a: desde, b: t.s0 + t.largo, junto: previo ? [previo] : [] });
+        trozos.forEach(({ a, b, junto }, n) => {
           const [A, B] = [this.ajustar(t, a), this.ajustar(t, b)];
           const centro: Vec2 = [(A.p[0] + B.p[0]) / 2, (A.p[1] + B.p[1]) / 2];
           const mitad = (B.s - A.s) / 2 - Math.min(DELTA_BORDE, (B.s - A.s) / 4);
           const corte = (z: number): Corte => ({ id: `${id}:${plantas[k]!.id}:T${i + 1}:M${n + 1}@${z}`, origen: [centro[0], centro[1], z], x: [0, 0, 1], vz: [-t.u[1], t.u[0], 0], y: [-mitad, mitad], z: [0, 0] });
-          r.push({ id: `${id}:${plantas[k]!.id}:T${i + 1}:M${n + 1}`, muro: id, tramo: i, planta: plantas[k]!.id, desde: A.s, hasta: B.s, base: this.cortar(corte(abajo), true), cabeza: this.cortar(corte(arriba)) });
+          // A2-49 (decisión del usuario): junto a un hueco que no llega a la cota, el machón va del
+          // alféizar a lo alto del hueco, como un «pier»: es la sección que dimensiona, y allí los
+          // machones son todo el muro (en la cota, el muro sigue por el antepecho o el dintel). Con dos
+          // huecos, del alféizar más alto a lo alto del hueco más bajo
+          const zb = Math.max(abajo, ...junto.map((h) => h.z0));
+          const zc = Math.min(arriba, ...junto.map((h) => h.z1));
+          const [z0, z1] = [zb > abajo + eps ? this.ajustarZ(t, A.s, zb) : abajo, zc < arriba - eps ? this.ajustarZ(t, A.s, zc) : arriba];
+          r.push({ id: `${id}:${plantas[k]!.id}:T${i + 1}:M${n + 1}`, muro: id, tramo: i, planta: plantas[k]!.id, desde: A.s, hasta: B.s, z0, z1, base: this.cortar(corte(z0), true), cabeza: this.cortar(corte(z1)) });
         });
       }
     });
