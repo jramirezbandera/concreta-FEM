@@ -718,8 +718,11 @@ export class Cortes {
     const sinMaestro = soloEstas !== null && corte.soloEsclavos === true;
     const filtro = sinMaestro && corte.esclavos ? new Set(corte.esclavos) : null;
     const cuenta = (v: number, maestro: boolean) => !(maestro && sinMaestro) && (filtro === null || (!maestro && filtro.has(v))) && lado(v) === -1;
-    for (const ir of conBarras || soloEstas ? ind.restricciones.buscar(caja.min, caja.max) : []) {
-      if (soloEstas && !soloEstas.has(lista[ir]!.id)) continue;
+    // Las nombradas, por su id y no por el índice del plano: el índice sólo da las que cortan o tocan
+    // el plano, y una cuyos nudos están todos del lado A (los enlaces de la tira de PB-11, a más de su
+    // diámetro de la recta) se perdía sin decir nada (A2-50). Las nombradas que no existen no cuentan
+    const candidatas = soloEstas ? this.porId().filter((ir) => soloEstas.has(lista[ir]!.id)) : conBarras ? ind.restricciones.buscar(caja.min, caja.max) : [];
+    for (const ir of candidatas) {
       if (!yz(ir)) continue;
       const rs = lista[ir]!;
       // Sus nudos del lado A, dentro y fuera del rectángulo, y los demás; se para en cuanto está
@@ -799,6 +802,12 @@ export class Cortes {
     const r: ResultadoCorte = { ...info, esfuerzos, ejes, diagnosticos: diag.lista, valido: true, muestras };
     if (corte.porLamina && !mixto) r.porLamina = porLamina.map((p) => ({ lamina: p.lamina, y: p.y, esfuerzos: aEjes(p.suma), nudos: p.nudos.map((x) => ({ y: x.y, esfuerzos: aEjes(x.suma) })) }));
     return r;
+  }
+
+  /** Los índices de las restricciones, en orden (para buscar las nombradas por id). */
+  private todas: number[] | null = null;
+  private porId(): number[] {
+    return (this.todas ??= (this.modelo.restricciones ?? []).map((_, i) => i));
   }
 
   private enlaceDe: Int32Array | null = null;

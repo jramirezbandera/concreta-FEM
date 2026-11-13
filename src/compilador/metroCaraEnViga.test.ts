@@ -15,6 +15,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { recuadros } from "../../validacion/pb/modelos.ts";
 import { woodArmer } from "../dimensionado/woodArmer.ts";
 import { calcular } from "../motor/calcular.ts";
+import { Cortes, type Corte } from "../motor/cortes.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { compilar } from "./compilar.ts";
 import { Consultas } from "./consultas.ts";
@@ -51,5 +52,35 @@ describe("el metro de un pilar de esquina con la cara en el ancho de una viga (P
       expect(Math.abs(mx / fina.mx - 1)).toBeLessThan(0.35);
       expect(Math.abs(sup / fina.sup - 1)).toBeLessThan(0.25);
     }
+  });
+});
+
+describe("los enlaces que pide el escalón entran aunque no toquen la recta base (A2-50)", () => {
+  it("un enlace de la cara de una viga con todos sus nudos del lado A, lejos del plano, entra en el corte si se nombra", () => {
+    // Antes se buscaban con el índice del plano, que sólo da las restricciones que lo cortan o lo
+    // tocan (con su diámetro de margen): en un pilar de esquina de 30 × 80 con la tira de más de b/2,
+    // el metro perdía los enlaces de la tira y salía con el signo cambiado (+8,4 frente a −4,95 kN·m/m)
+    const f = recuadros(2, 2, { pilar: [0.3, 0.8] });
+    const c = compilar(f, { tamanoMalla: 0.75 });
+    if (!c.valido) throw new Error(c.diagnosticos[0]!.mensaje);
+    const k = calcular(c.modelo);
+    if (!k.valido) throw new Error(k.diagnosticos[0]!.mensaje);
+    const m = c.modelo;
+    const rs = m.restricciones ?? [];
+    // Un enlace de un nudo de la cara de una viga a su eje (el maestro)
+    const ir = rs.findIndex((r, i) => r.tipo === "enlace-rigido" && c.mapeo.restricciones[i]?.viga !== undefined && c.mapeo.restricciones[i]?.pilar === undefined);
+    expect(ir).toBeGreaterThanOrEqual(0);
+    const r = rs[ir]!;
+    const xs = r.esclavos.map((v) => m.nudos[v]!.x);
+    const ys = r.esclavos.map((v) => m.nudos[v]!.y);
+    const z = m.nudos[r.esclavos[0]!]!.z;
+    // Plano x = cte a 1 m de sus nudos, con todos ellos del lado A (−x)
+    const x0 = Math.max(...xs, m.nudos[r.maestro]!.x) + 1;
+    const cortes = new Cortes(m);
+    const corte = (restricciones: string[]): Corte => ({ id: "x", origen: [x0, 0, z], x: [1, 0, 0], vz: [0, 0, 1], y: [Math.min(...ys) - 1, Math.max(...ys) + 1], z: [-0.01, 0.01], soloLaminas: true, metodo: "fuerzas-nodales", restricciones, soloEsclavos: true });
+    const con = cortes.cortar(corte([r.id]), k.casos);
+    expect(con.restricciones).toEqual([ir]);
+    const sin = cortes.cortar(corte([]), k.casos);
+    expect(sin.restricciones).toEqual([]);
   });
 });
