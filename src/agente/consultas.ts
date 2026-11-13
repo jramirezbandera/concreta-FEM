@@ -662,7 +662,7 @@ function leyendaEsfuerzos(tipo: "pilar" | "viga" | "barra", conPesimos: boolean)
   return {
     orden: ["N", "Vy", "Vz", "T", "My", "Mz"],
     unidades: "kN y kN·m",
-    convenio: "Ejes locales de la pieza, convenio de barras de la cabecera de modelo.ts (tipo CSI): N > 0 es tracción.",
+    convenio: "Ejes locales de la pieza, convenio de barras de la cabecera de modelo.ts: N > 0 es tracción.",
     ...(conPesimos ? { pesimos: PESIMOS[tipo] } : {}),
   };
 }
