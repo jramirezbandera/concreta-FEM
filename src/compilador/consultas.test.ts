@@ -459,3 +459,89 @@ describe("acciones de los casos no válidas (C5, criterio 6)", () => {
     expect(r.valido).toBe(false);
   });
 });
+
+describe("reacciones por objeto con nudos compartidos (A2-47)", () => {
+  // Pórtico de 4 pilares de 6 × 5 con vigas y losa en P1; peso propio, uso y viento
+  const portico = (): ModeloFisico => ({
+    plantas: [
+      { id: "P1", altura: null },
+      { id: "P0", altura: 3 },
+    ],
+    materiales: [{ id: "H", tipo: "hormigon", fck: 25 }],
+    secciones: [
+      { id: "p", material: "H", forma: "rectangular", b: 0.3, h: 0.3 },
+      { id: "v", material: "H", forma: "rectangular", b: 0.3, h: 0.5 },
+    ],
+    pilares: (
+      [
+        [0, 0],
+        [6, 0],
+        [0, 5],
+        [6, 5],
+      ] as const
+    ).map(([x, y], k) => ({ id: `C${k + 1}`, x, y, desde: "P0", hasta: "P1", seccion: "p" })),
+    vigas: [
+      { id: "VA", planta: "P1", puntos: [[0, 0], [6, 0]], seccion: "v" },
+      { id: "VB", planta: "P1", puntos: [[0, 5], [6, 5]], seccion: "v" },
+      { id: "V1", planta: "P1", puntos: [[0, 0], [0, 5]], seccion: "v" },
+      { id: "V2", planta: "P1", puntos: [[6, 0], [6, 5]], seccion: "v" },
+    ],
+    losas: [{ id: "L", planta: "P1", material: "H", espesor: 0.2, contorno: rect(0, 0, 6, 5) }],
+    casos: [{ id: "G", pesoPropio: true }, { id: "Q" }, { id: "W" }],
+    cargas: [
+      { tipo: "superficie", id: "q", caso: "Q", planta: "P1", losa: "L", q: [0, 0, -3] },
+      { tipo: "puntual", id: "w", caso: "W", planta: "P1", x: 3, y: 2, F: [30, 12, 0] },
+    ],
+  });
+  /** Σ por objetos frente a Σ del motor, por caso y componente (fuerzas y momentos respecto al origen). */
+  const comprobar = (f: ModeloFisico, compartidos: Record<string, number>) => {
+    const { r, casos, c } = preparar(f);
+    const ids = [...(f.pilares ?? []).map((p) => p.id), ...(f.muros ?? []).map((m) => m.id), ...(f.apoyosLineales ?? []).map((a) => a.id)];
+    for (let k = 0; k < casos.length; k++) {
+      const tot = [0, 0, 0, 0, 0, 0];
+      r.modelo.nudos.forEach((nd, n) => {
+        const R = casos[k]!.reacciones;
+        const F = [R[6 * n]!, R[6 * n + 1]!, R[6 * n + 2]!];
+        const M = [R[6 * n + 3]! + nd.y * F[2]! - nd.z * F[1]!, R[6 * n + 4]! + nd.z * F[0]! - nd.x * F[2]!, R[6 * n + 5]! + nd.x * F[1]! - nd.y * F[0]!];
+        [...F, ...M].forEach((v, a) => (tot[a]! += v));
+      });
+      const obj = [0, 0, 0, 0, 0, 0];
+      for (const id of ids) {
+        const x = c.reacciones(id);
+        if (!x.valido) throw new Error(id);
+        const R = x.valor.resultante.subarray(6 * k, 6 * k + 6);
+        const [px, py, pz] = x.valor.punto;
+        const M = [R[3]! + py * R[2]! - pz * R[1]!, R[4]! + pz * R[0]! - px * R[2]!, R[5]! + px * R[1]! - py * R[0]!];
+        [R[0]!, R[1]!, R[2]!, ...M].forEach((v, a) => (obj[a]! += v));
+        if (k === 0) expect(x.valor.compartidos ?? 0, id).toBe(compartidos[id] ?? 0);
+        if (k === 0) expect(x.diagnosticos.some((d) => d.codigo === "consulta/reaccion-compartida"), id).toBe((compartidos[id] ?? 0) > 0);
+      }
+      const esc = Math.max(1, ...tot.map(Math.abs));
+      for (let a = 0; a < 6; a++) expect(Math.abs(obj[a]! - tot[a]!), `caso ${k}, componente ${a}`).toBeLessThan(1e-9 * esc);
+    }
+  };
+
+  it("una losa en la planta baja sobre dos apoyos lineales que pasan por las bases de los pilares: la base es del pilar", () => {
+    const f = portico();
+    f.losas = [...f.losas!, { id: "L0", planta: "P0", material: "H", espesor: 0.3, contorno: rect(0, 0, 6, 5) }];
+    f.apoyosLineales = [
+      { id: "AL0", planta: "P0", puntos: [[0, 0], [6, 0]], coartados: [false, false, true, false, false, false] },
+      { id: "AL5", planta: "P0", puntos: [[0, 5], [6, 5]], coartados: [false, false, true, false, false, false] },
+    ];
+    f.cargas = [...f.cargas!, { tipo: "superficie", id: "q0", caso: "Q", planta: "P0", losa: "L0", q: [0, 0, -5] }];
+    // Antes: Σ objetos 828,2 kN frente a 468,0 en G (cada base, en su pilar y en su apoyo lineal)
+    comprobar(f, { C1: 1, C2: 1, C3: 1, C4: 1, AL0: 2, AL5: 2 });
+  }, 60_000);
+
+  it("dos muros en L que comparten la arista: la esquina, a partes iguales", () => {
+    const f = portico();
+    f.muros = [
+      { id: "M1", puntos: [[0, 0], [6, 0]], desde: "P0", hasta: "P1", espesor: 0.3, material: "H" },
+      { id: "M2", puntos: [[0, 0], [0, 5]], desde: "P0", hasta: "P1", espesor: 0.3, material: "H" },
+    ];
+    f.vigas = f.vigas!.filter((v) => v.id !== "VA" && v.id !== "V1");
+    f.pilares = f.pilares!.filter((p) => p.id === "C4");
+    // Antes: la esquina en los dos muros (y con viento, una resultante vertical que no existe)
+    comprobar(f, { M1: 1, M2: 1 });
+  }, 60_000);
+});

@@ -546,6 +546,8 @@ export function reacciones(q: Consultas, conjunto: ConjuntoCombinaciones, o: { o
       continue;
     }
     if (!r.valor.nudos && !o.objeto) continue;
+    // Los nudos que comparte con otro objeto (A2-47): lo dice, y entran con su parte
+    diags.push(...r.diagnosticos);
     objetos.push({ id, punto: r.valor.punto, R: conjunto.factores.map((fa) => comb(r.valor.resultante, 6, fa)) });
   }
   const fz = (x: Reacciones["objetos"][number]) => Math.max(...x.R.map((v) => Math.abs(v[2]!)));

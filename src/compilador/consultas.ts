@@ -150,6 +150,13 @@ export interface Resultante {
   /** Punto de reducción (global) y nudos que suma. */
   punto: Vec3;
   nudos: number;
+  /**
+   * De las reacciones, los nudos coartados que el objeto comparte con otros (A2-47): cada uno entra
+   * con su parte (los de un pilar o un apoyo puntual son suyos frente a un muro o un apoyo lineal;
+   * entre objetos del mismo tipo, a partes iguales), así que la suma de todos los objetos es el total.
+   * Sólo en las reacciones; 0 si no comparte ninguno.
+   */
+  compartidos?: number;
   /** [Fx, Fy, Fz, Mx, My, Mz] globales por caso (6·nc), con los momentos respecto a `punto`. */
   resultante: Float64Array;
 }
@@ -837,14 +844,48 @@ export class Consultas {
     return null;
   }
 
+  private reclamados?: Map<number, { puntuales: number; lineales: number }>;
+
+  /**
+   * Cuántos objetos con reacciones reclaman cada nudo coartado: los puntuales (apoyos y bases de
+   * pilar) y los lineales (bases de muro y apoyos lineales). Dos muros en L comparten la arista, y un
+   * apoyo lineal toma todo nudo coartado de su recta, también la base de un pilar (A2-47).
+   */
+  private nudosReclamados(): Map<number, { puntuales: number; lineales: number }> {
+    if (this.reclamados) return this.reclamados;
+    const r = new Map<number, { puntuales: number; lineales: number }>();
+    const f = this.fisico;
+    const objetos: [string, boolean][] = [...(f.apoyos ?? []).map((a) => [a.id, true] as [string, boolean]), ...(f.pilares ?? []).map((p) => [p.id, true] as [string, boolean]), ...(f.muros ?? []).map((m) => [m.id, false] as [string, boolean]), ...(f.apoyosLineales ?? []).map((a) => [a.id, false] as [string, boolean])];
+    for (const [id, puntual] of objetos) {
+      const ns = this.nudosReaccion(id);
+      if (!Array.isArray(ns)) continue;
+      for (const n of new Set(ns)) {
+        const x = r.get(n) ?? { puntuales: 0, lineales: 0 };
+        if (puntual) x.puntuales++;
+        else x.lineales++;
+        r.set(n, x);
+      }
+    }
+    return (this.reclamados = r);
+  }
+
   /**
    * Resultante de las reacciones de un apoyo, un pilar (su base), un muro (su base) o un apoyo
-   * lineal, por caso, respecto al centro de sus nudos coartados.
+   * lineal, por caso, respecto al centro de sus nudos coartados. Un nudo que reclaman varios objetos
+   * entra con su parte (`Resultante.compartidos`), así que los objetos suman el total (A2-47).
    */
   reacciones(id: string): Respuesta<Resultante> {
     const nudos = this.nudosReaccion(id);
     if (nudos === null) return this.noExiste("El objeto con reacciones", id);
     if (nudos === "sin-base") return this.no("consulta/sin-reaccion", `${id} nace sobre otra pieza (base "ninguno"): no tiene reacciones.`, [id]);
+    const puntual = id in this.mapeo.apoyos || this.ctx.pilarDe.has(id);
+    const rec = this.nudosReclamados();
+    let compartidos = 0;
+    const peso = nudos.map((n) => {
+      const x = rec.get(n) ?? { puntuales: puntual ? 1 : 0, lineales: puntual ? 0 : 1 };
+      if (x.puntuales + x.lineales > 1) compartidos++;
+      return puntual ? 1 / x.puntuales : x.puntuales ? 0 : 1 / x.lineales;
+    });
     const c = [0, 0, 0];
     for (const n of nudos) {
       const nd = this.modelo.nudos[n]!;
@@ -857,19 +898,24 @@ export class Consultas {
     const R = new Float64Array(6 * nc);
     for (let k = 0; k < nc; k++) {
       const rk = this.casos[k]!.reacciones;
-      for (const n of nudos) {
+      nudos.forEach((n, i) => {
+        const w = peso[i]!;
+        if (!w) return;
         const nd = this.modelo.nudos[n]!;
         const r = [nd.x - punto[0], nd.y - punto[1], nd.z - punto[2]];
         const F = [rk[6 * n]!, rk[6 * n + 1]!, rk[6 * n + 2]!];
-        R[6 * k] += F[0]!;
-        R[6 * k + 1] += F[1]!;
-        R[6 * k + 2] += F[2]!;
-        R[6 * k + 3] += rk[6 * n + 3]! + r[1]! * F[2]! - r[2]! * F[1]!;
-        R[6 * k + 4] += rk[6 * n + 4]! + r[2]! * F[0]! - r[0]! * F[2]!;
-        R[6 * k + 5] += rk[6 * n + 5]! + r[0]! * F[1]! - r[1]! * F[0]!;
-      }
+        // Con w = 1 (lo de siempre), los mismos bits que sin el reparto
+        const M = [rk[6 * n + 3]! + r[1]! * F[2]! - r[2]! * F[1]!, rk[6 * n + 4]! + r[2]! * F[0]! - r[0]! * F[2]!, rk[6 * n + 5]! + r[0]! * F[1]! - r[1]! * F[0]!];
+        for (let a = 0; a < 3; a++) {
+          R[6 * k + a] += w === 1 ? F[a]! : w * F[a]!;
+          R[6 * k + 3 + a] += w === 1 ? M[a]! : w * M[a]!;
+        }
+      });
     }
-    return { valido: true, valor: { punto, nudos: nudos.length, resultante: R }, diagnosticos: [] };
+    const diagnosticos: Diagnostico[] = compartidos
+      ? [{ codigo: "consulta/reaccion-compartida", severidad: "info", mensaje: `${compartidos} de los ${nudos.length} nudos de reacción de ${id} son también de otro apoyo, pilar o muro: cada uno entra con su parte (los de un pilar o un apoyo puntual, enteros frente a un muro o un apoyo lineal; entre iguales, a partes iguales).`, ids: [id] }]
+      : [];
+    return { valido: true, valor: { punto, nudos: nudos.length, compartidos, resultante: R }, diagnosticos };
   }
 
   // ─── Plantas ────────────────────────────────────────────────────────────────────────────────
