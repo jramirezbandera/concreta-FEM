@@ -322,7 +322,50 @@ export function formaValida(fisico: unknown, diag: Diagnosticos): boolean {
     if (!esObjeto(a)) diag.error("fisico/valor-no-valido", "acciones tiene que ser un objeto.");
     else for (const k of ACCIONES) if (a[k] !== undefined && !esObjeto(a[k])) diag.error("fisico/valor-no-valido", `acciones.${k} tiene que ser un objeto.`);
   }
+  if (diag.lista.length === antes) lejosDelOrigen(fisico, diag);
   return diag.lista.length === antes;
+}
+
+/**
+ * Coordenada en planta más lejana del origen que se admite (m). A2-15: las tolerancias del compilador
+ * son absolutas (ε_geom = 1e-6 m), y con coordenadas de decenas de kilómetros el redondeo se las come.
+ * Con el control sin pérdidas respecto al centro del modelo (`cargas.ts`), cuatro modelos dan la misma
+ * malla hasta 10 km, y a 30 km uno da `malla/area` y otro otra malla; antes, desde 1,5 km, el control
+ * fallaba con «Es un fallo del compilador». El límite es la mitad de lo medido. Un dibujo en UTM se trae
+ * al origen (la app ya lo hace al importar un DXF).
+ */
+export const LEJOS_DEL_ORIGEN = 5000;
+
+/** A2-15: error de modelo si algún punto en planta (pares [x, y] y objetos con x e y) pasa de LEJOS_DEL_ORIGEN. */
+function lejosDelOrigen(fisico: Record<string, unknown>, diag: Diagnosticos): void {
+  let peor: { d: number; id: string } | null = null;
+  const ver = (x: unknown, y: unknown, id: string) => {
+    if (!num(x) || !num(y)) return;
+    const d = Math.max(Math.abs(x), Math.abs(y));
+    if (d > LEJOS_DEL_ORIGEN && (!peor || d > peor.d)) peor = { d, id };
+  };
+  const recorrer = (v: unknown, id: string, prof: number): void => {
+    if (prof > 6) return;
+    if (Array.isArray(v)) {
+      if (v.length === 2 && v.every(num)) return ver(v[0], v[1], id);
+      for (const x of v) recorrer(x, id, prof + 1);
+    } else if (esObjeto(v)) {
+      ver(v.x, v.y, id);
+      for (const [k, x] of Object.entries(v)) if (k !== "x" && k !== "y") recorrer(x, id, prof + 1);
+    }
+  };
+  for (const k of LISTAS) {
+    if (k === "plantas" || k === "materiales" || k === "secciones" || k === "casos") continue;
+    const l = fisico[k];
+    if (Array.isArray(l)) for (const [i, x] of l.entries()) recorrer(x, esObjeto(x) && typeof x.id === "string" ? x.id : `${k}[${i}]`, 0);
+  }
+  const p = peor as { d: number; id: string } | null;
+  if (p)
+    diag.error(
+      "fisico/lejos-del-origen",
+      `${p.id} está a ${(p.d / 1000).toFixed(1)} km del origen, y el compilador admite hasta ${LEJOS_DEL_ORIGEN / 1000} km en cada coordenada: sus tolerancias son absolutas (micras) y con coordenadas de kilómetros el redondeo las supera. Traslade el modelo cerca del origen (por ejemplo, restando a todas las coordenadas las de un pilar).`,
+      [p.id],
+    );
 }
 
 /** El modelo con los ábacos de los pilares (MA2) y las cargas de borde (MA4) resueltos, como lo valida y compila el compilador. */

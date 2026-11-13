@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { base } from "../pruebas/invalidos-c2.ts";
+import { transformar } from "../pruebas/metamorficasFisicas.ts";
 import { compilar } from "./compilar.ts";
 import type { ModeloFisico } from "./fisico.ts";
 
@@ -43,6 +44,19 @@ describe("la forma del modelo, antes de compilarlo (A2-61, A2-62)", () => {
       expect(codigos).not.toContain("compilador/error-interno");
       expect(codigos).toContain(codigo);
     });
+  it("a más de 5 km del origen, un error de modelo claro; dentro, compila con el mismo control sin pérdidas (A2-15)", () => {
+    // Antes, desde 1,5 km del origen, `cargas/perdidas` («Es un fallo del compilador»): el control sumaba
+    // los momentos de las regiones con sus coordenadas absolutas (2,5e-9 a 1,5 km, con 1e-9 de tolerancia)
+    const trasladado = (D: number) => transformar(base(), { p: (q) => [q[0] + D, q[1] - D], v: (q) => [q[0]!, q[1]!, q[2]!], giro: 0 });
+    const lejos = compilar(trasladado(20000));
+    expect(lejos.valido).toBe(false);
+    expect(lejos.diagnosticos.map((d) => d.codigo)).toEqual(["fisico/lejos-del-origen"]);
+    for (const D of [0, 1500, 4900]) {
+      const c = compilar(trasladado(D));
+      expect(c.valido, `${D} m: ${c.diagnosticos.map((d) => d.mensaje).join("\n")}`).toBe(true);
+      if (c.valido) expect(Math.max(c.estadisticas.sinPerdidas.fuerzas, c.estadisticas.sinPerdidas.momentos), `${D} m`).toBeLessThan(1e-13);
+    }
+  });
   it("un modelo que no es un objeto", () => {
     for (const x of [null, 5, "x", []]) {
       const r = compilar(x as unknown as ModeloFisico);

@@ -549,7 +549,14 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
   };
 
   // Momentos de una figura respecto al centro del modelo (en planta), y cota relativa de una planta
-  const desplazar = (m: Momentos): Momentos => ({ A: m.A, Sx: m.Sx - centro[0] * m.A, Sy: m.Sy - centro[1] * m.A });
+  // Los de una región, con sus vértices ya respecto al centro (A2-15): con las coordenadas absolutas, la
+  // fórmula del área suma términos de orden x³, y a 1,5 km del origen el control sin pérdidas de una
+  // losa de 10 m fallaba en los momentos (2,5e-9 con 1e-9 de tolerancia, «Es un fallo del compilador»)
+  const alCentro = (p: readonly Vec2[]): Vec2[] => p.map((q) => [q[0] - centro[0], q[1] - centro[1]]);
+  const regionAlCentro = (r: Region): Region => ({ contorno: alCentro(r.contorno), huecos: r.huecos.map(alCentro) });
+  const momentosEnCentro = (r: Region): Momentos => momentosRegion(regionAlCentro(r));
+  /** Los de la intersección de una región con una zona, también respecto al centro (sus triángulos van en las coordenadas que se le dan). */
+  const interseccionEnCentro = (r: Region, z: readonly Vec2[]): Momentos => momentosInterseccion(regionAlCentro(r), alCentro(z));
   const cota = (planta: string) => ctx.cotas[ctx.planta.get(planta)!]! - centro[2];
   /** Losas y paños (C4) de la planta de una viga, con su región unida y su espesor (C2-g). */
   const regionesBajo = (v: Viga): RegionPeso[] => [
@@ -761,18 +768,20 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       if (pp > 0) piezaAViga(cPeso, pa.ancho, pa.v, [0, 0, -pp]);
     }
     ctx.losas.forEach((l, i) => {
-      if (!losas.laminas.some((x) => x.losa === i)) return;
-      if (l.pp > 0) sumarSuperficie(fisicas[cPeso]!, desplazar(momentosRegion(losas.regiones[i]!)), cota(l.losa.planta), [0, 0, -l.pp]);
+      // Con las láminas o las piezas del ancho (A2-16: una losa de 0,5 m sobre una viga de 30 queda
+      // entera en el ancho y sus tiras, sin láminas, y su peso, que va a la viga, no se contaba aquí)
+      if (!losas.laminas.some((x) => x.losa === i) && !losas.piezasAncho.some((x) => x.losa === i)) return;
+      if (l.pp > 0) sumarSuperficie(fisicas[cPeso]!, momentosEnCentro(losas.regiones[i]!), cota(l.losa.planta), [0, 0, -l.pp]);
       // Ábacos: la diferencia con la zona aligerada sobre su parte dentro de la losa unida
       const dif = l.reticular ? l.reticular.ppAbaco - l.reticular.ppAligerada : 0;
-      if (dif !== 0) for (const ab of losas.abacosUnidos.get(i) ?? []) sumarSuperficie(fisicas[cPeso]!, desplazar(momentosInterseccion(losas.regiones[i]!, ab)), cota(l.losa.planta), [0, 0, -dif]);
+      if (dif !== 0) for (const ab of losas.abacosUnidos.get(i) ?? []) sumarSuperficie(fisicas[cPeso]!, interseccionEnCentro(losas.regiones[i]!, ab), cota(l.losa.planta), [0, 0, -dif]);
     });
     // Paños (C4-f): su pp, repartido a las viguetas; la física, sobre el paño unido
     for (const i of ctx.panos.flatMap((_, i) => (panos?.porPano[i]!.length ? [i] : []))) {
       const p = ctx.panos[i]!;
       if (!(p.pano.pp > 0)) continue;
       reparto(i).superficie([0, 0, -p.pano.pp], null, emisor(cPeso, i));
-      sumarSuperficie(fisicas[cPeso]!, desplazar(momentosRegion(panos!.regiones[i]!)), cota(p.pano.planta), [0, 0, -p.pano.pp]);
+      sumarSuperficie(fisicas[cPeso]!, momentosEnCentro(panos!.regiones[i]!), cota(p.pano.planta), [0, 0, -p.pano.pp]);
     }
     // Muros (C3-g): γ·t por lámina; la física, por franjas sin los huecos
     losas.muros.forEach((lm, j) => {
@@ -872,18 +881,18 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       let A = 0;
       ctx.losas.forEach((l, i) => {
         if (l.losa.planta !== carga.planta || carga.pano !== undefined || (carga.losa !== undefined && l.losa.id !== carga.losa)) return;
-        const m = zona ? momentosInterseccion(losas.regiones[i]!, zona) : momentosRegion(losas.regiones[i]!);
+        const m = zona ? interseccionEnCentro(losas.regiones[i]!, zona) : momentosEnCentro(losas.regiones[i]!);
         A += m.A;
-        sumarSuperficie(fisicas[c]!, desplazar(m), cota(carga.planta), carga.q);
+        sumarSuperficie(fisicas[c]!, m, cota(carga.planta), carga.q);
       });
       // Paños (C4-e): la parte que cae en ellos, a sus viguetas; la física, sobre el paño unido
       for (const i of panosDe(carga.planta)) {
         if (carga.losa !== undefined || (carga.pano !== undefined && ctx.panos[i]!.pano.id !== carga.pano)) continue;
-        const m = zona ? momentosInterseccion(panos!.regiones[i]!, zona) : momentosRegion(panos!.regiones[i]!);
+        const m = zona ? interseccionEnCentro(panos!.regiones[i]!, zona) : momentosEnCentro(panos!.regiones[i]!);
         if (!(m.A > umbral)) continue;
         A += m.A;
         reparto(i).superficie(carga.q, zona ?? null, emisor(c, i));
-        sumarSuperficie(fisicas[c]!, desplazar(m), cota(carga.planta), carga.q);
+        sumarSuperficie(fisicas[c]!, m, cota(carga.planta), carga.q);
       }
       const Az = zona ? Math.abs(areaConSigno(zona)) : A;
       const conPanos = ctx.panos.some((p) => p.pano.planta === carga.planta);
