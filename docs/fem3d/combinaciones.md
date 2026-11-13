@@ -19,6 +19,7 @@ Cada combinación es un `Float64Array` de factores alineado con los casos de car
 - Las permanentes son favorables o desfavorables «consideradas globalmente» (4.2.2-1): todas en el mismo estado, cada una con su γ.
 - Una variable favorable no entra (γ = 0).
 - De cada familia excluyente entra como mucho un caso (por ejemplo, el viento en 4 direcciones).
+- Los casos de una misma acción (`simultaneo`; `Consultas` lo pone a los Q sin familia con el mismo ψ por su nombre, A2-6) van juntos con el mismo coeficiente, principal o acompañante, y cada uno puede faltar: la sobrecarga de uso de una categoría partida en varios casos se combina como si fuera uno.
 - No se repiten combinaciones: un ψ = 0 deja una igual a otra y se elimina.
 
 **Cargas nocionales** (casos `N` con `derivadoDe`, RES-17):

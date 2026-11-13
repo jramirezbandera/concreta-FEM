@@ -289,3 +289,28 @@ describe("reglas", () => {
     expect(Array.from(m.subarray(2 * CASOS_H30.length, 3 * CASOS_H30.length))).toEqual(Array.from(c[2]!.factores));
   });
 });
+
+describe("casos de una misma acción variable (A2-6)", () => {
+  const casos: CasoCarga[] = [
+    { id: "G", tipo: "G" },
+    { id: "Q1", tipo: "Q", psi: psiUso("A"), simultaneo: "uso-A" },
+    { id: "Q2", tipo: "Q", psi: psiUso("A"), simultaneo: "uso-A" },
+    { id: "QC", tipo: "Q", psi: psiUso("C"), simultaneo: "uso-C" },
+  ];
+  const etiquetas = (s: Situacion) => generarCombinaciones(casos, { situaciones: [s] }).map((c) => c.etiqueta);
+  it("van juntos con el coeficiente del principal o del acompañante, y cada uno puede faltar", () => {
+    // Antes, cada caso era un grupo propio: como mucho 1,35·G + 1,5·Q1 + 1,05·Q2 (−5,4 % de axil en un pilar)
+    const elu = etiquetas("ELU-PT");
+    for (const e of ["1.35·G + 1.5·Q1 + 1.5·Q2", "1.35·G + 1.5·Q1", "1.35·G + 1.5·Q2", "1.35·G + 1.05·Q1 + 1.05·Q2 + 1.5·QC", "1.35·G + 1.5·Q1 + 1.5·Q2 + 1.05·QC"]) expect(elu).toContain(e);
+    // Nunca uno de uso A como principal y el otro como acompañante
+    expect(elu.some((e) => /1\.5·Q1 \+ 1\.05·Q2|1\.05·Q1 \+ 1\.5·Q2/.test(e))).toBe(false);
+    expect(etiquetas("ELS-C")).toContain("1·G + 1·Q1 + 1·Q2");
+    expect(etiquetas("ELS-CP")).toContain("1·G + 0.3·Q1 + 0.3·Q2 + 0.6·QC");
+  });
+  it("sin simultaneo, como siempre (cada caso, un grupo propio)", () => {
+    const sueltos = casos.map(({ simultaneo: _, ...c }) => c);
+    const elu = generarCombinaciones(sueltos, { situaciones: ["ELU-PT"] }).map((c) => c.etiqueta);
+    expect(elu).toContain("1.35·G + 1.5·Q1 + 1.05·Q2");
+    expect(elu).not.toContain("1.35·G + 1.5·Q1 + 1.5·Q2");
+  });
+});

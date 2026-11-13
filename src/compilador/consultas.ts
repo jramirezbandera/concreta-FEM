@@ -1221,9 +1221,12 @@ export class Consultas {
     const sin = logicos.filter((c) => !c.accion).map((c) => c.id);
     if (sin.length) return this.no("consulta/sin-accion", `Para generar las combinaciones, todos los casos tienen que llevar su acción (tipo, ψ…); no la llevan: ${sin.join(", ")}.`, sin);
     // A-2: ψ por su nombre, a sus valores
+    // A2-6: los casos Q sin familia con el mismo ψ por su nombre son una misma acción (la sobrecarga de
+    // uso de una categoría partida en varios casos): van juntos, con el mismo coeficiente
     const casos: CasoCarga[] = logicos.map((c) => {
       const { psi, ...a } = c.accion!;
-      return { ...a, ...(psi !== undefined ? { psi: psiDe(psi) } : {}), id: c.id };
+      const simultaneo = a.tipo === "Q" && a.familia === undefined && typeof psi === "string" ? psi : undefined;
+      return { ...a, ...(psi !== undefined ? { psi: psiDe(psi) } : {}), ...(simultaneo !== undefined ? { simultaneo } : {}), id: c.id };
     });
     try {
       return { valido: true, valor: generarCombinaciones(casos, opciones), diagnosticos: [] };

@@ -251,7 +251,7 @@ export interface CasoFisico {
 /**
  * La acción de un caso: los datos de `CasoCarga` con ψ por su nombre o por sus valores (A-2).
  */
-export type AccionCaso = Omit<CasoCarga, "id" | "psi"> & {
+export type AccionCaso = Omit<CasoCarga, "id" | "psi" | "simultaneo"> & {
   /**
    * ψ de la tabla 4.2 del DB SE (Q, S, W y T). Mejor por su nombre, para no escribir los números de
    * la norma: "uso-A" … "uso-G" (la categoría de uso de la tabla 3.1 del DB SE-AE), "nieve-hasta-1000"

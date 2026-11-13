@@ -38,6 +38,11 @@ export interface CasoCarga {
   tipo: TipoAccion;
   /** Familia excluyente: como mucho un caso de la familia por combinación. */
   familia?: string;
+  /**
+   * A2-6: grupo de casos de una misma acción variable (la sobrecarga de uso partida en varios casos):
+   * van juntos, con el mismo coeficiente, principal o acompañante; cada uno puede faltar. Sin familia.
+   */
+  simultaneo?: string;
   /** ψ de la tabla 4.2 (Q, S, W y T). */
   psi?: Psi;
   /** G: fila de la tabla 4.1 (peso propio y del terreno por defecto). */
@@ -193,13 +198,15 @@ export function generarCombinaciones(casos: readonly CasoCarga[], opciones: Opci
   const n = casos.length;
   const indice = new Map(casos.map((c, i) => [c.id, i]));
   const variables = casos.map((c, i) => (esVariable(c) ? i : -1)).filter((i) => i >= 0);
-  // Grupos excluyentes de variables (familia o caso suelto)
+  // Grupos de variables: excluyentes (una familia o un caso suelto) o simultáneos (A2-6)
   const grupos = new Map<string, number[]>();
   for (const i of variables) {
-    const k = casos[i]!.familia ?? `#${casos[i]!.id}`;
+    const c = casos[i]!;
+    const k = c.familia ?? (c.simultaneo !== undefined ? `=${c.simultaneo}` : `#${c.id}`);
     grupos.set(k, [...(grupos.get(k) ?? []), i]);
   }
   const gruposVar = [...grupos.values()];
+  const simultaneos = new Set([...grupos].filter(([k, g]) => k.startsWith("=") && g.length > 1).map(([, g]) => g));
   const permanentes = casos.map((c, i) => (c.tipo === "G" ? i : -1)).filter((i) => i >= 0);
   const sismos = { X: [] as number[], Y: [] as number[] };
   casos.forEach((c, i) => c.tipo === "E" && sismos[c.direccion!].push(i));
@@ -263,6 +270,26 @@ export function generarCombinaciones(casos: readonly CasoCarga[], opciones: Opci
               return;
             }
             const g = gruposVar[k]!;
+            if (simultaneos.has(g)) {
+              // A2-6: cualquier subconjunto de los casos del grupo, todos con el coeficiente del grupo
+              // (el del principal si el principal es del grupo, el de acompañante si no)
+              if (g !== grupoPr && !acompanan) return recorrer(k + 1, f);
+              const libres = g.filter((i) => i !== pr);
+              const factor = (i: number) => (g === grupoPr ? coef[i]!.desf * coef[i]!.psiP : coef[i]!.desf * coef[i]!.psiA);
+              for (let mask = 0; mask < 1 << libres.length; mask++) {
+                const f2 = f.slice();
+                let nulo = false;
+                libres.forEach((i, b) => {
+                  if (!(mask & (1 << b))) return;
+                  const v = factor(i);
+                  if (v === 0) nulo = true;
+                  f2[i] = v;
+                });
+                if (nulo) continue;
+                recorrer(k + 1, f2);
+              }
+              return;
+            }
             if (g === grupoPr || !acompanan) return recorrer(k + 1, f);
             recorrer(k + 1, f); // ausente: favorable, γ = 0
             for (const i of g) {

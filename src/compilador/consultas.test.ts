@@ -533,6 +533,19 @@ describe("reacciones por objeto con nudos compartidos (A2-47)", () => {
     comprobar(f, { C1: 1, C2: 1, C3: 1, C4: 1, AL0: 2, AL5: 2 });
   }, 60_000);
 
+  it("dos casos Q con el mismo ψ por su nombre van juntos en las combinaciones (A2-6)", () => {
+    const f = portico();
+    f.casos = [
+      { id: "G", pesoPropio: true, accion: { tipo: "G" } },
+      { id: "Q", accion: { tipo: "Q", psi: "uso-A" } },
+      { id: "W", accion: { tipo: "Q", psi: "uso-A" } },
+    ];
+    const { c } = preparar(f);
+    const r = c.combinacionesGeneradas({ situaciones: ["ELU-PT"] });
+    if (!r.valido) throw new Error("sin combinaciones");
+    expect(r.valor.map((x) => x.etiqueta)).toContain("1.35·G + 1.5·Q + 1.5·W");
+  }, 60_000);
+
   it("dos muros en L que comparten la arista: la esquina, a partes iguales", () => {
     const f = portico();
     f.muros = [
