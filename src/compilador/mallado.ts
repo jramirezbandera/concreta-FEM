@@ -361,6 +361,14 @@ export function siembraGraduada(L: number, sa: number, sb: number, s: number, nF
   const acum = [0];
   for (let i = 1; i <= m; i++) acum.push(acum[i - 1]! + ((L / m) * (1 / g(((i - 1) * L) / m) + 1 / g((i * L) / m))) / 2);
   const total = acum[m]!;
+  // A2-52: con un rasgo diminuto en un extremo (dos puntos a micras, lo que deja una planta girada con
+  // las coordenadas al milímetro), el primer trapecio vale L/(2m·sa) y un lado de un metro recibía
+  // miles de puntos: la triangulación y su refinamiento no acababan. Si los trapecios se disparan
+  // respecto a la integral exacta (un logaritmo), la exacta; si no, lo de siempre (las mismas mallas)
+  if (nFijo === undefined) {
+    const exacta = siembraExacta(L, sa, sb, s);
+    if (total > 4 * exacta.total + 8) return exacta.puntos(Math.max(1, Math.ceil(exacta.total - HOLGURA_SIEMBRA)));
+  }
   // Con holgura: un lado de justo k pasos no puede pasar a k + 1 por un redondeo o un ruido
   const n = nFijo ?? Math.max(1, Math.ceil(total - HOLGURA_SIEMBRA));
   const t: number[] = [];
@@ -371,6 +379,46 @@ export function siembraGraduada(L: number, sa: number, sb: number, s: number, nF
     t.push((j + (objetivo - acum[j]!) / (acum[j + 1]! - acum[j]!)) / m);
   }
   return { n, t };
+}
+
+/**
+ * La siembra graduada con la integral exacta de 1/g, con g = mín(s, sa + c·x, sb + c·(L − x)), lineal
+ * a trozos: `total` es el número de pasos sin redondear y `puntos(n)` da los n − 1 puntos interiores
+ * (fracciones de L) que la parten en n trozos iguales de esa integral (por bisección).
+ */
+function siembraExacta(L: number, sa: number, sb: number, s: number): { total: number; puntos: (n: number) => { n: number; t: number[] } } {
+  const c = CRECIMIENTO;
+  const g = (x: number) => Math.min(s, sa + c * x, sb + c * (L - x));
+  const cortes = [0, L, (s - sa) / c, L - (s - sb) / c, (sb + c * L - sa) / (2 * c)].filter((x) => x > 0 && x < L).sort((a, b) => a - b);
+  const xs = [...new Set([0, ...cortes, L])];
+  /** ∫ de 0 a x de 1/g, exacto en cada trozo lineal. */
+  const F = (x: number): number => {
+    let r = 0;
+    for (let i = 0; i + 1 < xs.length && xs[i]! < x; i++) {
+      const [a, b] = [xs[i]!, Math.min(x, xs[i + 1]!)];
+      const [ga, gb] = [g(a), g(b)];
+      r += Math.abs(gb - ga) > 1e-15 * Math.max(ga, gb) ? ((b - a) * Math.log(gb / ga)) / (gb - ga) : (b - a) / ga;
+    }
+    return r;
+  };
+  const total = F(L);
+  return {
+    total,
+    puntos: (n) => {
+      const t: number[] = [];
+      for (let i = 1; i < n; i++) {
+        const objetivo = (total * i) / n;
+        let [lo, hi] = [0, L];
+        for (let k = 0; k < 80; k++) {
+          const mid = (lo + hi) / 2;
+          if (F(mid) < objetivo) lo = mid;
+          else hi = mid;
+        }
+        t.push((lo + hi) / 2 / L);
+      }
+      return { n, t };
+    },
+  };
 }
 
 /**
