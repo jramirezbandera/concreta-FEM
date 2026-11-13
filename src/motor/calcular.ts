@@ -30,7 +30,7 @@ import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada }
 import { definicionModal, modosCondensados, prepararModal, type PlanModal } from "./modal.ts";
 import { NOMBRES_GDL, type CargasCaso, type CasoCarga, type EstadisticasCalculo, type ModeloAnalitico, type ModoVibracion, type ResultadoCalculo, type ResultadoCaso, type ResultadoModal } from "./modelo.ts";
 import { ErrorSinMemoria } from "../nucleo/index.ts";
-import { ErrorLimiteMemoria, resolver, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
+import { ErrorLimiteMemoria, resolver, RESIDUO_INADMISIBLE, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
 
 /** Tolerancia del equilibrio global por caso (regla de oro 2). */
 export const TOL_EQUILIBRIO = 1e-9;
@@ -476,7 +476,14 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         { ...eqCargas, residuo },
       );
     }
-    if (residuo > RESIDUO_OBJETIVO) {
+    if (!(residuo <= RESIDUO_INADMISIBLE)) {
+      diag.error(
+        "solver/residuo",
+        `El caso ${caso.id} queda con un error hacia atrás de ${residuo.toExponential(2)} tras el refinamiento (inadmisible por encima de ${RESIDUO_INADMISIBLE}): el solver no ha resuelto el sistema y el resultado no es válido, aunque cumpla el equilibrio global.`,
+        [caso.id],
+        { residuo },
+      );
+    } else if (residuo > RESIDUO_OBJETIVO) {
       diag.aviso(
         "solver/residuo",
         `El caso ${caso.id} queda con un error hacia atrás de ${residuo.toExponential(2)} tras el refinamiento (objetivo ${RESIDUO_OBJETIVO}): el solver no ha resuelto bien el sistema.`,
@@ -597,6 +604,10 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   }
   let residuo = 0;
   for (let j = 0; j < nm; j++) residuo = Math.max(residuo, sol!.residuos[nc + j]!);
+  if (!(residuo <= RESIDUO_INADMISIBLE)) {
+    diag.error("solver/residuo", `Las soluciones unitarias del análisis modal quedan con un error hacia atrás de ${residuo.toExponential(2)} tras el refinamiento (inadmisible por encima de ${RESIDUO_INADMISIBLE}): el análisis modal no es válido.`, undefined, { residuo });
+    return { valido: false, diagnosticos: diag.lista, estadisticas };
+  }
   if (residuo > RESIDUO_OBJETIVO) {
     diag.aviso("solver/residuo", `Las soluciones unitarias del análisis modal quedan con un error hacia atrás de ${residuo.toExponential(2)} tras el refinamiento (objetivo ${RESIDUO_OBJETIVO}).`, undefined, { residuo });
   }

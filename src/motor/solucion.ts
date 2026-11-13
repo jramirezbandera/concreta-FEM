@@ -30,6 +30,13 @@ export const UMBRAL_MAL_CONDICIONADO = 1e-8;
 /** Error hacia atrás objetivo tras el refinamiento. */
 export const RESIDUO_OBJETIVO = 1e-10;
 /**
+ * Error hacia atrás por encima del cual el resultado no es válido (A2-20): un error de u
+ * autoequilibrado no lo ve el equilibrio global, y sólo lo dice ω. Tras el refinamiento queda en
+ * 1e-16…1e-13 en todos los modelos medidos (E1, E2-4); con 1e-8, la solución resuelve un sistema
+ * cuyos coeficientes se han movido en la octava cifra.
+ */
+export const RESIDUO_INADMISIBLE = 1e-8;
+/**
  * Error hacia atrás por debajo del cual no se refina. LDLᵀ deja ω entre 5e-16 y 2e-15 en los
  * modelos de E1 (el ruido de la propia medida), y hasta 1,3e-13 en unas pocas filas con barras
  * de E2 (brazos rígidos y vigas descolgadas, E2-4); refinar por debajo de 1e-12 no mejora nada que
@@ -272,22 +279,35 @@ export function resolver(
     marcar("residuo");
     let pasos = 0;
     let a = 0;
+    // Por columna (A2-21): cada solución se refina mientras pase de RESIDUO_SUFICIENTE y su error al
+    // menos se reduzca a la mitad en cada paso; las demás del grupo no se tocan (su lado del residuo
+    // va a cero), y un paso que la empeora se deshace. Antes se decidía por el máximo del grupo: una
+    // solución atascada paraba a las que mejoraban y las que ya estaban bien cambiaban
     for (const tam of opciones.grupos ?? [nrhs]) {
       const b = a + tam;
       const delGrupo = residuos.subarray(a, b);
+      const activo = Array.from(delGrupo, (r) => r > RESIDUO_SUFICIENTE);
       let pasosGrupo = 0;
-      while (pasosGrupo < 3 && delGrupo.some((r) => r > RESIDUO_SUFICIENTE)) {
-        const anterior = Math.max(...delGrupo);
+      while (pasosGrupo < 3 && activo.some(Boolean)) {
+        const anterior = Float64Array.from(delGrupo);
         if (!R) {
           R = new Float64Array(n * nrhs);
           calcularResiduos();
         }
+        for (let c = 0; c < tam; c++) if (!activo[c]) R.fill(0, n * (a + c), n * (a + c + 1));
         const dX = factor.resolver(tam === nrhs ? R : R.subarray(n * a, n * b), tam);
-        for (let i = 0; i < dX.length; i++) X[n * a + i]! += dX[i]!;
+        for (let c = 0; c < tam; c++) if (activo[c]) for (let i = n * c; i < n * (c + 1); i++) X[n * a + i]! += dX[i]!;
         pasosGrupo++;
         calcularResiduos(a, b);
+        for (let c = 0; c < tam; c++) {
+          if (!activo[c]) continue;
+          if (delGrupo[c]! > anterior[c]!) {
+            for (let i = n * c; i < n * (c + 1); i++) X[n * a + i]! -= dX[i]!;
+            calcularResiduos(a + c, a + c + 1);
+            activo[c] = false;
+          } else if (!(delGrupo[c]! > RESIDUO_SUFICIENTE) || delGrupo[c]! > anterior[c]! / 2) activo[c] = false;
+        }
         marcar("refinamiento");
-        if (Math.max(...delGrupo) > anterior / 2) break;
       }
       pasos = Math.max(pasos, pasosGrupo);
       a = b;
