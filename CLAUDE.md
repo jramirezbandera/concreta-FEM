@@ -978,7 +978,13 @@
     - **A2-4:** el momento de vuelco de cada hipótesis horizontal, desde su nivel sin desplazamientos (`z0`: el más alto bajo el cual se mueve < 1 % del máximo; un sótano rígido ya no cuenta);
     - **A2-49:** los machones junto a una ventana, del alféizar a lo alto del hueco (`Machon.z0`, `z1`), donde suman la estática;
     - **A2-2:** las estaciones de paso de las franjas, escaladas al corte exacto de la recta de la malla más cercana (en ella, exactas; referencia de F regenerada, `validacion/au2/out_cambiosA22.txt`: mediana 1,3 %).
-  - **Siguen abiertos:** la decisión de A2-51 (zona rígida con el eje de la viga en la cara del pilar), A2-52 (el recuadro girado con zunchos sigue sin compilar en un tercio de los ángulos al milímetro), A2-53/A2-54 (malla que cambia con ruido o al trasladar) y A2-14 a A2-17.
+  - **Hechos también el 2026-11-13** (§11):
+    - **A2-52 (y A2-18):** el recuadro girado con zunchos y las coordenadas al milímetro compila en todos los ángulos (la esquina de la huella sembrada va a la cara del ancho desde ε_geom y, con dos vigas, a su cruce; respaldo de la triangulación con un marco lejano si constrainautor falla);
+    - **A2-54:** a δ justo de la rejilla, lejos (la malla ya no cambia al trasladar);
+    - **A2-53:** las láminas no cambian con un ruido de ε_geom/3 (holgura de 10·ε_geom en las caras comunes de C5-g y en el paralelismo de las tiras de borde); queda alguna viga partida en un nudo más;
+    - **A2-16:** una losa entera en el ancho de su viga y sus tiras compila (el control sin pérdidas contaba sólo el peso de las losas con láminas);
+    - **A2-15:** el control sin pérdidas, respecto al centro del modelo (de fallo a 1,5 km a ≤ 4e-15 a cualquier distancia), y `fisico/lejos-del-origen` a más de 5 km.
+  - **Siguen abiertos:** la decisión de A2-51 (zona rígida con el eje de la viga en la cara del pilar), A2-14 y A2-17 (cortes por campos) y los leves.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
