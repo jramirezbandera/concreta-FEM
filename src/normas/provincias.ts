@@ -149,9 +149,13 @@ function normalizarNombre(nombre: string): string {
   return resto.length > 0 && ARTICULOS.includes(primera!) ? resto.join(" ") : base;
 }
 
-/** El nombre entero y cada mitad de los bilingües: «Vitoria-Gasteiz» → entero, «vitoria», «gasteiz». */
-function variantes(nombre: string): string[] {
-  const trozos = nombre.split("/").flatMap((t) => t.split("-"));
+/**
+ * El nombre entero y cada mitad de los bilingües: «Vitoria-Gasteiz» → entero, «vitoria», «gasteiz».
+ * Con `guion: false`, sólo las mitades con «/» («Alicante/Alacant»): el municipio que se compara con
+ * la capital, porque un nombre compuesto con guion no es bilingüe («Vélez-Málaga» no es Málaga, A2-27).
+ */
+function variantes(nombre: string, guion = true): string[] {
+  const trozos = nombre.split("/").flatMap((t) => (guion ? t.split("-") : [t]));
   return [nombre, ...trozos].map(normalizarNombre).filter((v) => v !== "");
 }
 
@@ -165,5 +169,5 @@ export function esCapitalDeProvincia(ine: string, municipio: string): boolean {
   const p = provinciaPorIne(ine);
   if (!p || municipio.trim() === "") return false;
   const aceptadas = new Set([...variantes(p.capital.capital), ...(ALIAS_CAPITAL[p.ine] ?? []).flatMap(variantes)]);
-  return variantes(municipio).some((v) => aceptadas.has(v));
+  return variantes(municipio, false).some((v) => aceptadas.has(v));
 }

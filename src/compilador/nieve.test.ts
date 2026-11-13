@@ -153,3 +153,13 @@ describe("A2-26: la zona de clima invernal en una provincia que la figura E.2 pa
     expect(avisosNieve(edificio({ emplazamiento: { provincia: "09", municipio: "Burgos", altitud: 860 } }, [S("nieve-hasta-1000")]))).toEqual([]);
   });
 });
+
+describe("A2-27: un municipio con guion no es la capital por una de sus mitades", () => {
+  it("Vélez-Málaga no es Málaga; Vitoria-Gasteiz, Gasteiz y Alicante/Alacant sí son las suyas", () => {
+    expect(esCapitalDeProvincia("29", "Vélez-Málaga")).toBe(false);
+    expect(esCapitalDeProvincia("29", "Málaga")).toBe(true);
+    expect(esCapitalDeProvincia("01", "Vitoria-Gasteiz")).toBe(true);
+    expect(esCapitalDeProvincia("01", "Gasteiz")).toBe(true);
+    expect(esCapitalDeProvincia("03", "Alicante/Alacant")).toBe(true);
+  });
+});
