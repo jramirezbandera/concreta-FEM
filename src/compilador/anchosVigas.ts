@@ -310,9 +310,11 @@ export function tirasBorde(ctx: Contexto, k: number, anchos: readonly AnchoViga[
           if (a.tira) continue;
           const { A, u } = a.tramo.t;
           const nn: Vec2 = [-u[1], u[0]];
-          if (Math.abs(l.e[0] * u[1] - l.e[1] * u[0]) > 1e-9) continue;
+          // Paralelo con la holgura de la rejilla (10·ε_geom a lo largo del lado; A2-53): con |sen| ≤ 1e-9,
+          // un vértice del borde movido 3e-7 en un lado de 20 m quitaba la tira y cambiaba la malla
+          if (Math.abs(l.e[0] * u[1] - l.e[1] * u[0]) * l.L > 10 * tol) continue;
           const [tP, tQ] = [prod([l.P[0] - A[0], l.P[1] - A[1]], nn), prod([l.Q[0] - A[0], l.Q[1] - A[1]], nn)];
-          if (Math.abs(tP - tQ) > tol) continue;
+          if (Math.abs(tP - tQ) > 10 * tol) continue;
           const t = (tP + tQ) / 2;
           const d = Math.abs(t);
           if (!(d > a.b / 2 + eps && d <= a.b / 2 + TIRA_MAXIMA * a.b + tol)) continue;

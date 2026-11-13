@@ -332,7 +332,7 @@ export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
       return cerca;
     };
     const conForma = todos.filter((p) => alineada(p.huella, d) && (dentro(p) || bordeSegunD(p)) && !conApoyoLineal(p.p, d, n, semiextension(p.huella, d), semiextension(p.huella, n), lineas, ctx.op.tamanoMalla / 2));
-    const tramos = carasComunes(conForma, d);
+    const tramos = carasComunes(conForma, d, 10 * ctx.op.epsGeom);
     const porRecta = new Map<string, CaraFranja>();
     for (const p of conForma) {
       const [sa, sb] = tramos.get(p.id)!;

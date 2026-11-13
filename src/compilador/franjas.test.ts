@@ -22,7 +22,7 @@ import { compilar } from "./compilar.ts";
 import { combinar } from "./envolventes.ts";
 import { EsfuerzosFranjas } from "./esfuerzosFranjas.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type Pilar, type Vec2 } from "./fisico.ts";
-import { franjasLosa, PASO_ESTACIONES, tramosRecta } from "./franjas.ts";
+import { franjasLosa, tramosRecta } from "./franjas.ts";
 import { validar } from "./validar.ts";
 
 beforeAll(async () => {

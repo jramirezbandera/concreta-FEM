@@ -127,15 +127,17 @@ export function semiextension(h: Huella, d: Vec2): number {
  * 2. Grupos de cada línea, de la menor semiextensión a la mayor: un pilar entra en el grupo mientras
  *    la cara común quede, a los dos lados, a no menos de CARA_COMUN de su semiextensión de su eje
  *    (con los ejes alineados, mientras no pase del doble de la menor); si no, empieza otro.
- * Devuelve el tramo [s0, s1] de cada pilar (s = p·d).
+ * Devuelve el tramo [s0, s1] de cada pilar (s = p·d). `tol` (10·ε_geom) es la holgura del límite: un
+ * 30 × 60 con un 30 × 30 en su eje está justo en el doble (A2-53); con 1e-12, un ruido de 3e-10 en
+ * uno de los dos lo sacaba de la cara común y cambiaba la malla de toda la línea.
  */
-export function carasComunes(pilares: readonly { id: string; p: Vec2; huella: Huella }[], d: Vec2): Map<string, [number, number]> {
+export function carasComunes(pilares: readonly { id: string; p: Vec2; huella: Huella }[], d: Vec2, tol: number): Map<string, [number, number]> {
   type Item = { id: string; s: number; e: number };
   const items: Item[] = pilares.map((p) => ({ id: p.id, s: p.p[0] * d[0] + p.p[1] * d[1], e: semiextension(p.huella, d) })).sort((a, b) => a.s - a.e - (b.s - b.e) || (a.id < b.id ? -1 : 1));
   const tramo = (g: Item[]): [number, number] => [Math.max(...g.map((x) => x.s - x.e)), Math.min(...g.map((x) => x.s + x.e))];
   const cabe = (g: Item[]) => {
     const [lo, hi] = tramo(g);
-    return g.every((x) => hi - x.s >= CARA_COMUN * x.e - 1e-12 && x.s - lo >= CARA_COMUN * x.e - 1e-12);
+    return g.every((x) => hi - x.s >= CARA_COMUN * x.e - tol && x.s - lo >= CARA_COMUN * x.e - tol);
   };
   const r = new Map<string, [number, number]>();
   const agrupar = (linea: Item[]) => {
@@ -335,7 +337,7 @@ export function proponerBandas(fisico: ModeloFisico, opciones: OpcionesCompilaci
       if (o.losa.planta === l.losa.planta) for (const p of enLosa[j]!) dePlanta.set(p.id, p);
     });
     const todos = [...dePlanta.values()];
-    bandas.push(...bandasDireccion(ctx, l, pilares, carasComunes(todos, d), d, n, "1", diag), ...bandasDireccion(ctx, l, pilares, carasComunes(todos, n), n, d, "2", diag));
+    bandas.push(...bandasDireccion(ctx, l, pilares, carasComunes(todos, d, 10 * ctx.op.epsGeom), d, n, "1", diag), ...bandasDireccion(ctx, l, pilares, carasComunes(todos, n, 10 * ctx.op.epsGeom), n, d, "2", diag));
   });
   return { bandas, diagnosticos: diag.lista };
 }
@@ -389,7 +391,7 @@ export function apoyosBandaEn(ctx: Contexto, b: Banda): [number, number][] {
   const { d, n } = direccionesBanda(b, l.losa.eje1 ?? 0);
   const todos = new Map<string, PilarEnLosa>();
   for (const o of ctx.losas) if (o.losa.planta === b.planta) for (const p of pilaresEnLosa(ctx, o)) todos.set(p.id, p);
-  const tramos = carasComunes([...todos.values()], d);
+  const tramos = carasComunes([...todos.values()], d, 10 * ctx.op.epsGeom);
   const grupos = alineaciones(pilaresEnLosa(ctx, l), d, n, ctx.op.epsSnap).map((g) => ({ t: g.reduce((a, q) => a + q.t, 0) / g.length, pilares: g }));
   const tc = b.desde[0] * n[0] + b.desde[1] * n[1];
   const tol = ctx.op.epsSnap;
