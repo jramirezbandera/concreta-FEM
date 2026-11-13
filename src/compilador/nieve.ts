@@ -136,6 +136,9 @@ export function avisosNieve(m: ModeloFisico): ProblemaNieve[] {
         ids: malos,
       });
   }
+  // A2-26: la zona de la capital, en una provincia que la figura E.2 parte (como viento/zona-frontera)
+  if (nieve.frontera && nieve.skOrigen === "anejoE")
+    r.push({ codigo: "nieve/zona-frontera", mensaje: `La zona de clima invernal ${nieve.zona} es la de la capital de ${nieve.provincia?.nombre ?? "la provincia"}, y la figura E.2 parte la provincia: ${nieve.frontera} Si la obra cae al otro lado de la línea, escriba la zona (acciones.nieve.zonaInvernal).` });
   if (nieve.sk === null) r.push({ codigo: "nieve/fuera-de-tabla", mensaje: nieve.notas.find((x) => x.includes("art. 3.5.2-3")) ?? "La altitud no está tabulada para la zona de clima invernal." });
   return r;
 }

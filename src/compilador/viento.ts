@@ -321,6 +321,9 @@ export function calcularViento(m: ModeloFisico): CalculoViento | null {
       const qe = qb * ce;
       plantas.push({ planta: id, z: p.z, ce, qe, area: A, dada: dada !== undefined, centro, F: (cp - cs) * qe * A });
     }
+    // A2-29: con las fachadas escritas y la planta sin geometría, el fondo y el ancho salen 0
+    if (plantas.length && (!(profundidad > EPS) || !(ancho > EPS)))
+      avisos.push({ codigo: "viento/sin-geometria", mensaje: `El viento según ${a === 0 ? "X" : "Y"} sale de las fachadas escritas, pero el edificio no tiene ${!(profundidad > EPS) ? "fondo" : "ancho"} en planta (losas, vigas, pilares ni muros): la esbeltez sale 0 (cp − cs = ${coma(cp - cs)}) y la excentricidad, 0. Dibuje la planta o compruebe el coeficiente eólico.` });
     if (esbeltez > ESBELTEZ_MAX)
       err("viento/esbeltez", `Esbeltez ${coma(esbeltez)} según ${a === 0 ? "X" : "Y"}: el DB SE-AE no cubre esbelteces mayores de ${ESBELTEZ_MAX} (art. 3.3.1-3); hay que considerar los efectos dinámicos.`);
     return { eje: a === 0 ? "X" : "Y", profundidad, ancho, esbeltez, cp, cs, e: EXCENTRICIDAD_VIENTO * ancho, plantas, F: plantas.reduce((s, x) => s + x.F, 0) };

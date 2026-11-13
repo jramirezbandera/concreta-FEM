@@ -109,8 +109,10 @@ describe("la nieve de la obra, del emplazamiento", () => {
 describe("el caso de nieve frente a la altitud", () => {
   it("aviso si el ψ no es el de la altitud, en compilar; con el bueno, nada", () => {
     const alto = { emplazamiento: { provincia: "05", altitud: 1130 } };
-    expect(avisosNieve(edificio(alto, [S("nieve-hasta-1000")])).map((a) => a.codigo)).toEqual(["nieve/psi-altitud"]);
-    expect(avisosNieve(edificio(alto, [S("nieve-mas-de-1000")]))).toEqual([]);
+    // Ávila tiene además la frontera de la zona invernal (A2-26): aquí sólo se mira el ψ
+    const psi = (f: ModeloFisico) => avisosNieve(f).filter((a) => a.codigo !== "nieve/zona-frontera");
+    expect(psi(edificio(alto, [S("nieve-hasta-1000")])).map((a) => a.codigo)).toEqual(["nieve/psi-altitud"]);
+    expect(psi(edificio(alto, [S("nieve-mas-de-1000")]))).toEqual([]);
     const c = compilar(edificio(alto, [{ id: "G", pesoPropio: true, accion: { tipo: "G" } }, S("nieve-hasta-1000")]));
     expect(c.valido).toBe(true);
     expect(c.diagnosticos.find((d) => d.codigo === "nieve/psi-altitud")?.ids).toEqual(["S"]);
@@ -140,5 +142,14 @@ describe("el caso de nieve frente a la altitud", () => {
     expect(o.operaciones).toEqual([{ op: "cambiar", coleccion: "casos", id: "S", objeto: { id: "S", nombre: "Nieve", accion: { tipo: "S", psi: "nieve-mas-de-1000", duracion: "media" } } }]);
     expect(propuestaCasoNieve({ ...m, casos: [...m.casos, S("nieve-mas-de-1000")] }, "nieve-mas-de-1000")!.estado).toBe("ok");
     expect(propuestaCasoNieve(m, null)).toBeNull();
+  });
+});
+
+describe("A2-26: la zona de clima invernal en una provincia que la figura E.2 parte", () => {
+  it("aviso nieve/zona-frontera con la zona de la capital; sin él si la zona está escrita o sk sale de la capital", () => {
+    const burgos = { emplazamiento: { provincia: "09", municipio: "Villarcayo", altitud: 615 } };
+    expect(avisosNieve(edificio(burgos, [S("nieve-hasta-1000")])).map((a) => a.codigo)).toEqual(["nieve/zona-frontera"]);
+    expect(avisosNieve(edificio({ ...burgos, nieve: { zonaInvernal: 1 } }, [S("nieve-hasta-1000")]))).toEqual([]);
+    expect(avisosNieve(edificio({ emplazamiento: { provincia: "09", municipio: "Burgos", altitud: 860 } }, [S("nieve-hasta-1000")]))).toEqual([]);
   });
 });

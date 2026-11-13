@@ -299,3 +299,22 @@ describe("VS1: en el cálculo", () => {
       expect(q.fisico.casos.map((x) => x.id)).toEqual(c.modelo.casos.map((x) => x.id));
     });
 });
+
+describe("A2-29: el viento con las fachadas escritas y sin geometría en planta", () => {
+  it("avisa viento/sin-geometria; con la planta dibujada, no", () => {
+    const sinNada: ModeloFisico = {
+      plantas: [
+        { id: "N2", altura: null },
+        { id: "N1", altura: 3 },
+        { id: "C", altura: 3 },
+      ],
+      materiales: [],
+      secciones: [],
+      casos: [{ id: "G", pesoPropio: true, accion: { tipo: "G" } }],
+      acciones: { viento: { zona: "A", aspereza: "IV", fachadas: [{ planta: "N2", x: 10, y: 10 }, { planta: "N1", x: 20, y: 20 }] } },
+    };
+    const c = calcularViento(sinNada)!;
+    expect(c.avisos.map((a) => a.codigo)).toContain("viento/sin-geometria");
+    expect(calcularViento(edificio([3, 3], 20, 12, { zona: "B", aspereza: "III" }))!.avisos.map((a) => a.codigo)).not.toContain("viento/sin-geometria");
+  });
+});

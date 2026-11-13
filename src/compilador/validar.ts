@@ -792,6 +792,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     usaPlanta(l.id, l.planta);
     if (!pos(l.espesor)) mal(l.id, "el espesor tiene que ser un número > 0 (m)");
     if (l.pp !== undefined && !(num(l.pp) && l.pp >= 0)) mal(l.id, "el peso propio pp tiene que ser un número ≥ 0 (kN/m²)");
+    // A2-33: un pp de 0 escrito deja la losa sin peso propio
+    else if (l.pp === 0) diag.aviso("forjado/pp-nulo", `${l.id}: tiene escrito pp = 0, así que no pesa. Si su peso va en otra carga, está bien; si no, quite pp y el programa lo calcula.`, [l.id]);
     if (l.ppProcedencia !== undefined) {
       const e = procedenciaNoValida(l.ppProcedencia);
       if (e) mal(l.id, e);
@@ -950,6 +952,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     if (!okS) mal(p.id, `el intereje tiene que ser un número mayor que 2·ε_snap (${2 * op.epsSnap} m)`);
     if (!okPp)
       mal(p.id, p.pp === undefined ? "falta el peso propio pp (kN/m², con las bovedillas): sólo sale solo con una vigueta en T (sección forma \"T\") más estrecha que el intereje" : "el peso propio pp tiene que ser un número ≥ 0 (kN/m²): incluye las bovedillas, que la sección de la vigueta no conoce");
+    else if (p.pp === 0) diag.aviso("forjado/pp-nulo", `${p.id}: tiene escrito pp = 0, así que no pesa. Si su peso va en otra carga, está bien; si no, quite pp y el programa lo calcula.`, [p.id]);
     const dc = poligonoNoValido(p.contorno);
     if (dc) {
       mal(p.id, `el contorno ${dc}`);

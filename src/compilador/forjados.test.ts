@@ -468,3 +468,10 @@ describe("regresiones de la malla de C2 que encontró C4", () => {
     }
   });
 });
+
+describe("A2-33: un pp de 0 escrito", () => {
+  it("avisa forjado/pp-nulo; sin pp, no", () => {
+    expect(compilar(recuadro({ pp: 0 })).diagnosticos.map((d) => d.codigo)).toContain("forjado/pp-nulo");
+    expect(compilar(recuadro({})).diagnosticos.map((d) => d.codigo)).not.toContain("forjado/pp-nulo");
+  });
+});
