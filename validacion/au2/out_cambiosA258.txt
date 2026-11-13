@@ -1,0 +1,13 @@
+== etabs-15c-3-60: estructura idéntica; cargas idénticas
+== etabs-15f-1: estructura idéntica; cargas idénticas
+== sotano-empuje: estructura idéntica; cargas idénticas
+== viga-en-muro: estructura idéntica; cargas idénticas
+== aleatorio-3-muros: estructura idéntica; cargas idénticas
+== reticula-nucleo: estructura idéntica; cargas idénticas
+== aleatorio-3-muros-lv: estructura idéntica; cargas idénticas
+== aleatorio-3-muros-lv2: estructura idéntica; cargas idénticas
+== reticula-nucleo-lvd: estructura idéntica; cargas idénticas
+== reticula-nucleo-rvb: estructura idéntica
+  caso G: 62 cargas nodales cambian en Fz (Σ Fz nodal -55.865000 → -40.740000 kN); lo demás del caso igual
+== reticula-nucleo-tb: estructura idéntica
+  caso G: 62 cargas nodales cambian en Fz (Σ Fz nodal -62.705000 → -47.580000 kN); lo demás del caso igual

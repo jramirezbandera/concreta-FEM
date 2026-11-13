@@ -17,6 +17,7 @@ import { fisicoAleatorio } from "../pruebas/fisicoAleatorio.ts";
 import { conLosasAleatorias } from "../pruebas/losasAleatorias.ts";
 import { valido } from "../pruebas/metamorficasFisicas.ts";
 import { conMurosAleatorios } from "../pruebas/murosAleatorios.ts";
+import { resultanteAnalitica } from "./cargas.ts";
 import { compilar } from "./compilar.ts";
 import type { CargaFisica, Losa, ModeloFisico, Muro, Pilar, Vec2, Viga } from "./fisico.ts";
 import { ASPECTO_ALTO } from "./muros.ts";
@@ -297,6 +298,27 @@ describe("cargas (C3-g, C3-h)", () => {
     const esperado = g * t * (6 * 6 - 2) - 2 * g * (t / 2) * (e / 2) * 4;
     expect(Fz / esperado - 1).toBeLessThan(1e-9);
     expect(Math.abs(Fz / esperado - 1)).toBeLessThan(1e-9);
+  });
+
+  it("A2-58: el solape de un muro que acaba en la losa y de uno que arranca de ella, según el plano del forjado", () => {
+    const g = 25;
+    const t = 0.25;
+    const e = 0.2;
+    // Un muro de 4 m cubierto por los dos lados: M1, de C a P1 bajo la losa, o M2, de P1 a P2 sobre ella
+    const peso = (m: Muro, plano: "superior" | "medio") => {
+      const f = modelo({ peso: g, muros: [m], losas: [{ id: "L", planta: "P1", contorno: rect(0, 0, 6, 5), espesor: e, material: "HA", pp: 0 }] });
+      const r = valido(compilar(f, { tamanoMalla: 0.5, planoForjado: plano }));
+      return -resultanteAnalitica(r.modelo, 0, [0, 0, 0]).F[2];
+    };
+    const M1 = muro("M1", [[1, 1], [5, 1]], "C", "P1");
+    const M2 = muro("M2", [[1, 4], [5, 4]], "P1", "P2", { base: "ninguno" });
+    const alzado = g * t * 4 * 3;
+    // RV-b (por defecto): la losa ocupa todo el canto de la cabeza de M1 y nada de la base de M2. Antes,
+    // e/2 en cada uno: M2, que se apoya en la losa, pesaba γ·t·(e/2) por metro de menos (−5 % en el ejemplo del auditor)
+    expect(peso(M1, "superior") / (alzado - g * t * e * 4) - 1).toBeCloseTo(0, 12);
+    expect(peso(M2, "superior") / alzado - 1).toBeCloseTo(0, 12);
+    // Con el plano medio, e/2 en los dos
+    for (const m of [M1, M2]) expect(peso(m, "medio") / (alzado - g * t * (e / 2) * 4) - 1).toBeCloseTo(0, 12);
   });
 
   it("empuje hidrostático en un muro con un hueco: resultante y punto de aplicación, del lado que toca", () => {

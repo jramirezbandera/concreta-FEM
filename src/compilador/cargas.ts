@@ -47,6 +47,12 @@ import { RepartoPano, trozosEnPanos, type BordePano, type EmisorPano, type Nudos
 import { distanciaARegion } from "./topologia.ts";
 import type { Contexto, MuroCompilado } from "./validar.ts";
 
+/**
+ * C3-g y A2-58: la parte del canto de la losa que ocupa el muro que llega a ella, [desde abajo (su
+ * cabeza), desde arriba (su base)], según el plano del forjado.
+ */
+export const SOLAPE_MURO_LOSA: Record<"superior" | "medio", readonly [number, number]> = { superior: [1, 0], medio: [0.5, 0.5] };
+
 export const TOL_SIN_PERDIDAS = 1e-9;
 
 type V = [number, number, number];
@@ -799,7 +805,11 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
           sumarPuntual(fisicas[cPeso]!, [f.A[0] + (f.u[0] * f.L) / 2 - centro[0], f.A[1] + (f.u[1] * f.L) / 2 - centro[1], (za + zb) / 2 - centro[2]], [0, 0, -w * A], [0, 0, 0]);
         }
     }
-    // Solape muro–losa (C3-g): γ·(t/2)·(e/2) hacia arriba por lado cubierto y por muro que llega
+    // Solape muro–losa (C3-g): γ·(t/2)·e·f hacia arriba por lado cubierto, con f lo que la losa ocupa
+    // del muro que llega: con el plano medio, e/2 en la cabeza del de debajo y e/2 en la base del de
+    // encima; con RV-b (la cota es la cara superior), todo el canto en la cabeza del de debajo y nada en
+    // la base del de encima (A2-58: antes, e/2 y e/2 también con RV-b)
+    const [fDebajo, fEncima] = SOLAPE_MURO_LOSA[ctx.op.planoForjado];
     for (const ld of losas.ladosMuros) {
       const m = ctx.muros[ld.w]!;
       const L = Math.sqrt((ld.B[0] - ld.A[0]) * (ld.B[0] - ld.A[0]) + (ld.B[1] - ld.A[1]) * (ld.B[1] - ld.A[1]));
@@ -812,7 +822,7 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         const i = ctx.losas.findIndex((l, li) => l.losa.planta === idPlanta && puntoEnRegion(q, losas.regiones[li]!));
         if (i >= 0) e += ctx.losas[i]!.material.t;
       }
-      const qz = m.gamma * (m.material.t / 2) * (e / 2) * ((ld.debajo ? 1 : 0) + (ld.encima ? 1 : 0));
+      const qz = m.gamma * (m.material.t / 2) * e * ((ld.debajo ? fDebajo : 0) + (ld.encima ? fEncima : 0));
       if (!(qz > 0)) continue;
       nodal(cPeso, ld.nudos[0], [0, 0, (qz * L) / 4], [0, 0, 0]);
       nodal(cPeso, ld.nudos[1], [0, 0, (qz * L) / 2], [0, 0, 0]);

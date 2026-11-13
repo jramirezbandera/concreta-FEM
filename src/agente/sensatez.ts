@@ -18,7 +18,7 @@
 import { resolverAbacos, TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { direccionEjes } from "../compilador/ejes.ts";
-import { resultanteAnalitica } from "../compilador/cargas.ts";
+import { resultanteAnalitica, SOLAPE_MURO_LOSA } from "../compilador/cargas.ts";
 import { puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { cuerdaHuella, distanciaAHuella, huellaPilar } from "../compilador/geometria2d.ts";
@@ -633,7 +633,7 @@ export function pesoLibre(f: ModeloFisico, planta: string, q: Vec2, h: number, g
  * entre dos niveles (fase BN) pesa γ·A por su longitud real, en la planta de su extremo alto salvo su
  * zona rígida en el extremo bajo (CB-f, la que el compilador lleva al nudo de esa planta).
  */
-export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, toleranciaAbacos = TOLERANCIA_ABACOS): Omit<PesoPropioPlanta, "calculado">[] {
+export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, toleranciaAbacos = TOLERANCIA_ABACOS, planoForjado: "superior" | "medio" = "superior"): Omit<PesoPropioPlanta, "calculado">[] {
   // MA2: con los ábacos que usa el compilador (los de los pilares y los unidos)
   f = resolverAbacos(f, toleranciaAbacos).modelo;
   const material = new Map(f.materiales.map((m) => [m.id, m]));
@@ -705,11 +705,13 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, tole
       const huecos = (m.huecos ?? []).reduce((s, h) => s + Math.max(0, h.hasta - h.desde) * Math.max(0, Math.min(z1, h.z1) - Math.max(z0, h.z0)), 0);
       r.get(P.ids[k]!)!.muros += w * (L * (z1 - z0) - huecos);
     }
-    // C3-g: el solape con las losas de cada planta a la que llega, la mitad por cada lado
+    // C3-g: el solape con las losas de cada planta a la que llega, lo que la losa ocupa del muro de
+    // debajo y del de encima (A2-58: todo el canto en la cabeza con RV-b; la mitad y la mitad con el plano medio)
     const kh = ks[0]!;
     const kb = ks[ks.length - 1]! + 1;
+    const [fDebajo, fEncima] = SOLAPE_MURO_LOSA[planoForjado];
     for (let k = kh; k <= kb; k++) {
-      const lados = (k < kb ? 0.5 : 0) + (k > kh ? 0.5 : 0);
+      const lados = (k < kb ? fDebajo : 0) + (k > kh ? fEncima : 0);
       if (!lados) continue;
       for (const l of losasEn(P.ids[k]!))
         for (const t of tramos(m.puntos)) r.get(P.ids[k]!)!.solapes += momentosInterseccion(regionDe(l), huellaTramo(t, m.espesor)).A * l.espesor * gammaMaterial(mat) * lados;
@@ -811,7 +813,7 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
   const pendiente = dado === "pendiente";
   const calc = dado === undefined ? pesoPropioCalculado(f, opciones) : pendiente ? null : dado;
   if (pendiente) reg.c.estado = "pendiente";
-  const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P, opciones?.epsSnap, (opciones?.tamanoMalla ?? TAMANO_MALLA) / 2).map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
+  const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P, opciones?.epsSnap, (opciones?.tamanoMalla ?? TAMANO_MALLA) / 2, opciones?.planoForjado ?? "superior").map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
   const total = { pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, ...(f.barras?.length ? { barras: 0 } : {}), solapes: 0, esperado: 0, calculado: calc ? 0 : null } as DesglosePesoPropio["total"];
   for (const x of plantas) {
     for (const k of ["pilares", "vigas", "losas", "panos", "muros", "solapes", "esperado"] as const) total[k] += x[k];
