@@ -1,0 +1,73 @@
+
+### C2
+== losa-plana: malla idéntica; casos idénticos
+== navier-delgada: malla idéntica; casos idénticos
+== aleatorio-8-losas: malla idéntica
+  caso 0: ΣRz 722.6596 → 722.6596 kN (-0.000 %); Δu máx 0.001 % del mayor
+== aleatorio-11-losas-sin-diafragma: malla idéntica
+  caso 0: ΣRz 1304.3617 → 1304.3617 kN (-0.000 %); Δu máx 0.001 % del mayor
+== losa-plana-rejilla: malla idéntica; casos idénticos
+== aleatorio-8-losas-rejilla: malla idéntica
+  caso 0: ΣRz 722.6596 → 722.6596 kN (-0.000 %); Δu máx 0.001 % del mayor
+== reticula-enrasada: malla idéntica; casos idénticos
+== aleatorio-8-losas-rejilla-lv: malla idéntica
+  caso 0: ΣRz 722.6596 → 722.6596 kN (-0.000 %); Δu máx 0.001 % del mayor
+== aleatorio-8-losas-rejilla-lv2: malla idéntica
+  caso 0: ΣRz 722.6596 → 722.6596 kN (-0.000 %); Δu máx 0.001 % del mayor
+
+### C3
+== etabs-15c-3-60: malla idéntica; casos idénticos
+== etabs-15f-1: malla idéntica; casos idénticos
+== sotano-empuje: malla idéntica; casos idénticos
+== viga-en-muro: malla idéntica; casos idénticos
+== aleatorio-3-muros: malla idéntica
+  caso 0: ΣRz 1004.8423 → 1004.8423 kN (0.000 %); Δu máx 0.002 % del mayor
+== reticula-nucleo: malla idéntica; casos idénticos
+== aleatorio-3-muros-lv: malla idéntica
+  caso 0: ΣRz 1004.8423 → 1004.8423 kN (0.000 %); Δu máx 0.001 % del mayor
+== aleatorio-3-muros-lv2: malla idéntica
+  caso 0: ΣRz 1004.8423 → 1004.8423 kN (0.000 %); Δu máx 0.002 % del mayor
+== reticula-nucleo-lvd: malla idéntica; casos idénticos
+== reticula-nucleo-rvb: malla idéntica; casos idénticos
+== reticula-nucleo-tb: malla idéntica; casos idénticos
+
+### C4
+== pano-oblicuo: malla idéntica; casos idénticos
+== dos-vanos-voladizo: malla idéntica; casos idénticos
+== pano-hueco: malla idéntica; casos idénticos
+== aleatorio-7-unidireccional: malla idéntica
+  caso 0: ΣRz 1073.0667 → 1073.0667 kN (-0.000 %); Δu máx 0.000 % del mayor
+== aleatorio-6-reticular: malla idéntica; casos idénticos
+== aleatorio-5-mixto: malla idéntica; casos idénticos
+== aleatorio-5-mixto-lv: malla idéntica; casos idénticos
+== aleatorio-5-mixto-lv2: malla idéntica; casos idénticos
+
+### C5
+== pilares-mezclados: malla idéntica; casos idénticos
+== reticular-h25: malla idéntica; casos idénticos
+== etabs-15c-3-60: malla idéntica; casos idénticos
+== aleatorio-3: malla idéntica
+  caso 0: ΣRz 921.9388 → 921.9388 kN (-0.000 %); Δu máx 0.001 % del mayor
+
+### F
+== h25-plana: malla idéntica; casos idénticos
+== h25-reticular: malla idéntica; casos idénticos
+== pilares-mezclados: malla idéntica; casos idénticos
+== aleatorio-3: malla idéntica
+  caso 0: ΣRz 921.9388 → 921.9388 kN (-0.000 %); Δu máx 0.001 % del mayor
+== losa-3x3-refinada: malla idéntica; casos idénticos
+== h25-plana-sin-refinar: malla idéntica; casos idénticos
+== losa-3x3-mezclada: malla idéntica; casos idénticos
+== reticular-2x2-abacos: malla idéntica; casos idénticos
+== aleatorio-3-lv: malla idéntica
+  caso 0: ΣRz 921.9388 → 921.9388 kN (-0.000 %); Δu máx 0.001 % del mayor
+== reticular-2x2-abacos-lv: malla idéntica; casos idénticos
+== aleatorio-3-lv2: malla idéntica
+  caso 0: ΣRz 921.9388 → 921.9388 kN (-0.000 %); Δu máx 0.001 % del mayor
+== reticular-2x2-abacos-lv2: malla idéntica; casos idénticos
+== edificio-2x2-lv2: malla idéntica; casos idénticos
+== edificio-2x2-lvd: malla idéntica; casos idénticos
+== edificio-2x2-rvb: malla idéntica; casos idénticos
+== reticular-2x2-planas-rva: malla idéntica; casos idénticos
+== edificio-2x2-tb: malla idéntica; casos idénticos
+== reticular-2x2-abacos-tb: malla idéntica; casos idénticos

@@ -40,7 +40,7 @@ import type { Vec2, Viga } from "./fisico.ts";
 import { alDiafragma, type Losas } from "./losas.ts";
 import { franjas, franjasLibres } from "./muros.ts";
 import type { Piezas, Recta } from "./piezas.ts";
-import { areaConSigno, momentosInterseccion, momentosRegion, puntoEnRegion, type Momentos, type Region } from "./poligonos.ts";
+import { areaConSigno, momentosInterseccion, momentosRegion, puntoEnRegion, recorteRegionConvexo, type Momentos, type Region } from "./poligonos.ts";
 import type { Topologia } from "./topologia.ts";
 import { cotaNudo, seccionTramo } from "./topologia.ts";
 import { RepartoPano, trozosEnPanos, type BordePano, type EmisorPano, type NudosBorde, type PanosU, type Receptor } from "./unidireccional.ts";
@@ -162,55 +162,75 @@ function sumarSuperficie(r: Resultante, m: Momentos, z: number, q: readonly numb
 }
 
 /**
- * C2-g: tramos de peso de una viga de hormigón rectangular bajo losa. Por cada lado de su eje
- * cubierto por una losa se le quita lo que esa mitad del ancho ya pesa como forjado: (b/2)·pp, sin
- * pasar de γ·(b/2)·min(h, t) (AU-4: en un aligerado o un paño, el ancho pesa como hormigón, no como
- * el forjado). El lado se mira a b/4 del eje, en tramos partidos donde esas dos líneas cortan el
- * borde de una losa o de un ábaco (que va antes que su losa en `regiones`).
+ * C2-g: tramos de peso de una viga de hormigón rectangular bajo losa. De cada mitad de su ancho (del eje
+ * a una cara) se le quita lo que la losa que la cubre ya pesa como forjado: (b/2)·pp por metro, sin pasar
+ * de γ·(b/2)·min(h, t) (AU-4: en un aligerado o un paño, el ancho pesa como hormigón, no como el forjado).
+ * A2-31: con el área de la losa (o del ábaco, que va antes que su losa en `regiones`) en esa mitad, en
+ * tramos partidos donde el eje y las caras cortan el borde de una losa o de un ábaco y en los vértices que
+ * caen dentro del ancho; en cada tramo, la fracción cubierta. Antes se miraba un punto a b/4 del eje, y un
+ * borde entre el eje y la cara dejaba sin contar, o contaba de más, hasta γ·t·b/4 por metro. Con la mitad
+ * cubierta entera o nada, lo de antes con los mismos bits.
  */
 function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: readonly RegionPeso[], eps: number): { desde: number; hasta: number; w: number }[] {
   const gamma = w / (b * h);
   const n: Vec2 = [-r.e[1], r.e[0]];
   const cortes = new Set<number>([0, r.len]);
-  for (const s of [1, -1]) {
-    const O: Vec2 = [r.O[0] + (s * b * n[0]) / 4, r.O[1] + (s * b * n[1]) / 4];
-    for (const { region } of regiones) {
-      for (const p of [region.contorno, ...region.huecos]) {
-        for (let i = 0; i < p.length; i++) {
-          const [A, B] = [p[i]!, p[(i + 1) % p.length]!];
-          // O + σ·e = A + τ·(B − A)
-          const d: Vec2 = [B[0] - A[0], B[1] - A[1]];
-          const den = r.e[0] * d[1] - r.e[1] * d[0];
-          if (Math.abs(den) < 1e-14) continue;
-          const wx = A[0] - O[0];
-          const wy = A[1] - O[1];
+  const enRecta = (sigma: number) => sigma > eps && sigma < r.len - eps;
+  for (const { region } of regiones)
+    for (const p of [region.contorno, ...region.huecos])
+      for (let i = 0; i < p.length; i++) {
+        const [A, B] = [p[i]!, p[(i + 1) % p.length]!];
+        // Los vértices dentro del ancho
+        const wa = [A[0] - r.O[0], A[1] - r.O[1]];
+        const sa = wa[0]! * r.e[0] + wa[1]! * r.e[1];
+        const ta = wa[0]! * n[0] + wa[1]! * n[1];
+        if (Math.abs(ta) < b / 2 - eps && enRecta(sa)) cortes.add(sa);
+        // Los cortes del lado con el eje y con las dos caras: O + o·n + σ·e = A + τ·(B − A)
+        const d: Vec2 = [B[0] - A[0], B[1] - A[1]];
+        const den = r.e[0] * d[1] - r.e[1] * d[0];
+        if (Math.abs(den) < 1e-14) continue;
+        for (const o of [0, b / 2, -b / 2]) {
+          const wx = A[0] - r.O[0] - o * n[0];
+          const wy = A[1] - r.O[1] - o * n[1];
           const sigma = (wx * d[1] - wy * d[0]) / den;
           const tau = (wx * r.e[1] - wy * r.e[0]) / den;
-          if (tau >= 0 && tau <= 1 && sigma > eps && sigma < r.len - eps) cortes.add(sigma);
+          if (tau >= 0 && tau <= 1 && enRecta(sigma)) cortes.add(sigma);
         }
       }
-    }
-  }
   // Sin tramos más cortos que ε_geom (un borde que corta el eje casi en el mismo punto dos veces)
   const cs = [...cortes].sort((x, y) => x - y).filter((x, i, l) => i === 0 || i === l.length - 1 || x - l[i - 1]! > eps);
   if (cs.length > 2 && cs[cs.length - 1]! - cs[cs.length - 2]! <= eps) cs.splice(cs.length - 2, 1);
+  const punto = (sg: number, o: number): Vec2 => [r.O[0] + sg * r.e[0] + o * n[0], r.O[1] + sg * r.e[1] + o * n[1]];
   const tramos: { desde: number; hasta: number; w: number }[] = [];
   for (let i = 0; i + 1 < cs.length; i++) {
-    const sm = (cs[i]! + cs[i + 1]!) / 2;
+    const [s0, s1] = [cs[i]!, cs[i + 1]!];
+    const media = (b / 2) * (s1 - s0);
     let quita = 0;
-    for (const s of [1, -1]) {
-      const q: Vec2 = [r.O[0] + sm * r.e[0] + (s * b * n[0]) / 4, r.O[1] + sm * r.e[1] + (s * b * n[1]) / 4];
-      const l = regiones.find((x) => puntoEnRegion(q, x.region) && (!x.en || puntoEnRegion(q, x.en)));
-      if (!l) continue;
-      // En una maciza con su pp (γ·t), lo de C2-g con los mismos bits
-      const solido = gamma * (b / 2) * Math.min(h, l.t);
-      const forjado = (b / 2) * l.pp;
-      quita += forjado < solido * (1 - 1e-9) ? forjado : solido;
+    for (const lado of [1, -1]) {
+      // La mitad del ancho de este lado en el tramo
+      const Z: Vec2[] = [punto(s0, 0), punto(s1, 0), punto(s1, (lado * b) / 2), punto(s0, (lado * b) / 2)];
+      const deAbacos = new Map<Region, number>();
+      for (const x of regiones) {
+        let A: number;
+        if (x.en) {
+          // Un ábaco, dentro de su losa (uno de fachada se sale de ella)
+          A = (recorteRegionConvexo(x.region, Z) ?? []).reduce((t, z) => t + Math.abs(momentosInterseccion(x.en!, z).A), 0);
+          deAbacos.set(x.en, (deAbacos.get(x.en) ?? 0) + A);
+        } else A = Math.abs(momentosInterseccion(x.region, Z).A) - (deAbacos.get(x.region) ?? 0);
+        let fr = A / media;
+        if (!(fr > 1e-9)) continue;
+        if (fr > 1 - 1e-9) fr = 1;
+        // En una maciza con su pp (γ·t), lo de C2-g con los mismos bits
+        const solido = gamma * (b / 2) * Math.min(h, x.t);
+        const forjado = (b / 2) * x.pp;
+        const q = forjado < solido * (1 - 1e-9) ? forjado : solido;
+        quita += fr === 1 ? q : fr * q;
+      }
     }
     const wi = w - quita;
     const ult = tramos[tramos.length - 1];
-    if (ult && ult.w === wi) ult.hasta = cs[i + 1]!;
-    else tramos.push({ desde: cs[i]!, hasta: cs[i + 1]!, w: wi });
+    if (ult && ult.w === wi) ult.hasta = s1;
+    else tramos.push({ desde: s0, hasta: s1, w: wi });
   }
   return tramos;
 }
