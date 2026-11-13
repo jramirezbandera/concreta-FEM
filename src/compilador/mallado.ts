@@ -1146,7 +1146,30 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         tri = d.triangles;
         sinEmpates = true;
       } catch (e) {
-        return e instanceof Error ? e.message : String(e);
+        // A2-52: una arista obligatoria por la envolvente convexa con puntos alineados sólo al redondeo
+        // (el borde de una planta girada con sus vértices al milímetro) «sale de la envolvente» y
+        // constrainautor no la sigue. Con un marco de cuatro puntos lejos, ninguna arista obligatoria
+        // está en la envolvente. Los triángulos de dentro de las losas, encerradas por aristas
+        // obligatorias, son los mismos (la triangulación restringida de cada región sólo depende de
+        // lo que hay en ella); los del marco se quitan. Sólo si lo demás falla: los mismos bits siempre
+        try {
+          const n = orden.length;
+          let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+          for (let i = 0; i < n; i++) [x0, y0, x1, y1] = [Math.min(x0, coords[2 * i]!), Math.min(y0, coords[2 * i + 1]!), Math.max(x1, coords[2 * i]!), Math.max(y1, coords[2 * i + 1]!)];
+          const m = 10 * Math.max(x1 - x0, y1 - y0, 1);
+          const conMarco = new Float64Array(2 * (n + 4));
+          conMarco.set(coords);
+          conMarco.set([x0 - m, y0 - m, x1 + m, y0 - m, x1 + m, y1 + m, x0 - m, y1 + m], 2 * n);
+          const d = new Delaunator(conMarco);
+          pasadas = new Restringidor(d).restringir(aristas, losas[0]?.eje1 ?? [1, 0], origenes[0] ?? [0, 0], epsGeom);
+          const t = d.triangles;
+          const quedan: number[] = [];
+          for (let k = 0; k < t.length; k += 3) if (t[k]! < n && t[k + 1]! < n && t[k + 2]! < n) quedan.push(t[k]!, t[k + 1]!, t[k + 2]!);
+          tri = Uint32Array.from(quedan);
+          sinEmpates = false;
+        } catch {
+          return e instanceof Error ? e.message : String(e);
+        }
       }
     }
     return null;

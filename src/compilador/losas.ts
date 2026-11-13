@@ -269,6 +269,39 @@ export function casiEnCaras(q: Vec2, antes: Vec2, despues: Vec2, caras: readonly
   return [c.A[0] + t * c.u[0], c.A[1] + t * c.u[1]];
 }
 
+/**
+ * A2-52: el punto X, ya proyectado sobre la cara `cara`, al cruce de esa cara con otra no paralela de
+ * `caras` que le queda a ≤ `CASI_EN_CARA` (la esquina de dos vigas que acaban en un pilar girado, con
+ * los extremos redondeados al milímetro: la esquina de la huella queda a micras de las dos caras y,
+ * proyectada sobre una sola, dejaba un lado de micras contra la otra que la malla perdía). Null si no
+ * hay otra cara así o si X ya está en ella (a ≤ ε_geom, lo que el arreglo une: con una tolerancia de
+ * redondeo, la decisión dependía del motor de JavaScript).
+ */
+export function enEsquinaDeCaras(X: Vec2, cara: readonly [Vec2, Vec2], caras: readonly (readonly [Vec2, Vec2])[], epsGeom: number): Vec2 | null {
+  // Sólo con +, −, ×, / y √, que IEEE redondea igual en todos los motores (`Math.hypot` no: el cruce
+  // salía con un ulp distinto en Bun y en Node)
+  const [A, B] = cara;
+  const va: Vec2 = [B[0] - A[0], B[1] - A[1]];
+  const La2 = va[0] * va[0] + va[1] * va[1];
+  if (!(La2 > 0)) return null;
+  let mejor: { X: Vec2; d: number } | null = null;
+  for (const [C, D] of caras) {
+    const vb: Vec2 = [D[0] - C[0], D[1] - C[1]];
+    const Lb2 = vb[0] * vb[0] + vb[1] * vb[1];
+    if (!(Lb2 > 0)) continue;
+    const s = va[0] * vb[1] - va[1] * vb[0];
+    if (Math.abs(s) < 0.5 * Math.sqrt(La2 * Lb2)) continue;
+    const d = Math.abs((X[0] - C[0]) * vb[1] - (X[1] - C[1]) * vb[0]) / Math.sqrt(Lb2);
+    if (d <= epsGeom || d > CASI_EN_CARA) continue;
+    if (mejor && d >= mejor.d) continue;
+    const t = ((C[0] - A[0]) * vb[1] - (C[1] - A[1]) * vb[0]) / s;
+    mejor = { X: [A[0] + t * va[0], A[1] + t * va[1]], d };
+  }
+  if (!mejor) return null;
+  const [dx, dy] = [mejor.X[0] - X[0], mejor.X[1] - X[1]];
+  return Math.sqrt(dx * dx + dy * dy) <= 2 * CASI_EN_CARA ? mejor.X : null;
+}
+
 /** Polígono convexo (en cualquier sentido), sin vértices a ≤ 10·ε_geom ni ángulos llanos. */
 export function convexoEstricto(p: readonly Vec2[], epsGeom: number): boolean {
   const n = p.length;
@@ -597,10 +630,12 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
           if (!(L2 > 0)) continue;
           const t = ((q[0] - A[0]) * ux + (q[1] - A[1]) * uy) / L2;
           const X: Vec2 = [A[0] + t * ux, A[1] + t * uy];
-          const d = Math.hypot(q[0] - X[0], q[1] - X[1]);
-          if (d > 10 * epsGeom && d <= epsSnap + 10 * epsGeom) {
+          const d = Math.sqrt((q[0] - X[0]) * (q[0] - X[0]) + (q[1] - X[1]) * (q[1] - X[1]));
+          // A2-52: desde ε_geom, lo que el arreglo ya no une (con 10·ε_geom, una esquina a micras de la
+          // cara se quedaba con un lado de micras contra ella, que la malla perdía)
+          if (d > epsGeom && d <= epsSnap + 10 * epsGeom) {
             movidos[i] = true;
-            return X;
+            return enEsquinaDeCaras(X, [A, B], rectas, epsGeom) ?? X;
           }
         }
         return q;
