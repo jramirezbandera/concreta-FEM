@@ -40,7 +40,7 @@ import { barrasTorsionEquilibrio, construirPiezas, diafragmaDe, type BarraP, typ
 import { conPuntoFijo } from "./puntoFijo.ts";
 import { construirTopologia, cotaNudo, ejeTramo } from "./topologia.ts";
 import { construirPanos, type PanosU } from "./unidireccional.ts";
-import { ordenarPoligonos, validar, type Contexto } from "./validar.ts";
+import { formaValida, ordenarPoligonos, validar, type Contexto } from "./validar.ts";
 import { pesoReticular, textoOrigenPp } from "./pesoForjado.ts";
 import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
@@ -155,6 +155,10 @@ export function huellaSinCompilar(fisico: ModeloFisico, opciones: OpcionesCompil
 
 export function compilar(fisico: ModeloFisico, opciones: OpcionesCompilacion = {}): ResultadoCompilacion {
   let huella = "";
+  // A2-61: la forma del modelo, antes de su huella y de resolverlo (sin el esquema de la CLI, un
+  // elemento null o una lista que no lo es acababa en compilador/error-interno)
+  const forma = new Diagnosticos();
+  if (!formaValida(fisico, forma)) return { valido: false, huella, diagnosticos: forma.lista };
   try {
     const op = resolverOpciones(opciones);
     huella = huellaCompilacion(fisico, op);

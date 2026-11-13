@@ -283,6 +283,48 @@ function ranura(p: readonly Vec2[], eps: number): { i: number; j: number; d: num
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
 
+const LISTAS = ["plantas", "materiales", "secciones", "pilares", "vigas", "barras", "apoyos", "losas", "apoyosLineales", "bandas", "muros", "panos", "casos", "cargas", "ejes"] as const;
+const ACCIONES = ["emplazamiento", "viento", "sismo", "nieve", "segundoOrden"] as const;
+
+/**
+ * A2-61: la forma del modelo antes de resolverlo (ábacos, bordes, viento) y de validarlo: un objeto,
+ * sus listas, listas de objetos, los contornos y huecos de losas y paños, listas de pares de números,
+ * y las acciones, objetos. Sin esto, `compilar` llamado sin el esquema de la CLI (la integración en
+ * Concreta) acababa en `compilador/error-interno` con un elemento null o una lista que no lo es.
+ * Devuelve si la forma vale; los errores, en `diag`.
+ */
+export function formaValida(fisico: unknown, diag: Diagnosticos): boolean {
+  if (!esObjeto(fisico)) {
+    diag.error("fisico/no-valido", "El modelo físico no es un objeto.");
+    return false;
+  }
+  const antes = diag.lista.length;
+  const par = (p: unknown) => Array.isArray(p) && p.length === 2 && p.every(num);
+  const poligono = (p: unknown) => Array.isArray(p) && p.every(par);
+  for (const k of LISTAS) {
+    const v = fisico[k];
+    if (v === undefined && k !== "plantas" && k !== "materiales" && k !== "secciones" && k !== "casos") continue;
+    // Con los mismos códigos y mensajes que la comprobación de las listas de `validar`
+    if (!Array.isArray(v)) {
+      diag.error("fisico/no-valido", `El modelo físico no tiene la lista «${k}».`);
+      continue;
+    }
+    v.forEach((x, i) => {
+      if (!esObjeto(x)) return diag.error("fisico/sin-id", `El elemento ${i + 1} de «${k}» no es un objeto con un id de texto no vacío.`);
+      if (k !== "losas" && k !== "panos") return;
+      const id = typeof x.id === "string" ? x.id : `${k}[${i}]`;
+      if (!poligono(x.contorno)) diag.error("fisico/valor-no-valido", `${id}: el contorno tiene que ser una lista de puntos [x, y].`, [id]);
+      if (x.huecos !== undefined && !(Array.isArray(x.huecos) && x.huecos.every(poligono))) diag.error("fisico/valor-no-valido", `${id}: los huecos tienen que ser listas de puntos [x, y].`, [id]);
+    });
+  }
+  const a = fisico.acciones;
+  if (a !== undefined) {
+    if (!esObjeto(a)) diag.error("fisico/valor-no-valido", "acciones tiene que ser un objeto.");
+    else for (const k of ACCIONES) if (a[k] !== undefined && !esObjeto(a[k])) diag.error("fisico/valor-no-valido", `acciones.${k} tiene que ser un objeto.`);
+  }
+  return diag.lista.length === antes;
+}
+
 /** El modelo con los ábacos de los pilares (MA2) y las cargas de borde (MA4) resueltos, como lo valida y compila el compilador. */
 export function fisicoResuelto(fisico: ModeloFisico, op: Pick<OpcionesResueltas, "tamanoMalla" | "epsGeom" | "epsSnap">): ModeloFisico {
   // VS1: los casos y las cargas del viento del programa, al final de las listas
@@ -290,14 +332,12 @@ export function fisicoResuelto(fisico: ModeloFisico, op: Pick<OpcionesResueltas,
 }
 
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
+  // A2-61: la forma, antes de resolver nada
+  if (!formaValida(fisico, diag)) return null;
   // MA2 y MA4: los ábacos de los pilares y las cargas de borde, resueltos (idempotente: el compilador
   // ya los trae resueltos; las consultas, las bandas y los muros validan el modelo tal como se guarda)
   fisico = fisicoResuelto(fisico, op);
   const f = fisico as unknown as Record<string, unknown>;
-  if (!esObjeto(f)) {
-    diag.error("fisico/no-valido", "El modelo físico no es un objeto.");
-    return null;
-  }
   // VS4: el emplazamiento común al viento y al sismo
   for (const e of erroresEmplazamiento(fisico)) diag.error(e.codigo, e.mensaje);
   for (const e of erroresNieve(fisico)) diag.error(e.codigo, e.mensaje);
@@ -638,6 +678,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   // Casos y cargas
   const caso = new Map<string, number>();
   casos.forEach((c, i) => caso.set(c.id, i));
+  // A2-62: un pesoPropio que no es un booleano («sí», 1) quitaba el peso propio sin decir nada
+  for (const c of casos) if (c.pesoPropio !== undefined && typeof c.pesoPropio !== "boolean") mal(c.id, "pesoPropio tiene que ser true o false");
   const conPeso = casos.filter((c) => c.pesoPropio === true);
   if (conPeso.length > 1)
     diag.error(
@@ -770,7 +812,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     }
     const region: Region = { contorno: l.contorno, huecos };
     const reticular = l.reticular !== undefined && huecosBien ? validarReticular(l, region, mal, op, diag) : undefined;
-    if (!huecosBien || !m || m.tipo === "acero" || !pos(l.espesor) || reticular === null) continue;
+    if (!huecosBien || !m || (m.tipo !== "hormigon" && m.tipo !== "general") || !pos(l.espesor) || reticular === null) continue;
     const { elastico, peso } = materialElastico(m);
     const nu = elastico.E / (2 * elastico.G) - 1;
     if (!(nu > -1 && nu < 0.5)) {
@@ -1012,7 +1054,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
             mal(w.id, `los huecos ${i + 1} y ${j + 1} se solapan`);
         }
     }
-    if (!m || m.tipo === "acero" || !pos(w.espesor) || !okD || !okH) continue;
+    if (!m || (m.tipo !== "hormigon" && m.tipo !== "general") || !pos(w.espesor) || !okD || !okH) continue;
     const { elastico, peso } = materialElastico(m);
     const nu = elastico.E / (2 * elastico.G) - 1;
     if (!(nu > -1 && nu < 0.5)) {

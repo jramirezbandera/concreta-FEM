@@ -55,6 +55,8 @@ export function opcionesSegundoOrden(s: SegundoOrdenEdificio | undefined): Opcio
 
 /** Lo que no vale de `acciones.segundoOrden` (los tipos y los campos desconocidos los rechaza el esquema). */
 export function erroresSegundoOrden(s: SegundoOrdenEdificio | undefined): { codigo: string; mensaje: string }[] {
+  // A2-62: amplificar «no» amplificaba
+  if (s?.amplificar !== undefined && typeof s.amplificar !== "boolean") return [{ codigo: "segundo-orden/no-valido", mensaje: `amplificar del segundo orden tiene que ser true o false (es ${JSON.stringify(s.amplificar)}).` }];
   const m = s?.multiplicadorDesplazamientos;
   if (m === undefined) return [];
   if (!(typeof m === "number" && Number.isFinite(m) && m > 0 && m <= MULTIPLICADOR_MAXIMO))
