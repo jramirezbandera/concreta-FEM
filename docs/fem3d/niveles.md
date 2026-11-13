@@ -74,6 +74,8 @@ Mientras tanto, lo nuevo de las consultas debe trabajar sobre «un vector de res
 
 ## 3. Desniveles de paño
 
+**Plan de la fase DN, con DN-a medida: `desniveles.md` (2026-11-14).**
+
 En CYPECAD, cada paño puede llevar un desnivel respecto a la cota de su planta. Hay dos casos típicos:
 
 - una terraza 10 cm más baja para que quepa el acabado de cubierta;
