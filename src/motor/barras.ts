@@ -285,10 +285,12 @@ export function cargasDeBarrasDelCaso(
   modelo: ModeloAnalitico,
   geo: Geometria,
   diag: Diagnosticos,
-): { porBarra: Map<number, CargasDeBarra>; resultante: Resultante } {
+): { porBarra: Map<number, CargasDeBarra>; resultante: Resultante; zF: [number, number] } {
   const tol = TOL_GEOMETRICA * geo.tamano;
   const locales = new Map<number, CargaLocal[]>();
   const res: Resultante = { F: [0, 0, 0], M: [0, 0, 0], escalaF: 0, escalaM: 0 };
+  /** SO (A2-19): Σ z·Fx y Σ z·Fy de las cargas donde están, no de sus fuerzas nodales equivalentes. */
+  const zF: [number, number] = [0, 0];
   const C = geo.centro;
   const sumar = (Fg: readonly number[], Mg: readonly number[], brazoF: readonly number[], escF: number, escR: number, escM: number) => {
     // brazoF = ∫ (X − C) × q, ya calculado; Fg = ∫q
@@ -338,6 +340,9 @@ export function cargasDeBarrasDelCaso(
       const Mg = aGlobal(M);
       const X = [ip[0]! + x * R[0]! - C[0], ip[1]! + x * R[1]! - C[1], ip[2]! + x * R[2]! - C[2]];
       sumar(Fg, Mg, cruz(X, Fg), norma(Fg), norma(X), norma(Mg));
+      const z = ip[2]! + x * R[2]!;
+      zF[0] += z * Fg[0]!;
+      zF[1] += z * Fg[1]!;
       continue;
     }
     const qa = c.qa;
@@ -378,6 +383,9 @@ export function cargasDeBarrasDelCaso(
     const m2 = cruz(e1, Sg);
     const brazo = Math.max(norma([base[0]! + xa * e1[0]!, base[1]! + xa * e1[1]!, base[2]! + xa * e1[2]!]), norma([base[0]! + xb * e1[0]!, base[1]! + xb * e1[1]!, base[2]! + xb * e1[2]!]));
     sumar(Fg, [0, 0, 0], [m1[0] + m2[0], m1[1] + m2[1], m1[2] + m2[2]], ((norma(ga) + norma(gb)) / 2) * len, brazo, 0);
+    // ∫ z·q = ip_z·∫q + e1_z·∫ s·q
+    zF[0] += ip[2]! * Fg[0]! + R[2]! * Sg[0]!;
+    zF[1] += ip[2]! * Fg[1]! + R[2]! * Sg[1]!;
   }
   const porBarra = new Map<number, CargasDeBarra>();
   for (const [ib, l] of locales) {
@@ -386,7 +394,7 @@ export function cargasDeBarrasDelCaso(
     const fer = ferBarra(pb.seccion, dc);
     porBarra.set(ib, { cargas: l, dc, fer, ferC: ferCondensadas(pb, fer) });
   }
-  return { porBarra, resultante: res };
+  return { porBarra, resultante: res, zF };
 }
 
 /** FER condensadas de una barra: las de sus liberaciones o, con empotramiento parcial, la mezcla (CY2). */

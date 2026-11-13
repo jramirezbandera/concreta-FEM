@@ -207,6 +207,10 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     const deLamina = deLaminas[k]!.equivalentes;
     if (deLamina) for (let q = 0; q < P; q++) t[q] += deLamina[q]!;
     deLaminas[k]!.equivalentes = null;
+    // A2-19: lo de las barras entra en Σ z·F donde está su carga, no en la cota de sus nudos (las
+    // fuerzas nodales equivalentes llevan el resto en sus momentos, que Σ z·F no ve: una puntual a
+    // 0,75 m de la base de un pilar de 3 m contaba 5,625 de 9)
+    const zF: [number, number] = [deBarras[k]!.zF[0], deBarras[k]!.zF[1]];
     for (const [ib, cb] of porBarra) {
       const [i, j] = modelo.barras![ib]!.nudos;
       const eq = equivalentesEnNudos(preparadas[ib]!, cb.ferC);
@@ -214,6 +218,9 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         t[6 * i + c]! += eq[c]!;
         t[6 * j + c]! += eq[6 + c]!;
       }
+      const [zi, zj] = [geo.xyz[3 * i + 2]!, geo.xyz[3 * j + 2]!];
+      zF[0] -= zi * eq[0]! + zj * eq[6]!;
+      zF[1] -= zi * eq[1]! + zj * eq[7]!;
     }
     if (masa && defModal!.fraccion[k] !== 0) {
       const f = defModal!.fraccion[k]! / defModal!.g;
@@ -221,7 +228,6 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     }
     const peso = new Float64Array(nn);
     const F: [number, number, number] = [0, 0, 0];
-    const zF: [number, number] = [0, 0];
     for (let v = 0; v < nn; v++) {
       const [fx, fy, fz] = [t[6 * v]!, t[6 * v + 1]!, t[6 * v + 2]!];
       peso[v] = -fz;

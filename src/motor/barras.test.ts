@@ -421,3 +421,34 @@ describe("diagnósticos de barras y cargas de barra", () => {
     expect(r.valido).toBe(true);
   });
 });
+
+describe("A2-19: Σ z·F de las cargas de barra, donde están", () => {
+  it("una puntual horizontal en un pilar y una trapecial, también con un offset rígido en la base", () => {
+    for (const offset of [0, 0.4]) {
+      const m = new Constructor();
+      const a = m.nudo(0, 0, 0);
+      const b = m.nudo(0, 0, 3);
+      m.barra(a, b, seccionRectangular(0.3, 0.3), [1, 0, 0], offset ? { offsets: { i: [0, 0, offset], j: [0, 0, 0] } } : undefined);
+      m.apoyo(a);
+      // Puntual de 12 kN en X a 0,75 m del inicio del tramo flexible y trapecial en Y de 2 a 6 kN/m en [0,5; 2,5]
+      m.caso("H", [], [], [
+        { tipo: "puntual", barra: 0, ejes: "global", x: 0.75, F: [12, 0, 0] },
+        { tipo: "distribuida", barra: 0, ejes: "global", a: 0.5, b: 2.5, qa: [0, 2, 0], qb: [0, 6, 0] },
+      ]);
+      const r = calcular(m.modelo());
+      const [caso] = casosValidos(r);
+      const L = 3 - offset;
+      expect(L).toBeGreaterThan(2.5);
+      // ∫ z·q de la trapecial: z = offset + s, q = 2 + 2·(s − 0,5) en [0,5; 2,5]
+      let zq = 0;
+      const n = 2000;
+      for (let i = 0; i < n; i++) {
+        const s = 0.5 + (2 * (i + 0.5)) / n;
+        zq += (offset + s) * (2 + 2 * (s - 0.5)) * (2 / n);
+      }
+      expect(caso!.cargas.zF[0]).toBeCloseTo(12 * (offset + 0.75), 9);
+      expect(caso!.cargas.zF[1]).toBeCloseTo(zq, 5);
+      // Antes, con la cota de los nudos: 5,625 de 9 sin offset
+    }
+  });
+});
