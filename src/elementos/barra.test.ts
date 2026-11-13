@@ -289,6 +289,20 @@ describe("diagrama de la barra", () => {
     for (const x of [0, L / 4, L / 2, 0.8, 1.0, 1.7, 2.4, L]) expect(est).toContain(x);
     for (const x of c.ceros(2)) expect(Math.abs(c.esfuerzosEn(x)[2]!)).toBeLessThan(1e-10);
   });
+
+  it("A2-42: con una trapecial que cambia de signo, el extremo de N, Vy y Vz donde se anula la carga es estación", () => {
+    // q de 6 a −4 kN/m en las tres direcciones entre 0 y 4 m: se anula en s = 2,4, donde N, Vy y Vz tienen su extremo
+    const dc = diagramaDeCargas(4, [{ tipo: "distribuida", a: 0, b: 4, qa: [6, 6, 6], qb: [-4, -4, -4] }]);
+    const d = DiagramaBarra.desde(TIMO, dc, [0, 0, 0, 0, 0, 0], new Float64Array(6));
+    const est = d.estaciones();
+    expect(est.some((x) => Math.abs(x - 2.4) < 1e-12)).toBe(true);
+    // El extremo por estaciones es el de la función: con las de antes (0, 1, 2, 3 y 4) se quedaba corto
+    for (const k of [0, 1, 2]) {
+      const v = (x: number) => d.esfuerzosEn(x)[k]!;
+      const fino = Math.max(...Array.from({ length: 4001 }, (_, i) => Math.abs(v((4 * i) / 4000))));
+      expect(Math.max(...est.map((x) => Math.abs(v(x))))).toBeCloseTo(fino, 9);
+    }
+  });
 });
 
 describe("offsets y liberaciones en ejes globales", () => {

@@ -248,13 +248,30 @@ export class DiagramaBarra {
 
   /**
    * Estaciones para tablas y comprobaciones: extremos, cuartos y puntos de carga (H36), más los
-   * extremos interiores de My y Mz (donde se anulan Vz y Vy, salvo en los saltos).
+   * extremos interiores de My y Mz (donde se anulan Vz y Vy, salvo en los saltos) y los de N, Vy y
+   * Vz (donde se anula su carga: una trapecial que cambia de signo en el tramo, A2-42).
    */
   estaciones(): number[] {
     const L = this.L;
     const xs = new Set<number>([0, L / 4, L / 2, (3 * L) / 4, L, ...this.cortes]);
     for (const c of [1, 2]) for (const x of this.ceros(c, this.pares?.[3 - c] ?? 0)) xs.add(x);
+    for (const c of [0, 1, 2]) for (const x of this.vertices(c)) xs.add(x);
     return [...xs].sort((a, b) => a - b);
+  }
+
+  /** Vértices interiores de la componente `c` (de grado 2 por tramo: N, Vy o Vz), donde su derivada se anula. */
+  private vertices(c: number): number[] {
+    const t = this.esfuerzos[c]!;
+    const r: number[] = [];
+    for (let k = 0; k < t.nTramos; k++) {
+      const x0 = this.cortes[k]!;
+      const h = this.cortes[k + 1]! - x0;
+      const [a1, a2] = [t.c[6 * k + 1]!, t.c[6 * k + 2]!];
+      if (a2 === 0) continue;
+      const s = -a1 / (2 * a2);
+      if (s > 1e-9 * h && s < h * (1 - 1e-9)) r.push(x0 + s);
+    }
+    return r;
   }
 
   /** Raíces interiores de la componente de esfuerzo `c` menos `a` (un cortante: grado ≤ 2 por tramo). */
