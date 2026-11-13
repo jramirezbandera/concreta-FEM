@@ -46,7 +46,7 @@
  * `ResultantesLaminas`. Lo que `CamposLaminas` expone sin decir la partición (`regiones`, `region`,
  * `plazas`, `lebesgueEn`…) es de la de flexión.
  */
-import { PUNTOS_GAUSS } from "../elementos/dkmq.ts";
+import { PUNTOS_GAUSS, type SeccionFlexion } from "../elementos/dkmq.ts";
 import { coordenadasNaturales, funcionesForma, operadorResultantes } from "../elementos/lamina.ts";
 import { cajaCorte, ladoIndice, TOL_CORTE, type CortePreparado, type InfoCorte, type IntegradorCampos, type MuestrasCorte } from "./cortes.ts";
 import { cajaDe, IndiceCajas } from "./indice.ts";
@@ -93,6 +93,30 @@ const PIVOTE_MINIMO = 1e-8;
  * el bilineal de 4 muestras daba Λ ≈ 170 y 31 veces. En los modelos congelados, fuera de esos ábacos, Λ ≤ 9,2.
  */
 export const LEBESGUE_MAXIMO = 10;
+
+/**
+ * A2-14 y AU-18: peso de la fuerza de borde de Kirchhoff en un corte por campos, según r = h⊥/t (el
+ * ancho de la lámina a través del borde entre el espesor equivalente de `espesorCapaLimite`). En un
+ * borde libre o apoyado sólo en uz, el Mxy real cae a cero en una capa límite de ancho ~t/√10, que
+ * concentra un cortante igual al salto de Mxy. Con h ≫ t la malla no la ve (el Mxy recuperado no se
+ * anula en el borde) y hace falta la fuerza entera; con h ≲ 0,4·t la DKMQ ya la resuelve y la fuerza
+ * sobra. Ajuste a las placas de 6 × 6 de `validacion/au2/kirchhoff.ts` (apoyada en uz en los cuatro
+ * lados y sobre cuatro esquinas, t = 0,25 y 0,3 m, h de 0,1 a 0,75 m): el peso que da el cortante
+ * exacto es el mismo en las dos para cada r (0,30 con r = 0,5; 0,8 con 1; 0,97 con 2).
+ */
+export function pesoKirchhoff(r: number): number {
+  return r <= 0.4 ? 0 : 1 - Math.exp(-3 * (r - 0.4));
+}
+
+/**
+ * Espesor equivalente de la capa límite de una sección de flexión: el de una lámina isótropa con el
+ * mismo cociente entre la rigidez a torsión (Hb₃₃ = D·(1 − ν)/2) y la de cortante (κ·G·t, κ = 5/6),
+ * t = √(10·Hb₃₃/S) (con multiplicadores, t·√(m12/v)).
+ */
+export function espesorCapaLimite(f: SeccionFlexion): number {
+  const S = (f.Hs[0]! + f.Hs[3]!) / 2;
+  return Math.sqrt((10 * Math.abs(f.Hb[8]!)) / S);
+}
 
 type Base = { n: number; p: (x: number, y: number, o: Float64Array) => void; px: (x: number, y: number, o: Float64Array) => void; py: (x: number, y: number, o: Float64Array) => void };
 
@@ -629,7 +653,7 @@ export class CamposLaminas implements IntegradorCampos {
   private readonly laminas: (LaminaPreparada | undefined)[] = [];
   /** ¿Se deforma la lámina (no tiene sus 4 nudos en un mismo enlace rígido)? Igual en las dos particiones. */
   private readonly deformable: Uint8Array;
-  private libres: Set<string> | null = null;
+  private libres: Map<string, number> | null = null;
   private porLado: Map<string, number[]> | null = null;
   /** Índice espacial de las láminas, para los cortes (C5, criterio 8). */
   private indice: IndiceCajas | null = null;
@@ -807,31 +831,59 @@ export class CamposLaminas implements IntegradorCampos {
   }
 
   /**
-   * Lados de lámina libres: en el borde de su región, sin otra lámina ni barra que los comparta y
-   * sin apoyo, muelle ni enlace rígido en sus nudos. Claves «u,v» con u < v.
+   * Lados de lámina en los que el corte por campos lleva la fuerza de borde de Kirchhoff, con su
+   * peso (A2-14): en el borde de su región, sin otra lámina ni barra que los comparta, y sin muelle,
+   * enlace rígido ni apoyo que coarte en sus nudos el giro alrededor de la normal al lado en el plano
+   * de la lámina (un apoyo sólo en uz, o en traslaciones, deja el lado «blando»: el Mxy real se anula
+   * en él en una capa límite, como en un borde libre). El peso es `pesoKirchhoff(h⊥/t)`, con h⊥ el
+   * ancho de la lámina a través del lado. Claves «u,v» con u < v.
    */
-  private bordesLibres(): Set<string> {
+  private bordesLibres(): Map<string, number> {
     if (this.libres) return this.libres;
     const clave = (u: number, v: number) => (u < v ? `${u},${v}` : `${v},${u}`);
     const usos = new Map<string, number>();
     const enRegion = new Map<string, number>();
+    const deLamina = new Map<string, [number, number]>();
     (this.modelo.laminas ?? []).forEach((l, k) => {
       for (let a = 0; a < 4; a++) {
         const c = clave(l.nudos[a]!, l.nudos[(a + 1) % 4]!);
         usos.set(c, (usos.get(c) ?? 0) + 1);
-        if (this.deformable[k]) enRegion.set(c, (enRegion.get(c) ?? 0) + 1);
+        if (this.deformable[k]) {
+          enRegion.set(c, (enRegion.get(c) ?? 0) + 1);
+          deLamina.set(c, [k, a]);
+        }
       }
     });
     const barras = new Set((this.modelo.barras ?? []).map((b) => clave(b.nudos[0], b.nudos[1])));
     const atados = new Set<number>();
-    for (const a of this.modelo.apoyos ?? []) if (a.coartados.some(Boolean)) atados.add(a.nudo);
+    /** Giros coartados por apoyos en cada nudo, [rx, ry, rz]. */
+    const giros = new Map<number, [boolean, boolean, boolean]>();
+    for (const a of this.modelo.apoyos ?? []) {
+      if (!a.coartados.some(Boolean)) continue;
+      const g = giros.get(a.nudo) ?? [false, false, false];
+      for (let q = 0; q < 3; q++) g[q] ||= a.coartados[3 + q]!;
+      giros.set(a.nudo, g);
+    }
     for (const m of this.modelo.muelles ?? []) for (const v of m.nudos) atados.add(v);
     for (const r of this.modelo.restricciones ?? []) if (r.tipo === "enlace-rigido") for (const v of [r.maestro, ...r.esclavos]) atados.add(v);
-    this.libres = new Set<string>();
+    const { xyz } = this.geo;
+    this.libres = new Map<string, number>();
     for (const [c, n] of enRegion) {
       if (n !== 1 || usos.get(c) !== 1 || barras.has(c)) continue;
-      const [u, v] = c.split(",").map(Number);
-      if (!atados.has(u!) && !atados.has(v!)) this.libres.add(c);
+      const [u, v] = c.split(",").map(Number) as [number, number];
+      if (atados.has(u) || atados.has(v)) continue;
+      const [k] = deLamina.get(c)!;
+      const pl = this.laminas[k]!;
+      // La normal al lado en el plano de la lámina: n = e₃ × s
+      const s = [0, 1, 2].map((q) => xyz[3 * v + q]! - xyz[3 * u + q]!);
+      const L = Math.hypot(s[0]!, s[1]!, s[2]!);
+      const e3 = pl.R.subarray(6, 9);
+      const nn = [e3[1]! * s[2]! - e3[2]! * s[1]!, e3[2]! * s[0]! - e3[0]! * s[2]!, e3[0]! * s[1]! - e3[1]! * s[0]!].map((q) => q / L);
+      const duro = (p: number) => giros.get(p)?.some((g, q) => g && Math.abs(nn[q]!) > 1e-6) ?? false;
+      // Un borde «duro» (con el giro coartado) no la lleva: su capa límite es más débil y no se ajusta
+      // a una sola curva (en la placa empotrada el peso exacto va de −0,5 a 1,5; `kirchhoff.ts`)
+      if (duro(u) || duro(v)) continue;
+      this.libres.set(c, pesoKirchhoff(pl.area / L / espesorCapaLimite(pl.seccion.flexion)));
     }
     return this.libres;
   }
@@ -887,9 +939,9 @@ export class CamposLaminas implements IntegradorCampos {
       cruza: boolean;
       /** Se integra: atraviesa, o es un lado sobre el plano de un corte mixto. */
       integra: boolean;
-      /** ¿Acaba A (o B) en un borde libre? */
-      libreA: boolean;
-      libreB: boolean;
+      /** Peso de la fuerza de borde de Kirchhoff en A (o B): 0 si no acaba en un borde libre o blando. */
+      libreA: number;
+      libreB: number;
     }
     const tramos: Tramo[] = [];
     const ext = { y: [Infinity, -Infinity] as [number, number], z: [Infinity, -Infinity] as [number, number] };
@@ -963,7 +1015,7 @@ export class CamposLaminas implements IntegradorCampos {
       const L = Math.hypot(P[1]!.x[0]! - P[0]!.x[0]!, P[1]!.x[1]! - P[0]!.x[1]!, P[1]!.x[2]! - P[0]!.x[2]!);
       if (!((t1 - t0) * L > 10 * TOL_CORTE)) return;
       const en = (t: number) => [0, 1, 2].map((c) => P[0]!.x[c]! + t * (P[1]!.x[c]! - P[0]!.x[c]!));
-      const esLibre = (q: { lados: number[] }) => q.lados.some((e) => libres.has(claveLado(l, e)));
+      const pesoLibre = (q: { lados: number[] }) => Math.max(0, ...q.lados.map((e) => libres.get(claveLado(l, e)) ?? 0));
       const integra = cruza || lados;
       // Partido en los quiebres del corte que caen dentro (los bordes de las franjas, F)
       const ta = Math.max(0, t0);
@@ -979,7 +1031,7 @@ export class CamposLaminas implements IntegradorCampos {
       const primero = tramos.length;
       for (let i = 0; i + 1 < partes.length; i++) {
         const ultimo = i + 2 === partes.length;
-        tramos.push({ k, A: en(partes[i]!), B: en(partes[i + 1]!), cruza, integra, libreA: i === 0 && integra && t0 <= 0 && esLibre(P[0]!), libreB: ultimo && integra && t1 >= 1 && esLibre(P[1]!) });
+        tramos.push({ k, A: en(partes[i]!), B: en(partes[i + 1]!), cruza, integra, libreA: i === 0 && integra && t0 <= 0 ? pesoLibre(P[0]!) : 0, libreB: ultimo && integra && t1 >= 1 ? pesoLibre(P[1]!) : 0 });
       }
       if (integra) info.laminas.push(k);
       for (const q of [tramos[primero]!.A, tramos.at(-1)!.B]) {
@@ -1014,7 +1066,7 @@ export class CamposLaminas implements IntegradorCampos {
       return [Math.min(1, Math.max(-1, nat?.[0] ?? 0)), Math.min(1, Math.max(-1, nat?.[1] ?? 0))];
     };
     /** Extremos libres: lámina, punto, coordenadas naturales, signo del extremo, marco y normal n. */
-    const extremos: { k: number; P: number[]; nat: [number, number]; s: number; marco: number[]; n: number[] }[] = [];
+    const extremos: { k: number; P: number[]; nat: [number, number]; s: number; marco: number[]; n: number[]; w: number }[] = [];
     tramos.forEach(({ k, A, B, integra, libreA, libreB }, i) => {
       const Rf = this.flexion.triedro(k);
       const Rm = this.membrana.triedro(k);
@@ -1049,8 +1101,8 @@ export class CamposLaminas implements IntegradorCampos {
       if (!integra) return;
       // Signo del extremo: + en el que está más adelante según t
       const st = pr(dir, t) >= 0 ? 1 : -1;
-      if (libreA) extremos.push({ k, P: A, nat: naturales(k, A), s: -st, marco: mr, n });
-      if (libreB) extremos.push({ k, P: B, nat: naturales(k, B), s: st, marco: mr, n });
+      if (libreA > 0) extremos.push({ k, P: A, nat: naturales(k, A), s: -st, marco: mr, n, w: libreA });
+      if (libreB > 0) extremos.push({ k, P: B, nat: naturales(k, B), s: st, marco: mr, n, w: libreB });
     });
 
     // 3. Por caso: campos en cada punto, fuerza y momento de los tramos que atraviesan
@@ -1142,7 +1194,7 @@ export class CamposLaminas implements IntegradorCampos {
       // Fuerza de borde de Kirchhoff en los extremos libres: ±Mxy·n
       for (const e of extremos) {
         const v = ev.enRegiones(e.k, e.nat[0], e.nat[1]);
-        const fk = e.s * mxyFranja(v, e.marco);
+        const fk = e.w * e.s * mxyFranja(v, e.marco);
         agregar(6 * kc, e.P, e.n.map((c) => fk * c), [0, 0, 0], 1);
       }
       m.valores.push(val);
