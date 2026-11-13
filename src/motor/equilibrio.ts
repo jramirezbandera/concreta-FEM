@@ -80,3 +80,45 @@ export function equilibrio(geo: Geometria, f: Float64Array, r: Float64Array, mag
     momentos: escalaM > 0 ? Math.hypot(M[0]!, M[1]!, M[2]!) / (escalaM + escalaF * geo.tamano) : 0,
   };
 }
+
+/**
+ * A2-10: el mismo desequilibrio, referido sólo a las cargas (las nodales `f` y las de barra y lámina
+ * `extra`); null si el caso no tiene cargas. La escala de `equilibrio` lleva las reacciones y su
+ * `magnitudR` (Σ|k·u|), que crecen con u: en un mecanismo que el pivote no ve, u se dispara y el
+ * desequilibrio relativo queda en el redondeo aunque las reacciones no equilibren las cargas.
+ */
+export function desequilibrioCargas(geo: Geometria, f: Float64Array, r: Float64Array, extra?: Resultante): Equilibrio | null {
+  const { xyz, centro } = geo;
+  const nn = xyz.length / 3;
+  const F = extra ? [...extra.F] : [0, 0, 0];
+  const M = extra ? [...extra.M] : [0, 0, 0];
+  let escalaF = extra?.escalaF ?? 0;
+  let escalaM = extra?.escalaM ?? 0;
+  for (let i = 0; i < nn; i++) {
+    const x = xyz[3 * i]! - centro[0];
+    const y = xyz[3 * i + 1]! - centro[1];
+    const z = xyz[3 * i + 2]! - centro[2];
+    for (const [vec, carga] of [
+      [f, true],
+      [r, false],
+    ] as const) {
+      const b = 6 * i;
+      const [fx, fy, fz, mx, my, mz] = [vec[b]!, vec[b + 1]!, vec[b + 2]!, vec[b + 3]!, vec[b + 4]!, vec[b + 5]!];
+      F[0]! += fx;
+      F[1]! += fy;
+      F[2]! += fz;
+      M[0]! += y * fz - z * fy + mx;
+      M[1]! += z * fx - x * fz + my;
+      M[2]! += x * fy - y * fx + mz;
+      if (!carga) continue;
+      const ef = Math.hypot(fx, fy, fz);
+      escalaF += ef;
+      escalaM += Math.hypot(x, y, z) * ef + Math.hypot(mx, my, mz);
+    }
+  }
+  if (!(escalaF > 0 || escalaM > 0)) return null;
+  return {
+    fuerzas: escalaF > 0 ? Math.hypot(F[0]!, F[1]!, F[2]!) / escalaF : 0,
+    momentos: Math.hypot(M[0]!, M[1]!, M[2]!) / (escalaM + escalaF * geo.tamano),
+  };
+}

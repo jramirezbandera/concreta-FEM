@@ -24,7 +24,7 @@ import { cargasDeBarrasDelCaso, desplazamientosLocales, equivalentesEnNudos, esf
 import { Diagnosticos, listaIds } from "./diagnosticos.ts";
 import { elementosDelModelo, esMuelleATierra, geometria, rigidezGlobal, type ElementoMotor, type Geometria } from "./elementos.ts";
 import { ensamblarRigidez, patronSistema } from "./ensamblado.ts";
-import { equilibrio, sumaResultantes } from "./equilibrio.ts";
+import { desequilibrioCargas, equilibrio, sumaResultantes } from "./equilibrio.ts";
 import { desplazamientosFisicos, fuerzasIndependientes, numerar, TipoGdl, type Numeracion } from "./gdl.ts";
 import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada } from "./laminas.ts";
 import { definicionModal, modosCondensados, prepararModal, type PlanModal } from "./modal.ts";
@@ -34,6 +34,12 @@ import { ErrorLimiteMemoria, resolver, RESIDUO_OBJETIVO, type TipoSolver } from 
 
 /** Tolerancia del equilibrio global por caso (regla de oro 2). */
 export const TOL_EQUILIBRIO = 1e-9;
+/**
+ * A2-10: el desequilibrio referido sólo a las cargas. Con un caso resuelto, su redondeo es del orden de
+ * 1e-16 por Σ|k·u|/Σ|cargas|; pasar de 1e-6 exige que las reacciones sean 1e10 veces las cargas, que
+ * sólo pasa cuando u se dispara (un mecanismo que el pivote no ha visto).
+ */
+export const TOL_EQUILIBRIO_CARGAS = 1e-6;
 
 /**
  * Límites de tamaño del dispositivo (D9, H16). Un modelo que los pasa acaba con el error
@@ -428,7 +434,9 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     if (sol?.X) for (let j = 0; j < n; j++) uI[num.gdlDeEcuacion[j]!] = sol.X[n * k + j]!;
     const u = desplazamientosFisicos(num, uI);
     const reacciones = reaccionesDe(uI, u, k);
-    const eq = equilibrio(geo, cargasNodales(caso, P), reacciones, magnitud, sumaResultantes(deBarras[k]!.resultante, deLaminas[k]!.resultante));
+    const extra = sumaResultantes(deBarras[k]!.resultante, deLaminas[k]!.resultante);
+    const eq = equilibrio(geo, cargasNodales(caso, P), reacciones, magnitud, extra);
+    const eqCargas = desequilibrioCargas(geo, cargasNodales(caso, P), reacciones, extra);
     // Esfuerzos de las barras en los extremos de su tramo flexible
     const esfuerzosBarras = new Float64Array(12 * (modelo.barras?.length ?? 0));
     for (const e of elementos) {
@@ -451,6 +459,15 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
             : ""),
         [caso.id],
         { ...eq, residuo },
+      );
+    } else if (eqCargas && !(eqCargas.fuerzas <= TOL_EQUILIBRIO_CARGAS && eqCargas.momentos <= TOL_EQUILIBRIO_CARGAS)) {
+      equilibrioRoto = true;
+      diag.error(
+        "equilibrio/no-cumple",
+        `El caso ${caso.id} no cumple el equilibrio global respecto a sus cargas: |ΣF|/Σ|cargas| = ${eqCargas.fuerzas.toExponential(2)} y |ΣM|/Σ|M de las cargas| = ${eqCargas.momentos.toExponential(2)} (tolerancia ${TOL_EQUILIBRIO_CARGAS}), con desplazamientos de hasta ${u.reduce((a, v) => Math.max(a, Math.abs(v)), 0).toExponential(2)}. El resultado no es válido: lo más probable es un mecanismo (un giro o un desplazamiento sin coartar) que el solver no ha detectado.` +
+          (sol?.malCondicionados.length ? " Ver el aviso solver/mal-condicionado: el GDL que nombra suele ser el del mecanismo." : ""),
+        [caso.id],
+        { ...eqCargas, residuo },
       );
     }
     if (residuo > RESIDUO_OBJETIVO) {
