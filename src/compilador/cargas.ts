@@ -826,8 +826,11 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       // Fase LV: en el ancho de una viga, fuera de su eje, a la viga
       const enAncho = !destino && enLosa === undefined && enPano === undefined ? losas.puntosAncho.get(carga.id) : undefined;
       // SP-5: una puntual sólo horizontal en una losa con diafragma rígido, al nudo del diafragma más
-      // cercano con su momento de transporte (Mz: el nudo está en la cota de la planta)
-      const diafragma = !destino && enLosa === undefined && enPano === undefined && enAncho === undefined && alDiafragma(ctx, k, carga) ? piezas.diafragmas.find((d) => d.k === k) : undefined;
+      // cercano con su momento de transporte (Mz: el nudo está en la cota de la planta). También si cae
+      // en el eje de una viga del diafragma (A2-11: la del viento en la viga central le dejaba un
+      // cortante lateral que no existe); en un nudo, a ese nudo, como siempre
+      const libre = destino ? destino.tipo !== "nudo" : enLosa === undefined && enPano === undefined && enAncho === undefined;
+      const diafragma = libre && alDiafragma(ctx, k, carga) ? piezas.diafragmas.find((d) => d.k === k) : undefined;
       if (diafragma) {
         let n = diafragma.nudos[0]!;
         let dmin = Infinity;

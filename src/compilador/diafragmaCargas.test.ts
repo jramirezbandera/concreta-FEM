@@ -73,4 +73,28 @@ describe("puntuales horizontales al diafragma (SP-5)", () => {
     const maxR = Math.max(...Array.from(a.reacciones, Math.abs));
     expect(Math.max(...Array.from(a.reacciones, (v, i) => Math.abs(v - b.reacciones[i]!)))).toBeLessThan(1e-10 * maxR);
   });
+
+  it("en el eje de una viga del diafragma, también al diafragma: la viga no recibe un cortante lateral (A2-11)", () => {
+    // (9, 5): a media luz de la viga interior X5-N2. Antes iba a la viga como carga de barra, y le dejaba
+    // Vy y Mz que no existen (la del viento del programa en la viga central)
+    const F: [number, number, number] = [0, 30, 0];
+    const r = compilar(base([puntual("N2", 9, 5, F)]));
+    if (!r.valido) throw new Error(r.diagnosticos[0]!.mensaje);
+    const k = calcular(r.modelo);
+    if (!k.valido) throw new Error(k.diagnosticos[0]!.mensaje);
+    const iH = r.modelo.casos.findIndex((c) => c.id === "H");
+    expect(r.modelo.casos[iH]!.barras ?? []).toEqual([]);
+    const vigaX5 = (r.mapeo.piezas["X5-N2"] ?? []).map((b) => k.casos[iH]!.esfuerzosBarras.subarray(12 * b, 12 * b + 12));
+    expect(vigaX5.length).toBeGreaterThan(0);
+    for (const e of vigaX5) for (const q of [1, 5, 7, 11]) expect(Math.abs(e[q]!)).toBeLessThan(1e-9);
+    // Y la misma carga en la losa, a 1 m, con su torsor de transporte, da lo mismo
+    // Mz = (P − Q) × F con P = (9, 5) y Q = (9, 6): (0)·Fy − (−1)·Fx
+    const otra = compilar(base([puntual("N2", 9, 6, F, [0, 0, 0 * F[1] + 1 * F[0]])]));
+    if (!otra.valido) throw new Error("no compila");
+    const ko = calcular(otra.modelo);
+    const a = k.casos[iH]!.u;
+    const b = ko.casos.find((x) => x.id === "H")!.u;
+    const maxU = Math.max(...Array.from(a, Math.abs));
+    expect(Math.max(...Array.from(a, (v, i) => Math.abs(v - b[i]!)))).toBeLessThan(1e-10 * maxU);
+  });
 });
