@@ -185,6 +185,19 @@ describe("errores y avisos de C2", () => {
     expect(ap.diagnosticos.find((x) => x.codigo === "apoyo/fuera-de-losa")!.ids).toEqual(["AL"]);
   });
 
+  it("una puntual en la cara de fuera del ancho de una viga de borde va a la viga (A2-12)", () => {
+    // La losa llega al eje de V0 (y = 0): la cara de fuera de su ancho, y = −0,15, no toca ninguna lámina.
+    // Antes, «no cae sobre ningún pilar, nudo, viga, losa ni muro»
+    for (const [x, y] of [
+      [3, -0.15],
+      [-0.15, -0.15],
+    ] as const) {
+      const r = valido(compilar(base({ cargas: [{ tipo: "puntual", id: "F", caso: "Q", planta: "P1", x, y, F: [0, 0, -10] }] })));
+      expect(resultanteAnalitica(r.modelo, 1, [0, 0, 0]).F[2]).toBeCloseTo(-10, 9);
+      expect(resultanteAnalitica(r.modelo, 1, [0, 0, 0]).M[0]).toBeCloseTo(-10 * y, 9);
+    }
+  });
+
   it("una zona que se sale de la losa: aviso con el área, y su resultante es la de la parte en la losa", () => {
     const r = valido(compilar(base({ cargas: [{ tipo: "superficie", id: "z", caso: "Q", planta: "P1", zona: rect(4, 3, 8, 6), q: [0, 0, -2] }] }), { tamanoMalla: 0.5 }));
     const d = r.diagnosticos.find((x) => x.codigo === "carga/zona-fuera-de-losa")!;

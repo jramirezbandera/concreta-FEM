@@ -1421,12 +1421,21 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // Fase LV: las puntuales en el ancho de una viga
     for (const [id, j] of e.puntoAncho) r.puntosAncho.set(id, e.anchos[j]!.g);
     // Puntos sueltos: en un vértice de la malla o en una estación de un muro
-    for (const [id, { i }] of e.puntoDe) {
+    for (const [id, { i, Q }] of e.puntoDe) {
       const nm = usado.get(i);
       const n = nm !== undefined ? nudoT[nm]! : nodoPunto.get(i);
       const esApoyo = ctx.apoyos.some((x) => x.id === id);
       const extremo = ctx.extremos.find((x) => x.id === id);
       if (n === undefined) {
+        // A2-12: en el borde de un ancho que no da a la losa (la cara de fuera de un zuncho con la losa
+        // enrasada, el borde de una tira, su inglete) el punto no toca ninguna lámina: va a la viga
+        const borde = e.anchos.flatMap((x, j) => (puntoEnPoligono(Q, x.a.poligono) || distanciaABorde(Q, x.a.poligono) <= epsGeom ? [j] : []));
+        if (borde.length) {
+          const j = anchoMasCercano(Q, borde, e.anchos.map((x) => x.a));
+          if (extremo || esApoyo) e.apoyoAncho.set(id, j);
+          else r.puntosAncho.set(id, e.anchos[j]!.g);
+          continue;
+        }
         if (extremo) diag.error("barra/extremo-sin-apoyo", `El ${extremo.lado} de la barra ${extremo.barra} no cae sobre ningún pilar, nudo, viga, losa ni muro de la planta ${idPlanta} (tolerancia ${cm(epsSnap)}).`, [extremo.barra]);
         else diag.error(esApoyo ? "apoyo/sin-destino" : "carga/sin-destino", `${esApoyo ? "El apoyo" : "La carga"} ${id} no cae sobre ningún pilar, nudo, viga, losa ni muro de la planta ${idPlanta} (tolerancia ${cm(epsSnap)}).`, [id]);
         continue;
