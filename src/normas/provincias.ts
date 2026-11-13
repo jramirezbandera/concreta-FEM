@@ -168,6 +168,6 @@ function variantes(nombre: string, guion = true): string[] {
 export function esCapitalDeProvincia(ine: string, municipio: string): boolean {
   const p = provinciaPorIne(ine);
   if (!p || municipio.trim() === "") return false;
-  const aceptadas = new Set([...variantes(p.capital.capital), ...(ALIAS_CAPITAL[p.ine] ?? []).flatMap(variantes)]);
+  const aceptadas = new Set([...variantes(p.capital.capital), ...(ALIAS_CAPITAL[p.ine] ?? []).flatMap((a) => variantes(a))]);
   return variantes(municipio, false).some((v) => aceptadas.has(v));
 }
