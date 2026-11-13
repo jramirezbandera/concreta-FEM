@@ -322,8 +322,13 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
         const nrm: Vec2 = [-tv.t.u[1], tv.t.u[0]];
         const f = pp.huella.forma;
         const semi = !f ? 0 : f.tipo === "circulo" ? f.D / 2 : (f.h / 2) * Math.abs(nrm[0] * pp.huella.ez[0] + nrm[1] * pp.huella.ez[1]) + (f.b / 2) * Math.abs(nrm[0] * pp.huella.ey[0] + nrm[1] * pp.huella.ey[1]);
-        if (d - semi <= epsSnap) tv.partes.push(pp.nudo);
-        else if (d - semi <= 3 * epsSnap)
+        if (d - semi <= epsSnap) {
+          tv.partes.push(pp.nudo);
+          // Sin tocar la huella, la unión es una fusión a ε_snap como las demás: se avisa (A2-8;
+          // antes, un centímetro de dibujo decidía en silencio si el pilar apoyaba la viga)
+          if (d - semi > epsGeom)
+            diag.aviso("topologia/fusion", `La viga ${tv.viga.id} pasa a ${cm(d - semi)} del pilar ${pp.pilares[0]} sin tocarlo y se une a él, con un brazo rígido.`, [tv.viga.id, pp.pilares[0]!], { distancia: d - semi });
+        } else if (d - semi <= 3 * epsSnap)
           diag.aviso("topologia/casi-encuentro", `La viga ${tv.viga.id} pasa a ${cm(d - semi)} del pilar ${pp.pilares[0]} sin unirse a él.`, [tv.viga.id, pp.pilares[0]!], {
             distancia: d - semi,
           });

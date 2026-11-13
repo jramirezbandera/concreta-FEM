@@ -101,6 +101,21 @@ describe("topología: encuentros", () => {
     expect(codigos(r)).toContain("topologia/casi-encuentro");
   });
 
+  it("una viga que pasa a 1–4 cm de la cara de un pilar sin tocarlo se une a él con aviso y la distancia; si la toca, sin aviso (A2-8)", () => {
+    for (const hueco of [0.01, 0.04]) {
+      const r = valido(compilar(modelo([...cuatro(), pilar("M", 3, 2.5)], [...bordes(), viga("V", [0, 2.5 + 0.15 + hueco], [6, 2.5 + 0.15 + hueco])])));
+      expect(r.mapeo.piezas.V!.length).toBe(2);
+      const d = r.diagnosticos.find((x) => x.codigo === "topologia/fusion" && x.ids?.includes("M"))!;
+      expect(d.ids).toEqual(["V", "M"]);
+      expect(d.detalles!.distancia).toBeCloseTo(hueco, 9);
+    }
+    for (const y of [2.5, 2.5 + 0.1, 2.5 + 0.15]) {
+      const r = valido(compilar(modelo([...cuatro(), pilar("M", 3, 2.5)], [...bordes(), viga("V", [0, y], [6, y])])));
+      expect(r.mapeo.piezas.V!.length).toBe(2);
+      expect(r.diagnosticos.filter((x) => x.ids?.includes("M"))).toEqual([]);
+    }
+  });
+
   it("cruce reutilizado a 4 cm de otro nudo: aviso con la distancia", () => {
     const r = valido(compilar(modelo(cuatro(), [...bordes(), viga("X", [0, 2.5], [6, 2.5]), viga("Y1", [3, 0], [3, 5]), viga("Y2", [3.02, 0.5], [3.06, 4.5])])));
     expect(codigos(r)).toContain("topologia/fusion");
