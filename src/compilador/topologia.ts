@@ -28,6 +28,9 @@ import { conPuntoFijo, ejePilar, medidasForma } from "./puntoFijo.ts";
 import { cortarTramos, cuerdaHuella, dist, distanciaAHuella, huellaPilar, proyectar, radioHuella, RejillaHash, tramo, type Huella, type Tramo2D } from "./geometria2d.ts";
 import { distanciaABorde, distanciaASegmento, puntoEnRegion, type Region } from "./poligonos.ts";
 
+/** A2-34: margen relativo de ε_snap al unir dos pilares apilados, para que a ε_snap justos se unan siempre. */
+export const MARGEN_SNAP = 1 + 1e-9;
+
 /** Distancia de un punto a una región (0 dentro). */
 export function distanciaARegion(q: Vec2, r: Region): number {
   if (puntoEnRegion(q, r)) return 0;
@@ -184,10 +187,13 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
       const [x, y] = ejeEnPlanta(ctx, p, k);
       let destino: PuntoPilar | null = null;
       let dmin = Infinity;
-      for (const i of cerca(gEjes, [x, y], epsSnap)) {
+      // A2-34: a ε_snap justos (5 cm, una medida redonda), siempre unidos: con un margen relativo de
+      // 1e-9, como en `piezas.ts`. Antes decidía el redondeo de la distancia
+      const rUnion = epsSnap * MARGEN_SNAP;
+      for (const i of cerca(gEjes, [x, y], rUnion)) {
         const pp = puntos[i]!;
         const d = dist([x, y], P(pp.nudo));
-        if (d <= epsSnap && d < dmin) [destino, dmin] = [pp, d];
+        if (d <= rUnion && d < dmin) [destino, dmin] = [pp, d];
       }
       if (destino) {
         if ((abajo && abajoDe.has(destino)) || (arriba && arribaDe.has(destino))) {

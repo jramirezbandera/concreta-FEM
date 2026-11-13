@@ -495,6 +495,8 @@ Hechos, cada uno con su prueba (que falla con el código de antes salvo los text
   - **En las 24 retículas al azar:** cambian 240 estaciones de paso (mediana 1,2 % del mayor |mx| de su franja, hasta el 11 %) y las dos de apoyo de la causa del auditor en la retícula 8.
   - **Referencia de F regenerada a sabiendas** (`validacion/au2/out_cambiosA263.txt`): sólo `pilares-mezclados`, con 6 estaciones de paso y 2 de apoyo, por debajo del 0,1 %.
   - **Prueba:** `franjasInvariancia.test.ts`, con A2-56; falla con el código de antes.
+- **A2-34 (decisión del usuario):** dos pilares apilados con los ejes a ε_snap justos se unen siempre: la comparación lleva un margen relativo de 1e-9 (`MARGEN_SNAP`, en la topología, en la cabeza del último tramo de CY2 y en la sensatez). Con x = 1,3 y 1,35 (1,35 − 1,3 = 0,0500000000000003), antes el de arriba daba `pilar/arranque-sin-apoyo`; a 5,1 cm sigue sin unirse. Prueba en `umbrales.test.ts`.
+- **A2-36 (decisión del usuario):** una barra con menos de 1e-6 m (el ε_geom por defecto, `DESVIO_VERTICAL_BARRA`) de desvío horizontal entre sus extremos es vertical: sus ejes son los de la regla de los pilares (z = +X, quitada su componente según x) y no tiene zona rígida. Antes el umbral era 1e-9 del coseno, y con un desvío de nanómetros los ejes giraban hacia donde cayera. Vertical del todo, los mismos bits. Prueba en `umbrales.test.ts`.
 - **A2-57:** en la recta de my y mxy de una estación de cara o de apoyo (LV2-h), un obstáculo que tapa menos de la mitad del rango de la franja ya no la acerca a la cara. Son lo que asoma de un pilar más ancho que su viga (unos cm de la franja) y una viga paralela por el lado de la franja. Las muestras que caen en él ya no contaban (fuera de la losa), y las demás van a un canto como en el resto. Antes toda la recta iba a 2,5–5 cm, dentro de la capa límite.
   - **En las retículas 1, 2, 4, 7 y 8 del auditor:** cambian 36 de 1 285 estaciones. Con h = 0,75 frente a 0,25 (cada una con su regla), el error de mxy pasa de 0,61 a 0,29 kN·m/m de mediana (de 2,06 a 1,52 de máximo) y el de my, de 6,95 a 2,33 de máximo.
   - **La precisión local de HR (criterio 11), cada regla frente a su propia malla fina:** la retícula 12, de 3,74 a 3,08 % de mediana con viga; la 16, de 2,90 a 3,26 %; las demás, igual.
@@ -506,7 +508,7 @@ Sin tocar, con su motivo:
 - **Sin reproducir (plausibles):** A2-20, A2-21 y A2-40. A2-41 y A2-45 están documentados y no cambian resultados.
 - **Sólo el aviso, sin medir:** A2-24 (la θ de una planta `escalon` toma d y h del mismo intervalo de 0,90 m, así que su cociente no cambia mucho; no está medido).
 - **Del mallador, junto con el pendiente de las astillas** (`malla/astillas-junto-a-pilar`): A2-37, A2-38, A2-39 y A2-46.
-- **Que piden una decisión:** A2-32 (la unión encadenada de ábacos), A2-34 y A2-36 (dónde poner el umbral de dos pilares apilados a 5 cm y de una barra casi vertical) y A2-31 (el lado de C2-g a b/4, que habría que integrar con el área en vez de con un punto).
+- **Que piden una decisión:** A2-32 (la unión encadenada de ábacos) y A2-31 (el lado de C2-g a b/4, que habría que integrar con el área en vez de con un punto); decididas el 2026-11-13: avisar del área que maciza la unión e integrar con el área.
 - **Por cotejar con una fuente:** A2-44 (el It de los HEA).
 - **Notas:** A2-43 (con sismo, el máximo de My por estaciones ≤ 0,69 % bajo), A2-64 y A2-66 (conservador).
 

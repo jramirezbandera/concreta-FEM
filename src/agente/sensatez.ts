@@ -22,6 +22,7 @@ import { resultanteAnalitica, SOLAPE_MURO_LOSA } from "../compilador/cargas.ts";
 import { puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { cuerdaHuella, distanciaAHuella, huellaPilar } from "../compilador/geometria2d.ts";
+import { MARGEN_SNAP } from "../compilador/topologia.ts";
 import { compilarSeccion } from "../compilador/secciones.ts";
 import { TAMANO_MALLA, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type OpcionesCompilacion, type PanoUnidireccional, type Seccion, type Vec2 } from "../compilador/fisico.ts";
 import { ppLosa as ppLosaFisica, ppPano } from "../compilador/pesoForjado.ts";
@@ -527,7 +528,7 @@ function pilares(f: ModeloFisico, P: Plantas, epsSnap: number): Registro[] {
     const sigue = (f.pilares ?? []).some((q) => {
       if (q === p || q.desde !== p.hasta) return false;
       const [qx, qy] = eje(q, encima);
-      return Math.hypot(qx - px, qy - py) <= epsSnap;
+      return Math.hypot(qx - px, qy - py) <= epsSnap * MARGEN_SNAP;
     });
     if (sigue) continue;
     const cubre = [...(f.losas ?? []), ...(f.panos ?? [])].find((x) => x.planta === encima && puntoEnRegion([px, py], regionDe(x)));

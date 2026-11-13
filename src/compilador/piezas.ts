@@ -36,9 +36,9 @@ import type { Liberacion, Pilar } from "./fisico.ts";
 import type { Losas } from "./losas.ts";
 import type { SeccionCompilada } from "./secciones.ts";
 import { cuerdaHuella, huellaPilar, proyectar } from "./geometria2d.ts";
-import { cuerdaEnTramo, distanciaARegion, ejeTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
+import { MARGEN_SNAP, cuerdaEnTramo, distanciaARegion, ejeTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { PanosU } from "./unidireccional.ts";
-import { ejesBarra } from "./barras.ts";
+import { DESVIO_VERTICAL_BARRA, ejesBarra } from "./barras.ts";
 import { idExtremo, type Contexto } from "./validar.ts";
 
 /** Trozo de una recta: [desde, hasta] en σ, que va a un nudo o al tramo flexible de una barra. */
@@ -151,7 +151,7 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     const continua = ctx.pilares.some((q) => {
       if (q === p || q.desde !== p.hasta) return false;
       const [xq, yq] = ejeTramo(ctx, q, kh - 1);
-      return Math.hypot(xq - xh, yq - yh) <= ctx.op.epsSnap;
+      return Math.hypot(xq - xh, yq - yh) <= ctx.op.epsSnap * MARGEN_SNAP;
     });
     const empCabeza = (p.empotramiento?.cabeza ?? 1) * (continua ? 1 : ctx.op.empotramientoCabeza);
     const empBase = p.empotramiento?.base ?? 1;
@@ -429,7 +429,8 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     const horiz = Math.hypot(ex[0], ex[1]);
     const dentro = (n: number, dz: number): [number, number] | null => {
       const pp = topo.nudos[n]!.pilar;
-      if (!pp?.huella.forma || !(horiz > 1e-9)) return null;
+      // A2-36: una barra vertical (a DESVIO_VERTICAL_BARRA) no tiene zona rígida, como en `ejesBarra`
+      if (!pp?.huella.forma || !(horiz * L > DESVIO_VERTICAL_BARRA)) return null;
       const k = topo.nudos[n]!.k;
       // Los tramos de pilar del lado de la barra: el de encima (k − 1) si sube, el de debajo (k) si baja,
       // y los dos si es horizontal; con dos (un pilar sobre otro), el primero según las cotas
