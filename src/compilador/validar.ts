@@ -7,6 +7,7 @@ import { PSI_NOMBRES, type PsiNombrado } from "../combinaciones/psi.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
+import { desnivelesVigas, forjadosDN, soportesVigas } from "./desniveles.ts";
 import { ladosAbacos, resolverAbacos } from "./abacos.ts";
 import { problemaBorde, resolverBordes } from "./bordes.ts";
 import { erroresSegundoOrden } from "./segundoOrden.ts";
@@ -158,6 +159,8 @@ export interface Contexto {
   /** C4: paños unidireccionales (por id). */
   panos: readonly PanoCompilado[];
   panoDe: ReadonlyMap<string, PanoCompilado>;
+  /** Fase DN: el desnivel de las vigas que tocan un forjado con desnivel (DN-e); las demás, 0. */
+  desnivelViga: ReadonlyMap<string, number>;
 }
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -791,6 +794,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   for (const l of losas) {
     usaPlanta(l.id, l.planta);
     if (!pos(l.espesor)) mal(l.id, "el espesor tiene que ser un número > 0 (m)");
+    if (l.desnivel !== undefined && !num(l.desnivel)) mal(l.id, "el desnivel tiene que ser un número (m; negativo, más bajo que la cota de la planta)");
     if (l.pp !== undefined && !(num(l.pp) && l.pp >= 0)) mal(l.id, "el peso propio pp tiene que ser un número ≥ 0 (kN/m²)");
     // A2-33: un pp de 0 escrito deja la losa sin peso propio
     else if (l.pp === 0) diag.aviso("forjado/pp-nulo", `${l.id}: tiene escrito pp = 0, así que no pesa. Si su peso va en otra carga, está bien; si no, quite pp y el programa lo calcula.`, [l.id]);
@@ -931,6 +935,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     const okP = usaPlanta(p.id, p.planta);
     usaSeccion(p.id, p.seccion);
     const okDir = num(p.direccion);
+    if (p.desnivel !== undefined && !num(p.desnivel)) mal(p.id, "el desnivel tiene que ser un número (m; negativo, más bajo que la cota de la planta)");
     const okS = num(p.intereje) && p.intereje > 2 * op.epsSnap;
     const okBov = p.bovedilla === undefined || (BOVEDILLAS as readonly unknown[]).includes(p.bovedilla);
     if (!okBov) mal(p.id, `la bovedilla tiene que ser ${BOVEDILLAS.map((x) => `«${x}»`).join(", ")}`);
@@ -1167,8 +1172,11 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   const compiladas = new Map<string, SeccionCompilada>();
   for (const s of secciones) compiladas.set(s.id, compilarSeccion(s, material.get(s.material)!, op.cortante));
   for (const p of panosC) p.seccion = compiladas.get(p.pano.seccion)!;
+  // Fase DN: el desnivel de cada viga (DN-e); los escalones, en `compilar` (con las huellas de los pilares)
+  const desnivelViga = desnivelesVigas(forjadosDN(losasC, panosC), soportesVigas(vigas, compiladas), op.epsSnap);
   return {
     op,
+    desnivelViga,
     plantas,
     cotas: cotas.map((c) => c ?? Number.NaN),
     planta,

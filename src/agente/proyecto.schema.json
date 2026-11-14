@@ -1105,6 +1105,10 @@
           "type": "number",
           "description": "Dirección del eje 1 de sus láminas en planta, en grados desde +X (E3-2). Por defecto, 0. Orienta también la retícula de la malla."
         },
+        "desnivel": {
+          "type": "number",
+          "description": "Desnivel de la cara superior del forjado respecto a la cota de su planta, m (negativo, más bajo;\npor defecto, 0): una terraza más baja o una losa enrasada por abajo con otra más gruesa (fase DN,\n`docs/fem3d/desniveles.md`). Los nudos siguen en el plano de la planta (DN-a): cambian lo que\nocupa el nudo de cada pilar (ZR1), la cota de las vigas que toca y el dibujo. Dos forjados con\ndesniveles distintos que comparten un lado sin solapar en canto necesitan una viga, un muro o un\napoyo lineal en él (DN-b)."
+        },
         "reticular": {
           "$ref": "#/$defs/Reticular",
           "description": "Forjado reticular (C4, D3): la losa es su zona aligerada, de canto total `espesor`, con nervios\nsegún el `eje1` y la perpendicular."
@@ -1695,6 +1699,10 @@
         "ppProcedencia": {
           "$ref": "#/$defs/Procedencia",
           "description": "De dónde sale el `pp` escrito: sólo se informa, no cambia el cálculo."
+        },
+        "desnivel": {
+          "type": "number",
+          "description": "Desnivel de la cara superior del paño respecto a la cota de su planta, m (negativo, más bajo;\npor defecto, 0): una terraza más baja o una losa enrasada por abajo con otra más gruesa (fase DN,\n`docs/fem3d/desniveles.md`). Los nudos siguen en el plano de la planta (DN-a): cambian lo que\nocupa el nudo de cada pilar (ZR1), la cota de las vigas que toca y el dibujo. Dos forjados con\ndesniveles distintos que comparten un lado sin solapar en canto necesitan una viga, un muro o un\napoyo lineal en él (DN-b)."
         },
         "bovedilla": {
           "enum": [

@@ -117,8 +117,32 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
    * en el plano; una viga con la cara superior en el plano cuelga entera por debajo (su canto, y nada
    * por encima).
    */
-  const junta =
-    ctx.op.planoForjado === "superior"
+  const superior = ctx.op.planoForjado === "superior";
+  /**
+   * Fase DN: con algún forjado con desnivel, cada pieza ocupa lo de su sitio real (`desniveles.ts`):
+   * una losa, lo de su huella (`HuellaL.bajo`, `encima`); una viga, con su cara superior en el
+   * desnivel del forjado más alto que la toca (DN-e), h − arriba por debajo y arriba por encima. El
+   * nudo ocupa lo más bajo y lo más alto de todo ello (lo de encima puede ser negativo: todo está más
+   * bajo que el plano, y la base del tramo de encima arranca por debajo del nudo). Sin desniveles, el
+   * cálculo de antes, con los mismos bits.
+   */
+  const conDesnivel = ctx.losas.some((l) => (l.losa.desnivel ?? 0) !== 0) || ctx.panos.some((p) => (p.pano.desnivel ?? 0) !== 0);
+  const ocupaHuella = new Map(losas.huellas.map((h) => [h.maestro, [h.bajo, h.encima]] as const));
+  const ocupaViga = (v: string): [number, number] => {
+    const h = cantoViga(v);
+    const arriba = (ctx.desnivelViga.get(v) ?? 0) + (!superior && ctx.vigaDe.get(v)!.insercion !== "superior" ? h / 2 : 0);
+    return [h - arriba, arriba];
+  };
+  const junta = conDesnivel
+    ? (n: number, vigas: ReadonlySet<string>, bajo: boolean) => {
+        const g = bajo ? 0 : 1;
+        let max = -Infinity;
+        const o = ocupaHuella.get(n);
+        if (o && o[g] > max) max = o[g];
+        for (const v of vigas) max = Math.max(max, ocupaViga(v)[g]);
+        return max === -Infinity ? 0 : max;
+      }
+    : superior
       ? (n: number, vigas: ReadonlySet<string>, bajo: boolean) => (bajo ? Math.max(espesorHuella.get(n) ?? 0, ...[...vigas].map(cantoViga)) : 0)
       : (n: number, vigas: ReadonlySet<string>, bajo: boolean) =>
           Math.max(
@@ -165,7 +189,8 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       const vigas = topo.vigasEn.get(nj) ?? new Set<string>();
       const rz = fp * junta(nj, vigas, true);
       const vigasBase = topo.vigasEn.get(ni) ?? new Set<string>();
-      const rzBase = ctx.op.zonaRigidaBase ? fp * junta(ni, vigasBase, false) : 0;
+      // DN: con el plano en la cara superior, la base sólo se mueve por un desnivel (sin él, 0)
+      const rzBase = ctx.op.zonaRigidaBase || (conDesnivel && superior) ? fp * junta(ni, vigasBase, false) : 0;
       // PF: el tramo, en su eje; si no es el de la planta de abajo, el offset de la base lo une a su nudo
       const [x, y] = ejeTramo(ctx, p, k - 1);
       if (x !== recta.O[0] || y !== recta.O[1]) {

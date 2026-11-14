@@ -1,6 +1,6 @@
 # Fase DN: los desniveles de paño
 
-Plan del 2026-11-14, desde la propuesta de `niveles.md` §3, que pidió el usuario el 2026-10-29. El orden lo decidió el usuario el 2026-11-08: DN, luego LC y luego CO. Estado: **plan, con DN-a medida; las decisiones DN-a…DN-f, por tomar** (§5).
+Plan del 2026-11-14, desde la propuesta de `niveles.md` §3, que pidió el usuario el 2026-10-29. El orden lo decidió el usuario el 2026-11-08: DN, luego LC y luego CO. Estado: **plan, con DN-a medida; DN-a…DN-e decididas por el usuario el 2026-11-14 como se recomendaban** (§5); DN-f (la sombra), a falta del modelo de CYPECAD.
 
 ## 1. Qué se pide
 
@@ -80,6 +80,8 @@ Todos van sin diafragma, porque la referencia no cabe en uno. El error de RV-b s
 
 ## 5. Decisiones
 
+**Decididas el 2026-11-14:** DN-a (a), DN-b (error sin solape, aviso por debajo de t/2), DN-c (una orden), DN-d (positivos admitidos) y DN-e (vigas y pilares sin campo propio), todas como se recomendaban.
+
 - **DN-a, el cálculo: (a), los nudos en el plano de la planta** (recomendado, §3). La (b), la lámina excéntrica, sólo serviría sin diafragma rígido, y con viga en el escalón da lo mismo que lo que ya se acepta.
 - **DN-b, el solape mínimo en canto para dar continuidad sin viga.** Recomendado:
   - el error, sólo sin solape (≤ 0);
@@ -110,3 +112,22 @@ Todos van sin diafragma, porque la referencia no cabe en uno. El error de RV-b s
 - **DN1, el compilador:** el campo, las zonas rígidas, las vigas, el escalón y la hipótesis, con los criterios 1 a 3 y 6.
 - **DN2, el dibujo y el editor:** el alzado, el 3D, la tabla, la ficha y «Enrasar», con los criterios 4 y 5.
 - **DN3:** la skill, el esquema y la sombra (criterio 7).
+
+## 8. DN1 hecho (2026-11-14)
+
+Pasan los criterios 1, 2, 3 y 6. El compilador no cambia de versión, porque sin desniveles su salida es la misma bit a bit (como PF): la batería entera del compilador pasa con las referencias congeladas idénticas.
+
+- **Modelo físico:** `desnivel` en `Losa` y en `PanoUnidireccional`; `validar` exige un número finito, y los esquemas están regenerados.
+- **`src/compilador/desniveles.ts`** (puro, también para el dibujo):
+  - `desnivelesVigas` (DN-e);
+  - `escalones` y `avisarEscalones` (DN-b): el borde común sin una viga, un muro que llegue a la planta, un apoyo lineal o la huella de un pilar debajo. El error y el aviso nombran los dos forjados y el tramo, y no dependen del orden de las listas.
+- **Lo que ocupa el nudo de un pilar** (`losas.ts`, `piezas.ts`): cada huella guarda lo que sus losas ocupan por debajo y por encima del plano (`HuellaL.bajo`, `encima`). Cada viga, con su cara superior en su desnivel. La cabeza va hasta lo más bajo y la base del tramo de encima, desde lo más alto. Con el plano en la cara superior, la base se mueve también hacia abajo cuando todo lo que llega está más bajo.
+  - Sin desniveles, el camino de antes, con los mismos bits.
+  - Con el plano medio y `zonaRigidaBase: false`, la base no se mueve: es la opción de antes de LV-d, y se queda así.
+- **El peso de las vigas bajo el forjado** (C2-g, `cargas.ts`): se quita sólo lo que se solapan en canto la viga y el forjado (del pp del forjado, esa fracción). La sensatez de A3 lo replica, y el esperado es el calculado a 1e-6.
+- **RV-a:** cuenta como plana la viga cuya cara inferior no queda por debajo de la del reticular.
+- **La hipótesis** nombra los forjados con desnivel y las vigas que lo toman.
+- **Pruebas:**
+  - `src/compilador/desnivel.test.ts`: los offsets a mano con los dos planos y desniveles positivos y negativos, la viga, el peso con el de A3 y los escalones, con un apoyo entero o a medias, y sin depender del orden;
+  - tres entradas nuevas en el catálogo de no válidos de C2.
+- **Queda:** el peso de una viga por el eje de un muro (A-9) no mira el desnivel del forjado de al lado; es raro y se deja.

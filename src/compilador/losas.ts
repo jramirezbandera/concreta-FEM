@@ -85,6 +85,13 @@ export interface HuellaL {
   esclavos: number[];
   /** Espesor de la losa más gruesa de la huella (para la zona rígida de la cabeza del pilar, C2-e). */
   espesor: number;
+  /**
+   * Lo que ocupan las losas de la huella por debajo y por encima del plano del forjado (ZR1 con el
+   * desnivel, fase DN): con el plano en la cara superior, t − Δ y Δ; con el plano medio, t/2 − Δ y
+   * t/2 + Δ; el mayor de cada uno. Sin láminas en la huella, −∞.
+   */
+  bajo: number;
+  encima: number;
 }
 
 export interface Losas {
@@ -495,6 +502,14 @@ interface PlantaL extends PlantaMuros {
  */
 export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly CargaFisica[], diag: Diagnosticos, puntosMuros: readonly Vec2[][], panos: PanosU | null = null): Losas {
   const { epsGeom, epsSnap, tamanoMalla: h, rejilla } = ctx.op;
+  // Fase DN: lo que ocupa una losa por debajo y por encima del plano del forjado (sin desnivel, t y 0
+  // con el plano en la cara superior, t/2 y t/2 con el medio: los mismos bits que el espesor)
+  const medio = ctx.op.planoForjado === "medio";
+  const ocupaLosa = (lc: Contexto["losas"][number]): [number, number] => {
+    const t = lc.material.t;
+    const arriba = (lc.losa.desnivel ?? 0) + (medio ? t / 2 : 0);
+    return [t - arriba, arriba];
+  };
   const r: Losas = {
     laminas: [],
     huellas: [],
@@ -1069,19 +1084,31 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     for (let i = huellasPlanta.length - 1; i >= 0; i--) if (!huellasPlanta[i]!.esclavos.length && !aPilar.has(huellasPlanta[i]!.maestro)) huellasPlanta.splice(i, 1);
     // Los que van con la huella de un pilar
     const espesorNudo = new Map<number, number>();
+    const ocupaNudo = new Map<number, [number, number]>();
     if (aPilar.size)
       for (const q of m.quads) {
-        const t = ctx.losas[e.losaDeMallar[q.losa]!]!.material.t;
-        for (const nn of q.nudos) espesorNudo.set(nudoT[nn]!, Math.max(espesorNudo.get(nudoT[nn]!) ?? 0, t));
+        const lc = ctx.losas[e.losaDeMallar[q.losa]!]!;
+        const t = lc.material.t;
+        const [b, a] = ocupaLosa(lc);
+        for (const nn of q.nudos) {
+          espesorNudo.set(nudoT[nn]!, Math.max(espesorNudo.get(nudoT[nn]!) ?? 0, t));
+          const o = ocupaNudo.get(nudoT[nn]!);
+          ocupaNudo.set(nudoT[nn]!, o ? [Math.max(o[0], b), Math.max(o[1], a)] : [b, a]);
+        }
       }
     for (const [pn, ns] of [...aPilar].sort((x, y) => x[0] - y[0])) {
       const pilar = topo.nudos[pn]!.pilar!.pilares[0]!;
       let h = huellasPlanta.find((x) => x.maestro === pn);
-      if (!h) huellasPlanta.push((h = { pilar, k, maestro: pn, esclavos: [], espesor: 0 }));
+      if (!h) huellasPlanta.push((h = { pilar, k, maestro: pn, esclavos: [], espesor: 0, bajo: -Infinity, encima: -Infinity }));
       for (const n of ns) {
         if (!h.esclavos.includes(n)) h.esclavos.push(n);
         esclavoDe.set(n, pilar);
         h.espesor = Math.max(h.espesor, espesorNudo.get(n) ?? 0);
+        const o = ocupaNudo.get(n);
+        if (o) {
+          h.bajo = Math.max(h.bajo, o[0]);
+          h.encima = Math.max(h.encima, o[1]);
+        }
       }
       h.esclavos.sort((x, y) => x - y);
     }
@@ -1253,12 +1280,17 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // El mayor espesor de las láminas que tocan cada nudo de la malla, para el espesor de cada
     // huella (antes, todos los cuadriláteros de la planta por cada huella)
     const espesorEnNudo = new Map<number, number>();
+    const ocupaEnNudo = new Map<number, [number, number]>();
     for (const q of m?.quads ?? []) {
-      const t = ctx.losas[losaDeMallar[q.losa]!]!.material.t;
+      const lc = ctx.losas[losaDeMallar[q.losa]!]!;
+      const t = lc.material.t;
+      const [b, a] = ocupaLosa(lc);
       for (const nn of q.nudos) {
         const x = nudoT[nn]!;
         const v = espesorEnNudo.get(x);
         if (v === undefined || t > v) espesorEnNudo.set(x, t);
+        const o = ocupaEnNudo.get(x);
+        ocupaEnNudo.set(x, o ? [Math.max(o[0], b), Math.max(o[1], a)] : [b, a]);
       }
     }
     for (const [n, poli] of huellasK) {
@@ -1294,7 +1326,9 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       }
       // El mismo máximo que el de las láminas que tocan algún esclavo
       const espesor = Math.max(0, ...esclavos.map((x) => espesorEnNudo.get(x) ?? -Infinity));
-      huellasPlanta.push({ pilar, k, maestro: n, esclavos, espesor });
+      const bajo = Math.max(...esclavos.map((x) => ocupaEnNudo.get(x)?.[0] ?? -Infinity));
+      const encima = Math.max(...esclavos.map((x) => ocupaEnNudo.get(x)?.[1] ?? -Infinity));
+      huellasPlanta.push({ pilar, k, maestro: n, esclavos, espesor, bajo, encima });
     }
     // Fase LV: las piezas en el ancho de las vigas y la unión de la losa a sus caras
     const caras = e.anchos.length && m ? unirCaras(e, m, nudoT, esclavoDe, huellasPlanta, nudosMuros) : { enlaces: [], ejes: [] };

@@ -15,6 +15,7 @@
  *
  * Unidades kN y m (D1); fck en MPa; pesos específicos en kN/m³. Puro: sin IO.
  */
+import { desnivelesVigas } from "../compilador/desniveles.ts";
 import { resolverAbacos, TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { direccionEjes } from "../compilador/ejes.ts";
@@ -653,6 +654,21 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, tole
     }
   const losasEn = (planta: string) => (f.losas ?? []).filter((l) => l.planta === planta);
   const panosEn = (planta: string) => (f.panos ?? []).filter((x) => x.planta === planta);
+  // Fase DN: el desnivel de cada viga, el del forjado más alto que la toca (DN-e), como el compilador
+  const desnivelViga = desnivelesVigas(
+    [
+      ...(f.losas ?? []).map((l) => ({ id: l.id, planta: l.planta, region: regionDe(l), desnivel: l.desnivel ?? 0, canto: l.espesor })),
+      ...(f.panos ?? []).map((pn) => {
+        const h = seccion.get(pn.seccion);
+        return { id: pn.id, planta: pn.planta, region: regionDe(pn), desnivel: pn.desnivel ?? 0, canto: (h && cantoSeccion(h)) || 0 };
+      }),
+    ],
+    (f.vigas ?? []).map((v) => {
+      const s = seccion.get(v.seccion);
+      return { id: v.id, planta: v.planta, puntos: v.puntos, semiancho: s?.forma === "rectangular" ? s.b / 2 : 0 };
+    }),
+    eps,
+  );
   for (const v of f.vigas ?? []) {
     const w = pesoSeccion(v.seccion);
     if (!w) continue;
@@ -665,7 +681,13 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, tole
     for (const t of tramos(v.puntos)) {
       const huella = huellaTramo(t, w.s.b);
       const hs = w.s.h;
-      const forjado = (t: number, pp: number) => Math.min(gamma * Math.min(hs, t), pp);
+      const dv = desnivelViga.get(v.id) ?? 0;
+      // DN: con un desnivel, sólo lo que se solapan en canto la viga (cara superior en dv) y el forjado
+      const forjado = (t: number, pp: number, dz = 0) => {
+        if (dv === 0 && dz === 0) return Math.min(gamma * Math.min(hs, t), pp);
+        const solape = Math.max(0, Math.min(dv, dz) - Math.max(dv - hs, dz - t));
+        return Math.min(gamma * solape, pp * (solape / t));
+      };
       for (const l of losasEn(v.planta)) {
         const ml = material.get(l.material);
         if (!ml) continue;
@@ -673,12 +695,12 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, tole
         const A = momentosInterseccion(regionDe(l), huella).A;
         // Lo de los ábacos dentro de la losa (uno de fachada se sale de ella): el ábaco recortado por la huella, que es convexa
         const Aab = (l.reticular?.abacos ?? []).reduce((t, ab) => t + (recorteRegionConvexo({ contorno: ab, huecos: [] }, huella) ?? []).reduce((u, z) => u + Math.abs(momentosInterseccion(regionDe(l), z).A), 0), 0);
-        x.solapes += (A - Aab) * forjado(l.espesor, pp) + Aab * forjado(l.espesor, ppAbaco);
+        x.solapes += (A - Aab) * forjado(l.espesor, pp, l.desnivel ?? 0) + Aab * forjado(l.espesor, ppAbaco, l.desnivel ?? 0);
       }
       for (const pn of panosEn(v.planta)) {
         const h = seccion.get(pn.seccion);
         const hv = h ? cantoSeccion(h) : null;
-        if (hv) x.solapes += momentosInterseccion(regionDe(pn), huella).A * forjado(hv, ppDePano(f, pn) ?? 0);
+        if (hv) x.solapes += momentosInterseccion(regionDe(pn), huella).A * forjado(hv, ppDePano(f, pn) ?? 0, pn.desnivel ?? 0);
       }
       // A-9: por el eje de un muro que le llega desde abajo, sólo lo que sobresale de él
       for (const o of sobreMuros(t, k, f, P, eps)) {

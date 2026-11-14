@@ -140,6 +140,8 @@ interface RegionPeso {
   pp: number;
   /** De un ábaco: la región de su losa (un ábaco de fachada se sale de ella). */
   en?: Region;
+  /** Fase DN: el desnivel de su cara superior. */
+  dz: number;
 }
 
 export interface CargasCompiladas {
@@ -171,7 +173,7 @@ function sumarSuperficie(r: Resultante, m: Momentos, z: number, q: readonly numb
  * borde entre el eje y la cara dejaba sin contar, o contaba de más, hasta γ·t·b/4 por metro. Con la mitad
  * cubierta entera o nada, lo de antes con los mismos bits.
  */
-function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: readonly RegionPeso[], eps: number): { desde: number; hasta: number; w: number }[] {
+function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: readonly RegionPeso[], eps: number, dv = 0): { desde: number; hasta: number; w: number }[] {
   const gamma = w / (b * h);
   const n: Vec2 = [-r.e[1], r.e[0]];
   const cortes = new Set<number>([0, r.len]);
@@ -220,9 +222,12 @@ function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: reado
         let fr = A / media;
         if (!(fr > 1e-9)) continue;
         if (fr > 1 - 1e-9) fr = 1;
-        // En una maciza con su pp (γ·t), lo de C2-g con los mismos bits
-        const solido = gamma * (b / 2) * Math.min(h, x.t);
-        const forjado = (b / 2) * x.pp;
+        // En una maciza con su pp (γ·t), lo de C2-g con los mismos bits. Fase DN: con un desnivel, lo
+        // que se solapan en canto la viga (con la cara superior en dv) y el forjado, y del forjado esa parte
+        const desnivel = dv !== 0 || x.dz !== 0;
+        const solape = desnivel ? Math.max(0, Math.min(dv, x.dz) - Math.max(dv - h, x.dz - x.t)) : 0;
+        const solido = gamma * (b / 2) * (desnivel ? solape : Math.min(h, x.t));
+        const forjado = desnivel ? (b / 2) * x.pp * (solape / x.t) : (b / 2) * x.pp;
         const q = forjado < solido * (1 - 1e-9) ? forjado : solido;
         quita += fr === 1 ? q : fr * q;
       }
@@ -589,12 +594,12 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     ...ctx.losas.flatMap((l, i) =>
       l.losa.planta === v.planta
         ? [
-            ...(l.reticular?.abacos ?? []).map((ab) => ({ region: { contorno: ab, huecos: [] }, t: l.material.t, pp: l.reticular!.ppAbaco, en: losas.regiones[i]! })),
-            { region: losas.regiones[i]!, t: l.material.t, pp: l.pp },
+            ...(l.reticular?.abacos ?? []).map((ab) => ({ region: { contorno: ab, huecos: [] }, t: l.material.t, pp: l.reticular!.ppAbaco, en: losas.regiones[i]!, dz: l.losa.desnivel ?? 0 })),
+            { region: losas.regiones[i]!, t: l.material.t, pp: l.pp, dz: l.losa.desnivel ?? 0 },
           ]
         : [],
     ),
-    ...ctx.panos.flatMap((p, i) => (p.pano.planta === v.planta && panos ? [{ region: panos.regiones[i]!, t: p.seccion.canto, pp: p.pano.pp }] : [])),
+    ...ctx.panos.flatMap((p, i) => (p.pano.planta === v.planta && panos ? [{ region: panos.regiones[i]!, t: p.seccion.canto, pp: p.pano.pp, dz: p.pano.desnivel ?? 0 }] : [])),
   ];
 
   // Reparto de los paños (C4-e): a las rectas de sus viguetas y de las vigas de sus lados paralelos, y
@@ -772,7 +777,7 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
           continue;
         }
         // C2-g bajo las losas y los paños; A-9 sobre los muros
-        const bajo = regiones.length ? pesoBajoLosa(r, w, sc.huella.b, sc.canto, regiones, ctx.op.epsGeom) : [{ desde: 0, hasta: r.len, w }];
+        const bajo = regiones.length ? pesoBajoLosa(r, w, sc.huella.b, sc.canto, regiones, ctx.op.epsGeom, ctx.desnivelViga.get(v.id) ?? 0) : [{ desde: 0, hasta: r.len, w }];
         for (const t of quitarMuros(bajo, enMuros, sc.huella.b)) if (t.w > 0) repartir(cPeso, r, t.desde, t.hasta, [0, 0, -t.w], [0, 0, -t.w]);
       }
     }

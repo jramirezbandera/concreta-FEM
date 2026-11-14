@@ -22,6 +22,7 @@ import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, Mo
 import { avisarAbacosUnidos, errorPilaresSinAbaco, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
 import { resolverBordes } from "./bordes.ts";
+import { avisarEscalones } from "./desniveles.ts";
 import { esHipotesisHorizontal, hipotesisSegundoOrden } from "./segundoOrden.ts";
 import { calcularSismo, CASOS_SISMO, hipotesisEspectro, hipotesisSismo } from "./sismo.ts";
 import { avisosNieve, hipotesisNieve } from "./nieve.ts";
@@ -204,6 +205,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const ctx = validar(viento.modelo, op, diag);
   // AC-d: un reticular lleva un ábaco en cada pilar (detrás de la validación, para que sus errores vayan antes)
   if (ctx) errorPilaresSinAbaco(abacos.modelo, abacos.porLosa, diag);
+  // DN-b: los escalones entre forjados con desniveles distintos
+  if (ctx && !diag.hayErrores) avisarEscalones(ctx, diag);
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
   // VS2: las masas del sismo, de los casos (con los del viento); sus errores ya los ha dado `validar`
@@ -569,6 +572,16 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
         ? "Nudos de eje a eje: sin zonas rígidas (factor 0)."
         : `Nudos de dimensión finita: ${vigasZR}; ${pilaresZR}.`,
   );
+  // Fase DN: los forjados con desnivel
+  const conDesnivel = [...ctx.losas.map((l) => [l.losa.id, l.losa.desnivel ?? 0] as const), ...ctx.panos.map((p) => [p.pano.id, p.pano.desnivel ?? 0] as const)].filter(([, d]) => d !== 0);
+  if (conDesnivel.length) {
+    const vigas = [...ctx.desnivelViga].filter(([, d]) => d !== 0);
+    h.push(
+      `Forjados con desnivel (DN): ${conDesnivel.map(([id, d]) => `${id} ${d > 0 ? "+" : "−"}${coma(Math.abs(d))} m`).join(", ")}. Sus nudos van en el plano de su planta, como los demás (DN-a: la excentricidad no se modela); el desnivel cuenta en lo que ocupa el nudo de cada pilar (la cabeza del tramo de debajo, rígida hasta la cara inferior más baja de lo que le llega; la base del de encima, desde la cara superior más alta) y en el peso de las vigas bajo el forjado.${
+        vigas.length ? ` Las vigas toman el desnivel del forjado más alto que tocan (DN-e): ${vigas.map(([id, d]) => `${id} ${d > 0 ? "+" : "−"}${coma(Math.abs(d))} m`).join(", ")}.` : ""
+      }`,
+    );
+  }
   // PF: los pilares cuyo eje cambia entre tramos
   const excentricos = ctx.pilares.filter((p) => {
     if (!conPuntoFijo(p)) return false;
@@ -767,7 +780,8 @@ function vigasPlanasEnReticular(ctx: Contexto, losas: Losas, piezas: Piezas): Se
       const q: Vec2 = [M[0] + (s * sc.huella.b * n[0]) / 4, M[1] + (s * sc.huella.b * n[1]) / 4];
       ctx.losas.forEach((l, i) => {
         if (l.losa.planta !== v.planta || !puntoEnRegion(q, losas.regiones[i]!)) return;
-        if (l.reticular?.abaco && !l.reticular.dados && sc.canto <= l.material.t + eps) reticular = true;
+        // DN: con la cara inferior de la viga no más baja que la del reticular (sin desniveles, h ≤ t)
+        if (l.reticular?.abaco && !l.reticular.dados && sc.canto - (ctx.desnivelViga.get(v.id) ?? 0) <= l.material.t - (l.losa.desnivel ?? 0) + eps) reticular = true;
         else otra = true;
       });
       if (ctx.panos.some((p) => p.pano.planta === v.planta && puntoEnRegion(q, p.region))) otra = true;

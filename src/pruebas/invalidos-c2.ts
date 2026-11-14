@@ -114,6 +114,15 @@ export const CATALOGO: Caso[] = [
     carga(f, "z").zona = rect(3.7, 3.2, 4.5, 4.0);
   }, "carga/fuera-de-losa", "z"],
   ["superficie en un caso que no existe", (f) => (carga(f, "z").caso = "X"), "fisico/referencia", "z"],
+  // Desniveles (fase DN)
+  ["desnivel que no es un número", (f) => (f.losas![0]!.desnivel = m("-0,1")), "fisico/valor-no-valido", "L"],
+  ["desnivel no finito", (f) => (f.losas![0]!.desnivel = Number.NaN), "fisico/valor-no-valido", "L"],
+  [
+    "losa en el hueco 40 cm más baja, sin viga en el escalón",
+    (f) => (f.losas = [...f.losas!, { id: "L2", planta: "P1", contorno: rect(3.6, 3.1, 4.6, 4.1), espesor: 0.25, material: "HA", desnivel: -0.4 }]),
+    "losa/escalon-sin-apoyo",
+    "L2",
+  ],
   // Cargas lineales
   ["lineal de un punto", (f) => (carga(f, "t").puntos = [[1, 1]]), "fisico/valor-no-valido", "t"],
   ["lineal con dos puntos iguales", (f) => (carga(f, "t").puntos = [[1, 1], [1, 1], [2, 2]]), "fisico/valor-no-valido", "t"],

@@ -877,6 +877,9 @@
         "eje1": {
           "type": "number"
         },
+        "desnivel": {
+          "type": "number"
+        },
         "reticular": {
           "$ref": "#/$defs/Reticular"
         }
@@ -1368,6 +1371,9 @@
         },
         "ppProcedencia": {
           "$ref": "#/$defs/Procedencia"
+        },
+        "desnivel": {
+          "type": "number"
         },
         "bovedilla": {
           "enum": [

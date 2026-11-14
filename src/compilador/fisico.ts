@@ -374,6 +374,15 @@ export interface Losa {
   /** Dirección del eje 1 de sus láminas en planta, en grados desde +X (E3-2). Por defecto, 0. Orienta también la retícula de la malla. */
   eje1?: number;
   /**
+   * Desnivel de la cara superior del forjado respecto a la cota de su planta, m (negativo, más bajo;
+   * por defecto, 0): una terraza más baja o una losa enrasada por abajo con otra más gruesa (fase DN,
+   * `docs/fem3d/desniveles.md`). Los nudos siguen en el plano de la planta (DN-a): cambian lo que
+   * ocupa el nudo de cada pilar (ZR1), la cota de las vigas que toca y el dibujo. Dos forjados con
+   * desniveles distintos que comparten un lado sin solapar en canto necesitan una viga, un muro o un
+   * apoyo lineal en él (DN-b).
+   */
+  desnivel?: number;
+  /**
    * Forjado reticular (C4, D3): la losa es su zona aligerada, de canto total `espesor`, con nervios
    * según el `eje1` y la perpendicular.
    */
@@ -468,6 +477,15 @@ export interface PanoUnidireccional {
   pp?: number;
   /** De dónde sale el `pp` escrito: sólo se informa, no cambia el cálculo. */
   ppProcedencia?: Procedencia;
+  /**
+   * Desnivel de la cara superior del paño respecto a la cota de su planta, m (negativo, más bajo;
+   * por defecto, 0): una terraza más baja o una losa enrasada por abajo con otra más gruesa (fase DN,
+   * `docs/fem3d/desniveles.md`). Los nudos siguen en el plano de la planta (DN-a): cambian lo que
+   * ocupa el nudo de cada pilar (ZR1), la cota de las vigas que toca y el dibujo. Dos forjados con
+   * desniveles distintos que comparten un lado sin solapar en canto necesitan una viga, un muro o un
+   * apoyo lineal en él (DN-b).
+   */
+  desnivel?: number;
   /** Bovedilla, para el peso sin `pp`. Por defecto, "hormigon". */
   bovedilla?: "hormigon" | "ceramica" | "poliestireno";
   /** El relleno entre viguetas dado por el usuario: sustituye al estimado de la `bovedilla`. Un `pp` escrito manda. */
