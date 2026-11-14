@@ -799,6 +799,14 @@ const forjados: DefTabla = {
     { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes de las vigas y los muros en que se apoya: «x y; x y; …» (al menos 3, sin repetir el primero)" },
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»", defecto: () => "ninguno" },
     { clave: "espesor", titulo: "canto", unidad: "m", ayuda: "maciza y reticular: el canto total; vacío en un unidireccional (lo da la sección de la vigueta)" },
+    {
+      clave: "desnivel",
+      titulo: "desnivel",
+      unidad: "m",
+      ayuda:
+        "de la cara superior respecto a la cota de la planta: negativo, más bajo (una terraza, −0,10). Vacío, en la cota. Para que quede a ras de otro forjado, «Enrasar con…» en sus propiedades, por arriba o por abajo. Dos forjados con desniveles distintos que no se solapan en canto necesitan una viga, un muro o un apoyo en su borde común",
+      defecto: () => "0 (en la cota)",
+    },
     { clave: "material", titulo: "material", ayuda: "maciza y reticular; vacío en un unidireccional", opciones: materiales_("ninguno: unidireccional"), referencia: "materiales" },
     {
       clave: "pp",
@@ -855,6 +863,7 @@ const forjados: DefTabla = {
         contorno: textoPuntos(p.contorno),
         huecos: p.huecos?.length ? textoPoligonos(p.huecos) : "",
         espesor: "",
+        desnivel: n(p.desnivel),
         material: "",
         pp: n(p.pp),
         direccion: n(p.direccion),
@@ -882,6 +891,7 @@ const forjados: DefTabla = {
       contorno: textoPuntos(l.contorno),
       huecos: l.huecos?.length ? textoPoligonos(l.huecos) : "",
       espesor: n(l.espesor),
+      desnivel: n(l.desnivel),
       material: l.material,
       pp: n(l.pp),
       direccion: n(l.eje1),
@@ -902,7 +912,7 @@ const forjados: DefTabla = {
   objeto(f) {
     const L = new Lector(f);
     const tipo = tipoFila(f);
-    const comun = { id: L.texto("id") ?? "", nombre: L.texto("nombre"), planta: L.texto("planta", { obligatorio: true }), contorno: L.puntos("contorno", { obligatorio: true, min: 3 }), huecos: L.poligonos("huecos") };
+    const comun = { id: L.texto("id") ?? "", nombre: L.texto("nombre"), planta: L.texto("planta", { obligatorio: true }), contorno: L.puntos("contorno", { obligatorio: true, min: 3 }), huecos: L.poligonos("huecos"), desnivel: L.numero("desnivel") };
     // El relleno y la procedencia (2026-11-05): la procedencia es la del pp escrito o, sin él, la del relleno
     const tr = L.texto("relleno");
     const rl = tr === undefined ? undefined : leerRelleno(tr);

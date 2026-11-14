@@ -559,7 +559,7 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
 
 /** Un número de la plantilla; vacío es «el de por defecto» (y 0 también, salvo con `cero`); `falta`, en rojo mientras esté vacío. */
 /** Lo más que puede medir cada longitud de la plantilla de Forjado, m (las de la tabla). */
-const MAXIMO_FORJADO: Partial<Record<"espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", number>> = { espesor: LONGITUD_MAXIMA.espesor, intereje: LONGITUD_MAXIMA.intereje, nervio: LONGITUD_MAXIMA.nervio, capa: LONGITUD_MAXIMA.nervio };
+const MAXIMO_FORJADO: Partial<Record<"espesor" | "desnivel" | "pp" | "direccion" | "intereje" | "nervio" | "capa", number>> = { espesor: LONGITUD_MAXIMA.espesor, intereje: LONGITUD_MAXIMA.intereje, nervio: LONGITUD_MAXIMA.nervio, capa: LONGITUD_MAXIMA.nervio };
 
 /**
  * Un número de la plantilla. En m admite la unidad escrita («25 cm», «250 mm»), y con `max` rechaza
@@ -829,7 +829,7 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
   const peso = pesoPlantillaForjado(m, t);
   const faltaPp = t.pp === undefined && (tipo === "reticular" ? t.caseton === "perdido" : tipo === "unidireccional" && !!m.secciones.find((x) => x.id === t.seccion) && !peso);
   const vacioPp = peso ? `${String(Math.round(peso.pp * 100) / 100).replace(".", ",")} (sale solo)` : "sale solo";
-  const num = (k: "espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", etiqueta: string, unidad: string, ayuda?: string) => <NumeroCampo key={`${tipo}-${k}`} etiqueta={etiqueta} unidad={unidad} valor={t[k]} onCambio={(v) => poner({ [k]: v })} ayuda={ayuda} cero={k === "pp"} vacio={k === "pp" ? vacioPp : "0"} falta={k === "pp" && faltaPp} max={MAXIMO_FORJADO[k]} />;
+  const num = (k: "espesor" | "desnivel" | "pp" | "direccion" | "intereje" | "nervio" | "capa", etiqueta: string, unidad: string, ayuda?: string) => <NumeroCampo key={`${tipo}-${k}`} etiqueta={etiqueta} unidad={unidad} valor={t[k]} onCambio={(v) => poner({ [k]: v })} ayuda={ayuda} cero={k === "pp"} vacio={k === "pp" ? vacioPp : "0"} falta={k === "pp" && faltaPp} max={MAXIMO_FORJADO[k]} />;
   return (
     <Seccion titulo="Plantilla" valor="para los siguientes">
       <div className="py-1">
@@ -843,7 +843,8 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
           onCambio={(modo) => poner({ modo })}
           ayuda={(t.modo ?? "recuadro") === "recuadro" ? "Un clic dentro de un recuadro cerrado por vigas, muros, apoyos lineales o bordes de forjado: el contorno, por sus ejes, desde el vértice más cercano al clic." : "Clic a clic; Intro, doble clic o un clic en el primero lo cierra."}
         />
-        <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x, zunchos: t.zunchos, anchoZuncho: t.anchoZuncho, abacos: t.abacos }, true)} />
+        <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x, zunchos: t.zunchos, anchoZuncho: t.anchoZuncho, abacos: t.abacos, desnivel: t.desnivel }, true)} />
+        {num("desnivel", "desnivel", "m", "De la cara superior respecto a la cota de la planta: negativo, más bajo (una terraza, −0,10). Vacío, en la cota. Para dejarlo a ras de otro forjado, «Enrasar con…» en sus propiedades.")}
         {tipo !== "unidireccional" && (
           <>
             {num("espesor", "canto", "m")}

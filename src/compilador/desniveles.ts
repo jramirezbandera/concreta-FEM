@@ -19,7 +19,7 @@
  * Sólo aritmética y `Math.sqrt`/`Math.hypot` (COM-12).
  */
 import type { Diagnosticos } from "../motor/diagnosticos.ts";
-import type { Vec2, Viga } from "./fisico.ts";
+import type { ModeloFisico, Seccion, Vec2, Viga } from "./fisico.ts";
 import { cuerdaHuella, huellaPilar, type Huella } from "./geometria2d.ts";
 import { puntoEnRegion, type Region } from "./poligonos.ts";
 import type { SeccionCompilada } from "./secciones.ts";
@@ -241,4 +241,39 @@ function restar(A: [number, number][], B: [number, number][]): [number, number][
     if (s < a1) r.push([s, a1]);
   }
   return r;
+}
+
+/** Canto de una sección física (h; D en una circular), m; null si no se sabe. */
+function cantoFisico(s: Seccion | undefined): number | null {
+  if (!s) return null;
+  switch (s.forma) {
+    case "rectangular":
+    case "T":
+      return s.h;
+    case "circular":
+      return s.D;
+    case "I":
+      return s.perfil.h / 1000;
+    case "general":
+      return s.h ?? null;
+  }
+}
+
+/**
+ * `desnivelesVigas` sobre el modelo físico, sin compilar (para el dibujo y la sensatez): las losas y los
+ * paños con su canto, y las vigas con medio ancho de su sección (b de una rectangular, bw de una T).
+ */
+export function desnivelesVigasFisico(f: ModeloFisico, eps = 0.05): Map<string, number> {
+  if (![...(f.losas ?? []), ...(f.panos ?? [])].some((x) => (x.desnivel ?? 0) !== 0)) return new Map();
+  const seccion = new Map(f.secciones.map((s) => [s.id, s]));
+  const region = (x: { contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[] }): Region => ({ contorno: x.contorno, huecos: x.huecos ?? [] });
+  const ancho = (s: Seccion | undefined) => (s?.forma === "rectangular" ? s.b : s?.forma === "T" ? s.bw : s?.forma === "circular" ? s.D : 0);
+  return desnivelesVigas(
+    [
+      ...(f.losas ?? []).map((l) => ({ id: l.id, planta: l.planta, region: region(l), desnivel: l.desnivel ?? 0, canto: l.espesor })),
+      ...(f.panos ?? []).map((p) => ({ id: p.id, planta: p.planta, region: region(p), desnivel: p.desnivel ?? 0, canto: cantoFisico(seccion.get(p.seccion)) ?? 0 })),
+    ],
+    (f.vigas ?? []).map((v) => ({ id: v.id, planta: v.planta, puntos: v.puntos, semiancho: ancho(seccion.get(v.seccion)) / 2 })),
+    eps,
+  );
 }

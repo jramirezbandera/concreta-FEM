@@ -14,6 +14,7 @@
  * Puro: sin IO.
  */
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { desnivelesVigasFisico } from "../compilador/desniveles.ts";
 import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { espesorLosaEn, LADO_APOYO_3D } from "./solido.ts";
@@ -91,10 +92,13 @@ export function alambrico(f: ModeloFisico): Alambrico {
       poner([x, y, z0], [x, y, z1], i);
     }
   }
+  // Fase DN: las vigas y los forjados en la cota de su cara superior
+  const desnivelViga = desnivelesVigasFisico(f);
   for (const v of porId(f.vigas)) {
     const i = indice.get(v.planta);
-    const z = i === undefined ? null : cotas[i];
-    if (i === undefined || z === null || z === undefined) continue;
+    const zp = i === undefined ? null : cotas[i];
+    if (i === undefined || zp === null || zp === undefined) continue;
+    const z = zp + (desnivelViga.get(v.id) ?? 0);
     nuevo(v.id, "viga");
     for (let j = 1; j < v.puntos.length; j++) poner([v.puntos[j - 1]![0], v.puntos[j - 1]![1], z], [v.puntos[j]![0], v.puntos[j]![1], z], i);
   }
@@ -109,10 +113,11 @@ export function alambrico(f: ModeloFisico): Alambrico {
     [f.losas, "losa"],
     [f.panos, "pano"],
   ] as const) {
-    for (const l of porId<{ id: string; planta: string; contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[] }>(lista)) {
+    for (const l of porId<{ id: string; planta: string; contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[]; desnivel?: number }>(lista)) {
       const i = indice.get(l.planta);
-      const z = i === undefined ? null : cotas[i];
-      if (i === undefined || z === null || z === undefined) continue;
+      const zp = i === undefined ? null : cotas[i];
+      if (i === undefined || zp === null || zp === undefined) continue;
+      const z = zp + (l.desnivel ?? 0);
       nuevo(l.id, tipo);
       anillo(l.contorno, z, i);
       for (const h of l.huecos ?? []) anillo(h, z, i);

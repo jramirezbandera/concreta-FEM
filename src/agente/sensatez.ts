@@ -15,7 +15,7 @@
  *
  * Unidades kN y m (D1); fck en MPa; pesos específicos en kN/m³. Puro: sin IO.
  */
-import { desnivelesVigas } from "../compilador/desniveles.ts";
+import { desnivelesVigasFisico } from "../compilador/desniveles.ts";
 import { resolverAbacos, TOLERANCIA_ABACOS } from "../compilador/abacos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { direccionEjes } from "../compilador/ejes.ts";
@@ -655,20 +655,7 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05, tole
   const losasEn = (planta: string) => (f.losas ?? []).filter((l) => l.planta === planta);
   const panosEn = (planta: string) => (f.panos ?? []).filter((x) => x.planta === planta);
   // Fase DN: el desnivel de cada viga, el del forjado más alto que la toca (DN-e), como el compilador
-  const desnivelViga = desnivelesVigas(
-    [
-      ...(f.losas ?? []).map((l) => ({ id: l.id, planta: l.planta, region: regionDe(l), desnivel: l.desnivel ?? 0, canto: l.espesor })),
-      ...(f.panos ?? []).map((pn) => {
-        const h = seccion.get(pn.seccion);
-        return { id: pn.id, planta: pn.planta, region: regionDe(pn), desnivel: pn.desnivel ?? 0, canto: (h && cantoSeccion(h)) || 0 };
-      }),
-    ],
-    (f.vigas ?? []).map((v) => {
-      const s = seccion.get(v.seccion);
-      return { id: v.id, planta: v.planta, puntos: v.puntos, semiancho: s?.forma === "rectangular" ? s.b / 2 : 0 };
-    }),
-    eps,
-  );
+  const desnivelViga = desnivelesVigasFisico(f, eps);
   for (const v of f.vigas ?? []) {
     const w = pesoSeccion(v.seccion);
     if (!w) continue;

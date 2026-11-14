@@ -88,7 +88,7 @@ Todos van sin diafragma, porque la referencia no cabe en uno. El error de RV-b s
   - el aviso, con un solape menor que la mitad del espesor de la losa más delgada. En la terraza de 25 cm, eso es un desnivel de más de 12,5 cm sin viga.
 
   Es una regla de armado (la losa tiene que poder doblar o anclar sus barras en lo que solapan), no de cálculo.
-- **DN-c, «enrasar por abajo»: una orden del editor** (recomendado) que escribe el desnivel con los cantos de ahora (Δ = t_esta − t_otra). La alternativa es un modo del desnivel (`enrase: "inferior"`), que lo recalcularía al cambiar un canto. La orden deja en el fichero lo que se calcula, como AC-b; el modo necesita una losa de referencia, y se rompe si ésta cambia o desaparece.
+- **DN-c, «enrasar»: una orden del editor** (recomendado; desde DN2, por arriba o por abajo) que escribe el desnivel con los cantos de ahora (Δ = t_esta − t_otra). La alternativa es un modo del desnivel (`enrase: "inferior"`), que lo recalcularía al cambiar un canto. La orden deja en el fichero lo que se calcula, como AC-b; el modo necesita una losa de referencia, y se rompe si ésta cambia o desaparece.
 - **DN-d, desniveles positivos** (un forjado más alto que la cota de su planta): admitidos, con las mismas reglas (recomendado). La cota de la planta deja entonces de ser la cara superior más alta, y la hipótesis lo dice.
 - **DN-e, las vigas y los pilares, sin campo propio** (recomendado):
   - la viga toma el desnivel de la losa más alta que la toca;
@@ -131,3 +131,29 @@ Pasan los criterios 1, 2, 3 y 6. El compilador no cambia de versión, porque sin
   - `src/compilador/desnivel.test.ts`: los offsets a mano con los dos planos y desniveles positivos y negativos, la viga, el peso con el de A3 y los escalones, con un apoyo entero o a medias, y sin depender del orden;
   - tres entradas nuevas en el catálogo de no válidos de C2.
 - **Queda:** el peso de una viga por el eje de un muro (A-9) no mira el desnivel del forjado de al lado; es raro y se deja.
+
+## 9. DN2 hecho (2026-11-14)
+
+A petición del usuario, «Enrasar» va **por arriba o por abajo**. Pasan los criterios 4 y 5.
+
+- **Editor** (`src/editor/desnivel.ts`):
+  - `enrasar` y `desnivelEnrasado`: por arriba, el desnivel del otro (la misma cara superior); por abajo, Δ_otro − t_otro + t_este (la misma cara inferior). El canto de un paño es el de su vigueta;
+  - el número se redondea a 1e-9 m, y un desnivel nulo no se escribe;
+  - `forjadosParaEnrasar` da los de su planta, primero los que tocan su borde;
+  - la columna «desnivel» de Forjados (losas y paños) y el campo en la plantilla de la herramienta Forjado. Mover, Copiar, Girar, Simetría y Estirar copian el objeto entero, así que lo conservan.
+- **Propiedades de un forjado** (`app/src/editor/FichaForjado.tsx`, grupo «Cota»): dónde quedan sus dos caras y «Enrasar con [forjado] · Por arriba · Por abajo». La orden escribe el campo como si se tecleara: un paso de deshacer.
+- **El dibujo, en la cota real:**
+  - el 3D sólido (`solido.ts`): losas, casetones, marcas y paños con la cara superior en la cota más su desnivel, y las vigas con el del forjado más alto que tocan. Los pilares y los muros llegan a la cara inferior de la losa de su cabeza y salen de la cara superior de la de su base, y los apoyos van bajo la cara inferior real;
+  - el alámbrico físico;
+  - el alzado, con el desnivel rotulado en el corte («B −0,1»);
+  - el rótulo en planta («B · maciza 25 · −0,10»);
+  - las cargas dibujadas: la zona que cae en varios forjados va por partes, cada una en su cota;
+  - los isovalores y el armado en 3D (`ResultadosRender.desnivelLamina`).
+
+  Sin desniveles, cada expresión da los mismos números que antes. El alzado y el alámbrico analíticos siguen en el plano de la planta: es lo que se calcula (DN-a).
+- **`desnivelesVigasFisico`** (`desniveles.ts`): el desnivel de las vigas sin compilar, para el dibujo y la sensatez de A3.
+- **Pruebas:**
+  - `src/editor/desnivel.test.ts`: la columna, las dos formas de enrasar y la operación, byte a byte como escrita a mano; enrasar de vuelta da los bytes de antes;
+  - `src/visor/desnivel.test.ts`: el sólido (cotas y volúmenes, también el de los dos tramos de un pilar), el alzado, el rótulo, las cargas y el alámbrico;
+  - `app/src/test/formulario.test.tsx`: el panel «Cota».
+- **Queda para DN3:** la skill y la lista de datos del encargo (MA1), y la sombra con CYPECAD.

@@ -37,6 +37,8 @@
 import { ejesBarra, puntosBarra } from "../../compilador/barras.ts";
 import { tramosBorde } from "../../compilador/bordes.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
+import { desnivelesVigasFisico } from "../../compilador/desniveles.ts";
+import { puntoEnRegion } from "../../compilador/poligonos.ts";
 import { conPuntoFijo } from "../../compilador/puntoFijo.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
 import { intervalosRecta, PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type OpcionesAlzado, type PlanoAlzado } from "./alzado.ts";
@@ -126,6 +128,16 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
   const anillos = (x: { contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[] }): Vec2[][] => [x.contorno as Vec2[], ...((x.huecos ?? []) as Vec2[][])];
   const notas: string[] = [];
   const r: GeometriaCarga[] = [];
+  // Fase DN: cada carga, en la cara superior real de su forjado (o de su viga)
+  const forjados = [...(f.losas ?? []), ...(f.panos ?? [])];
+  const conDesnivel = forjados.some((x) => (x.desnivel ?? 0) !== 0);
+  const desnivelViga = desnivelesVigasFisico(f);
+  /** El desnivel del forjado de la planta en el que cae q (0 fuera de todos). */
+  const dzEn = (planta: string, q: Vec2): number => {
+    if (!conDesnivel) return 0;
+    const x = forjados.find((l) => l.planta === planta && puntoEnRegion(q, { contorno: l.contorno, huecos: l.huecos ?? [] }));
+    return x?.desnivel ?? 0;
+  };
 
   for (const g of porId((f.cargas ?? []).filter((x) => x.caso === caso))) {
     const x: GeometriaCarga = { carga: g, clase: CLASE_CARGA[g.tipo], regiones: [], lineas: [], puntos: [], presiones: [] };
@@ -137,11 +149,15 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
         const sobre = g.losa ? losas.get(g.losa) : g.pano ? panos.get(g.pano) : undefined;
         if (g.losa || g.pano) {
           if (!sobre) notas.push(`${g.id}: no existe ${g.losa ?? g.pano}.`);
-          else x.regiones.push({ P: anillos(sobre), capas: g.zona ? [[g.zona as Vec2[]]] : null, z, q });
+          else x.regiones.push({ P: anillos(sobre), capas: g.zona ? [[g.zona as Vec2[]]] : null, z: z + (sobre.desnivel ?? 0), q });
         } else if (g.zona) {
           // Lo que cae fuera de las losas y los paños no es carga (C2-h)
-          const capas = [...(f.losas ?? []), ...(f.panos ?? [])].filter((l) => l.planta === g.planta).map(anillos);
-          if (capas.length) x.regiones.push({ P: [g.zona as Vec2[]], capas, z, q });
+          const deLaPlanta = forjados.filter((l) => l.planta === g.planta);
+          const capas = deLaPlanta.map(anillos);
+          // DN: con desniveles, la zona por forjados, cada parte en su cota
+          if (capas.length && deLaPlanta.some((l) => (l.desnivel ?? 0) !== 0))
+            for (const l of deLaPlanta) x.regiones.push({ P: [g.zona as Vec2[]], capas: [anillos(l)], z: z + (l.desnivel ?? 0), q });
+          else if (capas.length) x.regiones.push({ P: [g.zona as Vec2[]], capas, z, q });
           else notas.push(`${g.id}: en ${g.planta} no hay losas ni paños donde caiga.`);
         } else notas.push(`${g.id}: carga de superficie sin zona, losa ni paño.`);
         break;
@@ -156,19 +172,21 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
         for (const puntos of g.tipo === "lineal" ? [g.puntos] : (tramosBorde(f, g) ?? []))
           for (let i = 1; i < puntos.length; i++) {
             const [a, b] = [puntos[i - 1]!, puntos[i]!];
-            if (a[0] !== b[0] || a[1] !== b[1]) x.lineas.push({ a: [a[0], a[1], z], b: [b[0], b[1], z], qa: q, qb: q });
+            const zt = z + dzEn(planta!, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+            if (a[0] !== b[0] || a[1] !== b[1]) x.lineas.push({ a: [a[0], a[1], zt], b: [b[0], b[1], zt], qa: q, qb: q });
           }
         break;
       }
       case "puntual": {
         const z = cota(g.planta);
         if (z === null) break;
-        x.puntos.push({ p: [g.x, g.y, z], F: [...(g.F ?? [0, 0, 0])] as V3, M: [...(g.M ?? [0, 0, 0])] as V3 });
+        x.puntos.push({ p: [g.x, g.y, z + dzEn(g.planta, [g.x, g.y])], F: [...(g.F ?? [0, 0, 0])] as V3, M: [...(g.M ?? [0, 0, 0])] as V3 });
         break;
       }
       case "viga": {
         const v = vigas.get(g.viga);
-        const z = v ? cota(v.planta) : null;
+        const zp = v ? cota(v.planta) : null;
+        const z = zp === null ? null : zp + (desnivelViga.get(g.viga) ?? 0);
         if (!v || z === null) {
           notas.push(`${g.id}: no existe la viga ${g.viga} o su planta.`);
           break;

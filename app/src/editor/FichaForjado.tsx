@@ -13,6 +13,7 @@
  * Lo que escriben va por `escribir`, como un campo más (un paso de deshacer).
  */
 import { fijarAbacosPilares, toleranciaAbacos } from "../../../src/editor/abacos.ts";
+import { desnivelEnrasado, forjadosParaEnrasar, type Enrase } from "../../../src/editor/desnivel.ts";
 import { useVisor } from "../contexto.ts";
 import { useEffect, useMemo, useState } from "react";
 import { gammaMaterial } from "../../../src/agente/sensatez.ts";
@@ -60,6 +61,60 @@ export function FijarAbacos({ losa }: { losa: string }) {
       <button type="button" className="btn" onClick={fijar}>
         Fijar como polígonos
       </button>
+      {error && <p className="nota text-state-fail">{error}</p>}
+    </div>
+  );
+}
+
+// ─── Cota (fase DN) ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * El desnivel del forjado: dónde quedan sus dos caras respecto a la cota de la planta, y «Enrasar con…»
+ * otro forjado de su planta, por arriba (la misma cara superior) o por abajo (la misma cara inferior).
+ * Escribe el número con los cantos de ahora (DN-c: una orden, no un modo), como si se tecleara.
+ */
+export function CotaForjado({ id, fila, ctx, escribir }: Props) {
+  const otros = useMemo(() => (id ? forjadosParaEnrasar(ctx.modelo, id) : []), [id, ctx.modelo]);
+  const [con, setCon] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const elegido = otros.some((o) => o.id === con) ? con : (otros[0]?.id ?? "");
+  const d = Number((fila.desnivel ?? "").trim().replace(",", ".") || "0");
+  const e = Number((fila.espesor ?? "").replace(",", "."));
+  const m = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${n(Math.abs(v), 3)} m`;
+  const enrasar = (como: Enrase) => {
+    if (!id || !elegido) return;
+    const r = desnivelEnrasado(ctx.modelo, id, elegido, como);
+    if (!r.ok) return setError(r.mensaje);
+    setError(null);
+    escribir("desnivel", r.desnivel === 0 ? "" : n(r.desnivel, 9));
+  };
+  return (
+    <div className="nota" data-testid="cota-forjado">
+      {Number.isFinite(d) && (
+        <p>
+          Cara superior a {d === 0 ? "la cota de la planta" : `${m(d)} de la cota`}
+          {e > 0 ? `; la inferior, a ${m(d - e)}` : ""}.
+        </p>
+      )}
+      {otros.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span>Enrasar con</span>
+          <select className="rounded border border-border-main bg-bg-primary px-1 py-px text-[12px]" aria-label="Forjado con el que enrasar" value={elegido} onChange={(ev) => setCon(ev.target.value)}>
+            {otros.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.id}
+                {o.toca ? "" : " (no toca su borde)"}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn" onClick={() => enrasar("arriba")} title="La misma cara superior que el otro forjado">
+            Por arriba
+          </button>
+          <button type="button" className="btn" onClick={() => enrasar("abajo")} title="La misma cara inferior que el otro forjado (una maciza junto a un reticular más grueso)">
+            Por abajo
+          </button>
+        </div>
+      )}
       {error && <p className="nota text-state-fail">{error}</p>}
     </div>
   );

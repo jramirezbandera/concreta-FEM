@@ -119,6 +119,18 @@ export class ResultadosRender {
     this.c = c;
   }
 
+  private desnivelC?: Map<string, number>;
+  /**
+   * Fase DN: lo que hay que subir una lámina de losa para dibujarla en la cota real de su forjado (su
+   * desnivel; los nudos del cálculo van en el plano de la planta, DN-a). 0 en los muros y sin desniveles.
+   */
+  desnivelLamina(l: number): number {
+    this.desnivelC ??= new Map((this.q.fisico.losas ?? []).filter((x) => (x.desnivel ?? 0) !== 0).map((x) => [x.id, x.desnivel!] as const));
+    if (!this.desnivelC.size) return 0;
+    const losa = this.c.mapeo.laminas?.[l]?.losa;
+    return (losa && this.desnivelC.get(losa)) || 0;
+  }
+
   get campos(): CamposLaminas {
     // Los de las consultas: los cortes de las bandas y los mapas comparten lo recuperado
     return (this.camposC ??= this.q.compilado === this.c.modelo ? this.q.campos : new CamposLaminas(this.c.modelo));

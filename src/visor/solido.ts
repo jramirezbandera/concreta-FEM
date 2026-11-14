@@ -45,6 +45,7 @@
 import { resolverAbacos, reticulaCasetones } from "../compilador/abacos.ts";
 import { ejesBarra, puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { desnivelesVigasFisico } from "../compilador/desniveles.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
 import { puntoEnRegion, trozosSegmento } from "../compilador/poligonos.ts";
 import { distanciaARegion } from "../compilador/topologia.ts";
@@ -630,6 +631,8 @@ interface Tapa {
   id: string;
   anillos: Vec2[][];
   e: number;
+  /** Fase DN: el desnivel de su cara superior respecto a la cota. */
+  dz: number;
   /** Un paño (las vigas rectangulares de hormigón sólo se recortan por los paños). */
   pano?: true;
 }
@@ -638,6 +641,8 @@ interface Tapa {
 interface VigaEnLosa {
   huella: Vec2[];
   h: number;
+  /** Fase DN: el desnivel de su cara superior (el del forjado más alto que la toca). */
+  dv: number;
 }
 
 function cajaAnillos(an: readonly (readonly Vec2[])[]): [number, number, number, number] {
@@ -689,12 +694,15 @@ export function huellaPilarSolido(p: PilarFijo, poligono: readonly Vec2[], sec?:
 /** Alto (m) de la pirámide de un apoyo y de la cuña de un apoyo lineal; su base, la mitad de ancha a cada lado. */
 export const LADO_APOYO_3D = 0.3;
 
-/** Espesor de la losa de una planta en un punto (también en su borde), para dibujar un apoyo bajo ella; 0 si no cae en ninguna. */
+/**
+ * Lo que baja la cara inferior de la losa de una planta en un punto (también en su borde) bajo la cota:
+ * su espesor menos su desnivel (fase DN), para dibujar un apoyo bajo ella; 0 si no cae en ninguna.
+ */
 export function espesorLosaEn(f: ModeloFisico, planta: string, q: Vec2): number {
   for (const l of porId(f.losas)) {
     if (l.planta !== planta) continue;
     const r = { contorno: l.contorno, huecos: l.huecos ?? [] };
-    if (puntoEnRegion(q, r) || distanciaARegion(q, r) <= 1e-6) return l.espesor;
+    if (puntoEnRegion(q, r) || distanciaARegion(q, r) <= 1e-6) return l.espesor - (l.desnivel ?? 0);
   }
   return 0;
 }
@@ -745,38 +753,45 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
   for (const l of porId(f.losas)) {
     const k = indice.get(l.planta);
     if (k === undefined || !(l.espesor > 0)) continue;
-    tapas.set(k, [...(tapas.get(k) ?? []), { id: l.id, anillos: [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])], e: l.espesor }]);
+    tapas.set(k, [...(tapas.get(k) ?? []), { id: l.id, anillos: [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])], e: l.espesor, dz: l.desnivel ?? 0 }]);
   }
   for (const p of porId(f.panos)) {
     const k = indice.get(p.planta);
     const e = cantoPano(f, p.seccion);
     if (k === undefined || e === null) continue;
-    tapas.set(k, [...(tapas.get(k) ?? []), { id: p.id, anillos: [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])], e, pano: true }]);
+    tapas.set(k, [...(tapas.get(k) ?? []), { id: p.id, anillos: [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])], e, dz: p.desnivel ?? 0, pano: true }]);
   }
   // Las vigas rectangulares de hormigón se hormigonan con la losa: su huella es de la viga en todo
   // su canto y la losa (maciza o reticular) se recorta por ella. Si no, una viga plana quedaba
   // entera dentro de la losa y no se veía, y el ábaco parecía no llegar a su cara
   const huellasV = huellasVigasDe(f);
+  // Fase DN: el desnivel de cada viga y si hay alguno (sin ninguno, las bases no miran la losa de abajo)
+  const desnivelViga = desnivelesVigasFisico(f);
+  const conDesnivel = [...(f.losas ?? []), ...(f.panos ?? [])].some((x) => (x.desnivel ?? 0) !== 0);
   const hormigonRect = (s: Seccion | undefined): s is Extract<Seccion, { forma: "rectangular" }> => !!s && s.forma === "rectangular" && material.get(s.material)?.tipo === "hormigon";
   const vigasLosa = new Map<number, VigaEnLosa[]>();
   for (const v of porId(f.vigas)) {
     const k = indice.get(v.planta);
     const sec = seccion.get(v.seccion);
     if (k === undefined || !hormigonRect(sec)) continue;
-    for (const huella of huellasV.get(v.id) ?? []) vigasLosa.set(k, [...(vigasLosa.get(k) ?? []), { huella, h: sec.h }]);
+    for (const huella of huellasV.get(v.id) ?? []) vigasLosa.set(k, [...(vigasLosa.get(k) ?? []), { huella, h: sec.h, dv: desnivelViga.get(v.id) ?? 0 }]);
   }
   const vigasEn = (k: number, region: readonly (readonly Vec2[])[]): VigaEnLosa[] => {
     const c = cajaAnillos(region);
     return (vigasLosa.get(k) ?? []).filter((v) => tocan(cajaAnillos([v.huella]), c));
   };
-  /** Lo que queda de la losa en una franja que está en alguna de las vigas `vs` (sus capas desde `i0`): bajo la más alta, o nada; null si no está en ninguna. */
-  const bajoVigas = (fr: Franja, i0: number, vs: readonly VigaEnLosa[], zc: number, e: number): Iv | null => {
+  /**
+   * Lo que queda de la losa en una franja que está en alguna de las vigas `vs` (sus capas desde `i0`):
+   * bajo la que más baja, o nada; null si no está en ninguna. La losa, con la cara superior en zc + dz;
+   * cada viga, con la suya en zc + dv (fase DN; sin desniveles, los números de antes).
+   */
+  const bajoVigas = (fr: Franja, i0: number, vs: readonly VigaEnLosa[], zc: number, e: number, dz = 0): Iv | null => {
     let h = -Infinity;
     vs.forEach((v, i) => {
-      if (fr.capas[i0 + i]) h = Math.max(h, v.h);
+      if (fr.capas[i0 + i]) h = Math.max(h, v.h - v.dv);
     });
     if (h === -Infinity) return null;
-    return h >= e - EPS ? [] : [[zc - e, zc - h]];
+    return h + dz >= e - EPS ? [] : [[zc + dz - e, zc - h]];
   };
   const tapasCerca = (k: number, an: readonly (readonly Vec2[])[]): Tapa[] => {
     const c = cajaAnillos(an);
@@ -811,13 +826,16 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       if (fs.sinForma) sinForma.add(p.id);
       const huella = huellaPilarSolido(p, fs.poligono, sec);
       const ts = tapasCerca(k, [huella]);
+      // DN: la base, sobre la cara superior de la losa de abajo (sólo con algún desnivel, para no partir de más)
+      const tb = conDesnivel ? tapasCerca(k + 1, [huella]).filter((t) => t.dz !== 0) : [];
       const caras: Cara[] = [];
       prismas(
-        descomponer([huella], ts.map((t) => t.anillos), ez),
+        descomponer([huella], [...ts, ...tb].map((t) => t.anillos), ez),
         ez,
         (fr) => {
           const t = tapaDe(ts, fr);
-          return [[z0, t ? z1 - t.e : z1]];
+          const b = tb.find((_, i) => fr.capas[ts.length + i]);
+          return [[b ? z0 + b.dz : z0, t ? z1 + t.dz - t.e : z1]];
         },
         caras,
       );
@@ -834,6 +852,9 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const fs = sec ? formaSeccion(sec) : null;
     if (k === undefined || zc === null || !sec || !fs) continue;
     if (fs.sinForma) sinForma.add(v.id);
+    // DN: la cara superior, en el desnivel del forjado más alto que la toca
+    const dv = desnivelViga.get(v.id) ?? 0;
+    const zv = zc + dv;
     const tr = tramosDe(v.puntos);
     const caras: Cara[] = [];
     const S = fs.poligono.map(([x, u]) => [x, u - fs.h / 2] as Vec2);
@@ -847,7 +868,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
           t.d,
           (fr) => {
             const x = tapaDe(ts, fr);
-            return [[zc - fs.h, x ? zc - x.e : zc]];
+            return [[zv - fs.h, x ? zc + x.dz - x.e : zv]];
           },
           caras,
         );
@@ -877,12 +898,12 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
           const m = (s0 + s1) / 2;
           const q: Vec2 = [t.A[0] + m * t.d[0], t.A[1] + m * t.d[1]];
           const x = ts.find((y) => dentroAnillos(q, y.anillos));
-          const techo = x ? -x.e : 0;
+          const techo = x ? x.dz - x.e - dv : 0;
           const u = tramos[tramos.length - 1];
           if (u && u.techo === techo) u.s1 = s1;
           else tramos.push({ s0, s1, techo });
         }
-        barrido(S, t.A, t.d, zc, tramos, caras);
+        barrido(S, t.A, t.d, zv, tramos, caras);
       }
     piezas.push({ id: v.id, tipo: "viga", planta: k, material: matSec(v.seccion), seccion: v.seccion, caras, ...(fs.sinForma ? { sinForma: true as const } : {}) });
   }
@@ -919,8 +940,11 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
   // Losas: maciza o reticular
   for (const l of porId(f.losas)) {
     const k = indice.get(l.planta);
-    const zc = cota(k);
-    if (k === undefined || zc === null || !(l.espesor > 0)) continue;
+    const zp = cota(k);
+    if (k === undefined || zp === null || !(l.espesor > 0)) continue;
+    // DN: la cara superior, en la cota más el desnivel
+    const dz = l.desnivel ?? 0;
+    const zc = zp + dz;
     const region = [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])];
     const d = cosSen(l.eje1 ?? 0);
     const n: Vec2 = [-d[1], d[0]];
@@ -932,7 +956,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const vs = vigasEn(k, region);
     const enViga = (q: Vec2) => vs.some((v) => dentroAnillos(q, [v.huella]));
     if (!ret || !(ret.capa > 0 && ret.capa < e && ret.nervio > 0 && ret.intereje > ret.nervio)) {
-      prismas(descomponer(region, vs.map((v) => [v.huella]), d), d, (fr) => bajoVigas(fr, 0, vs, zc, e) ?? [[zc - e, zc]], caras);
+      prismas(descomponer(region, vs.map((v) => [v.huella]), d), d, (fr) => bajoVigas(fr, 0, vs, zp, e, dz) ?? [[zc - e, zc]], caras);
     } else {
       const { intereje: s, nervio: bw, capa: hf } = ret;
       const abacos = (ret.abacos ?? []) as Vec2[][];
@@ -959,7 +983,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       const macizos = [...abacos, ...macizosEn(k)].filter((m) => tocan(cajaAnillos([m]), cajaAnillos(region)));
       const cols = descomponer(region, [celdas, ...macizos.map((m) => [m]), ...vs.map((v) => [v.huella])], d);
       const hueco = (fr: Franja) => fr.capas[0]! && !fr.capas.some((x, i) => i > 0 && x);
-      prismas(cols, d, (fr) => bajoVigas(fr, 1 + macizos.length, vs, zc, e) ?? (hueco(fr) ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
+      prismas(cols, d, (fr) => bajoVigas(fr, 1 + macizos.length, vs, zp, e, dz) ?? (hueco(fr) ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
       // Casetón que se queda en obra (todos menos el recuperable; el de hormigón por defecto desde el
       // 2026-10-28): su cara inferior, enrasada con la de los nervios
       if ((ret.caseton ?? "hormigon") !== "recuperable")
@@ -1000,7 +1024,9 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
   let sinViguetas = false;
   for (const p of porId(f.panos)) {
     const k = indice.get(p.planta);
-    const zc = cota(k);
+    const zp = cota(k);
+    // DN: la cara superior, en la cota más el desnivel
+    const zc = zp === null ? null : zp + (p.desnivel ?? 0);
     const sec = seccion.get(p.seccion);
     const fs = sec ? formaSeccion(sec) : null;
     if (k === undefined || zc === null || !fs) continue;
@@ -1072,14 +1098,17 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
         const huecos = (m.huecos ?? []).filter((h) => h.hasta > tr.s0 + EPS && h.desde < tr.s0 + tr.L - EPS);
         const cortes = huecos.flatMap((h) => [ox + h.desde - tr.s0, ox + h.hasta - tr.s0]);
         const ts = tapasCerca(k, [hs[i]!]);
+        // DN: la base, sobre la cara superior de la losa de abajo (sólo con algún desnivel)
+        const tb = conDesnivel ? tapasCerca(k + 1, [hs[i]!]).filter((x) => x.dz !== 0) : [];
         prismas(
-          descomponer([hs[i]!], ts.map((x) => x.anillos), tr.d, cortes),
+          descomponer([hs[i]!], [...ts, ...tb].map((x) => x.anillos), tr.d, cortes),
           tr.d,
           (fr, col) => {
             const x = tapaDe(ts, fr);
+            const b = tb.find((_, j) => fr.capas[ts.length + j]);
             const sm = (col.xa + col.xb) / 2 - ox + tr.s0;
             const quitar: Iv = huecos.filter((h) => h.desde < sm && sm < h.hasta).map((h) => [zb + h.z0, zb + h.z1]);
-            return restarIv([[z0, x ? z1 - x.e : z1]], normalizarIv(quitar));
+            return restarIv([[b ? z0 + b.dz : z0, x ? z1 + x.dz - x.e : z1]], normalizarIv(quitar));
           },
           caras,
         );

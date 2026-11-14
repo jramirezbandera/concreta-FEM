@@ -98,7 +98,9 @@ export interface PlanoLamina {
 export function planoLamina(r: ResultadosRender, l: number): PlanoLamina {
   const c = r.c;
   const lam = c.modelo.laminas![l]!;
-  const P = lam.nudos.map((n): V3 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y, c.modelo.nudos[n]!.z]);
+  // DN: en la cota real de su forjado
+  const dz = r.desnivelLamina(l);
+  const P = lam.nudos.map((n): V3 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y, c.modelo.nudos[n]!.z + dz]);
   if (c.mapeo.laminas?.[l]?.muro && lam.eje1) {
     const o = P[0]!;
     const [ex, ey] = [lam.eje1[0], lam.eje1[1]];
@@ -165,7 +167,8 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
   for (const { laminas, v, comb: combNudo } of mejor.por)
     laminas.forEach((l, i) => {
       const ns = c.modelo.laminas![l]!.nudos;
-      const P = ns.map((n): V3 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y, c.modelo.nudos[n]!.z]);
+      const dz = r.desnivelLamina(l);
+      const P = ns.map((n): V3 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y, c.modelo.nudos[n]!.z + dz]);
       const w = [0, 1, 2, 3].map((a) => v[4 * i + a]!);
       if (w.some(Number.isNaN)) {
         for (const a of [0, 1, 2, 0, 2, 3]) rel(P[a]!, sinMapa);

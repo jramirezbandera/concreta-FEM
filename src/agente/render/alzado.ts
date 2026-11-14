@@ -25,6 +25,7 @@
  * Puro: sin IO.
  */
 import { cotasPlantas } from "../../compilador/cotas.ts";
+import { desnivelesVigasFisico } from "../../compilador/desniveles.ts";
 import { ejesDe } from "../../compilador/ejes.ts";
 import type { ModeloFisico, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Mapeo } from "../../compilador/mapeo.ts";
@@ -249,22 +250,30 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
   }
 
   // ─── Losas y paños, cortados ─────────────────────────────────────────────────────────────────
-  const cortes: { id: string; anillos: Vec2[][]; espesor: number; planta: string; estilo: Estilo }[] = [
-    ...porId(f.losas ?? []).map((l) => ({ id: l.id, anillos: [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])], espesor: l.espesor, planta: l.planta, estilo: "losa-cortada" as const })),
-    ...porId(f.panos ?? []).map((p) => ({ id: p.id, anillos: [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])], espesor: cantoSeccion(seccion(p.seccion)) || 0.3, planta: p.planta, estilo: "pano-cortado" as const })),
+  // Fase DN: cada forjado, con la cara superior en la cota de su planta más su desnivel, que se rotula
+  const cortes: { id: string; anillos: Vec2[][]; espesor: number; planta: string; estilo: Estilo; desnivel: number }[] = [
+    ...porId(f.losas ?? []).map((l) => ({ id: l.id, anillos: [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])], espesor: l.espesor, planta: l.planta, estilo: "losa-cortada" as const, desnivel: l.desnivel ?? 0 })),
+    ...porId(f.panos ?? []).map((p) => ({ id: p.id, anillos: [p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])], espesor: cantoSeccion(seccion(p.seccion)) || 0.3, planta: p.planta, estilo: "pano-cortado" as const, desnivel: p.desnivel ?? 0 })),
   ];
   for (const c of fisico ? cortes : []) {
-    const z = cotaDe(c.planta);
-    if (z === null) continue;
-    for (const [a, b] of intervalosRecta(c.anillos, plano.desde, dir))
+    const zp = cotaDe(c.planta);
+    if (zp === null) continue;
+    const z = zp + c.desnivel;
+    for (const [a, b] of intervalosRecta(c.anillos, plano.desde, dir)) {
       if (modo === "alambrico") poner({ tipo: "linea", puntos: [[a, z], [b, z]], estilo: c.estilo === "losa-cortada" ? "losa-alambrico" : "pano-alambrico", objeto: c.id });
       else poner({ tipo: "poligono", anillos: [rect(a, b, z - c.espesor, z)], estilo: c.estilo, objeto: c.id });
+      if (c.desnivel !== 0)
+        poner({ tipo: "texto", p: [(a + b) / 2, z], texto: `${c.id} ${c.desnivel > 0 ? "+" : "−"}${rotulo(Math.abs(c.desnivel), 3).replace(".", ",")}`, tamano: 10, ancla: "medio", dy: -4, fondo: true, prioridad: 20, clase: "id", objeto: c.id });
+    }
   }
 
   // ─── Vigas ────────────────────────────────────────────────────────────────────────────────────
+  const desnivelViga = desnivelesVigasFisico(f);
   for (const v of fisico ? porId(f.vigas ?? []) : []) {
-    const z = cotaDe(v.planta);
-    if (z === null) continue;
+    const zp = cotaDe(v.planta);
+    if (zp === null) continue;
+    // DN: la cara superior, en el desnivel del forjado más alto que la toca
+    const z = zp + (desnivelViga.get(v.id) ?? 0);
     const s = seccion(v.seccion);
     const h = cantoSeccion(s) || 0.3;
     const b = anchoViga(s);

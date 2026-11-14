@@ -25,7 +25,7 @@ import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { PlantaForjado, SeccionForjado } from "./CroquisForjado.tsx";
 import { ValorCarga } from "./FichaCarga.tsx";
-import { FijarAbacos, PesoForjado, RigidezAligeradoPanel } from "./FichaForjado.tsx";
+import { CotaForjado, FijarAbacos, PesoForjado, RigidezAligeradoPanel } from "./FichaForjado.tsx";
 import { TramosPilarPanel } from "./FichaPilar.tsx";
 import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
 
@@ -38,6 +38,7 @@ const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly s
     ["General", ["id", "nombre", "planta", "tipo"]],
     ["Geometría en planta", ["contorno", "huecos", "abacos", "abacosPilares", "direccion", "paso"]],
     ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion", "bovedilla"]],
+    ["Cota", ["desnivel"]],
     ["Material y peso", ["material", "pp", "relleno", "procedencia"]],
     ["Rigidez del aligerado", ["multiplicadores"]],
   ],
@@ -110,6 +111,7 @@ const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCro
       </>
     ),
     Sección: ({ fila, ctx, activo, onCampo }) => <SeccionForjado c={croquisForjado(fila, ctx)} activo={activo} onCampo={onCampo} />,
+    Cota: CotaForjado,
     "Material y peso": PesoForjado,
     "Rigidez del aligerado": ({ rigidezReticular, ...p }) => <RigidezAligeradoPanel {...p} rigidez={rigidezReticular} />,
   },

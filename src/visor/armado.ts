@@ -142,7 +142,7 @@ export function armado3D(r: ResultadosRender, origen: [number, number, number], 
   const c = r.c;
   const z = new Map<string, number>();
   (c.mapeo.laminas ?? []).forEach((ml, i) => {
-    if (ml.losa && !z.has(ml.losa)) z.set(ml.losa, c.modelo.nudos[c.modelo.laminas![i]!.nudos[0]!]!.z);
+    if (ml.losa && !z.has(ml.losa)) z.set(ml.losa, c.modelo.nudos[c.modelo.laminas![i]!.nudos[0]!]!.z + r.desnivelLamina(i));
   });
   const todas = r.q.fisico.plantas.map((p) => p.id);
   const plantaDe = new Map((r.q.fisico.losas ?? []).map((l) => [l.id, l.planta]));

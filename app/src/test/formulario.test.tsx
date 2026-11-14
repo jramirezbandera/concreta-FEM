@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { leerProyecto } from "../../../src/agente/proyecto.ts";
+import { desnivelEnrasado } from "../../../src/editor/desnivel.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { ContextoVisor } from "../contexto.ts";
 import { FormularioObjeto } from "../editor/Formulario.tsx";
@@ -34,13 +35,39 @@ const nombre = (el: HTMLElement) => el.closest("label")!.querySelector(".campo-n
 describe("Propiedades de un forjado", () => {
   it("por grupos, con lo obligatorio marcado y el pp que toma una maciza", () => {
     const { container } = montar("L1");
-    expect([...container.querySelectorAll(".campo-grupo")].map((h) => h.textContent)).toEqual(["General", "Geometría en planta", "Sección", "Material y peso"]);
+    expect([...container.querySelectorAll(".campo-grupo")].map((h) => h.textContent)).toEqual(["General", "Geometría en planta", "Sección", "Cota", "Material y peso"]);
     expect(nombre(screen.getByLabelText("canto"))).toBe("canto*");
     expect(nombre(screen.getByLabelText("pp"))).toBe("pp");
     expect((screen.getByLabelText("pp") as HTMLInputElement).placeholder).toBe("6,25 = γ·canto");
     expect((screen.getByLabelText("dirección") as HTMLInputElement).placeholder).toBe("0 (según +X)");
     expect(screen.getByRole("img", { name: /^Planta del forjado/ })).toBeTruthy();
     expect(screen.getByRole("img", { name: "Sección de la losa maciza" })).toBeTruthy();
+  });
+
+  it("Cota (fase DN): dónde quedan sus caras y «Enrasar con…» por arriba o por abajo escribe el desnivel", () => {
+    // otra losa en PB, de 20 cm, para enrasar con ella (el muestrario tiene una por planta)
+    const losas = proyecto.modelo.losas!;
+    proyecto.modelo.losas = [...losas, { id: "L9", planta: "PB", material: losas[0]!.material, espesor: 0.2, contorno: [[40, 40], [42, 40], [42, 42], [40, 42]] }];
+    const { editar, unmount } = montar("L1");
+    expect(screen.getByTestId("cota-forjado").textContent).toContain("Cara superior a la cota de la planta");
+    const con = (screen.getByLabelText("Forjado con el que enrasar") as HTMLSelectElement).value;
+    expect(con).toBe("L9");
+    for (const como of ["abajo", "arriba"] as const) {
+      editar.mockClear();
+      fireEvent.click(screen.getByRole("button", { name: como === "abajo" ? "Por abajo" : "Por arriba" }));
+      const r = desnivelEnrasado({ ...proyecto.modelo, losas: [...losas, { id: "L9", planta: "PB", material: losas[0]!.material, espesor: 0.2, contorno: [[40, 40], [42, 40], [42, 42], [40, 42]] }] }, "L1", con, como);
+      if (!r.ok) throw new Error(r.mensaje);
+      if (r.desnivel === 0) {
+        // ya está a ras: escribir «» no cambia nada
+        expect(editar.mock.calls.every(([o]) => (o as { objeto?: { desnivel?: number } }).objeto?.desnivel === undefined)).toBe(true);
+        continue;
+      }
+      expect(editar).toHaveBeenCalledTimes(1);
+      const op = editar.mock.calls[0]![0] as { op: string; objeto: { desnivel?: number } };
+      expect(op.objeto.desnivel).toBe(r.desnivel);
+    }
+    unmount();
+    proyecto.modelo.losas = losas;
   });
 
   it("en un reticular con casetón perdido, el pp es obligatorio y vacío lo dice", () => {

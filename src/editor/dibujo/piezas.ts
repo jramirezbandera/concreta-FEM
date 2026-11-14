@@ -61,6 +61,8 @@ export interface PlantillaForjado {
   nombre?: string;
   /** Canto total (maciza y reticular). */
   espesor?: number;
+  /** Fase DN: desnivel de la cara superior respecto a la cota de la planta, m (negativo, más bajo). */
+  desnivel?: number;
   material?: string;
   pp?: number;
   /** Eje 1 de la losa (nervios de un reticular) o dirección de las viguetas, ° desde +X. */
@@ -298,6 +300,7 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: numb
       direccion: t.direccion ?? 0,
       intereje: t.intereje!,
       seccion: t.seccion!,
+      ...(t.desnivel ? { desnivel: t.desnivel } : {}),
       ...(t.pp !== undefined ? { pp: t.pp } : {}),
       ...(t.bovedilla && t.bovedilla !== BOVEDILLA_POR_DEFECTO ? { bovedilla: t.bovedilla } : {}),
     };
@@ -315,7 +318,7 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: numb
     reticular = { intereje: t.intereje!, nervio: t.nervio!, capa: t.capa!, ...(t.caseton && t.caseton !== CASETON_POR_DEFECTO ? { caseton: t.caseton } : {}) };
   }
   const id = idNuevo(m, "L");
-  let losa: Losa = { id, ...(nombre ? { nombre } : {}), planta: ctx.planta, contorno, espesor: t.espesor!, material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
+  let losa: Losa = { id, ...(nombre ? { nombre } : {}), planta: ctx.planta, contorno, espesor: t.espesor!, ...(t.desnivel ? { desnivel: t.desnivel } : {}), material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
   let etiqueta = `Forjado ${id} (${tipo})`;
   // AC-e: los ábacos según las luces, en la misma losa (sin pilares, se avisa: AC-d pedirá uno en cada uno)
   let avisoAbacos: string | null = null;

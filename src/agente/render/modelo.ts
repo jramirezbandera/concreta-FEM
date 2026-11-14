@@ -525,16 +525,23 @@ function rotuloForjado(anillos: readonly (readonly Vec2[])[], vigas: readonly (r
  * en T; con otra sección, «F1 · viguetas/70»). La dirección se ve en su símbolo, y el pp, en Propiedades.
  */
 export function etiquetaLosa(l: Losa): string {
-  if (l.nombre) return l.nombre;
   const cm = (x: number) => rotulo(x * 100);
-  if (l.reticular) return `${l.id} · ${cm(l.espesor - l.reticular.capa)}+${cm(l.reticular.capa)}/${cm(l.reticular.intereje)}`;
-  return `${l.id} · maciza ${cm(l.espesor)}`;
+  const base = l.nombre ? l.nombre : l.reticular ? `${l.id} · ${cm(l.espesor - l.reticular.capa)}+${cm(l.reticular.capa)}/${cm(l.reticular.intereje)}` : `${l.id} · maciza ${cm(l.espesor)}`;
+  return base + textoDesnivel(l.desnivel);
 }
 
 export function etiquetaPano(p: PanoUnidireccional, s: Seccion | undefined): string {
-  if (p.nombre) return p.nombre;
   const cm = (x: number) => rotulo(x * 100);
-  return s?.forma === "T" ? `${p.id} · ${cm(s.h - s.hf)}+${cm(s.hf)}/${cm(p.intereje)}` : `${p.id} · viguetas/${cm(p.intereje)}`;
+  const base = p.nombre ? p.nombre : s?.forma === "T" ? `${p.id} · ${cm(s.h - s.hf)}+${cm(s.hf)}/${cm(p.intereje)}` : `${p.id} · viguetas/${cm(p.intereje)}`;
+  return base + textoDesnivel(p.desnivel);
+}
+
+/** Fase DN: el desnivel en el rótulo de un forjado, en m con su signo (« · −0,10»); nada sin él. */
+export function textoDesnivel(d: number | undefined): string {
+  if (!d) return "";
+  // dos decimales, o tres si hacen falta (−0,125)
+  const t = Math.abs(d).toFixed(3).replace(/0$/, "");
+  return ` · ${d > 0 ? "+" : "−"}${t.replace(".", ",")}`;
 }
 
 /**
