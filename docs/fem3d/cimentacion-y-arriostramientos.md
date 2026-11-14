@@ -155,7 +155,7 @@ Cada paso, con su plan y sus criterios fijados al empezar, como las demás fases
   - es lo que hace hoy una base empotrada en horizontal: z₀ del segundo orden en la losa y la masa sísmica de la cimentación al terreno, como ahora.
 
   El deslizamiento se comprueba aparte (ΣH de las reacciones frente a μ·ΣN). **Por mirar en la sombra:** qué hace CYPECAD en lo horizontal de una losa de cimentación.
-- **CB-b:** muelles por nudo o matriz consistente (§2.2), después de medirlas. **Decidida el 2026-11-14** (recomendación de Claude aceptada por el usuario): muelles por nudo (Kz,i = ∫ k·Nᵢ dA, `Muelle` a tierra), con la medida como primer paso de LC. Razones:
+- **CB-b:** muelles por nudo o matriz consistente (§2.2), después de medirlas. **Medidas el 2026-11-14** (`losa-cimentacion.md` §3): se recomiendan los muelles por nudo. **Decidida el 2026-11-14** (recomendación de Claude aceptada por el usuario): muelles por nudo (Kz,i = ∫ k·Nᵢ dA, `Muelle` a tierra), con la medida como primer paso de LC. Razones:
   - el motor no cambia;
   - el despegue de §4 es apagar un muelle (con la consistente, habría que hacerlo por punto de Gauss dentro de la lámina);
   - σ = k·w sale directa en cada nudo;

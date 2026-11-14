@@ -36,6 +36,11 @@ export interface PlacaOrtotropa {
    * Woinowsky-Krieger, Theory of Plates and Shells, §30).
    */
   parche?: { x: number; y: number; u: number; v: number };
+  /**
+   * Módulo de balasto (Winkler), kN/m³ (fase LC): la reacción del terreno −k·w entra en el
+   * equilibrio vertical (Qx,x + Qy,y + q − k·w = 0), así que suma k al término de W.
+   */
+  balasto?: number;
 }
 
 /** [w, Mx, My, Mxy, Qx, Qy] en (x, y), sumando los términos impares (todos, con parche) hasta `terminos`. */
@@ -50,7 +55,7 @@ export function navierMindlin(p: PlacaOrtotropa, x: number, y: number, terminos 
     for (let n = 1; n <= terminos; n += paso) {
       const be = (n * Math.PI) / p.b;
       const qmn = ((16 * p.q) / (Math.PI * Math.PI * m * n)) * (pa ? Math.sin(al * pa.x) * Math.sin(be * pa.y) * Math.sin((al * pa.u) / 2) * Math.sin((be * pa.v) / 2) : 1);
-      const s11 = p.K55 * al * al + p.K44 * be * be;
+      const s11 = p.K55 * al * al + p.K44 * be * be + (p.balasto ?? 0);
       const s12 = p.K55 * al;
       const s13 = p.K44 * be;
       const s22 = p.D11 * al * al + p.D66 * be * be + p.K55;
