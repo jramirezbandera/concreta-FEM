@@ -95,6 +95,10 @@ describe("LC2: el balasto con su unidad", () => {
     expect(o.ok ? (o.objeto as unknown as Losa).cimentacion!.balasto : o.errores).toBeCloseTo(39226.6, 9);
     const mal = def.objeto({ ...fila, balasto: "4" }, ctx);
     expect(mal.ok).toBe(false);
+    // El tipo, también con su tilde (escrito o pegado)
+    const tilde = def.objeto({ ...fila, tipo: "Cimentación" }, ctx);
+    expect(tilde.ok ? (tilde.objeto as unknown as Losa).cimentacion!.balasto : tilde.errores).toBeCloseTo(39226.6, 9);
+    expect(def.columnas.find((c) => c.clave === "tipo")!.opciones!(ctx).find((o) => o.valor === "cimentacion")!.texto).toBe("cimentación");
   });
 });
 
@@ -117,7 +121,7 @@ describe("LC2: la herramienta Forjado de tipo cimentación", () => {
   };
   it("da lo de su fila de la tabla, sin zunchos, y compila con los pilares apoyados en ella", () => {
     const p = base();
-    const r = dibujar(p, { forjado: { modo: "poligono", tipo: "cimentacion", espesor: 0.6, material: "HA-30", balasto: 40000, kh: 8000, tensionAdmisible: 200 } });
+    const r = dibujar(p, { pilar: {}, viga: {}, forjado: { modo: "poligono", tipo: "cimentacion", espesor: 0.6, material: "HA-30", balasto: 40000, kh: 8000, tensionAdmisible: 200 } });
     expect(r.error).toBeUndefined();
     const a = aplicar(p, r.hecho!.operacion);
     if (!a.ok) throw new Error(a.errores.map((x) => x.mensaje).join(" "));
@@ -129,7 +133,7 @@ describe("LC2: la herramienta Forjado de tipo cimentación", () => {
     if (c.valido) expect(Object.keys(c.mapeo.cimentacion ?? {})).toEqual(["L1"]);
   });
   it("sin balasto, dice qué falta", () => {
-    const r = dibujar(base(), { forjado: { modo: "poligono", tipo: "cimentacion", espesor: 0.6, material: "HA-30" } });
+    const r = dibujar(base(), { pilar: {}, viga: {}, forjado: { modo: "poligono", tipo: "cimentacion", espesor: 0.6, material: "HA-30" } });
     expect(r.error).toBe("Escriba en Propiedades el balasto del terreno (kN/m³).");
   });
 });

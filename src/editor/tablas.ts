@@ -155,7 +155,7 @@ function rango(m: ModeloFisico, desde: unknown, hasta: unknown): string[] {
  * Lo que se ve en la lista de los valores del fichero que se escriben sin tilde (`auditoria-ui.md`,
  * C-29). El valor guardado no cambia, y la celda admite las dos formas (`Lector.opcion`).
  */
-const TEXTO_FIJAS: Readonly<Record<string, string>> = { sotano: "sótano", rigido: "rígido", hormigon: "hormigón", instantanea: "instantánea" };
+const TEXTO_FIJAS: Readonly<Record<string, string>> = { sotano: "sótano", rigido: "rígido", hormigon: "hormigón", instantanea: "instantánea", cimentacion: "cimentación" };
 
 /** Opciones de una lista cerrada; con `defecto`, la columna es opcional y la vacía va primero. */
 const fijas =
@@ -756,8 +756,8 @@ export function leerBalasto(texto: string): number | string {
 /** Lo horizontal de una losa de cimentación como se escribe: vacío o «coartado», o el kh. */
 const textoHorizontal = (h: NonNullable<Losa["cimentacion"]>["horizontal"]): string => (h === undefined ? "" : h === "coartado" ? "coartado" : textoNumero(h.kh));
 
-/** El tipo de una fila: el de su celda o, vacía, maciza. */
-const tipoFila = (f: Fila): string => (f.tipo ?? "").trim().toLowerCase() || "maciza";
+/** El tipo de una fila: el de su celda (sin distinguir mayúsculas ni tildes: «cimentación») o, vacía, maciza. */
+const tipoFila = (f: Fila): string => (f.tipo ?? "").trim().normalize("NFD").replace(/\p{M}/gu, "").toLowerCase() || "maciza";
 
 /** Un número de la fila, o undefined si no lo es (para decir el valor por defecto mientras se escribe). */
 const numeroDe = (f: Fila, c: string): number | undefined => {

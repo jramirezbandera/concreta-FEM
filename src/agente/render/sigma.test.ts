@@ -16,7 +16,7 @@ import type { ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
 import { calcular } from "../../motor/calcular.ts";
 import { iniciarNucleo } from "../../nucleo/index.ts";
 import { conjuntoCombinaciones, type ConjuntoCombinaciones } from "../combinaciones.ts";
-import { VERSION_ESQUEMA } from "../proyecto.ts";
+import { VERSION_ESQUEMA, type Proyecto } from "../proyecto.ts";
 import { revisar } from "../revision.ts";
 import { terreno } from "../terreno.ts";
 import { isovalores3D } from "../../visor/isovalores3d.ts";
@@ -144,10 +144,10 @@ describe("LC2: el mapa de σ del terreno", () => {
     const i = isovalores3D(rr, [0, 0, 0], "sigma", cj, { planta: null, envolvente: "max" });
     expect(i.plantas).toEqual(["C"]);
     expect(i.sinMapa.length).toBe(0);
-    expect(i.extremos.find((x) => x.texto.startsWith("σ máxima"))!.valor).toBe(Math.max(...envolventeCampo(rr, "C", "sigma", cj, "max").v));
+    expect(i.extremos.find((x) => x.texto?.startsWith("σ máxima"))!.valor).toBe(Math.max(...envolventeCampo(rr, "C", "sigma", cj, "max").v));
   });
   it("el informe lleva el terreno de la losa y las figuras de σ", () => {
-    const p = { esquema: VERSION_ESQUEMA, modelo: f };
+    const p: Proyecto = { esquema: VERSION_ESQUEMA, modelo: f };
     const rev = revisar(p, c, q, { motor: "x", diagnosticos: [], equilibrio: [] });
     expect(rev.markdown).toMatch(/## Terreno bajo las losas de cimentación/);
     expect(rev.markdown).toMatch(/Planta C: σ del terreno \(kN\/m²\), envolvente máxima/);
