@@ -536,6 +536,6 @@ A petición del usuario («vamos a hacer lo que queda»). Cada uno con su prueba
 
 Sin tocar, con su motivo:
 
-- **Del mallador:** sin rejilla, dos láminas de 4,3 mm (con su aviso) junto a un pilar rectangular de esquina en la retícula 22 con muros (`refinamiento-vigas.md` §21).
+- **Del mallador:** sin rejilla, dos láminas de 4,3 mm (con su aviso) junto a un pilar rectangular de esquina en la retícula 22 con muros (`refinamiento-vigas.md` §21), medido el 2026-11-14: están bien formadas (jacobiano 0,34 y 0,43) y no dan pico (en los cuatro casos, su mayor momento es como mucho el 7,5 % del percentil 99 del caso: 6,5 frente a 86 kN·m/m con G); el aviso, que sólo mira el tamaño, aquí es una falsa alarma del lado seguro, y se deja.
 - **Notas:** A2-41 y A2-45 (documentados, no cambian resultados), A2-43 (con sismo, el máximo de My por estaciones ≤ 0,69 % bajo), A2-64 y A2-66 (conservador).
 
