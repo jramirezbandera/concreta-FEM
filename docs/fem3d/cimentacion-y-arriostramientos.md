@@ -1,6 +1,6 @@
 # Propuesta — losa de cimentación sobre balasto y arriostramientos metálicos
 
-> **Fecha:** 2026-10-13. **Estado:** propuesta, sin fecha de desarrollo. No hay nada decidido ni hecho.
+> **Fecha:** 2026-10-13. **Estado:** propuesta. Decididas CB-c y CB-f (2026-11-01) y CB-a y CB-b (2026-11-14); la losa de cimentación (LC) es la fase siguiente a DN.
 >
 > **Origen:** el usuario. Hoy, la base de un pilar o un muro sólo puede ser libre (`"ninguno"`), articulada o empotrada. Con eso no se modela:
 > - una losa de cimentación como la de CYPECAD: los pilares caen en ella, la losa es «de cimentación» con su coeficiente de balasto y se calcula sobre muelles en los nudos de su malla;
@@ -148,8 +148,20 @@ Cada paso, con su plan y sus criterios fijados al empezar, como las demás fases
 
 ## 6. Decisiones del usuario para cuando toque
 
-- **CB-a:** lo horizontal de la losa de cimentación: `"coartado"` o un balasto horizontal (§2.3), y cuál por defecto.
-- **CB-b:** muelles por nudo o matriz consistente (§2.2), después de medirlas.
+- **CB-a:** lo horizontal de la losa de cimentación: `"coartado"` o un balasto horizontal (§2.3), y cuál por defecto. **Decidida el 2026-11-14** (recomendación de Claude aceptada por el usuario): `"coartado"` por defecto (ux y uy fijos en los nudos de la losa) y `{ kh }` como opción para quien tenga el dato. Razones:
+  - el cabeceo sobre los muelles verticales, que es lo que mueve la deriva y los pilares, sale igual con las dos;
+  - el geotécnico casi nunca da un kh, y uno por defecto sería un número inventado;
+  - con `kh`, el giro en planta tiene que quedar sujeto o el modelo es un mecanismo;
+  - es lo que hace hoy una base empotrada en horizontal: z₀ del segundo orden en la losa y la masa sísmica de la cimentación al terreno, como ahora.
+
+  El deslizamiento se comprueba aparte (ΣH de las reacciones frente a μ·ΣN). **Por mirar en la sombra:** qué hace CYPECAD en lo horizontal de una losa de cimentación.
+- **CB-b:** muelles por nudo o matriz consistente (§2.2), después de medirlas. **Decidida el 2026-11-14** (recomendación de Claude aceptada por el usuario): muelles por nudo (Kz,i = ∫ k·Nᵢ dA, `Muelle` a tierra), con la medida como primer paso de LC. Razones:
+  - el motor no cambia;
+  - el despegue de §4 es apagar un muelle (con la consistente, habría que hacerlo por punto de Gauss dentro de la lámina);
+  - σ = k·w sale directa en cada nudo;
+  - la losa de CYPECAD es un emparrillado con muelles en los nudos.
+
+  **El criterio de la medida:** con h = 0,75, Westergaard (placa con carga puntual) y Hetényi (viga sobre Winkler) con t de 0,4 a 1,0 m y k de 10 000 a 100 000 kN/m³ (L = (D/k)^¼ de ≈ 1,1 a ≈ 2,1 m o más). Si quedan a ≤ 2 % en w y en M (en la cara de la huella), se quedan; si no, se refina la malla de la losa de cimentación o se pasa a la consistente.
 - **CB-c:** `diagonales` o `barras` en general (§3.1), y si se añade el objeto `cruz`. **Decidida el 2026-11-01:** `barras`; la `cruz`, más adelante (`barras.md`).
 - **CB-d:** el diafragma por defecto de una planta sin losas (§3.3).
 - **CB-e:** cómo se tratan las cruces hasta que haya cálculo no lineal: opción a o b (§3.4).
