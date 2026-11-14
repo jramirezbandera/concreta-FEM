@@ -20,7 +20,8 @@
 import { useEffect, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { EscalaMapa } from "../../../src/agente/render/isovalores.ts";
-import { DECIMALES_CAMPO, type Campo, type Envolvente } from "../../../src/agente/render/resultados.ts";
+import { DECIMALES_CAMPO, propositoCampo, UNIDADES_CAMPO, type Campo, type Envolvente } from "../../../src/agente/render/resultados.ts";
+import type { TerrenoLosa } from "../../../src/agente/terreno.ts";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { ValorPunto } from "../../../src/visor/datos.ts";
 import type { SuperficiesMapa } from "../../../src/visor/isovalores3d.ts";
@@ -55,7 +56,12 @@ const ENVOLVENTES = (campo: Campo): { id: Envolvente; nombre: string; title: str
         { id: "min", nombre: "↓ Flecha", title: "En cada nudo, lo que más baja de todas las combinaciones (la envolvente mínima de uz)" },
         { id: "max", nombre: "↑ Hacia arriba", title: "En cada nudo, lo que más sube de todas las combinaciones (la envolvente máxima de uz)" },
       ]
-    : [
+    : campo === "sigma"
+      ? [
+          { id: "max", nombre: "Compresión", title: "En cada nudo, la mayor σ de todas las combinaciones (la envolvente máxima): la que se compara con la tensión admisible" },
+          { id: "min", nombre: "Despegue", title: "En cada nudo, la menor σ de todas las combinaciones (la envolvente mínima): por debajo de 0, la losa despega" },
+        ]
+      : [
         { id: "max", nombre: "Máxima", title: "En cada nudo, el mayor valor de todas las combinaciones, con la suya" },
         { id: "min", nombre: "Mínima", title: "En cada nudo, el menor valor de todas las combinaciones, con la suya" },
       ];
@@ -73,7 +79,7 @@ function PlantaLosas({ planta, campo, eleccion, escala, envolvente, punto, onPun
 function TresDLosas({ planta, campo, eleccion, escala, envolvente, superficies, dec }: { planta: string | null; campo: Campo; eleccion: EleccionCombinaciones; escala: EscalaMapa | undefined; envolvente: Envolvente; superficies: SuperficiesMapa; dec: number }) {
   const { proyecto } = useVisor();
   const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "isovalores3d", campo, combinaciones: eleccion, planta, superficies, envolvente, ...(escala ? { escala } : {}) });
-  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>{campo === "uz" ? "Preparando el mapa…" : "Suavizando los campos…"}</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>{campo === "uz" || campo === "sigma" ? "Preparando el mapa…" : "Suavizando los campos…"}</Aviso> : null;
   const datos = proyecto.desactualizado ? null : d.datos;
   const cliente = proyecto.cliente;
   const comb = datos?.combinacion?.nombre;
@@ -127,8 +133,76 @@ const CAMPOS: { id: Campo; nombre: string; dec: number }[] = (
     ["f11", "F11"],
     ["f22", "F22"],
     ["f12", "F12"],
+    ["sigma", "σ terreno"],
   ] as const
 ).map(([id, nombre]) => ({ id, nombre, dec: DECIMALES_CAMPO[id] }));
+
+/** LC2: una distorsión angular como se lee, «1/850». */
+const textoDistorsion = (v: number): string => (v > 0 ? `1/${fmt(Math.round(1 / v), 0)}` : "0");
+
+/** LC2: lo de cada losa de cimentación de la planta en las combinaciones del mapa (`fem consultar terreno`). */
+function TerrenoPlanta({ t, combinaciones }: { t: readonly TerrenoLosa[]; combinaciones: string }) {
+  return (
+    <Seccion titulo="Terreno" valor={combinaciones}>
+      {t.map((x) => (
+        <div key={x.losa} className="px-3.5 py-2" data-terreno={x.losa}>
+          <div className="mono text-[11px] text-text-muted">
+            {x.losa} · k = {fmt(x.balasto, 0)} kN/m³ · {fmt(x.area, 1)} m²
+          </div>
+          <table className="tb">
+            <tbody>
+              <tr>
+                <td>σ máxima</td>
+                <td data-sigma-max={x.sigmaMax.v}>
+                  {fmt(x.sigmaMax.v, 1)} kN/m²<small>{x.sigmaMax.comb}</small>
+                </td>
+              </tr>
+              {x.tensionAdmisible !== undefined && (
+                <tr>
+                  <td>admisible</td>
+                  <td className={x.sigmaMax.v > x.tensionAdmisible ? "text-state-fail" : undefined}>
+                    {fmt(x.tensionAdmisible, 1)} kN/m²<small>{x.sigmaMax.v > x.tensionAdmisible ? "la pasa" : `${fmt((100 * x.sigmaMax.v) / x.tensionAdmisible, 0)} %`}</small>
+                  </td>
+                </tr>
+              )}
+              <tr>
+                <td>σ mínima</td>
+                <td className={x.sigmaMin.v < 0 ? "text-state-warn" : undefined}>
+                  {fmt(x.sigmaMin.v, 1)} kN/m²<small>{x.sigmaMin.comb}</small>
+                </td>
+              </tr>
+              <tr>
+                <td>asiento máximo</td>
+                <td>
+                  {mm(x.asientoMax.v)} mm<small>{x.asientoMax.comb}</small>
+                </td>
+              </tr>
+              {x.distorsion && (
+                <tr>
+                  <td>distorsión angular</td>
+                  <td>
+                    {textoDistorsion(x.distorsion.v)}
+                    <small>
+                      {x.distorsion.entre.join("–")} · {x.distorsion.comb}
+                    </small>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {x.despegue ? (
+            <p className="nota text-state-warn" data-despegue={x.losa}>
+              Despega {fmt(x.despegue.area, 1)} m² (el {fmt(100 * x.despegue.fraccion, 1)} % de la losa) en {x.despegue.comb}. El cálculo es lineal y sus muelles trabajan a tracción, que el terreno no da: ahí los resultados no valen. Revise el canto, las cargas o el balasto.
+            </p>
+          ) : (
+            <p className="nota">No despega en ninguna combinación.</p>
+          )}
+        </div>
+      ))}
+      <p className="nota">σ = k·asiento, positiva en compresión. Distorsión angular: la mayor diferencia de asiento entre dos pilares que arrancan en la losa, entre su distancia.</p>
+    </Seccion>
+  );
+}
 
 export function ModoLosas() {
   const { proyecto, planta } = useVisor();
@@ -141,9 +215,14 @@ export function ModoLosas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
   }, []);
   const e = proyecto.estado!;
-  const [campo, setCampo] = useState<Campo>("uz");
+  const [elegido, setCampo] = useState<Campo>("uz");
+  // LC2: σ del terreno, sólo con losas de cimentación
+  const conTerreno = (e.cimentacion ?? []).length > 0;
+  const campos = conTerreno ? CAMPOS : CAMPOS.filter((c) => c.id !== "sigma");
+  const campo: Campo = elegido === "sigma" && !conTerreno ? "uz" : elegido;
   const [elDesp, setElDesp] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [elEsf, setElEsf] = useState<EleccionCombinaciones>({ tipo: "defecto" });
+  const [elTer, setElTer] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [punto, setPunto] = useState<Punto | null>(null);
   const [escalas, setEscalas] = useState<Partial<Record<Campo, EscalaElegida>>>({});
   const [envolventes, setEnvolventes] = useState<Partial<Record<Campo, Envolvente>>>({});
@@ -152,8 +231,8 @@ export function ModoLosas() {
   const escala = escalaDe(elegida);
   // Por defecto, la flecha en uz y la máxima en lo demás (UI-1)
   const envolvente: Envolvente = envolventes[campo] ?? (campo === "uz" ? "min" : "max");
-  const eleccion = campo === "uz" ? elDesp : elEsf;
-  const setEleccion = campo === "uz" ? setElDesp : setElEsf;
+  const eleccion = campo === "uz" ? elDesp : campo === "sigma" ? elTer : elEsf;
+  const setEleccion = campo === "uz" ? setElDesp : campo === "sigma" ? setElTer : setElEsf;
   const dec = CAMPOS.find((c) => c.id === campo)!.dec;
   const d = usePedido(proyecto.cliente, planta ? { tipo: "losas", planta, campo, combinaciones: eleccion, envolvente, ...(escala ? { escala } : {}) } : null);
   const x = d.datos;
@@ -177,7 +256,7 @@ export function ModoLosas() {
     setPunto({ p, v: r.ok ? (r.valor as ValorPunto | null) : null, planta: pl, clave: claveDe(pl) });
   };
 
-  const unidad = campo === "uz" ? "mm" : campo.startsWith("m") ? "kN·m/m" : "kN/m";
+  const unidad = UNIDADES_CAMPO[campo];
   const resumenComb = queCombinaciones(x ? { descripcion: x.combinaciones.descripcion, n: x.combinaciones.nombres.length } : undefined, x?.dibujada?.nombre);
   /** La envolvente, dicha: en uz, la de la flecha o la de lo que sube. */
   const textoEnv = campo === "uz" ? (envolvente === "min" ? "envolvente de la flecha" : "envolvente hacia arriba") : envolvente === "max" ? "envolvente máxima" : "envolvente mínima";
@@ -190,10 +269,10 @@ export function ModoLosas() {
       {/* Los modos, siempre en el mismo sitio (UI-51); detrás, lo de cada modo */}
       <BarraModos />
       <Separador />
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito={campo === "uz" ? "desplazamientos" : "esfuerzos"} />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito={propositoCampo(campo)} />
       {varias && <Segmentado etiqueta="Envolvente" opciones={ENVOLVENTES(campo)} valor={envolvente} onCambio={(v) => setEnvolventes((m) => ({ ...m, [campo]: v }))} />}
       <Separador />
-      <Segmentado etiqueta="Magnitud" opciones={CAMPOS.map((c) => ({ id: c.id, nombre: c.nombre }))} valor={campo} onCambio={setCampo} />
+      <Segmentado etiqueta="Magnitud" opciones={campos.map((c) => ({ id: c.id, nombre: c.nombre, ...(c.id === "sigma" ? { title: "La tensión en el terreno bajo las losas de cimentación, σ = k·asiento (positiva en compresión); lo que despega, rayado" } : {}) }))} valor={campo} onCambio={setCampo} />
       <Separador />
       <BarraVistas />
     </>
@@ -277,7 +356,7 @@ export function ModoLosas() {
           Con el sismo del programa, cada valor sale de combinar los modos en esa variable y en ese punto, con el signo del modo dominante: el mapa es la envolvente de {CAMPOS.find((c) => c.id === campo)!.nombre}, no un estado de la losa, y los valores de dos puntos o de dos magnitudes no son simultáneos. El armado (Wood–Armer) prueba los signos del sismo de mx, my y mxy por separado y se queda con el peor.
         </p>
       )}
-      {x && <p className="nota">uz en los nudos; momentos y cortantes suavizados entre láminas, en los ejes de cada losa. Las bandas no interpolan el color: el número de un punto, con un clic.</p>}
+      {x && <p className="nota">{campo === "sigma" ? "σ = k·asiento en los nudos de las losas de cimentación (k, su balasto), positiva en compresión; donde es negativa la losa despega (rayado). Por defecto, en la ELS característica, la de la tensión admisible." : "uz en los nudos; momentos y cortantes suavizados entre láminas, en los ejes de cada losa."} Las bandas no interpolan el color: el número de un punto, con un clic.</p>}
         <SeccionEscala
           key={campo}
           mapa={x?.escena.mapa}
@@ -333,6 +412,7 @@ export function ModoLosas() {
               ))}
               {!x.escena.extremos.length && <p className="nota">{textoApp(x.escena.notas.join(" "))}</p>}
             </Seccion>
+            {campo === "sigma" && x.terreno && x.terreno.length > 0 && <TerrenoPlanta t={x.terreno} combinaciones={x.combinaciones.descripcion} />}
             {/* R-34: las flechas, sólo con uz (con M11 o V13 empujaban lo que se lee) */}
             {campo === "uz" && (
             <Seccion titulo="Flechas" valor={x.combinacionesFlechas.descripcion}>

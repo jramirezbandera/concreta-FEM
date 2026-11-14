@@ -36,8 +36,16 @@ import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PI
 import { capaEjes } from "./ejes.ts";
 import { capaApoyos, ejeSeccion, fondoModelo, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica, type DatosVista } from "./modelo.ts";
 
-export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
+export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12", "sigma"] as const;
 export type Campo = (typeof CAMPOS)[number];
+/** Los campos que salen de uz de los nudos (los demás, del SPR): uz y la tensión en el terreno (LC2). */
+const DE_NUDOS = (c: Campo): c is "uz" | "sigma" => c === "uz" || c === "sigma";
+/**
+ * Qué combinaciones busca el mapa de un campo: uz, las de los desplazamientos; σ del terreno, las de
+ * las reacciones (la ELS característica, como `fem consultar terreno` y la tensión admisible); los
+ * demás, las de los esfuerzos.
+ */
+export const propositoCampo = (c: Campo): "desplazamientos" | "reacciones" | "esfuerzos" => (c === "uz" ? "desplazamientos" : c === "sigma" ? "reacciones" : "esfuerzos");
 /** `reacciones` (I4) está en `reacciones.ts`. */
 export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-mz", "vigas-vz", "vigas-vy", "vigas-n", "vigas-t", "pilares-n", "reacciones", "bandas"] as const;
 
@@ -55,10 +63,10 @@ export const esfuerzoDeVista = (v: string): EsfuerzoPlanta | null => ESFUERZOS_P
 export const DIAGRAMA_NULO = 1e-6;
 
 /** Componente de los campos SPR ([Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy]) de cada campo de láminas. */
-const COMPONENTE: Record<Exclude<Campo, "uz">, number> = { f11: 0, f22: 1, f12: 2, m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };
-const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m", f11: "kN/m", f22: "kN/m", f12: "kN/m" };
+const COMPONENTE: Record<Exclude<Campo, "uz" | "sigma">, number> = { f11: 0, f22: 1, f12: 2, m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };
+const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m", f11: "kN/m", f22: "kN/m", f12: "kN/m", sigma: "kN/m²" };
 /** R-21: los decimales con que se rotula cada campo (el extremo del dibujo, y en la app el panel, la sonda y el clic). */
-export const DECIMALES_CAMPO: Record<Campo, number> = { uz: 2, m11: 1, m22: 1, m12: 1, v13: 1, v23: 1, f11: 1, f22: 1, f12: 1 };
+export const DECIMALES_CAMPO: Record<Campo, number> = { uz: 2, m11: 1, m22: 1, m12: 1, v13: 1, v23: 1, f11: 1, f22: 1, f12: 1, sigma: 1 };
 const NOMBRE: Record<Campo, string> = {
   uz: "uz, desplazamiento vertical (mm; negativo hacia abajo)",
   m11: "M11 (kN·m/m), flexión según el eje 1 de la losa; positivo tracciona la cara inferior",
@@ -69,6 +77,7 @@ const NOMBRE: Record<Campo, string> = {
   f11: "F11 (kN/m), fuerza de membrana según el eje 1; positiva de tracción",
   f22: "F22 (kN/m), fuerza de membrana según el eje 2; positiva de tracción",
   f12: "F12 (kN/m), fuerza de membrana tangencial",
+  sigma: "σ (kN/m²), tensión en el terreno bajo las losas de cimentación, k·(−uz); positiva en compresión, negativa donde despega",
 };
 
 /** Las láminas de un mapa: las de las losas de una planta o las de los muros (las que van de la planta de debajo a ella). */
@@ -439,6 +448,8 @@ class CampoPlanta {
   private readonly planta: string;
   private readonly superficie: SuperficieMapa;
   private readonly uz: boolean;
+  /** σ del terreno (LC2): −k de la losa de cimentación en cada nudo, o NaN en las láminas de las demás losas. */
+  private readonly sigma: Float64Array | null = null;
   private readonly comp: number;
   /** uz: el nudo de cada valor. Los demás: los campos de cada caso base estático (32 por lámina), los de cada caso del sismo y si la lámina tiene. */
   private readonly nudos: Int32Array | null = null;
@@ -456,12 +467,22 @@ class CampoPlanta {
     this.planta = planta;
     this.superficie = de;
     this.uz = campo === "uz";
-    this.comp = campo === "uz" ? 0 : COMPONENTE[campo];
-    if (this.uz) {
+    this.comp = DE_NUDOS(campo) ? 0 : COMPONENTE[campo];
+    if (DE_NUDOS(campo)) {
       const { laminas } = r.laminas(planta, de);
       this.laminas = laminas;
       this.nudos = new Int32Array(4 * laminas.length);
       laminas.forEach((l, i) => r.c.modelo.laminas![l]!.nudos.forEach((n, a) => (this.nudos![4 * i + a] = n)));
+      if (campo === "sigma") {
+        // σ = k·(−uz) en los nudos de las láminas de una losa de cimentación; en las demás, sin mapa
+        const k = new Map((r.q.fisico.losas ?? []).filter((x) => x.cimentacion).map((x) => [x.id, x.cimentacion!.balasto] as const));
+        this.sigma = new Float64Array(4 * laminas.length);
+        laminas.forEach((l, i) => {
+          const losa = r.c.mapeo.laminas?.[l]?.losa;
+          const kl = de === "losas" && losa !== undefined ? k.get(losa) : undefined;
+          this.sigma!.fill(kl === undefined ? Number.NaN : -kl, 4 * i, 4 * i + 4);
+        });
+      }
     } else {
       const { laminas, region, valores, espectrales } = r.valores(planta, de, this.comp < 3 ? "membrana" : "flexion");
       this.laminas = laminas;
@@ -531,7 +552,8 @@ class CampoPlanta {
         }
         return g;
       };
-      v = sup.espectralVector(caso, base, this.N, true);
+      // uz por μ (es un desplazamiento); σ del terreno sin él (la fuerza del muelle, LC2-1)
+      v = sup.espectralVector(caso, base, this.N, !this.sigma);
     } else {
       // Combinado ya para la planta (todas las componentes): su componente
       const e = this.espectralesPlanta!.get(caso);
@@ -557,6 +579,7 @@ class CampoPlanta {
       for (let j = 0; j < N; j++) v[j]! += sismo[j]!;
     }
     if (this.uz) for (let j = 0; j < N; j++) v[j] = v[j]! * 1000;
+    else if (this.sigma) for (let j = 0; j < N; j++) v[j] = v[j]! * this.sigma[j]!;
   }
 }
 
@@ -612,14 +635,22 @@ export function envolventeCampo(r: ResultadosRender, planta: string, campo: Camp
  * el levantamiento (el máximo, si sube), en positivo y con su flecha; en los demás, el máximo y el
  * mínimo. Con una envolvente, sólo el suyo.
  */
-export function extremosMapa(campo: Campo, vmin: number, vmax: number, envolvente: Envolvente | null): { cual: "max" | "min"; que: string; texto: string }[] {
+export function extremosMapa(campo: Campo, vmin: number, vmax: number, envolvente: Envolvente | null, o: { asiento?: boolean } = {}): { cual: "max" | "min"; que: string; texto: string }[] {
   const u = UNIDAD[campo];
   // R-21: decimales fijos, los de la app (con cifras significativas, «0,0985» en el dibujo y «0,10» en el panel)
   const d = DECIMALES_CAMPO[campo];
   const r: { cual: "max" | "min"; que: string; texto: string }[] = [];
   if (campo === "uz") {
-    if (vmin < 0 && envolvente !== "max") r.push({ cual: "min", que: "flecha máxima", texto: `flecha máxima ${numeroFijo(-vmin, d)} mm ↓` });
+    // LC2: en una losa de cimentación, lo que baja es su asiento
+    const baja = o.asiento ? "asiento máximo" : "flecha máxima";
+    if (vmin < 0 && envolvente !== "max") r.push({ cual: "min", que: baja, texto: `${baja} ${numeroFijo(-vmin, d)} mm ↓` });
     if (vmax > 0 && envolvente !== "min") r.push({ cual: "max", que: "levantamiento máximo", texto: `levantamiento máximo ${numeroFijo(vmax, d)} mm ↑` });
+    return r;
+  }
+  if (campo === "sigma") {
+    // LC2: la compresión máxima y, si la hay, la tracción (donde despega)
+    if (envolvente !== "min") r.push({ cual: "max", que: "σ máxima", texto: `σ máxima ${numeroFijo(vmax, d)} ${u}` });
+    if (envolvente !== "max") r.push(vmin < 0 ? { cual: "min", que: "σ mínima (despega)", texto: `despega: σ ${numeroFijo(vmin, d)} ${u}` } : { cual: "min", que: "σ mínima", texto: `σ mínima ${numeroFijo(vmin, d)} ${u}` });
     return r;
   }
   if (envolvente !== "min") r.push({ cual: "max", que: `${campo} máximo`, texto: `máximo ${numeroFijo(vmax, d)} ${u}` });
@@ -655,6 +686,9 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   }
   const comb = env ? "" : (conjunto.nombres[k0] ?? "");
   const combDe = (j: number) => (combNudo ? (conjunto.nombres[combNudo[j]!] ?? "") : comb);
+  // LC2: ¿son todas las láminas de la planta de losas de cimentación? (su uz es el asiento)
+  const deCimentacion = new Set((r.q.fisico.losas ?? []).filter((x) => x.cimentacion && x.planta === planta).map((x) => x.id));
+  const asiento = laminas.length > 0 && laminas.every((l) => deCimentacion.has(c.mapeo.laminas![l]!.losa ?? ""));
   const P: Primitiva[] = [];
   const notas: string[] = [];
   // Triángulos y extremos
@@ -728,6 +762,16 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
     }
     leyenda.push({ estilo: "isolinea", texto: "Isolínea en cada límite, con su valor" });
     if (cero) leyenda.push({ estilo: "isolinea-cero", texto: "Isolínea de valor 0" });
+    // LC2: lo que despega (σ < 0), con su borde y rayado al otro lado que lo de fuera de la escala
+    if (campo === "sigma" && vmin < 0) {
+      const dsp = bandas(tris, [vmin, 0, vmax > 0 ? vmax : 1]).find((b) => b.banda === 0);
+      if (dsp) {
+        for (const a of dsp.anillos) P.push({ tipo: "linea", puntos: [...a, a[0]!], estilo: "despegue" });
+        for (const [p, q] of rayado(dsp.anillos, [Math.SQRT1_2, -Math.SQRT1_2], pasoRayado)) P.push({ tipo: "linea", puntos: [p, q], estilo: "despegue-rayado" });
+        leyenda.push({ estilo: "despegue", texto: "σ < 0: despega del terreno (rayado)" });
+        notas.push(`Despega donde σ < 0 (rayado), hasta ${rotulo(vmin, 4)} ${u}: el cálculo es lineal (Winkler) y sus muelles trabajan a tracción, que el terreno no da; ahí los resultados no valen. El área y su fracción de la losa, con «fem consultar terreno».`);
+      }
+    }
     const dentro = L.slice(fueraAbajo ? 1 : 0, fueraArriba ? nb : nb + 1);
     if (fueraAbajo || fueraArriba) notas.push(`Escala de ${rotulo(dentro[0]!, 4)} a ${rotulo(dentro[dentro.length - 1]!, 4)} ${u}${escala.modo === "sin-picos" ? `, sin picos (sin el ${rotulo(FRACCION_PICOS * 100)} % del área por cada lado)` : ""}: lo de fuera, rayado. Los extremos rotulados son los reales.`);
     // Picos: con la escala completa, si unos pocos puntos marcan la escala, se dice
@@ -744,7 +788,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   leyenda.push(...apoyos.leyenda);
   const extremos: ExtremoRotulado[] = [];
   if (pmax && pmin) {
-    for (const ex of extremosMapa(campo, vmin, vmax, env)) {
+    for (const ex of extremosMapa(campo, vmin, vmax, env, { asiento })) {
       const [x, p, o, j] = ex.cual === "max" ? [vmax, pmax, omax, jmax] : [vmin, pmin, omin, jmin];
       const [estilo, dy] = ex.cual === "max" ? (["extremo-maximo", -10] as const) : (["extremo-minimo", 20] as const);
       P.push({ tipo: "marca", p, forma: "circulo", radio: 6, estilo, objeto: o });
@@ -754,9 +798,14 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   }
   const paños = pl.enPlanta(pl.f.panos);
   if (paños.length) notas.push(`Los paños (${paños.map((p) => p.id).join(", ")}) no tienen láminas: sus viguetas, con «fem consultar pieza».`);
-  if (sinMapa) notas.push(`${sinMapa} láminas sin mapa (gris): las rígidas de las huellas de los pilares, que no se deforman.`);
+  if (campo === "sigma") {
+    if (laminas.length && !deCimentacion.size) notas.push("La planta no tiene losas de cimentación: la tensión en el terreno sólo la tienen ellas.");
+    else if (sinMapa) notas.push(`${sinMapa} láminas sin mapa (gris): las de las losas que no son de cimentación.`);
+  } else if (sinMapa) notas.push(`${sinMapa} láminas sin mapa (gris): las rígidas de las huellas de los pilares, que no se deforman.`);
   if (!laminas.length) notas.push("La planta no tiene losas.");
-  if (campo === "uz") notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; negativos hacia abajo (la flecha). La flecha relativa de cada recuadro, con «fem consultar flechas».");
+  if (campo === "sigma") notas.push("σ = k·(−uz) en los nudos de las láminas de las losas de cimentación (k, su balasto), interpolada en cada una como en un cuadrilátero bilineal; positiva en compresión. Es la de los muelles del cálculo (Winkler): la tensión admisible se compara con la ELS característica. Las cifras de cada losa (σ máxima y mínima, asiento, despegue y distorsión angular), con «fem consultar terreno».");
+  else if (campo === "uz" && asiento) notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; negativos hacia abajo (el asiento de la losa de cimentación).");
+  else if (campo === "uz") notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; negativos hacia abajo (la flecha). La flecha relativa de cada recuadro, con «fem consultar flechas».");
   else if (campo.startsWith("f")) notas.push(NOTA_MEMBRANA);
   else notas.push("Campos suavizados (SPR) en los nudos de cada lámina, en los ejes de su losa (eje 1 = su eje1, X por defecto), interpolados en cada una como en un cuadrilátero bilineal. Para dimensionar, las franjas de armado (modo Armado).");
   if (env && laminas.length) notas.push(`Envolvente ${env === "max" ? "máxima" : "mínima"} de las ${conjunto.factores.length} combinaciones de ${conjunto.descripcion}: en cada nudo de cada lámina, la de ${env === "max" ? "mayor" : "menor"} valor, interpolada en la lámina (entre los nudos queda del lado de la seguridad). El extremo rotulado, con la suya.`);

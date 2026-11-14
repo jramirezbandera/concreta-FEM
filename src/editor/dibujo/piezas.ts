@@ -83,6 +83,12 @@ export interface PlantillaForjado {
   anchoZuncho?: number;
   /** Reticular: un ábaco según las luces en cada pilar que llega al forjado (por defecto, sí; AC-e). */
   abacos?: boolean;
+  /** Cimentación (LC2): el balasto vertical, kN/m³ (obligatorio). */
+  balasto?: number;
+  /** Cimentación: el balasto horizontal kh, kN/m³; sin él, lo horizontal coartado (por defecto). */
+  kh?: number;
+  /** Cimentación: la tensión admisible del terreno, kN/m² (sólo para el aviso). */
+  tensionAdmisible?: number;
 }
 
 /**
@@ -100,7 +106,7 @@ export function pesoPlantillaForjado(m: ModeloFisico, t: PlantillaForjado): Desg
   const h = t.espesor;
   if (!mat || !(h! > 0)) return undefined;
   const g = materialElastico(mat).peso;
-  if (tipo === "maciza") return { hormigon: h!, gamma: g, hueco: 0, pesoHueco: 0, relleno: 0, metodo: "estimado", pp: g * h! };
+  if (tipo === "maciza" || tipo === "cimentacion") return { hormigon: h!, gamma: g, hueco: 0, pesoHueco: 0, relleno: 0, metodo: "estimado", pp: g * h! };
   const [s, bw, hf] = [t.intereje, t.nervio, t.capa];
   if (!(s! > 0 && bw! > 0 && hf! > 0 && bw! < s! && hf! < h!)) return undefined;
   return pesoReticular({ h: h!, hf: hf!, bw: bw!, s: s! }, g, t.caseton);
@@ -317,8 +323,14 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: numb
     if (t.caseton === "perdido" && t.pp === undefined) return "Con un casetón perdido de otro material, escriba en Propiedades el peso propio del reticular.";
     reticular = { intereje: t.intereje!, nervio: t.nervio!, capa: t.capa!, ...(t.caseton && t.caseton !== CASETON_POR_DEFECTO ? { caseton: t.caseton } : {}) };
   }
+  // LC2: una losa de cimentación, con su balasto (lo horizontal, coartado salvo con kh)
+  let cimentacion: Losa["cimentacion"];
+  if (tipo === "cimentacion") {
+    if (!positivo(t.balasto)) return "Escriba en Propiedades el balasto del terreno (kN/m³).";
+    cimentacion = { balasto: t.balasto!, ...(positivo(t.kh) ? { horizontal: { kh: t.kh! } } : {}), ...(positivo(t.tensionAdmisible) ? { tensionAdmisible: t.tensionAdmisible! } : {}) };
+  }
   const id = idNuevo(m, "L");
-  let losa: Losa = { id, ...(nombre ? { nombre } : {}), planta: ctx.planta, contorno, espesor: t.espesor!, ...(t.desnivel ? { desnivel: t.desnivel } : {}), material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
+  let losa: Losa = { id, ...(nombre ? { nombre } : {}), planta: ctx.planta, contorno, espesor: t.espesor!, ...(t.desnivel ? { desnivel: t.desnivel } : {}), material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}), ...(cimentacion ? { cimentacion } : {}) };
   let etiqueta = `Forjado ${id} (${tipo})`;
   // AC-e: los ábacos según las luces, en la misma losa (sin pilares, se avisa: AC-d pedirá uno en cada uno)
   let avisoAbacos: string | null = null;
@@ -332,7 +344,8 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[], direccion?: numb
       etiqueta += ` con ${u.abacos.length} ${u.abacos.length === 1 ? "ábaco" : "ábacos"}`;
     }
   }
-  const r = t.zunchos === false ? hecho(crear("losas", losa), etiqueta) : conZunchos(ctx, crear("losas", losa), etiqueta, losa, t.anchoZuncho);
+  // Una losa de cimentación no lleva zunchos: apoya en el terreno
+  const r = t.zunchos === false || cimentacion ? hecho(crear("losas", losa), etiqueta) : conZunchos(ctx, crear("losas", losa), etiqueta, losa, t.anchoZuncho);
   if (avisoAbacos && r.hecho) r.hecho.avisos = [...(r.hecho.avisos ?? []), avisoAbacos];
   return r;
 }

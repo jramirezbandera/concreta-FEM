@@ -18,8 +18,11 @@ import { useVisor } from "../contexto.ts";
 import { useEffect, useMemo, useState } from "react";
 import { gammaMaterial } from "../../../src/agente/sensatez.ts";
 import { pesoMedioConMacizo } from "../../../src/compilador/pesoForjado.ts";
+import { longitudCaracteristica } from "../../../src/compilador/cimentacion.ts";
+import { MALLA_CIMENTACION } from "../../../src/compilador/fisico.ts";
+import { materialElastico } from "../../../src/compilador/secciones.ts";
 import { fraccionAbacos, MULTIPLICADORES, rigidezAligerado, textoMultiplicadores, type RigidezAligerado } from "../../../src/editor/ficha.ts";
-import { desglosePesoFila, leerProcedencia, ppObligatorio, type Contexto } from "../../../src/editor/tablas.ts";
+import { desglosePesoFila, leerBalasto, leerProcedencia, ppObligatorio, type Contexto } from "../../../src/editor/tablas.ts";
 import { leerNumero, type Fila } from "../../../src/editor/celdas.ts";
 import type { MultiplicadoresLamina } from "../../../src/elementos/lamina.ts";
 import { Grupo } from "../componentes/Grupo.tsx";
@@ -170,7 +173,7 @@ export function PesoForjado({ id, fila, ctx, escribir }: Props) {
         : `el ${pieza} no pesa`;
   return (
     <div className="nota" data-testid="peso-forjado">
-      {tipo === "maciza" ? (
+      {tipo === "maciza" || tipo === "cimentacion" ? (
         <p>
           Peso propio: γ·canto = {n(d.gamma)} × {n(d.hormigon)} = <b>{n(d.pp, 2)} kN/m²</b>.
         </p>
@@ -199,6 +202,31 @@ export function PesoForjado({ id, fila, ctx, escribir }: Props) {
         </p>
       )}
       {medio(conEscrito ? escrito! : d.pp)}
+    </div>
+  );
+}
+
+// ─── Terreno de una losa de cimentación (LC2) ───────────────────────────────────────────────────
+
+/**
+ * Lo que sale del balasto de una losa de cimentación: su longitud característica l = (D/k)^¼ y el
+ * tamaño de malla que le da el cálculo, l/4 como mucho (LC-e), con lo que es cada cosa.
+ */
+export function TerrenoForjado({ fila, ctx }: Props) {
+  const tipo = (fila.tipo ?? "").trim().toLowerCase();
+  if (tipo !== "cimentacion") return null;
+  const k = leerBalasto((fila.balasto ?? "").trim() || "x");
+  const t = Number((fila.espesor ?? "").replace(",", "."));
+  const mat = ctx.modelo.materiales.find((x) => x.id === (fila.material ?? "").trim());
+  if (typeof k === "string" || !(t > 0) || !mat) return <p className="nota">Con el canto, el material y el balasto, aquí sale la longitud característica de la losa y el tamaño de su malla.</p>;
+  const { E, G } = materialElastico(mat).elastico;
+  const l = longitudCaracteristica({ E, nu: E / (2 * G) - 1, t }, k);
+  return (
+    <div className="nota" data-testid="terreno-forjado">
+      <p>
+        Longitud característica l = (D/k)^¼ = <b>{n(l, 2)} m</b> (D, la rigidez a flexión de la losa): a esa distancia de un pilar, su carga ya se ha repartido en el terreno.
+      </p>
+      <p className="mt-1">La losa se malla a l/{MALLA_CIMENTACION} = {n(l / MALLA_CIMENTACION, 2)} m como mucho. Cada nudo lleva un muelle con k por su área (Winkler); el cálculo es lineal, así que si alguno queda a tracción (despega) se avisa y ahí no vale. En Resultados · Losas, «σ terreno».</p>
     </div>
   );
 }

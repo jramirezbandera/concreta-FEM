@@ -603,8 +603,11 @@ const barras: DefTabla = {
 /** Multiplicadores de lámina de un reticular, en su orden (H47). */
 const MULT = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"] as const;
 
-/** Tipos de forjado de la tabla: los dos primeros son losas (láminas) y el último, un paño (viguetas como barras, D2). */
-export const TIPOS_FORJADO = ["maciza", "reticular", "unidireccional"] as const;
+/**
+ * Tipos de forjado de la tabla: maciza, reticular y cimentación son losas (láminas; la de cimentación,
+ * una maciza sobre el terreno, fase LC) y unidireccional, un paño (viguetas como barras, D2).
+ */
+export const TIPOS_FORJADO = ["maciza", "reticular", "unidireccional", "cimentacion"] as const;
 export type TipoForjado = (typeof TIPOS_FORJADO)[number];
 
 /** «2» o «2 x 1,6» (MA2). */
@@ -633,10 +636,37 @@ function puntoPasoFila(L: Lector): Vec2 | undefined {
 }
 
 const DEL_RETICULAR = ["nervio", "capa", "paso", "caseton", "abacos", "abacosPilares", "multiplicadores"] as const;
+/** Las columnas de una losa de cimentación (LC2). */
+const DE_CIMENTACION = ["balasto", "horizontal", "tension"] as const;
+
+/** La cimentación de una fila de tipo cimentación: el balasto (obligatorio), lo horizontal y la tensión admisible. */
+function cimentacionFila(L: Lector): Losa["cimentacion"] {
+  const tb = L.texto("balasto", { obligatorio: true });
+  let balasto: number | undefined;
+  if (tb !== undefined) {
+    const k = leerBalasto(tb);
+    if (typeof k === "string") L.errores.push({ columna: "balasto", mensaje: k });
+    else balasto = k;
+  }
+  let horizontal: NonNullable<Losa["cimentacion"]>["horizontal"];
+  const th = L.texto("horizontal");
+  if (th !== undefined) {
+    if (/^coartad[oa]$/i.test(th)) horizontal = "coartado";
+    else {
+      const k = leerBalasto(th);
+      if (typeof k === "string") L.errores.push({ columna: "horizontal", mensaje: `«coartado» o el balasto horizontal kh: ${k}` });
+      else horizontal = { kh: k };
+    }
+  }
+  const tensionAdmisible = L.numero("tension", { mayorQue: 0 });
+  if (balasto === undefined) return undefined;
+  return { balasto, ...(horizontal !== undefined ? { horizontal } : {}), ...(tensionAdmisible !== undefined ? { tensionAdmisible } : {}) };
+}
 
 /** Las columnas propias de cada tipo; las demás (id, planta, contorno, pp, dirección…) son de todos. */
 const PROPIAS: Readonly<Record<TipoForjado, readonly string[]>> = {
   maciza: ["espesor", "material"],
+  cimentacion: ["espesor", "material", "balasto", "horizontal", "tension"],
   reticular: ["espesor", "material", "intereje", ...DEL_RETICULAR, "relleno"],
   unidireccional: ["intereje", "seccion", "bovedilla", "relleno"],
 };
@@ -698,8 +728,33 @@ const DE_ALGUNO = new Set(Object.values(PROPIAS).flat());
 /** El tipo de un forjado del modelo. */
 export function tipoForjado(o: Objeto, ctx: Contexto): TipoForjado {
   if (ctx.coleccionDe(o.id) === "panos") return "unidireccional";
-  return (o as unknown as Losa).reticular ? "reticular" : "maciza";
+  const l = o as unknown as Losa;
+  return l.cimentacion ? "cimentacion" : l.reticular ? "reticular" : "maciza";
 }
+
+/** Factores a kN/m³ de las unidades del balasto que se admiten escritas. */
+const UNIDAD_BALASTO: Readonly<Record<string, number>> = { "kn/m3": 1, "mn/m3": 1000, "kg/cm3": 9.80665 * 1000 };
+
+/**
+ * Un balasto en kN/m³ (LC2): admite la unidad escrita («50 MN/m³», «5 kg/cm³») y, sin ella, rechaza lo
+ * que es menos de 500 kN/m³ con su causa probable (como `longitud`, UI-4: un «5» en kg/cm³ entraba como
+ * 5 kN/m³, un terreno diez mil veces más blando, y calculaba).
+ */
+export function leerBalasto(texto: string): number | string {
+  const t = texto.trim();
+  const u = /^(.*?)\s*(kn|mn|kg)\s*\/\s*(m|cm)\s*[³3]$/i.exec(t);
+  const v = leerNumero(u ? u[1]! : t);
+  if (typeof v === "string") return v;
+  const f = u ? UNIDAD_BALASTO[`${u[2]!.toLowerCase()}/${u[3]!.toLowerCase()}3`] : 1;
+  if (f === undefined) return "la unidad tiene que ser kN/m³, MN/m³ o kg/cm³";
+  const k = v * f;
+  if (!(k > 0)) return "tiene que ser mayor que 0";
+  if (!u && k < 500) return `¿${t} kN/m³? Es un terreno casi sin rigidez (uno blando tiene del orden de 10 000). Si son kg/cm³, escriba «${t} kg/cm³» (${textoNumero(Math.round(k * UNIDAD_BALASTO["kg/cm3"]!))} kN/m³); si son MN/m³, «${t} MN/m³»`;
+  return k;
+}
+
+/** Lo horizontal de una losa de cimentación como se escribe: vacío o «coartado», o el kh. */
+const textoHorizontal = (h: NonNullable<Losa["cimentacion"]>["horizontal"]): string => (h === undefined ? "" : h === "coartado" ? "coartado" : textoNumero(h.kh));
 
 /** El tipo de una fila: el de su celda o, vacía, maciza. */
 const tipoFila = (f: Fila): string => (f.tipo ?? "").trim().toLowerCase() || "maciza";
@@ -742,7 +797,7 @@ export function desglosePesoFila(f: Fila, ctx: Contexto): DesglosePeso | undefin
   const h = numeroDe(f, "espesor");
   if (!mat || !h || h <= 0) return undefined;
   const g = gammaMaterial(mat);
-  if (tipo === "maciza") return { hormigon: h, gamma: g, hueco: 0, pesoHueco: 0, relleno: 0, metodo: "estimado", pp: g * h };
+  if (tipo === "maciza" || tipo === "cimentacion") return { hormigon: h, gamma: g, hueco: 0, pesoHueco: 0, relleno: 0, metodo: "estimado", pp: g * h };
   const [s, bw, hf, c] = [numeroDe(f, "intereje"), numeroDe(f, "nervio"), numeroDe(f, "capa"), casetonFila(f)];
   if (tipo !== "reticular" || !s || !bw || !hf || !c || !(bw < s) || !(hf < h)) return undefined;
   if (c === "recuperable" && relleno) return undefined;
@@ -772,7 +827,7 @@ function ppPorDefecto(f: Fila, ctx: Contexto): string | undefined {
   const tipo = tipoFila(f);
   const d = desglosePesoFila(f, ctx);
   const conRelleno = !!(f.relleno ?? "").trim();
-  const que = tipo === "maciza" ? "γ·canto" : tipo === "reticular" ? (casetonFila(f) === "recuperable" ? "hormigón" : conRelleno ? "hormigón + relleno" : "hormigón + casetón") : conRelleno ? "vigueta + relleno" : "vigueta + bovedilla";
+  const que = tipo === "maciza" || tipo === "cimentacion" ? "γ·canto" : tipo === "reticular" ? (casetonFila(f) === "recuperable" ? "hormigón" : conRelleno ? "hormigón + relleno" : "hormigón + casetón") : conRelleno ? "vigueta + relleno" : "vigueta + bovedilla";
   return d ? `${textoNumero(Math.round(d.pp * 100) / 100)} = ${que}` : que;
 }
 
@@ -795,7 +850,7 @@ const forjados: DefTabla = {
     id,
     nombre,
     { clave: "planta", titulo: "planta", opciones: opcionesPlantas, referencia: "plantas" },
-    { clave: "tipo", titulo: "tipo", ayuda: "maciza (por defecto), reticular o unidireccional; cambiarlo cambia las columnas que tocan", opciones: fijas(TIPOS_FORJADO) },
+    { clave: "tipo", titulo: "tipo", ayuda: "maciza (por defecto), reticular, unidireccional o cimentación (una losa maciza sobre el terreno, con su balasto); cambiarlo cambia las columnas que tocan", opciones: fijas(TIPOS_FORJADO) },
     { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes de las vigas y los muros en que se apoya: «x y; x y; …» (al menos 3, sin repetir el primero)" },
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»", defecto: () => "ninguno" },
     { clave: "espesor", titulo: "canto", unidad: "m", ayuda: "maciza y reticular: el canto total; vacío en un unidireccional (lo da la sección de la vigueta)" },
@@ -823,6 +878,15 @@ const forjados: DefTabla = {
       ayuda: "desde +X. Maciza: la del eje 1 de las láminas (por defecto, 0). Reticular: la de los nervios y su perpendicular. Unidireccional: la de las viguetas (obligatoria)",
       defecto: (f) => (tipoFila(f) === "unidireccional" ? undefined : "0 (según +X)"),
     },
+    {
+      clave: "balasto",
+      titulo: "balasto",
+      unidad: "kN/m³",
+      ayuda:
+        "cimentación: el módulo de balasto vertical k del terreno, ya corregido por el tamaño y la forma de la losa (del estudio geotécnico; lo decide el ingeniero). Admite «50 MN/m³» o «5 kg/cm³». Cada nudo de la malla lleva un muelle con k por su área (Winkler, cálculo lineal) y la losa se malla a l/4 como mucho, con l = (D/k)^¼",
+    },
+    { clave: "horizontal", titulo: "horizontal", unidad: "kN/m³", ayuda: "cimentación: lo horizontal. Vacío o «coartado» (por defecto): ux y uy coartados en todos sus nudos. Un número: el balasto horizontal kh (rozamiento, empuje pasivo), con muelles en ux y uy; no con el sismo del programa", defecto: (f) => (tipoFila(f) === "cimentacion" ? "coartado" : undefined) },
+    { clave: "tension", titulo: "σ admisible", unidad: "kN/m²", ayuda: "cimentación (opcional): la tensión admisible del terreno. Sólo para avisar si la σ máxima de la ELS característica la pasa; la comprobación geotécnica es aparte", defecto: (f) => (tipoFila(f) === "cimentacion" ? "sin aviso" : undefined) },
     { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: entre ejes de nervios; unidireccional: entre ejes de viguetas; vacío en una maciza" },
     { clave: "nervio", titulo: "nervio", unidad: "m", ayuda: "reticular: ancho del nervio (bw)" },
     { clave: "capa", titulo: "capa", unidad: "m", ayuda: "reticular: espesor de la capa de compresión (hf)" },
@@ -843,7 +907,7 @@ const forjados: DefTabla = {
       titulo: "relleno",
       ayuda:
         "reticular y unidireccional: el peso del casetón o la bovedilla de su ficha, en lugar del estimado. «6,5» es un peso específico aparente equivalente, en kN por m³ del hueco entre nervios (no la densidad del material: la pieza tiene sus propios huecos); «12 kg × 6,25», el peso de una pieza por las piezas por m². Lo estimado (7,5, 6, 3,2 y 0,2 kN/m³) es de predimensionamiento, no un peso certificado ni de norma. Un pp escrito manda sobre él",
-      defecto: (f) => (tipoFila(f) === "maciza" ? undefined : "el estimado del tipo"),
+      defecto: (f) => (tipoFila(f) === "maciza" || tipoFila(f) === "cimentacion" ? undefined : "el estimado del tipo"),
     },
     {
       clave: "procedencia",
@@ -875,6 +939,9 @@ const forjados: DefTabla = {
         abacos: "",
         abacosPilares: "",
         multiplicadores: "",
+        balasto: "",
+        horizontal: "",
+        tension: "",
         seccion: p.seccion,
         bovedilla: s(p.bovedilla),
         relleno: textoRelleno(p.relleno),
@@ -903,6 +970,9 @@ const forjados: DefTabla = {
       abacos: r?.abacos?.length ? textoPoligonos(r.abacos) : "",
       abacosPilares: textoAbacosPilares(r?.abacosPilares),
       multiplicadores: r?.multiplicadores ? textoClaves(r.multiplicadores as Record<string, number>, MULT) : "",
+      balasto: n(l.cimentacion?.balasto),
+      horizontal: textoHorizontal(l.cimentacion?.horizontal),
+      tension: n(l.cimentacion?.tensionAdmisible),
       seccion: "",
       bovedilla: "",
       relleno: textoRelleno(r?.relleno),
@@ -924,6 +994,7 @@ const forjados: DefTabla = {
     if (pr && typeof pr !== "string" && !conPp && !rl) L.errores.push({ columna: "procedencia", mensaje: "es la del pp o la del relleno escritos: escriba uno de los dos" });
     const ppProcedencia = conPp && typeof pr === "object" ? pr : undefined;
     const relleno = rl && typeof rl === "object" ? (!conPp && typeof pr === "object" ? { ...rl, procedencia: pr } : rl) : undefined;
+    if (tipo !== "cimentacion") L.vacias(DE_CIMENTACION, tipo === "unidireccional" ? "a un unidireccional" : `a una losa ${tipo}`);
     if (tipo === "unidireccional") {
       L.vacias(["espesor", "material", ...DEL_RETICULAR], "a un unidireccional");
       const r = resultado(L, {
@@ -938,14 +1009,16 @@ const forjados: DefTabla = {
       });
       return r.ok ? { ...r, coleccion: "panos" } : r;
     }
-    if (tipo !== "maciza" && tipo !== "reticular") {
+    if (tipo !== "maciza" && tipo !== "reticular" && tipo !== "cimentacion") {
       L.errores.push({ columna: "tipo", mensaje: `«${f.tipo}» no es un tipo de forjado: ${TIPOS_FORJADO.join(", ")}` });
       return { ok: false, errores: L.errores };
     }
     L.vacias(["seccion", "bovedilla"], `a una losa ${tipo}`);
     let reticular: Losa["reticular"];
-    if (tipo === "maciza") L.vacias(["intereje", ...DEL_RETICULAR, "relleno"], "a una losa maciza");
-    else
+    let cimentacion: Losa["cimentacion"];
+    if (tipo === "maciza" || tipo === "cimentacion") L.vacias(["intereje", ...DEL_RETICULAR, "relleno"], tipo === "maciza" ? "a una losa maciza" : "a una losa de cimentación");
+    if (tipo === "cimentacion") cimentacion = cimentacionFila(L);
+    else if (tipo === "reticular")
       reticular = limpio({
         intereje: L.longitud("intereje", { obligatorio: true, max: LONGITUD_MAXIMA.intereje }),
         nervio: L.longitud("nervio", { obligatorio: true, max: LONGITUD_MAXIMA.nervio }),
@@ -965,6 +1038,7 @@ const forjados: DefTabla = {
       ppProcedencia,
       eje1: L.numero("direccion"),
       reticular,
+      cimentacion,
     });
     return r.ok ? { ...r, coleccion: "losas" } : r;
   },

@@ -26,7 +26,7 @@ import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
-import { casosSueltos, UNIDADES_CAMPO, type Envolvente, type EsfuerzoPlanta } from "../agente/render/resultados.ts";
+import { casosSueltos, propositoCampo, UNIDADES_CAMPO, type Envolvente, type EsfuerzoPlanta } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
@@ -240,6 +240,8 @@ export interface EstadoSesion {
   ejes: { id: string; nombre?: string; desde: Vec2; hasta: Vec2; propuesto: boolean }[];
   /** I3: las vistas guardadas en el proyecto. */
   vistas: VistaGuardada[];
+  /** LC2: las losas de cimentación del modelo, con su planta (sin ellas, vacío): Resultados · Losas da su σ del terreno. */
+  cimentacion: { losa: string; planta: string }[];
 }
 
 export type Apertura = { valido: true; sesion: Sesion } | { valido: false; diagnosticos: Diagnostico[] };
@@ -425,6 +427,7 @@ export class Sesion {
       sha256Resultados: this.shaR,
       ejes: this.ejesEstado(),
       vistas: this.proyecto.vistas ?? [],
+      cimentacion: (this.proyecto.modelo.losas ?? []).filter((l) => l.cimentacion).map((l) => ({ losa: l.id, planta: l.planta })),
     };
   }
 
@@ -452,6 +455,7 @@ export class Sesion {
       sha256Resultados: null,
       ejes: this.ejesEstado(),
       vistas: this.proyecto.vistas ?? [],
+      cimentacion: (this.proyecto.modelo.losas ?? []).filter((l) => l.cimentacion).map((l) => ({ losa: l.id, planta: l.planta })),
     };
   }
 
@@ -676,7 +680,7 @@ export class Sesion {
           if (!conj.valido) return conj;
           e = vistaReacciones(rr, planta, conj.valor, d, v.escala);
         } else {
-          const conj = this.conjunto(v.combinaciones, v.vista === "campo" && v.campo === "uz" ? "desplazamientos" : "esfuerzos");
+          const conj = this.conjunto(v.combinaciones, v.vista === "campo" ? propositoCampo(v.campo) : "esfuerzos");
           if (!conj.valido) return conj;
           e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala, v.envolvente) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : v.vista === "armado" ? this.vistaArmado(rr, planta, v, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
         }
@@ -781,7 +785,7 @@ export class Sesion {
     const rr = this.rr;
     if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Los isovalores necesitan el cálculo." }] };
     if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
-    const conj = this.conjunto(p.combinaciones, p.campo === "uz" ? "desplazamientos" : "esfuerzos");
+    const conj = this.conjunto(p.combinaciones, propositoCampo(p.campo));
     if (!conj.valido) return conj;
     return { valido: true, valor: isovalores3D(rr, this.origen3D, p.campo, conj.valor, { planta: p.planta, ...(p.superficies ? { superficies: p.superficies } : {}), ...(p.escala ? { escala: p.escala } : {}), ...(p.envolvente ? { envolvente: p.envolvente } : {}) }) };
   }
@@ -828,7 +832,7 @@ export class Sesion {
     const rr = this.rr;
     if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
     if (!Number.isInteger(p.lamina) || p.lamina < 0 || p.lamina >= (rr.c.modelo.laminas?.length ?? 0)) return { valido: false, diagnosticos: [{ codigo: "visor/lamina", severidad: "error", mensaje: `No hay ninguna lámina ${p.lamina}.` }] };
-    const proposito = p.campo === "uz" ? "desplazamientos" : "esfuerzos";
+    const proposito = propositoCampo(p.campo);
     if (p.envolvente) {
       // La de ese punto: cada combinación en él (lineal en los casos) y, de ellas, la mayor o la menor
       const conj = this.conjunto(p.combinaciones, proposito);

@@ -58,7 +58,7 @@ const W = 262;
 const H = 150;
 const M = 14;
 
-const NOMBRE_DIRECCION = { maciza: "eje 1", reticular: "nervios", unidireccional: "viguetas" } as const;
+const NOMBRE_DIRECCION = { maciza: "eje 1", reticular: "nervios", unidireccional: "viguetas", cimentacion: "eje 1" } as const;
 
 export function PlantaForjado({ c, activo, onCampo }: Props) {
   const id = useId().replace(/:/g, "");
@@ -83,7 +83,7 @@ export function PlantaForjado({ c, activo, onCampo }: Props) {
   const P = ([x, y]: Vec2): [number, number] => [dx + (x - x0) * k, H - dy - (y - y0) * k];
   const d = (p: readonly Vec2[]) => `M${p.map((q) => P(q).map((v) => v.toFixed(1)).join(" ")).join("L")}Z`;
   const paso = c.intereje ? c.intereje * k : 0;
-  const trama = c.tipo !== "maciza" && paso >= 3;
+  const trama = c.tipo !== "maciza" && c.tipo !== "cimentacion" && paso >= 3;
   const a = (-c.direccion * Math.PI) / 180;
   const [cx, cy] = [W / 2, H / 2];
   const largo = 30;
@@ -216,7 +216,7 @@ const WS = 262;
 export function SeccionForjado({ c, activo, onCampo }: Props) {
   const prop = { activo, onCampo };
   const [svg, letra] = useLetra(WS);
-  if (c.tipo === "maciza") {
+  if (c.tipo === "maciza" || c.tipo === "cimentacion") {
     const h = c.canto ?? TIPICO.canto;
     const ancho = 1.2;
     const k = Math.min((WS - 50) / ancho, 60 / h);

@@ -123,6 +123,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
 
 Combinaciones de las consultas: --casos | --situacion ELU-PT[,ELS-C…] | --combinacion "1.35*G+1.5*Q" (repetible) | --caso G
 Otras: --planta P --tipo pilar|viga|vigueta --objeto id --losa id --armadura x-inf|x-sup|y-inf|y-sup (refuerzos, con la base del proyecto) --top N --todos --estaciones --exacto --cifras N
+terreno: por losa de cimentación, en la ELS característica: σ máxima y mínima (kN/m²), asiento máximo, despegue (el cálculo es lineal) y distorsión angular entre pilares; --losa para una
 modos: masas por planta y modos de vibración (periodos, masa efectiva y forma); necesita "acciones": { "sismo": {} } en el modelo y no depende de las combinaciones
 sismo: el sismo del programa por espectros de respuesta (NCSE-02): emplazamiento y espectro y, según X y según Y, cortante en la base, cortantes y fuerzas de planta, desplazamientos, θ de segundo orden y el contraste con el método simplificado; necesita "ine" (el municipio, de fem emplazamiento) o "ab" y "K", y "terreno" y "mu", en "acciones": { "sismo": {…} }; sus casos EX+e, EX-e, EY+e y EY-e entran en las combinaciones sísmicas (--situacion ELU-SIS) y en --caso
 Salida: un objeto JSON. Códigos: 0 bien, 1 errores del modelo o del cálculo, 2 orden mal dada, 3 error interno.`;

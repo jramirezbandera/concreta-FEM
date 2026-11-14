@@ -11,7 +11,8 @@
  *   comprobación geotécnica es de CO).
  *
  * Con el sismo del programa (VS-o), uz no tiene un signo: en cada nudo se toman la parte estática
- * menos y más la amplitud del sismo.
+ * menos y más la amplitud del sismo. La de σ, sin μ (es la fuerza del muelle, como las reacciones); la
+ * del asiento y de la distorsión, por μ (son desplazamientos; LC2-1).
  */
 import type { Consultas } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -71,16 +72,19 @@ export function terreno(q: Consultas, conjunto: ConjuntoCombinaciones, o: { losa
       const fe = hay ? Float64Array.from(f, (x, i) => (espectral[i] ? x : 0)) : null;
       const fs = hay ? Float64Array.from(f, (x, i) => (espectral[i] ? 0 : x)) : f;
       const ws = q.combinar(uz, n, fs, true);
-      const we = fe ? q.combinar(uz, n, fe, true) : null;
+      // LC2-1: con el sismo, σ = k·w es una fuerza (la del muelle) y va sin μ; el asiento es un desplazamiento y va por μ
+      const weS = fe ? q.combinar(uz, n, fe, false) : null;
+      const weA = fe ? q.combinar(uz, n, fe, true) : null;
       let enTraccion = 0;
       for (let i = 0; i < n; i++) {
-        const amp = we ? Math.abs(we[i]!) : 0;
-        const [wBaja, wSube] = [ws[i]! - amp, ws[i]! + amp];
-        const sigmaMax = -k * wBaja;
-        const sigmaMin = -k * wSube;
+        const ampS = weS ? Math.abs(weS[i]!) : 0;
+        const ampA = weA ? Math.abs(weA[i]!) : 0;
+        const sigmaMax = -k * (ws[i]! - ampS);
+        const sigmaMin = -k * (ws[i]! + ampS);
+        const asiento = -(ws[i]! - ampA);
         if (!sMax || sigmaMax > sMax.v) sMax = { v: sigmaMax, punto: xy(i), comb };
         if (!sMin || sigmaMin < sMin.v) sMin = { v: sigmaMin, punto: xy(i), comb };
-        if (!wMax || -wBaja > wMax.v) wMax = { v: -wBaja, punto: xy(i), comb };
+        if (!wMax || asiento > wMax.v) wMax = { v: asiento, punto: xy(i), comb };
         if (sigmaMin < 0) enTraccion += areas[i]!;
       }
       if (enTraccion > 0 && (!despegue || enTraccion > despegue.area)) despegue = { comb, area: enTraccion, fraccion: enTraccion / area };

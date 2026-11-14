@@ -14,7 +14,8 @@ import { deriva, flechas, pieza, reacciones, type DerivaPlanta, type Extremo, ty
 import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
-import { casosSueltos, envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type CasoSuelto, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
+import { terreno, type TerrenoLosa } from "../agente/terreno.ts";
+import { casosSueltos, envolventePieza, propositoCampo, UNIDADES_CAMPO, valoresCampo, type Campo, type CasoSuelto, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { componerRevision, prepararRevision, type RevisionPreparada } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion, type PesoCalculado } from "../agente/sensatez.ts";
@@ -115,13 +116,18 @@ export interface DatosLosas {
   combinacionesFlechas: Combinaciones;
   /** UI-24: las plantas con losas (con mapa: un paño no lo tiene), de arriba abajo, para ir a una desde una que no tiene. */
   plantasConLosas: string[];
+  /**
+   * LC2: con σ del terreno, lo de cada losa de cimentación de la planta en las combinaciones del mapa
+   * (`fem consultar terreno`): σ máxima y mínima, asiento, despegue y distorsión angular.
+   */
+  terreno?: TerrenoLosa[];
 }
 
 /** El propósito de las flechas: el de la elección si el mapa es de uz, si no las de desplazamientos por defecto. */
 export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, escala?: EscalaMapa, malla?: boolean, envolvente?: Envolvente): Resultado<DatosLosas> {
   const esc = s.escena(planta, { vista: "campo", campo, combinaciones: e, ...(escala ? { escala } : {}), ...(malla ? { malla } : {}), ...(envolvente ? { envolvente } : {}) });
   if (!esc.valido) return esc;
-  const conj = s.conjunto(e, campo === "uz" ? "desplazamientos" : "esfuerzos");
+  const conj = s.conjunto(e, propositoCampo(campo));
   if (!conj.valido) return conj;
   const cjF = campo === "uz" ? conj : s.conjunto({ tipo: "defecto" }, "desplazamientos");
   if (!cjF.valido) return cjF;
@@ -132,6 +138,15 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
     const r = flechas(q, cjF.valor, { losa: l.id });
     if (!r.valido) return r;
     fl.push(...r.valor);
+  }
+  let terrenoPlanta: TerrenoLosa[] | undefined;
+  if (campo === "sigma") {
+    terrenoPlanta = [];
+    for (const l of (q.fisico.losas ?? []).filter((x) => x.planta === planta && x.cimentacion)) {
+      const t = terreno(q, conj.valor, { losa: l.id });
+      if (!t.valido) return t;
+      terrenoPlanta.push(...t.valor);
+    }
   }
   const env = esc.valor.mapa?.envolvente;
   const comb = env ? undefined : (esc.valor.mapa?.combinacion ?? esc.valor.extremos[0]?.comb);
@@ -146,7 +161,8 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
       ...(env ? { envolvente: env } : {}),
       flechas: fl,
       combinacionesFlechas: resumenConjunto(cjF.valor),
-      plantasConLosas: q.fisico.plantas.map((p) => p.id).filter((id) => (q.fisico.losas ?? []).some((l) => l.planta === id)),
+      plantasConLosas: q.fisico.plantas.map((p) => p.id).filter((id) => (q.fisico.losas ?? []).some((l) => l.planta === id && (campo !== "sigma" || l.cimentacion))),
+      ...(terrenoPlanta ? { terreno: terrenoPlanta } : {}),
     },
   };
 }
@@ -184,7 +200,7 @@ const UNIDAD = UNIDADES_CAMPO;
 export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, x: number, y: number, escala?: EscalaMapa, envolvente?: Envolvente): Resultado<ValorPunto | null> {
   const d = datosLosas(s, planta, campo, e, escala, undefined, envolvente);
   if (!d.valido) return d;
-  const conj = s.conjunto(e, campo === "uz" ? "desplazamientos" : "esfuerzos");
+  const conj = s.conjunto(e, propositoCampo(campo));
   if (!conj.valido) return conj;
   const env = d.valor.envolvente;
   if (env) {

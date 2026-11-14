@@ -100,7 +100,15 @@ export function figurasInforme(p: Proyecto, c: Extract<ResultadoCompilacion, { v
     if (losas && cj) {
       // La flecha: con varias combinaciones, su envolvente mínima en cada nudo (UI-1)
       const e = vistaCampo(rr, pl.id, "uz", cj, d, {}, "min");
-      r.push({ titulo: `Planta ${pl.id}: uz (mm), ${cj.factores.length > 1 ? `envolvente mínima de ${cj.descripcion}` : (cj.nombres[0] ?? cj.descripcion)}`, svg: escenaASvg(e).svg });
+      const de = (env: string) => (cj.factores.length > 1 ? `envolvente ${env} de ${cj.descripcion}` : (cj.nombres[0] ?? cj.descripcion));
+      r.push({ titulo: `Planta ${pl.id}: uz (mm), ${de("mínima")}`, svg: escenaASvg(e).svg });
+      // LC2: con una losa de cimentación, la tensión en el terreno (la máxima y, si despega en algo, la mínima)
+      if ((f.losas ?? []).some((l) => l.planta === pl.id && l.cimentacion)) {
+        const max = vistaCampo(rr, pl.id, "sigma", cj, d, {}, "max");
+        r.push({ titulo: `Planta ${pl.id}: σ del terreno (kN/m²), ${de("máxima")}`, svg: escenaASvg(max).svg });
+        const min = vistaCampo(rr, pl.id, "sigma", cj, d, {}, "min");
+        if ((min.mapa?.minimo ?? 0) < 0) r.push({ titulo: `Planta ${pl.id}: σ del terreno (kN/m²), ${de("mínima")}: lo que despega`, svg: escenaASvg(min).svg });
+      }
     }
   }
   return r;

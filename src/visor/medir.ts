@@ -28,7 +28,7 @@ export interface ResultadoMedida {
 }
 
 /** Los estilos de lo que se dibuja encima de las piezas: medir no engancha a ellos. */
-const SIN_ENGANCHE = /^(carga-|peso-propio|malla|isolinea|isobanda|diagrama-|diagnostico-|extremo-|eje-burbuja|hueco-aspa|fuera-escala|sin-mapa)/;
+const SIN_ENGANCHE = /^(carga-|peso-propio|malla|isolinea|isobanda|diagrama-|diagnostico-|extremo-|eje-burbuja|hueco-aspa|fuera-escala|despegue|sin-mapa)/;
 
 const dist = (a: Vec2, b: Vec2) => Math.hypot(b[0] - a[0], b[1] - a[1]);
 

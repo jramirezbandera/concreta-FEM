@@ -69,6 +69,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "valor-pilar": { fill: "#d4d6db", stroke: "#d4d6db", sw: 1 },
   "armado-cubierto": { fill: "#2a2e35" },
   "zona-refuerzo": { stroke: "#f8fafc", sw: 1.8 },
+  despegue: { stroke: "#fafafa", sw: 1.8, dash: "6 3" },
+  "despegue-rayado": { stroke: "#fafafa", sw: 0.7 },
 };
 
 export function pintura(estilo: Estilo, tema: Theme): Pintura {

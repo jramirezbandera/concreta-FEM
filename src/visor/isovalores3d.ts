@@ -137,7 +137,10 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
   const escala = op.escala ?? {};
   const todas = r.q.fisico.plantas.map((p) => p.id);
   const grupos: Grupo[] = [];
-  for (const planta of op.planta === null ? todas : todas.filter((p) => p === op.planta)) for (const de of gruposDe(superficies)) if (r.laminas(planta, de).laminas.length) grupos.push({ planta, de });
+  // LC2: σ del terreno, sólo en las losas de las plantas con alguna de cimentación (lo demás no tiene mapa)
+  const cimentadas = new Set((r.q.fisico.losas ?? []).filter((x) => x.cimentacion).map((x) => x.planta));
+  for (const planta of op.planta === null ? todas : todas.filter((p) => p === op.planta))
+    for (const de of gruposDe(superficies)) if (r.laminas(planta, de).laminas.length && (campo !== "sigma" || (de === "losas" && cimentadas.has(planta)))) grupos.push({ planta, de });
   const plantas = todas.filter((p) => grupos.some((g) => g.planta === p));
   // Con varias combinaciones y `envolvente`, la envolvente en cada nudo (UI-1); si no, la que gobierna
   // en lo que se ve: la del mayor |valor| (como `vistaCampo` en una planta)
@@ -264,8 +267,9 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
   notas.push(op.planta === null ? `Todas las plantas ${que} (${plantas.length}), con una escala común.` : superficies === "losas" ? `Planta ${op.planta}: la misma escala y la misma combinación que su vista en planta.` : `Planta ${op.planta}${superficies === "muros" ? ": sus muros" : ": sus losas y sus muros, con una escala común"} (los muros, de la planta de debajo a ella).`);
   if (env) notas.push(`Envolvente ${env === "max" ? "máxima" : "mínima"} de las ${conjunto.factores.length} combinaciones de ${conjunto.descripcion}: en cada nudo, la de ${env === "max" ? "mayor" : "menor"} valor.`);
   else if (conjunto.factores.length > 1) notas.push(`Combinación ${conjunto.nombres[mejor.k] ?? ""}: la del mayor |valor| de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
-  if (nSin) notas.push(`${nSin} láminas sin mapa (gris): las rígidas de las huellas de los pilares.`);
-  if (campo === "uz") notas.push(`uz de los nudos de las láminas${nMuros ? " (en los muros, su desplazamiento vertical)" : ""}, sobre la geometría sin deformar.`);
+  if (nSin) notas.push(campo === "sigma" ? `${nSin} láminas sin mapa (gris): las de las losas que no son de cimentación.` : `${nSin} láminas sin mapa (gris): las rígidas de las huellas de los pilares.`);
+  if (campo === "sigma") notas.push(`σ = k·(−uz) en los nudos de las losas de cimentación (k, su balasto), positiva en compresión${vmin < 0 ? "; por debajo de la isolínea de 0, despega (el cálculo es lineal: ahí no vale)" : ""}.${cimentadas.size ? "" : " El modelo no tiene losas de cimentación."}`);
+  else if (campo === "uz") notas.push(`uz de los nudos de las láminas${nMuros ? " (en los muros, su desplazamiento vertical)" : ""}, sobre la geometría sin deformar.`);
   else if (campo.startsWith("f")) notas.push(NOTA_MEMBRANA);
   else notas.push("Campos recuperados por SPR (E5) en los ejes de cada losa.");
   if (nMuros) notas.push("En los muros, sus ejes: 1 a lo largo de su eje desde su primer punto, 2 hacia arriba y 3 a su derecha; un momento positivo tracciona su cara izquierda (−3) y F22 es su axil vertical por metro.");
@@ -287,7 +291,7 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
     isolineas: Float32Array.from(iso),
     ceros: Float32Array.from(ceros),
     // Los de `extremosMapa` (UI-14: en uz, la flecha y el levantamiento; en una envolvente, el suyo)
-    extremos: nulo || !emax || !emin ? [] : extremosMapa(campo, vmin, vmax, env).map((x) => ({ ...(x.cual === "max" ? emax! : emin!), texto: x.texto })),
+    extremos: nulo || !emax || !emin ? [] : extremosMapa(campo, vmin, vmax, env, { asiento: mejor.por.length > 0 && mejor.por.every((x) => x.laminas.every((l) => !!r.c.mapeo.cimentacion?.[r.c.mapeo.laminas![l]!.losa ?? ""])) }).map((x) => ({ ...(x.cual === "max" ? emax! : emin!), texto: x.texto })),
     ...(mapa ? { mapa } : {}),
     leyenda,
     notas,

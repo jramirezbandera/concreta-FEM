@@ -125,7 +125,7 @@ cimentacion?: {
 ## 7. Tramos
 
 - **LC1, el compilador y las consultas:** el campo, los muelles, lo horizontal, la malla por l, los pilares y muros, el diafragma, `terreno`, los avisos, la hipótesis y la referencia congelada, con los criterios 1 a 7.
-- **LC2, la app y el agente:** la tabla y la plantilla, los mapas de σ y asiento, el despegue, el informe, la skill y `fem consultar terreno`.
+- **LC2, la app y el agente** (hecho, §9): la tabla y la plantilla, los mapas de σ y asiento, el despegue, el informe, la skill y `fem consultar terreno`.
 - **LC3:** la sombra (criterio 8).
 
 ## 8. LC1 hecho (2026-11-14)
@@ -176,3 +176,40 @@ Los tres edificios objetivo de 7 plantas con una losa de cimentación de 0,8 m s
 | Losa plana | 193 809 | 236 669 | +22,1 % | no cabe |
 
 Como se aceptó en LC-i, el reticular y la losa plana con su losa de cimentación pasan del perfil móvil (ya iban a menos de un 1 % de él sin ella).
+
+## 9. LC2 hecho (2026-11-14)
+
+La losa de cimentación en la app, en el informe y en la skill. El cálculo no cambia: sin losas de cimentación, los mismos bits (el único cambio de números es LC2-1, con el sismo del programa).
+
+**Editor:**
+
+- **Tabla Forjados** (`src/editor/tablas.ts`): el tipo «cimentación» (una losa maciza con `cimentacion`) y sus columnas «balasto» (obligatoria), «horizontal» (vacía o «coartado», o el kh) y «σ admisible». En los demás tipos tienen que ir vacías, y cambiar el tipo las vacía. El pp por defecto es γ·canto.
+- **El balasto con su unidad** (`leerBalasto`): admite «50 MN/m³» y «5 kg/cm³» y, sin unidad, rechaza lo que es menos de 500 kN/m³ diciendo qué sería en kg/cm³ y en MN/m³ (como las longitudes de UI-4: un «5» en kg/cm³ entraba como un terreno diez mil veces más blando, y calculaba).
+- **Herramienta Forjado** (`piezas.ts`, la plantilla en `Plantilla.tsx`): el tipo «Cimentación», con canto, material, balasto, kh y σ admisible. No pone zunchos (apoya en el terreno). Sin balasto, dice qué falta. Da byte a byte lo de su fila de la tabla.
+- **Propiedades de un forjado:** el grupo «Terreno», con la longitud característica l = (D/k)^¼ y el tamaño de malla l/4 que le da el cálculo (`TerrenoForjado`). El croquis la dibuja como una maciza.
+
+**Resultados:**
+
+- **El campo `sigma`** (`src/agente/render/resultados.ts`): σ = k·(−uz) en los nudos de las láminas de las losas de cimentación (k, su balasto); en las demás losas, sin mapa. Sale de uz de los nudos, como el mapa de uz, y por defecto en la ELS característica (`propositoCampo`, como las reacciones y la tensión admisible). En `fem render --vista sigma`, en Resultados · Losas («σ terreno», sólo si el modelo tiene alguna) y en el 3D (sólo las losas de cimentación).
+- **El despegue:** lo que tiene σ < 0 va rayado y con su borde (estilos `despegue` y `despegue-rayado`), con su entrada en la leyenda y su nota; el extremo mínimo se rotula «despega: σ …».
+- **El asiento:** en una planta cuyas losas son todas de cimentación, uz rotula el «asiento máximo» en vez de la flecha.
+- **Propiedades de Losas con σ:** el panel «Terreno» con lo de `fem consultar terreno` en las combinaciones del mapa: σ máxima (y la admisible, con su porcentaje), σ mínima, asiento máximo, distorsión angular entre pilares y el despegue (pedido `losas`, campo `terreno`). `EstadoSesion.cimentacion` lista las losas de cimentación.
+
+**Informe** (`fem revisar` y la Revisión de la app): la sección «Terreno bajo las losas de cimentación» (k, área, σ máxima con su combinación, la admisible, σ mínima, asiento, despegue y distorsión, de `SensatezResultados.terreno`) y, por planta con una losa de cimentación, la figura de σ en su envolvente máxima y, si despega en algo, la de la mínima. Los informes sin losas de cimentación no cambian ni un byte.
+
+**Skill:** la pregunta del balasto (del geotécnico, nunca de memoria), lo horizontal y la tensión admisible en la lista de datos del encargo; el campo `cimentacion` en los convenios (sin `base` en los pilares que arrancan en ella, su planta sin diafragma, sin zunchos, y que el despegue no se arregla quitando cargas); `consultar terreno` y `render --vista sigma` en sus tablas. `fem` dice la consulta `terreno` en su ayuda.
+
+**Validación:**
+
+- `src/editor/cimentacion.test.ts`: ida y vuelta de las filas (también con kh, «coartado» escrito y σ admisible), el balasto obligatorio y vacío en otro tipo, el pp por defecto, las unidades del balasto, y la herramienta, byte a byte con la tabla, sin zunchos y compilable.
+- `src/agente/render/sigma.test.ts`: σ = −k·uz en cada nudo; los extremos del mapa, los de la consulta `terreno` bit a bit; el despegue rayado sólo cuando despega; sin mapa en la planta del forjado; el asiento rotulado; el 3D con sólo la losa de cimentación; el informe con su sección y sus figuras; y LC2-1 (falla con el código de antes).
+- `app/src/test/terreno.test.tsx`: «σ terreno» sólo con losas de cimentación, con la ELS característica por defecto, y el panel «Terreno» y los extremos con los números del pedido.
+
+**Hallazgo:**
+
+- **LC2-1, σ con el sismo iba por μ (de LC1):** `terreno` tomaba la amplitud del sismo con los desplazamientos multiplicados por μ (los de `combinar(…, true)`) también para σ. σ = k·w es la fuerza del muelle, como las reacciones, y va sin μ; el asiento y la distorsión sí son desplazamientos y van por μ. Con μ = 2, σ con el sismo salía el doble de la amplitud del sismo (del lado seguro). Sin el sismo del programa, los mismos bits.
+
+**De paso:** dos errores de tipos de LC1 en `src/pruebas/invalidos-c2.ts` y `validacion/lc/malla.ts` (el typecheck de la raíz no pasaba).
+
+**Queda:** LC3, la sombra con CYPECAD (criterio 8), cuando el usuario dé el modelo.
+

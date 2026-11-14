@@ -268,6 +268,32 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
     });
   }
 
+  // ─── Terreno bajo las losas de cimentación (LC2) ───────────────────────────────────────────
+  const ter = d.resultados.terreno;
+  if (ter && ter.losas.length) {
+    titulo(2, "Terreno bajo las losas de cimentación");
+    parrafo(
+      `Cada nudo de la losa lleva un muelle vertical con k por su área (Winkler; cálculo lineal). σ = k·asiento, en kN/m² y positiva en compresión; el asiento, en mm. Despega donde algún muelle queda a tracción, que el terreno no da: ahí el cálculo no vale. Distorsión angular: la mayor diferencia de asiento entre dos pilares que arrancan en la losa entre su distancia. Combinaciones: ${ter.combinaciones}. La comprobación geotécnica (DB SE-C) es aparte.`,
+    );
+    b.push({
+      tipo: "tabla",
+      cabecera: ["Losa", "k (kN/m³)", "Área (m²)", "σ máx. (kN/m²)", "En", "Admisible (kN/m²)", "σ mín. (kN/m²)", "Asiento máx. (mm)", "Despegue (m²)", "Distorsión angular"],
+      numericas: [1, 2, 3, 5, 6, 7, 8],
+      filas: ter.losas.map((x) => [
+        x.losa,
+        String(Math.round(x.balasto)),
+        num(x.area, 4),
+        num(x.sigmaMax.v, 4),
+        x.sigmaMax.comb,
+        x.tensionAdmisible === undefined ? "—" : `${num(x.tensionAdmisible, 4)}${x.sigmaMax.v > x.tensionAdmisible ? " (la pasa)" : ""}`,
+        num(x.sigmaMin.v, 4),
+        num(1000 * x.asientoMax.v, 3),
+        x.despegue ? `${num(x.despegue.area, 3)} (${pct(x.despegue.fraccion)}, ${x.despegue.comb})` : "0",
+        x.distorsion ? `${x.distorsion.v > 0 ? `1/${Math.round(1 / x.distorsion.v)}` : "0"} (${x.distorsion.entre.join("–")}, ${x.distorsion.comb})` : "—",
+      ]),
+    });
+  }
+
   // ─── Peso propio ───────────────────────────────────────────────────────────────────────────
   const pp = d.modelo.pesoPropio;
   if (pp) {

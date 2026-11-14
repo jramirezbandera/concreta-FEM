@@ -22,7 +22,7 @@ import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import { casoCargasMuertas } from "../../../src/editor/casos.ts";
 import { nieveObra } from "../../../src/compilador/nieve.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
-import { TEXTO_BOVEDILLA, TEXTO_CASETON, TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
+import { leerBalasto, TEXTO_BOVEDILLA, TEXTO_CASETON, TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
 import { LONGITUD_MAXIMA } from "../../../src/editor/celdas.ts";
 import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
 import { esPlantillaDxf, type NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
@@ -119,11 +119,17 @@ function forjadoEfectivo(m: ModeloFisico, t: PlantillaForjado, obra?: ObraProyec
     const u = m.panos?.at(-1);
     return { ...t, tipo, intereje: t.intereje ?? u?.intereje ?? 0.7, seccion: valida(t.seccion) ?? valida(u?.seccion) ?? m.secciones.find((s) => s.forma === "T")?.id, bovedilla: t.bovedilla ?? u?.bovedilla, direccion: t.direccion ?? u?.direccion };
   }
-  const losas = (m.losas ?? []).filter((l) => !!l.reticular === (tipo === "reticular"));
+  const losas = (m.losas ?? []).filter((l) => (l.cimentacion ? "cimentacion" : l.reticular ? "reticular" : "maciza") === tipo);
   const u = losas.at(-1);
   // DO: el de la obra manda sobre el del último forjado y el más usado (no sobre el de la plantilla)
   const material = materialValido(t.material) ?? materialValido(obra?.materiales?.forjados) ?? materialValido(u?.material) ?? materialPorDefecto(m, m.losas ?? []);
   if (tipo === "maciza") return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.25, material };
+  if (tipo === "cimentacion") {
+    // LC2: el balasto y lo demás, del último de su tipo (no hay uno típico: lo da el estudio geotécnico)
+    const c = u?.cimentacion;
+    const kh = typeof c?.horizontal === "object" ? c.horizontal.kh : undefined;
+    return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.6, material, balasto: t.balasto ?? c?.balasto, kh: t.kh ?? kh, tensionAdmisible: t.tensionAdmisible ?? c?.tensionAdmisible };
+  }
   const r = u?.reticular;
   return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.3, material, intereje: t.intereje ?? r?.intereje ?? 0.8, nervio: t.nervio ?? r?.nervio ?? 0.12, capa: t.capa ?? r?.capa ?? 0.05, caseton: t.caseton ?? r?.caseton };
 }
@@ -820,7 +826,35 @@ function CampoZunchos({ t, poner, ayuda }: { t: { zunchos?: boolean; anchoZuncho
   );
 }
 
-const TIPO_FORJADO: Record<TipoForjado, string> = { maciza: "Maciza", reticular: "Reticular", unidireccional: "Unidirecc." };
+const TIPO_FORJADO: Record<TipoForjado, string> = { maciza: "Maciza", reticular: "Reticular", unidireccional: "Unidirecc.", cimentacion: "Cimentación" };
+
+/** Un balasto de la plantilla (LC2), en kN/m³: admite «50 MN/m³» o «5 kg/cm³», y sin unidad avisa de lo que no es un terreno (`leerBalasto`). */
+function CampoBalasto({ etiqueta, valor, onCambio, ayuda, falta, vacio }: { etiqueta: string; valor: number | undefined; onCambio: (v: number | undefined) => void; ayuda: string; falta?: boolean; vacio: string }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const mostrado = texto ?? (valor === undefined ? "" : String(valor).replace(".", ","));
+  const t = mostrado.trim();
+  const v = t === "" ? undefined : leerBalasto(t);
+  const error = typeof v === "string" ? v : null;
+  const escribir = () => {
+    if (texto === null) return;
+    if (!error) {
+      onCambio(v as number | undefined);
+      setTexto(null);
+    }
+  };
+  return (
+    <label className="campo">
+      <span>
+        <span className="campo-nombre">{etiqueta}</span>
+        <Ayuda texto={ayuda} />
+      </span>
+      <span className="dib-unidad" data-unidad="kN/m³">
+        <input value={mostrado} placeholder={falta ? "obligatorio" : vacio} data-error={!!error || (!!falta && !t)} aria-label={etiqueta} aria-invalid={!!error} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      </span>
+      {error && <p className="error">{error}</p>}
+    </label>
+  );
+}
 
 /** La plantilla de Forjado: el modo (recuadro o polígono), el tipo y lo de cada tipo, como las columnas de la tabla. */
 function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: ModeloFisico; t: PlantillaForjado; poner: (c: PlantillaForjado, limpiar?: boolean) => void; editar: Props["editar"] }) {
@@ -845,7 +879,16 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
         />
         <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x, zunchos: t.zunchos, anchoZuncho: t.anchoZuncho, abacos: t.abacos, desnivel: t.desnivel }, true)} />
         {num("desnivel", "desnivel", "m", "De la cara superior respecto a la cota de la planta: negativo, más bajo (una terraza, −0,10). Vacío, en la cota. Para dejarlo a ras de otro forjado, «Enrasar con…» en sus propiedades.")}
-        {tipo !== "unidireccional" && (
+        {tipo === "cimentacion" && (
+          <>
+            {num("espesor", "canto", "m")}
+            <CampoMaterial modelo={m} valor={t.material} para="la plantilla de Forjado" editar={editar} onCambio={(material) => poner({ material })} />
+            <CampoBalasto etiqueta="balasto" valor={t.balasto} onCambio={(balasto) => poner({ balasto })} falta={!t.balasto} vacio="obligatorio" ayuda="El módulo de balasto vertical k del terreno, ya corregido por el tamaño y la forma de la losa (del estudio geotécnico). Admite «50 MN/m³» o «5 kg/cm³». Un muelle por nudo, con k por su área; la losa se malla a l/4 como mucho, con l = (D/k)^¼. Los pilares y muros que arrancan en ella, sin base escrita, se apoyan en ella." />
+            <CampoBalasto etiqueta="kh" valor={t.kh} onCambio={(kh) => poner({ kh })} vacio="coartado" ayuda="Lo horizontal. Vacío (por defecto): ux y uy coartados en todos los nudos de la losa. Un número: el balasto horizontal kh (rozamiento, empuje pasivo), con muelles en ux y uy; no con el sismo del programa." />
+            <NumeroCampo etiqueta="σ admisible" unidad="kN/m²" valor={t.tensionAdmisible} onCambio={(tensionAdmisible) => poner({ tensionAdmisible })} vacio="sin aviso" ayuda="La tensión admisible del terreno (opcional): sólo para avisar si la σ máxima de la ELS característica la pasa." />
+          </>
+        )}
+        {(tipo === "maciza" || tipo === "reticular") && (
           <>
             {num("espesor", "canto", "m")}
             <CampoMaterial modelo={m} valor={t.material} para="la plantilla de Forjado" editar={editar} onCambio={(material) => poner({ material })} />
@@ -900,7 +943,7 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
           "pp",
           "pp",
           "kN/m²",
-          tipo === "maciza"
+          tipo === "maciza" || tipo === "cimentacion"
             ? "Vacío: γ·canto."
             : tipo === "reticular"
               ? "Vacío, sale solo: el hormigón de nervios y capa más el casetón (los ábacos, γ·canto). Lo escrito manda: es el de la zona aligerada (los ábacos, γ·canto)."

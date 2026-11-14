@@ -96,7 +96,10 @@ export type Estilo =
   | "reaccion-vertical"
   | "reaccion-horizontal"
   | "armado-cubierto"
-  | "zona-refuerzo";
+  | "zona-refuerzo"
+  /** LC2: el borde y el rayado de lo que despega de una losa de cimentación (σ < 0). */
+  | "despegue"
+  | "despegue-rayado";
 
 export type Primitiva =
   /** Polígono con huecos: el primer anillo es el contorno (relleno par-impar). `relleno` sustituye al del estilo. */

@@ -4,7 +4,7 @@
  * Cada entrada es una mutación del modelo `base()` con el código de error y el id físico que tiene
  * que nombrar.
  */
-import type { ModeloFisico, OpcionesCompilacion, Vec2 } from "../compilador/fisico.ts";
+import type { Losa, ModeloFisico, OpcionesCompilacion, Vec2 } from "../compilador/fisico.ts";
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
   [x0, y0],
@@ -54,7 +54,7 @@ const m = (o: unknown) => o as never;
 const losa = (f: ModeloFisico) => f.losas![0] as unknown as Record<string, unknown>;
 const carga = (f: ModeloFisico, id: string) => f.cargas!.find((c) => c.id === id) as unknown as Record<string, unknown>;
 /** Una losa de cimentación bajo los pilares, en la planta C (fase LC). */
-const cimentacion = (c: unknown) => ({ id: "LC", planta: "C", contorno: rect(-0.5, -0.5, 6.5, 5.5), espesor: 0.6, material: "HA", cimentacion: c }) as never;
+const cimentacion = (c: unknown) => ({ id: "LC", planta: "C", contorno: rect(-0.5, -0.5, 6.5, 5.5), espesor: 0.6, material: "HA", cimentacion: c }) as unknown as Losa;
 
 export const CATALOGO: Caso[] = [
   // Losas
@@ -130,7 +130,7 @@ export const CATALOGO: Caso[] = [
   ["cimentación con lo horizontal desconocido", (f) => (f.losas = [...f.losas!, cimentacion({ balasto: 30000, horizontal: "libre" })]), "fisico/valor-no-valido", "LC"],
   ["cimentación con kh negativo", (f) => (f.losas = [...f.losas!, cimentacion({ balasto: 30000, horizontal: { kh: -1 } })]), "fisico/valor-no-valido", "LC"],
   ["cimentación con tensión admisible nula", (f) => (f.losas = [...f.losas!, cimentacion({ balasto: 30000, tensionAdmisible: 0 })]), "fisico/valor-no-valido", "LC"],
-  ["cimentación reticular", (f) => (f.losas = [...f.losas!, { ...cimentacion({ balasto: 30000 }), espesor: 0.3, reticular: { intereje: 0.8, nervio: 0.12, capa: 0.05 } } as never]), "fisico/valor-no-valido", "LC"],
+  ["cimentación reticular", (f) => (f.losas = [...f.losas!, { ...cimentacion({ balasto: 30000 }), espesor: 0.3, reticular: { intereje: 0.8, nervio: 0.12, capa: 0.05 } } as unknown as Losa]), "fisico/valor-no-valido", "LC"],
   ["pilar empotrado escrito sobre la cimentación", (f) => ((f.losas = [...f.losas!, cimentacion({ balasto: 30000 })]), (((f.pilares as unknown as Record<string, unknown>[])[0]!.base = "empotrado"))), "pilar/apoyo-sobre-cimentacion", "A0"],
   ["diafragma rígido escrito en la planta de la cimentación", (f) => ((f.losas = [...f.losas!, cimentacion({ balasto: 30000 })]), (((f.plantas as unknown as Record<string, unknown>[])[1]!.diafragma = "rigido"))), "cimentacion/diafragma", "C"],
   // Cargas lineales

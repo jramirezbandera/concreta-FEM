@@ -110,6 +110,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "reaccion-horizontal": { stroke: "#d97706", sw: 2 },
   "armado-cubierto": { fill: "#e5e7eb" },
   "zona-refuerzo": { stroke: "#a21caf", sw: 2.8 },
+  despegue: { stroke: "#111827", sw: 1.8, dash: "6 3" },
+  "despegue-rayado": { stroke: "#111827", sw: 0.7 },
 };
 
 /** Número en px con un decimal, sin «-0» ni «.0». */

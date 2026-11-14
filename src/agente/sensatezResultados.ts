@@ -21,7 +21,7 @@ import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { ModeloFisico, OpcionesCompilacion, Pilar } from "../compilador/fisico.ts";
 import { bajadaTributaria, type TramoTributario } from "./tributaria.ts";
-import { avisosTerreno, terreno } from "./terreno.ts";
+import { avisosTerreno, terreno, type TerrenoLosa } from "./terreno.ts";
 import { ACCIONES_NO_GRAVITATORIAS, anchoSeccion, areaSeccion, cantoSeccion, num, Plantas, Registro, separacion, tipoCaso, UMBRALES, type Comprobacion } from "./sensatez.ts";
 
 /** Puntos de más (uniformes) en el muestreo de la deformada de cada tramo flexible. */
@@ -44,6 +44,8 @@ export interface SensatezResultados {
   /** Combinaciones de cada comprobación, en una línea. */
   combinaciones: { flechas: string; desplomes: string; axil: string };
   tributaria: TramoComparado[];
+  /** LC2: el terreno de cada losa de cimentación (`fem consultar terreno`), en las combinaciones de su comprobación; sin ellas, no está. */
+  terreno?: { combinaciones: string; losas: TerrenoLosa[] };
 }
 
 /** Casos gravitatorios: no son W, E, T, N ni A, y cargan en vertical (según el resumen). */
@@ -346,8 +348,10 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
   const cjTerreno = cjFlechas ?? conjunto(q, { tipo: "casos" });
   const dsp = new Registro("cimentacion/despegue", "Despegue de las losas de cimentación", `un nudo de una losa de cimentación en tracción (el cálculo es lineal; combinaciones: ${cjTerreno?.descripcion ?? "ninguna"})`);
   const ten = new Registro("cimentacion/tension", "Tensión en el terreno", `σ máxima más que la tensión admisible de la losa, si se da (combinaciones: ${cjTerreno?.descripcion ?? "ninguna"})`);
+  let terrenoLosas: SensatezResultados["terreno"];
   if (cimentadas.length && cjTerreno) {
     const t = terreno(q, cjTerreno);
+    if (t.valido) terrenoLosas = { combinaciones: cjTerreno.descripcion, losas: t.valor };
     if (t.valido)
       for (const x of t.valor) {
         dsp.peor(x.despegue?.fraccion ?? 0, `${x.losa}: σ mín ${num(x.sigmaMin.v)} kN/m²`);
@@ -361,5 +365,6 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
     gravedad: grav,
     combinaciones: { flechas: cjFlechas?.descripcion ?? "ninguna", desplomes: cjDesplome?.descripcion ?? "ninguna", axil: cjAxil?.descripcion ?? "ninguna" },
     tributaria: comparados,
+    ...(terrenoLosas ? { terreno: terrenoLosas } : {}),
   };
 }

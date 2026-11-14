@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compilar } from "../../src/compilador/compilar.ts";
 import { Consultas } from "../../src/compilador/consultas.ts";
-import type { ModeloFisico, OpcionesCompilacion, Pilar } from "../../src/compilador/fisico.ts";
+import type { CargaFisica, ModeloFisico, OpcionesCompilacion, Pilar } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
@@ -25,7 +25,7 @@ const ejes = Array.from({ length: N + 1 }, (_, i) => i * L);
 
 export function reticulaCimentacion(t = 0.7, kA = 50000, kB = 20000, P: readonly number[] = [1500, 900, 500]): ModeloFisico {
   const pilares: Pilar[] = [];
-  const cargas: ModeloFisico["cargas"] = [];
+  const cargas: CargaFisica[] = [];
   for (const x of ejes)
     for (const y of ejes) {
       const id = `P${pilares.length + 1}`;
