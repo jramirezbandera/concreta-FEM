@@ -110,8 +110,9 @@ export interface ResumenPlanta {
   /** Tramos de pilar con su cabeza en la planta, por sección. */
   pilares?: Record<string, number>;
   vigas?: { n: number; m: number };
-  losas?: { id: string; m2: number; espesor: number; tipo: "maciza" | "reticular" }[];
-  panos?: { id: string; m2: number; direccion: number; intereje: number }[];
+  /** `desnivel` (m), sólo si el forjado lo tiene (fase DN). */
+  losas?: { id: string; m2: number; espesor: number; tipo: "maciza" | "reticular"; desnivel?: number }[];
+  panos?: { id: string; m2: number; direccion: number; intereje: number; desnivel?: number }[];
   /** Tramos de muro que llegan a la planta: número y longitud en planta. */
   muros?: { n: number; m: number };
   /** Carga vertical por caso (−ΣFz de lo que recibe la planta, kN; el peso propio incluido). */
@@ -181,9 +182,9 @@ export function resumen(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: 
     const vigas = (f.vigas ?? []).filter((v) => v.planta === pl.id);
     if (vigas.length) r.vigas = { n: vigas.length, m: vigas.reduce((s, v) => s + longitud(v.puntos), 0) };
     const losas = (f.losas ?? []).filter((l) => l.planta === pl.id);
-    if (losas.length) r.losas = losas.map((l) => ({ id: l.id, m2: area(l.contorno) - (l.huecos ?? []).reduce((s, h) => s + area(h), 0), espesor: l.espesor, tipo: l.reticular ? "reticular" : "maciza" }));
+    if (losas.length) r.losas = losas.map((l) => ({ id: l.id, m2: area(l.contorno) - (l.huecos ?? []).reduce((s, h) => s + area(h), 0), espesor: l.espesor, tipo: l.reticular ? "reticular" : "maciza", ...(l.desnivel ? { desnivel: l.desnivel } : {}) }));
     const panos = (f.panos ?? []).filter((x) => x.planta === pl.id);
-    if (panos.length) r.panos = panos.map((x) => ({ id: x.id, m2: area(x.contorno) - (x.huecos ?? []).reduce((s, h) => s + area(h), 0), direccion: x.direccion, intereje: x.intereje }));
+    if (panos.length) r.panos = panos.map((x) => ({ id: x.id, m2: area(x.contorno) - (x.huecos ?? []).reduce((s, h) => s + area(h), 0), direccion: x.direccion, intereje: x.intereje, ...(x.desnivel ? { desnivel: x.desnivel } : {}) }));
     const muros = (f.muros ?? []).filter((m) => i >= k.get(m.hasta)! && i < k.get(m.desde)!);
     if (muros.length) r.muros = { n: muros.length, m: muros.reduce((s, m) => s + longitud(m.puntos), 0) };
     const sub = porPlanta.get(pl.id)!;

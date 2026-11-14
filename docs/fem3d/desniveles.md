@@ -1,6 +1,6 @@
 # Fase DN: los desniveles de paño
 
-Plan del 2026-11-14, desde la propuesta de `niveles.md` §3, que pidió el usuario el 2026-10-29. El orden lo decidió el usuario el 2026-11-08: DN, luego LC y luego CO. Estado: **plan, con DN-a medida; DN-a…DN-e decididas por el usuario el 2026-11-14 como se recomendaban** (§5); DN-f (la sombra), a falta del modelo de CYPECAD.
+Plan del 2026-11-14, desde la propuesta de `niveles.md` §3, que pidió el usuario el 2026-10-29. El orden lo decidió el usuario el 2026-11-08: DN, luego LC y luego CO. Estado: **DN1, DN2 y DN3 hechos el 2026-11-14** (§8–§10), con DN-a…DN-e decididas por el usuario como se recomendaban (§5); falta DN-f (la sombra), a falta del modelo de CYPECAD.
 
 ## 1. Qué se pide
 
@@ -157,3 +157,15 @@ A petición del usuario, «Enrasar» va **por arriba o por abajo**. Pasan los cr
   - `src/visor/desnivel.test.ts`: el sólido (cotas y volúmenes, también el de los dos tramos de un pilar), el alzado, el rótulo, las cargas y el alámbrico;
   - `app/src/test/formulario.test.tsx`: el panel «Cota».
 - **Queda para DN3:** la skill y la lista de datos del encargo (MA1), y la sombra con CYPECAD.
+
+## 10. DN3 hecho (2026-11-14), salvo la sombra
+
+Pasa todo menos el criterio 7: la sombra con CYPECAD (DN-f) espera al modelo del usuario.
+
+- **La skill** (`.claude/skills/fem/SKILL.md`):
+  - en la lista de datos del encargo (MA1), por forjado, si va a otra cota que la de su planta: la terraza o el baño rebajados, el enrase por abajo y, con un escalón sin solape, qué hay debajo;
+  - en los convenios de losas y paños, el campo `desnivel`: qué es, la regla del enrase por abajo (Δ_otro − canto_otro + canto_este), que no se mueve la planta para eso, lo que cambia en el cálculo (DN-a, DN-e) y los dos diagnósticos del escalón (DN-b), con la regla de no arreglar el error cambiando el desnivel sino preguntar qué hay debajo.
+- **El esquema:** ya llevaba la descripción del campo desde DN1 (`bun run esquema` no cambia nada).
+- **`fem resumen`:** cada losa y cada paño con desnivel lo dan (`desnivel`, en m); sin él, el resumen es el de antes.
+- **Pruebas:** `src/agente/desnivel.test.ts`. El ejemplo de la skill, con la losa de P1 partida y la mitad bajada, da lo que dice la skill (−0,05: nada; −0,12: aviso; −0,25: error), y la regla del enrase es la de «Enrasar» del editor.
+- **Queda:** DN-f (la sombra con una terraza bajada y un enrase de CYPECAD) y DN-g (el escalón como comprobación de armado, con CO).
