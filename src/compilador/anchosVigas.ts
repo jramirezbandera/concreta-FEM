@@ -20,6 +20,7 @@
 import type { Vec2, Viga } from "./fisico.ts";
 import { areaConSigno, defectoPoligono, distanciaABorde, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { cuerdaEnTramo, distanciaARegion, type Topologia, type TramoViga } from "./topologia.ts";
+import { cuerdaPoligono, poligonoDeHuella } from "./geometria2d.ts";
 import type { Contexto } from "./validar.ts";
 
 /** Giro máximo de un quiebro que se une a inglete, en grados. */
@@ -206,10 +207,19 @@ export function anchosPlanta(ctx: Contexto, topo: Topologia, k: number, e1: Vec2
     // planta. El ancho acaba donde empieza el pilar; lo que queda del muro bajo esos milímetros es suyo.
     // Sólo con la malla de LV2 (el trazo exacto del ancho): sin ella, el arreglo ya los unía a ε_snap
     const carasPilares: number[] = [];
+    // Las de un pilar circular, por las dos caras de la viga (su octógono las cruza en otro σ que el
+    // eje): por pilar, la cuerda de cada cara, o null si alguna no lo cruza
+    const carasOctogono: [[number, number], [number, number]][] = [];
+    const n: Vec2 = [-u[1], u[0]];
     for (const c of tv.cadena) {
       const pp = topo.nudos[c.nudo]!.pilar;
       const cu = pp ? cuerdaEnTramo(tv, pp, ctx.op.epsGeom) : null;
       if (cu) carasPilares.push(cu[0], cu[1]);
+      if (pp?.huella.forma?.tipo === "circulo") {
+        const poli = poligonoDeHuella(pp.huella)!;
+        const [q1, q2] = [-b / 2, b / 2].map((sg) => cuerdaPoligono([A[0] + sg * n[0], A[1] + sg * n[1]], u, poli));
+        if (q1 && q2) carasOctogono.push([q1, q2]);
+      }
     }
     // Sólo hacia el muro (el ancho crece hasta la cara, nunca se acorta hacia la losa)
     const aCara = (sg: number, sentido: 1 | -1): number => {
@@ -219,12 +229,39 @@ export function anchosPlanta(ctx: Contexto, topo: Topologia, k: number, e1: Vec2
         const d = (sg - x) * sentido;
         if (d > 0 && d <= eps && d < dm) [mejor, dm] = [x, d];
       }
+      // Un pilar circular sobre el muro: su octógono cruza las caras de la viga a milímetros del corte
+      // (un 40 en un muro de 26 bajo una viga de 30, a 9 mm), y entre la esquina del ancho y el lado del
+      // octógono quedaba un triángulo de losa de milímetros, con láminas de 1,2 mm
+      // (`malla/astillas-junto-a-pilar`). El extremo llega al cruce de las dos caras con el lado del
+      // octógono que da a la losa, si está a ≤ eps hacia el muro (con dos cruces distintos, al más
+      // lejano: las dos esquinas, en la huella)
+      if (mejor === sg)
+        for (const [q1, q2] of carasOctogono) {
+          const [s1, s2] = sentido > 0 ? [q1[1], q2[1]] : [q1[0], q2[0]];
+          const [d1, d2] = [(sg - s1) * sentido, (sg - s2) * sentido];
+          if (!(d1 > 0 && d1 <= eps && d2 > 0 && d2 <= eps)) continue;
+          mejor = sentido > 0 ? Math.min(s1, s2) : Math.max(s1, s2);
+          break;
+        }
       return mejor;
     };
+    // Un corte por un muro dentro de la huella de un pilar circular del extremo del tramo, con lo que
+    // queda hasta el extremo también dentro (por las dos caras de la viga): un muro apeado que arranca
+    // del centro del pilar. Lo de más allá del corte es rígido con el pilar, y cortar ahí dejaba la
+    // esquina del ancho a milímetros del lado del octógono (láminas de 0,5 mm): el ancho sigue hasta el
+    // extremo, como sin el muro. Sólo si las dos esquinas del extremo caen dentro de una losa de la
+    // planta (a más de ε_geom de su borde): en la esquina de la losa, con la viga por su contorno, el
+    // ancho alargado sale de la losa por el extremo del muro y sus estaciones no se pueden igualar
+    // entre plantas (`muro/estaciones`, muros al azar 9)
+    const enLosas = (q: Vec2) =>
+      ctx.losas.some((lc) => lc.losa.planta === ctx.plantas[k]!.id && puntoEnPoligono(q, lc.region.contorno) && distanciaABorde(q, lc.region.contorno) > ctx.op.epsGeom && !lc.region.huecos.some((hh) => puntoEnPoligono(q, hh) || distanciaABorde(q, hh) <= ctx.op.epsGeom));
+    const esquinasEnLosas = (sg: number) => [-b / 2, b / 2].every((o) => enLosas([A[0] + sg * u[0] + o * n[0], A[1] + sg * u[1] + o * n[1]]));
+    const dentroHasta = (desde: number, hasta: number) =>
+      carasOctogono.some(([q1, q2]) => q1[0] <= desde && q2[0] <= desde && q1[1] >= hasta && q2[1] >= hasta) && esquinasEnLosas(desde === 0 ? 0 : hasta);
     if (ctx.op.refinoEsquinas)
       for (let i = 0; i < trozos.length; i++) {
         const [d, h] = trozos[i]!;
-        trozos[i] = [d === 0 ? 0 : aCara(d, 1), h === len ? len : aCara(h, -1)];
+        trozos[i] = [d === 0 || (i === 0 && dentroHasta(0, d)) ? 0 : aCara(d, 1), h === len || (i === trozos.length - 1 && dentroHasta(h, len)) ? len : aCara(h, -1)];
       }
     for (const [desde, hasta] of trozos) {
       if (!(hasta - desde > eps)) continue;

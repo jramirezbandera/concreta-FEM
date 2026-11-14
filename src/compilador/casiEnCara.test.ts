@@ -111,15 +111,16 @@ describe("una esquina de huella casi en la cara de una viga (ejemplo 1)", () => 
     expect(casiEnCaras([0.2, -0.1], [0.2, -0.4], [0.205, 0.2], [caraX], CASI_EN_CARA, 1e-6)).toBeNull();
   });
 
-  it("las astillas que quedan junto a una huella se avisan (retícula 2 con muros: pilares circulares en una viga que acaba en un muro)", () => {
-    const f = reticulaAleatoria(2);
+  it("las astillas que quedan junto a una huella se avisan (retícula 22 con muros y sin rejilla: el ancho de la viga empieza 2 cm dentro de la huella de un pilar de esquina)", () => {
+    // La retícula 2 con muros, la de antes, ya no tiene astillas (`astillasCirculares.test.ts`)
+    const f = reticulaAleatoria(22);
     const conVb = { ...f, secciones: [...f.secciones, { id: "vb", material: "HA", forma: "rectangular" as const, b: 0.3, h: 0.5 }], casos: [...f.casos, { id: "V" }] };
-    const c = valido(compilar(conMurosAleatorios(conVb, 2)));
+    const c = valido(compilar(conMurosAleatorios(conVb, 22), { rejilla: false }));
     const avisos = c.diagnosticos.filter((d) => d.codigo === "malla/astillas-junto-a-pilar");
     expect(avisos.length).toBeGreaterThan(0);
     expect(avisos.every((d) => d.severidad === "aviso" && (d.ids?.length ?? 0) > 0)).toBe(true);
     // En una retícula sin muros, ninguna
-    expect(valido(compilar(reticulaAleatoria(2))).diagnosticos.filter((d) => d.codigo === "malla/astillas-junto-a-pilar")).toEqual([]);
+    expect(valido(compilar(reticulaAleatoria(22), { rejilla: false })).diagnosticos.filter((d) => d.codigo === "malla/astillas-junto-a-pilar")).toEqual([]);
   });
 
   it("convexoEstricto", () => {

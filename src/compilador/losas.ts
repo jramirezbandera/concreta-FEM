@@ -42,7 +42,7 @@
  */
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
-import { CUANTO_ORDEN, cortarTramos, tramo } from "./geometria2d.ts";
+import { CUANTO_ORDEN, cortarTramos, poligonoDeHuella, tramo } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type AnchoMallar, type LosaMallar, type ResultadoMalla, type RefinoCaras } from "./mallado.ts";
 import { anchoMasCercano, anchosPlanta, anchoUnion, sigmaEnAncho, tirasBorde, type AnchoViga } from "./anchosVigas.ts";
@@ -167,39 +167,10 @@ export interface Losas {
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
 
-/**
- * Polígono de la huella de un pilar: rectángulo, u octógono inscrito en el círculo. El octógono va
- * en los ejes de la huella (los de su `giro`), para que gire con el pilar.
- */
+/** Polígono de la huella de un pilar (`poligonoDeHuella`). */
 function poligonoHuella(nd: NudoT): Vec2[] | null {
   const h = nd.pilar?.huella;
-  const f = h?.forma;
-  if (!h || !f) return null;
-  const [cx, cy] = h.c;
-  if (f.tipo === "circulo") {
-    const r = f.D / 2;
-    const q = Math.SQRT1_2;
-    const [zx, zy] = h.ez;
-    const [yx, yy] = h.ey;
-    return [
-      [1, 0],
-      [q, q],
-      [0, 1],
-      [-q, q],
-      [-1, 0],
-      [-q, -q],
-      [0, -1],
-      [q, -q],
-    ].map(([a, b]) => [cx + r * (a! * zx + b! * yx), cy + r * (a! * zy + b! * yy)] as Vec2);
-  }
-  const [zx, zy] = [(h.ez[0] * f.h) / 2, (h.ez[1] * f.h) / 2];
-  const [yx, yy] = [(h.ey[0] * f.b) / 2, (h.ey[1] * f.b) / 2];
-  return [
-    [cx - zx - yx, cy - zy - yy],
-    [cx + zx - yx, cy + zy - yy],
-    [cx + zx + yx, cy + zy + yy],
-    [cx - zx + yx, cy - zy + yy],
-  ];
+  return h ? poligonoDeHuella(h) : null;
 }
 
 /**

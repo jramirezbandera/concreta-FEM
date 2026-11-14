@@ -104,6 +104,63 @@ export function cuerdaHuella(A: Vec2, u: Vec2, h: Huella, tol = 0, enCaraDentro 
   return t1 > t0 ? [t0, t1] : null;
 }
 
+/**
+ * Polígono de una huella (el que se siembra en la malla): rectángulo, u octógono inscrito en el
+ * círculo, en los ejes de la huella (los de su `giro`), para que gire con el pilar.
+ */
+export function poligonoDeHuella(h: Huella): Vec2[] | null {
+  const f = h.forma;
+  if (!f) return null;
+  const [cx, cy] = h.c;
+  if (f.tipo === "circulo") {
+    const r = f.D / 2;
+    const q = Math.SQRT1_2;
+    const [zx, zy] = h.ez;
+    const [yx, yy] = h.ey;
+    return [
+      [1, 0],
+      [q, q],
+      [0, 1],
+      [-q, q],
+      [-1, 0],
+      [-q, -q],
+      [0, -1],
+      [q, -q],
+    ].map(([a, b]) => [cx + r * (a! * zx + b! * yx), cy + r * (a! * zy + b! * yy)] as Vec2);
+  }
+  const [zx, zy] = [(h.ez[0] * f.h) / 2, (h.ez[1] * f.h) / 2];
+  const [yx, yy] = [(h.ey[0] * f.b) / 2, (h.ey[1] * f.b) / 2];
+  return [
+    [cx - zx - yx, cy - zy - yy],
+    [cx + zx - yx, cy + zy - yy],
+    [cx + zx + yx, cy + zy + yy],
+    [cx - zx + yx, cy - zy + yy],
+  ];
+}
+
+/**
+ * Tramo [σ0, σ1] de la recta O + σ·u (u unitario) dentro de un polígono convexo, o null si no lo
+ * corta (o sólo lo toca).
+ */
+export function cuerdaPoligono(O: Vec2, u: Vec2, poli: readonly Vec2[]): [number, number] | null {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = 0; i < poli.length; i++) {
+    const [A, B] = [poli[i]!, poli[(i + 1) % poli.length]!];
+    const e: Vec2 = [B[0] - A[0], B[1] - A[1]];
+    const den = u[0] * e[1] - u[1] * e[0];
+    if (Math.abs(den) < 1e-15) continue;
+    // O + σu = A + t·e
+    const w: Vec2 = [A[0] - O[0], A[1] - O[1]];
+    const sg = (w[0] * e[1] - w[1] * e[0]) / den;
+    const t = (w[0] * u[1] - w[1] * u[0]) / den;
+    if (t < -1e-12 || t > 1 + 1e-12) continue;
+    lo = Math.min(lo, sg);
+    hi = Math.max(hi, sg);
+  }
+  return hi > lo ? [lo, hi] : null;
+}
+
 /** Tramo recto A→B con su dirección unitaria y su longitud. */
 export interface Tramo2D {
   A: Vec2;
