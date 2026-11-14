@@ -748,7 +748,10 @@ export function mallarMuros(
     }
   }
   // Validador (H23): elementos no degenerados y el área de cada muro, la de su alzado sin huecos
-  // calculada por franjas, sin las láminas (a 1e-9)
+  // calculada por franjas, sin las láminas: a 1e-9 más lo que puede moverse cada franja por la fusión de
+  // sus estaciones con los nudos de la topología (≤ 2·ε_geom de ancho por su alto). A2-53: con un ruido
+  // de ε_geom/3 en el dibujo, el núcleo de 10 de 48 retículas daba un error de 1e-9 a 8e-9 y no compilaba;
+  // una lámina de menos sigue fuera de la tolerancia por órdenes de magnitud
   const area = new Map<number, number>();
   for (const l of laminas) {
     const X = l.nudos.map((n) => topo.nudos[n]!);
@@ -757,11 +760,16 @@ export function mallarMuros(
     area.set(l.w, (area.get(l.w) ?? 0) + a);
   }
   const alzado = new Map<number, number>();
+  const holgura = new Map<number, number>();
   for (const pa of plan.panos)
-    for (const f of franjas(pa)) for (const [za, zb] of franjasLibres(plan, pa, f.sm, ctx.cotas[pa.k + 1]!, ctx.cotas[pa.k]!)) alzado.set(pa.w, (alzado.get(pa.w) ?? 0) + f.L * (zb - za));
+    for (const f of franjas(pa))
+      for (const [za, zb] of franjasLibres(plan, pa, f.sm, ctx.cotas[pa.k + 1]!, ctx.cotas[pa.k]!)) {
+        alzado.set(pa.w, (alzado.get(pa.w) ?? 0) + f.L * (zb - za));
+        holgura.set(pa.w, (holgura.get(pa.w) ?? 0) + 2 * ctx.op.epsGeom * (zb - za));
+      }
   for (const [w, A] of alzado) {
     const e = Math.abs((area.get(w) ?? 0) - A) / A;
-    if (!(e <= 1e-9)) diag.error("malla/area", `La malla del muro ${ctx.muros[w]!.muro.id} no cubre su alzado sin huecos: ${(area.get(w) ?? 0).toPrecision(10)} m² frente a ${A.toPrecision(10)} m² (error ${e.toExponential(2)}). Es un fallo del compilador.`, [ctx.muros[w]!.muro.id]);
+    if (!(Math.abs((area.get(w) ?? 0) - A) <= 1e-9 * A + holgura.get(w)!)) diag.error("malla/area", `La malla del muro ${ctx.muros[w]!.muro.id} no cubre su alzado sin huecos: ${(area.get(w) ?? 0).toPrecision(10)} m² frente a ${A.toPrecision(10)} m² (error ${e.toExponential(2)}). Es un fallo del compilador.`, [ctx.muros[w]!.muro.id]);
   }
   for (const [id, a] of [...peor].sort((x, y) => (x[0] < y[0] ? -1 : 1)))
     diag.aviso(

@@ -873,7 +873,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       if (c.tipo !== "puntual" || c.planta !== idPlanta || topo.localizar(k, [c.x, c.y]) || enPano(k, [c.x, c.y]) || alDiafragma(ctx, k, c)) continue;
       const en = anchos.length ? anchosPunto([c.x, c.y]) : [];
       if (en.length) {
-        puntoAncho.set(c.id, anchoMasCercano([c.x, c.y], en, anchos.map((x) => x.a)));
+        puntoAncho.set(c.id, anchoMasCercano([c.x, c.y], en, anchos.map((x) => x.a), 10 * ctx.op.epsGeom));
         continue;
       }
       puntoDe.set(c.id, { i: a.punto([c.x, c.y], c.id, "punto", "su punto"), Q: [c.x, c.y] });
@@ -884,7 +884,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       if (ap.planta !== idPlanta || topo.apoyoEn.has(ap.id) || topo.extremoEn.has(ap.id)) continue;
       const en = anchos.length ? anchosPunto([ap.x, ap.y]) : [];
       if (en.length) {
-        apoyoAncho.set(ap.id, anchoMasCercano([ap.x, ap.y], en, anchos.map((y) => y.a)));
+        apoyoAncho.set(ap.id, anchoMasCercano([ap.x, ap.y], en, anchos.map((y) => y.a), 10 * ctx.op.epsGeom));
         continue;
       }
       puntoDe.set(ap.id, { i: a.punto([ap.x, ap.y], ap.id, "punto", "su punto"), Q: [ap.x, ap.y] });
@@ -1005,7 +1005,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     const aPilar = new Map<number, number[]>();
     for (const n of [...cand.keys()].sort((x, y) => x - y)) {
       const q: Vec2 = [topo.nudos[n]!.x, topo.nudos[n]!.y];
-      const x = anchosA[anchoMasCercano(q, cand.get(n)!, anchosA)]!;
+      const x = anchosA[anchoMasCercano(q, cand.get(n)!, anchosA, 10 * ctx.op.epsGeom)]!;
       const tv = x.tramo;
       const sg = sigmaEnAncho(q, x);
       // En la zona rígida de la viga en un pilar del tramo (C1-a): con la huella del pilar
@@ -1335,7 +1335,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     const anchoLado = (A: Vec2, B: Vec2): number => {
       const M: Vec2 = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
       const en = polisAncho.flatMap((pl, j) => (puntoEnPoligono(M, pl) || distanciaABorde(M, pl) <= epsGeom ? [j] : []));
-      return en.length ? anchoMasCercano(M, en, e.anchos.map((x) => x.a)) : -1;
+      return en.length ? anchoMasCercano(M, en, e.anchos.map((x) => x.a), 10 * ctx.op.epsGeom) : -1;
     };
     const recorrer = (t: Trazo): { aristas: [number, number][]; fuera: boolean; lados: [Vec2, Vec2][]; enAncho: { ancho: number; A: Vec2; B: Vec2 }[] } => {
       const aristas: [number, number][] = [];
@@ -1497,7 +1497,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         // enrasada, el borde de una tira, su inglete) el punto no toca ninguna lámina: va a la viga
         const borde = e.anchos.flatMap((x, j) => (puntoEnPoligono(Q, x.a.poligono) || distanciaABorde(Q, x.a.poligono) <= epsGeom ? [j] : []));
         if (borde.length) {
-          const j = anchoMasCercano(Q, borde, e.anchos.map((x) => x.a));
+          const j = anchoMasCercano(Q, borde, e.anchos.map((x) => x.a), 10 * ctx.op.epsGeom);
           if (extremo || esApoyo) e.apoyoAncho.set(id, j);
           else r.puntosAncho.set(id, e.anchos[j]!.g);
           continue;

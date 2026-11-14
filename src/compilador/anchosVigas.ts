@@ -411,14 +411,17 @@ export function sigmaEnAncho(q: Vec2, a: AnchoViga): number {
 
 /**
  * De varios anchos (índices en `anchos`, en el orden canónico de `anchosPlanta`) que contienen q, el
- * de eje más cercano; a igual distancia (a 1e-9), el primero.
+ * de eje más cercano; a igual distancia (a `tol`), el primero. A2-53: con 1e-9, en la diagonal del
+ * cruce de dos vigas (a la misma distancia de los dos ejes) un ruido de ε_geom/3 en el dibujo decidía a
+ * cuál de las dos iba un nudo de la cara, y la viga se partía en otro sitio; el compilador da
+ * 10·ε_geom.
  */
-export function anchoMasCercano(q: Vec2, candidatos: readonly number[], anchos: readonly AnchoViga[]): number {
+export function anchoMasCercano(q: Vec2, candidatos: readonly number[], anchos: readonly AnchoViga[], tol = 1e-9): number {
   let mejor = -1;
   let dm = Infinity;
   for (const i of candidatos) {
     const d = distanciaAlEje(q, anchos[i]!);
-    if (mejor < 0 || d < dm - 1e-9 || (Math.abs(d - dm) <= 1e-9 && i < mejor)) {
+    if (mejor < 0 || d < dm - tol || (Math.abs(d - dm) <= tol && i < mejor)) {
       mejor = i;
       dm = Math.min(dm, d);
     }
