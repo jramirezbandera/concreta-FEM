@@ -1,0 +1,14 @@
+viga α = 0°: 0 nudos en una cara sin enlace
+viga α = 0.5°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/calidad, malla/astillas-junto-a-pilar
+viga α = 1°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/calidad, malla/astillas-junto-a-pilar
+viga α = 2°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/calidad, malla/astillas-junto-a-pilar
+viga α = 3°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/calidad, malla/astillas-junto-a-pilar
+viga α = 5°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/calidad, malla/astillas-junto-a-pilar
+viga α = 10°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/calidad
+borde α = 0°: 0 nudos en una cara sin enlace
+borde α = 0.5°: 0 nudos en una cara sin enlace; avisos: losa/ajuste
+borde α = 1°: 0 nudos en una cara sin enlace; avisos: losa/ajuste
+borde α = 2°: 0 nudos en una cara sin enlace; avisos: losa/ajuste
+borde α = 3°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/esquina-sin-refinar
+borde α = 5°: 0 nudos en una cara sin enlace; avisos: losa/ajuste, malla/esquina-sin-refinar
+borde α = 10°: 0 nudos en una cara sin enlace; avisos: malla/esquina-sin-refinar
