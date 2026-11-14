@@ -66,6 +66,13 @@ export interface Mapeo {
    */
   anchos?: { viga: string; planta: string; b: number; poligono: [number, number][]; tira?: true }[];
   /**
+   * Fase LC: por losa de cimentación, su balasto (kN/m³), los nudos con muelle (analíticos, en orden)
+   * y el área tributaria de cada uno, m² (sólo si hay alguna). σ = k·(−uz) en cada nudo; la reacción
+   * de su muelle es k·área·(−uz). `apoyos`: con lo horizontal coartado, los nudos que llevan el apoyo
+   * (los de la losa o el maestro de su enlace: el pie de un pilar), que son también de sus reacciones.
+   */
+  cimentacion?: Record<string, { balasto: number; nudos: number[]; areas: number[]; apoyos?: number[] }>;
+  /**
    * Fase LV: los nudos del eje de las vigas que apoya cada apoyo lineal que llega a ellas por su
    * ancho o su cara (sólo si hay alguno). No tienen por qué caer sobre su polilínea.
    */

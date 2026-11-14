@@ -847,7 +847,58 @@ export class Consultas {
       for (const n of this.mapeo.apoyosEnVigas?.[id] ?? []) if (!r.includes(n)) r.push(n);
       return r.sort((a, b) => a - b);
     }
+    // Fase LC: una losa de cimentación, por sus muelles y sus apoyos horizontales
+    const cim = this.mapeo.cimentacion?.[id];
+    if (cim) return [...new Set([...cim.nudos, ...(cim.apoyos ?? [])])].sort((a, b) => a - b);
     return null;
+  }
+
+  /**
+   * Los objetos con reacciones, en el orden del modelo: los pilares y muros con base (la de la
+   * compilación: los que arrancan en una losa de cimentación sin base escrita no la tienen, LC-c), los
+   * apoyos, los apoyos lineales y las losas de cimentación.
+   */
+  objetosReaccion(): { id: string; tipo: "pilar" | "muro" | "apoyo" | "apoyo lineal" | "losa de cimentación" }[] {
+    return [
+      ...this.ctx.pilares.filter((p) => (p.base ?? "empotrado") !== "ninguno").map((p) => ({ id: p.id, tipo: "pilar" as const })),
+      ...this.ctx.muros.filter((m) => (m.muro.base ?? "empotrado") !== "ninguno").map((m) => ({ id: m.muro.id, tipo: "muro" as const })),
+      ...this.ctx.apoyos.map((a) => ({ id: a.id, tipo: "apoyo" as const })),
+      ...this.ctx.apoyosLineales.map((a) => ({ id: a.id, tipo: "apoyo lineal" as const })),
+      ...this.ctx.losas.filter((l) => l.losa.cimentacion !== undefined).map((l) => ({ id: l.losa.id, tipo: "losa de cimentación" as const })),
+    ];
+  }
+
+  /**
+   * Fase LC: lo que una losa de cimentación apoya en el terreno: su balasto, sus nudos con muelle (con
+   * su punto y su área tributaria) y el asiento uz de cada uno por caso base (`uz[k·n + i]`, como las
+   * demás variables por caso). σ = k·(−uz), positiva en compresión.
+   */
+  terreno(id: string): Respuesta<{ balasto: number; tensionAdmisible?: number; nudos: number[]; puntos: Vec3[]; areas: number[]; uz: Float64Array; pilares: { id: string; nudo: number; punto: Vec3 }[] }> {
+    const cim = this.mapeo.cimentacion?.[id];
+    const lc = this.ctx.losaDe.get(id);
+    if (!cim || !lc) return lc ? this.no("consulta/sin-terreno", `La losa ${id} no es de cimentación.`, [id]) : this.noExiste("La losa", id);
+    const n = cim.nudos.length;
+    const uz = new Float64Array(n * this.nb);
+    for (let k = 0; k < this.nb; k++) {
+      const u = this.casos[k]!.u;
+      cim.nudos.forEach((v, i) => (uz[k * n + i] = u[6 * v + 2]!));
+    }
+    const ta = lc.losa.cimentacion!.tensionAdmisible;
+    const punto = (v: number): Vec3 => [this.modelo.nudos[v]!.x, this.modelo.nudos[v]!.y, this.modelo.nudos[v]!.z];
+    // Los pilares que arrancan en ella (LC-c: base "ninguno" en su planta), con el nudo de su pie
+    const enLosa = new Set([...cim.nudos, ...(cim.apoyos ?? [])]);
+    const huella = new Map<string, number>();
+    this.mapeo.restricciones.forEach((r, i) => r.pilar && r.planta === lc.losa.planta && huella.set(r.pilar, this.modelo.restricciones![i]!.maestro));
+    const pilares = this.ctx.pilares.flatMap((p) => {
+      const v = this.mapeo.nudosPilar[`${p.id}@${lc.losa.planta}`];
+      if (p.desde !== lc.losa.planta || (p.base ?? "empotrado") !== "ninguno" || v === undefined) return [];
+      return enLosa.has(v) || huella.get(p.id) === v ? [{ id: p.id, nudo: v, punto: punto(v) }] : [];
+    });
+    return {
+      valido: true,
+      valor: { balasto: cim.balasto, ...(ta !== undefined ? { tensionAdmisible: ta } : {}), nudos: cim.nudos, puntos: cim.nudos.map(punto), areas: cim.areas, uz, pilares },
+      diagnosticos: [],
+    };
   }
 
   private reclamados?: Map<number, { puntuales: number; lineales: number }>;
@@ -861,7 +912,14 @@ export class Consultas {
     if (this.reclamados) return this.reclamados;
     const r = new Map<number, { puntuales: number; lineales: number }>();
     const f = this.fisico;
-    const objetos: [string, boolean][] = [...(f.apoyos ?? []).map((a) => [a.id, true] as [string, boolean]), ...(f.pilares ?? []).map((p) => [p.id, true] as [string, boolean]), ...(f.muros ?? []).map((m) => [m.id, false] as [string, boolean]), ...(f.apoyosLineales ?? []).map((a) => [a.id, false] as [string, boolean])];
+    const objetos: [string, boolean][] = [
+      ...(f.apoyos ?? []).map((a) => [a.id, true] as [string, boolean]),
+      ...(f.pilares ?? []).map((p) => [p.id, true] as [string, boolean]),
+      ...(f.muros ?? []).map((m) => [m.id, false] as [string, boolean]),
+      ...(f.apoyosLineales ?? []).map((a) => [a.id, false] as [string, boolean]),
+      // Fase LC: una losa de cimentación reclama sus nudos como un objeto lineal
+      ...Object.keys(this.mapeo.cimentacion ?? {}).map((id) => [id, false] as [string, boolean]),
+    ];
     for (const [id, puntual] of objetos) {
       const ns = this.nudosReaccion(id);
       if (!Array.isArray(ns)) continue;

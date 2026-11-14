@@ -108,13 +108,8 @@ export function figurasInforme(p: Proyecto, c: Extract<ResultadoCompilacion, { v
 
 /** Reacciones de cada pilar, muro y apoyo con base, en el orden del modelo (las cargas en cimentación del informe). */
 export function cimentacion(q: Consultas): ReaccionBase[] {
-  const f = q.fisico;
-  const objetos: [string, ReaccionBase["tipo"]][] = [
-    ...(f.pilares ?? []).filter((x) => x.base !== "ninguno").map((x) => [x.id, "pilar"] as [string, ReaccionBase["tipo"]]),
-    ...(f.muros ?? []).filter((x) => x.base !== "ninguno").map((x) => [x.id, "muro"] as [string, ReaccionBase["tipo"]]),
-    ...(f.apoyos ?? []).map((x) => [x.id, "apoyo"] as [string, ReaccionBase["tipo"]]),
-    ...(f.apoyosLineales ?? []).map((x) => [x.id, "apoyo lineal"] as [string, ReaccionBase["tipo"]]),
-  ];
+  // Con las bases de la compilación (LC-c) y las losas de cimentación al final
+  const objetos: [string, ReaccionBase["tipo"]][] = q.objetosReaccion().map((x) => [x.id, x.tipo]);
   const r: ReaccionBase[] = [];
   for (const [id, tipo] of objetos) {
     const x = q.reacciones(id);

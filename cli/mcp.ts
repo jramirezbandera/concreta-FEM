@@ -94,7 +94,7 @@ export const HERRAMIENTAS: Herramienta[] = [
   { name: "calcular", description: "Calcula (o reutiliza los resultados de la misma huella en .fem/).", inputSchema: obj({ proyecto: PROYECTO, recalcular: { type: "boolean" } }, ["proyecto"]) },
   {
     name: "consultar",
-    description: "Resultados acotados: envolventes, flechas, deriva, reacciones, pieza <id>, franjas, franja <id>, refuerzos, banda <id>, combinaciones.",
+    description: "Resultados acotados: envolventes, flechas, deriva, reacciones, terreno (losas de cimentación), pieza <id>, franjas, franja <id>, refuerzos, banda <id>, combinaciones.",
     inputSchema: obj(
       {
         proyecto: PROYECTO,

@@ -819,6 +819,44 @@
       ],
       "description": "Categorías de uso del DB SE-AE (tabla 3.1). F (cubiertas transitables) toma la del uso desde el que se accede."
     },
+    "Cimentacion": {
+      "type": "object",
+      "properties": {
+        "balasto": {
+          "type": "number",
+          "description": "Módulo de balasto vertical, kN/m³, ya corregido por tamaño y forma (lo decide el ingeniero)."
+        },
+        "horizontal": {
+          "anyOf": [
+            {
+              "const": "coartado"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kh": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "kh"
+              ],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Lo horizontal (CB-a). \"coartado\" (por defecto): ux y uy coartados en todos los nudos de la losa.\n`{ kh }`: muelles en ux y uy con un balasto horizontal kh, kN/m³, por el área tributaria."
+        },
+        "tensionAdmisible": {
+          "type": "number",
+          "description": "Tensión admisible del terreno, kN/m² (LC-f): sólo para el aviso `cimentacion/tension`."
+        }
+      },
+      "required": [
+        "balasto"
+      ],
+      "additionalProperties": false,
+      "description": "Losa de cimentación (fase LC)."
+    },
     "Duracion": {
       "enum": [
         "corta",
@@ -1112,6 +1150,10 @@
         "reticular": {
           "$ref": "#/$defs/Reticular",
           "description": "Forjado reticular (C4, D3): la losa es su zona aligerada, de canto total `espesor`, con nervios\nsegún el `eje1` y la perpendicular."
+        },
+        "cimentacion": {
+          "$ref": "#/$defs/Cimentacion",
+          "description": "Losa de cimentación sobre el terreno (fase LC, `docs/fem3d/losa-cimentacion.md`): un muelle\nvertical por nudo de su malla (Winkler, cálculo lineal). Los pilares y muros sin `base` escrita\nque arrancan en ella se apoyan en ella (LC-c). Sólo una losa maciza."
         }
       },
       "required": [
@@ -1647,6 +1689,10 @@
         "tirasBorde": {
           "type": "boolean",
           "description": "Tiras de borde (fase TB, `anchosVigas.ts`): con la unión por las caras, la franja de losa entre\nla cara de fuera de una viga y el borde dibujado del forjado, de hasta el ancho de la viga (el\nzuncho por el eje de los pilares y el forjado hasta la fachada), no se malla: va con la viga como\nsu ancho, y lo que cae en ella pasa a la viga con su momento de transporte. El borde dibujado no\nse mueve. Por defecto, sí (compilador TB1, 2026-10-28); sin ellas, esa franja se malla como losa."
+        },
+        "mallaCimentacion": {
+          "type": "number",
+          "description": "Malla de las losas de cimentación (fase LC, LC-e): h = min(`tamanoMalla`, l/n), con\nl = (D/k)^¼ la longitud característica de la losa sobre su balasto. Es n. Por defecto,\n`MALLA_CIMENTACION`."
         }
       },
       "additionalProperties": false

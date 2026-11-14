@@ -36,7 +36,7 @@ export const TRAMOS_TRIBUTARIA = 12;
 /** Reacciones de un objeto con base (pilar, muro, apoyo o apoyo lineal) en su punto, por caso: [Fx, Fy, Fz, Mx, My, Mz] (6·nc). */
 export interface ReaccionBase {
   id: string;
-  tipo: "pilar" | "muro" | "apoyo" | "apoyo lineal";
+  tipo: "pilar" | "muro" | "apoyo" | "apoyo lineal" | "losa de cimentación";
   punto: readonly number[];
   R: ArrayLike<number>;
 }

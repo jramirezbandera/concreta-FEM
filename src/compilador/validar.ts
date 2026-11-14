@@ -8,6 +8,7 @@ import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { desnivelesVigas, forjadosDN, soportesVigas } from "./desniveles.ts";
+import { cimentacionNoValida, erroresCimentacion, resolverCimentacion } from "./cimentacion.ts";
 import { ladosAbacos, resolverAbacos } from "./abacos.ts";
 import { problemaBorde, resolverBordes } from "./bordes.ts";
 import { erroresSegundoOrden } from "./segundoOrden.ts";
@@ -374,7 +375,8 @@ function lejosDelOrigen(fisico: Record<string, unknown>, diag: Diagnosticos): vo
 /** El modelo con los ábacos de los pilares (MA2) y las cargas de borde (MA4) resueltos, como lo valida y compila el compilador. */
 export function fisicoResuelto(fisico: ModeloFisico, op: Pick<OpcionesResueltas, "tamanoMalla" | "epsGeom" | "epsSnap">): ModeloFisico {
   // VS1: los casos y las cargas del viento del programa, al final de las listas
-  return resolverViento(resolverBordes(resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom).modelo, op.epsSnap).modelo).modelo;
+  // LC-c: los pilares y muros sin base escrita que arrancan en una losa de cimentación, apoyados en ella
+  return resolverCimentacion(resolverViento(resolverBordes(resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom).modelo, op.epsSnap).modelo).modelo, op.epsSnap);
 }
 
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
@@ -382,6 +384,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   if (!formaValida(fisico, diag)) return null;
   // MA2 y MA4: los ábacos de los pilares y las cargas de borde, resueltos (idempotente: el compilador
   // ya los trae resueltos; las consultas, las bandas y los muros validan el modelo tal como se guarda)
+  // LC: las bases escritas en una losa de cimentación se miran en el modelo tal como se escribió
+  const crudo = fisico;
   fisico = fisicoResuelto(fisico, op);
   const f = fisico as unknown as Record<string, unknown>;
   // VS4: el emplazamiento común al viento y al sismo
@@ -423,6 +427,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   }
   if (!(num(op.tamanoMalla) && op.tamanoMalla >= 2 * op.epsSnap)) {
     diag.error("opciones/no-validas", `El tamaño de malla tiene que ser un número de al menos 2·ε_snap (${2 * op.epsSnap} m).`);
+    return null;
+  }
+  if (op.mallaCimentacion !== undefined && !(num(op.mallaCimentacion) && op.mallaCimentacion >= 1 && op.mallaCimentacion <= 20)) {
+    diag.error("opciones/no-validas", "La opción mallaCimentacion (n de h = l/n en las losas de cimentación) tiene que ser un número entre 1 y 20.");
     return null;
   }
   if (typeof op.rejilla !== "boolean") {
@@ -804,6 +812,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       else if (l.pp === undefined) mal(l.id, "la procedencia del pp (ppProcedencia) es la de un pp escrito, y no lo hay");
     }
     if (l.eje1 !== undefined && !num(l.eje1)) mal(l.id, "el eje 1 tiene que ser un número (grados)");
+    // Fase LC: la losa de cimentación
+    const ec = cimentacionNoValida(l);
+    if (ec) mal(l.id, ec);
     const m = typeof l.material === "string" ? material.get(l.material) : undefined;
     if (!m) diag.error("fisico/referencia", `${l.id}: el material «${String(l.material)}» no existe.`, [l.id]);
     else if (m.tipo === "acero") mal(l.id, "el material de una losa tiene que ser hormigón o general");
@@ -1174,7 +1185,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   for (const p of panosC) p.seccion = compiladas.get(p.pano.seccion)!;
   // Fase DN: el desnivel de cada viga (DN-e); los escalones, en `compilar` (con las huellas de los pilares)
   const desnivelViga = desnivelesVigas(forjadosDN(losasC, panosC), soportesVigas(vigas, compiladas), op.epsSnap);
-  return {
+  const ctx: Contexto = {
     op,
     desnivelViga,
     plantas,
@@ -1202,6 +1213,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     panos: panosC,
     panoDe: new Map(panosC.map((p) => [p.pano.id, p] as const)),
   };
+  // Fase LC: lo que sólo se ve con el modelo entero
+  erroresCimentacion(ctx, crudo, diag);
+  return diag.hayErrores ? null : ctx;
 }
 
 /** ¿Son válidos los huecos de un contorno? (simples, dentro de él sin tocarlo y disjuntos) */

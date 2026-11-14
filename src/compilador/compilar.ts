@@ -18,9 +18,10 @@
  * excepción acaba en `compilador/error-interno`.
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
-import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
+import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, Muelle, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
 import { avisarAbacosUnidos, errorPilaresSinAbaco, resolverAbacos } from "./abacos.ts";
 import { anchoUnion } from "./anchosVigas.ts";
+import { construirCimentacion, hipotesisCimentacion } from "./cimentacion.ts";
 import { resolverBordes } from "./bordes.ts";
 import { avisarEscalones } from "./desniveles.ts";
 import { esHipotesisHorizontal, hipotesisSegundoOrden } from "./segundoOrden.ts";
@@ -219,8 +220,10 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   for (const a of avisosNieve(viento.modelo)) diag.aviso(a.codigo, a.mensaje, a.ids);
   if (sismo) {
     // VS-h: una planta con forjado y sin diafragma rígido tiene masa que no va a ningún diafragma
+    // Fase LC: la planta de una losa de cimentación tampoco (sus nudos van coartados al terreno)
+    const conCimentacion = new Set(ctx.losas.filter((l) => l.losa.cimentacion !== undefined).map((l) => l.losa.planta));
     const sueltas = ctx.plantas
-      .filter((p, k) => k !== ctx.plantaBaja && diafragmaDe(ctx, k) !== "rigido" && (ctx.losas.some((l) => l.losa.planta === p.id) || ctx.panos.some((x) => x.pano.planta === p.id) || ctx.vigas.some((v) => v.planta === p.id)))
+      .filter((p, k) => k !== ctx.plantaBaja && !conCimentacion.has(p.id) && diafragmaDe(ctx, k) !== "rigido" && (ctx.losas.some((l) => l.losa.planta === p.id) || ctx.panos.some((x) => x.pano.planta === p.id) || ctx.vigas.some((v) => v.planta === p.id)))
       .map((p) => p.id);
     if (sueltas.length) {
       diag.error(
@@ -245,6 +248,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   marca("losas");
   if (diag.hayErrores) return fallo();
   const piezas = construirPiezas(ctx, topo, losas, diag, panos);
+  // Fase LC: los muelles de las losas de cimentación y, con lo horizontal coartado, sus apoyos
+  const cimentacion = construirCimentacion(ctx, topo, losas, piezas);
   marca("piezas");
   // A2-35: al final, lo que no ha parado antes otro error (en una planta con losa ya lo es)
   if (!diag.hayErrores) pilaresSolapadosSinLosa(ctx, topo, diag);
@@ -372,6 +377,10 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const apoyos: Apoyo[] = [...piezas.apoyos]
     .map(([n, c]) => ({ nudo: nuevo[n]!, coartados: c as unknown as Apoyo["coartados"] }))
     .sort((a, b) => a.nudo - b.nudo);
+  const muelles: Muelle[] = [...cimentacion.muelles]
+    .map(([n, k]) => ({ n: nuevo[n]!, k }))
+    .sort((a, b) => a.n - b.n)
+    .map(({ n, k }) => ({ id: `${nudos[n]!.id}:balasto`, nudos: [n] as const, k: [k[0], k[1], k[2], 0, 0, 0] }));
   marca("numeracion");
 
   // Cargas, respecto al centro del modelo
@@ -404,6 +413,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     nudos,
     barras,
     ...(laminas.length ? { laminas } : {}),
+    ...(muelles.length ? { muelles } : {}),
     apoyos,
     restricciones,
     casos,
@@ -459,6 +469,15 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const enVigas = [...losas.apoyosAViga].filter(([id, x]) => x.nudos.length && ctx.apoyosLineales.some((y) => y.id === id));
   if (enVigas.length) mapeo.apoyosEnVigas = Object.fromEntries(enVigas.map(([id, x]) => [id, x.nudos.map((n) => nuevo[n]!).sort((p, q) => p - q)]));
   if (losas.anchos.length) mapeo.anchos = losas.anchos.map((a) => ({ viga: a.viga, planta: ctx.plantas[a.k]!.id, b: a.b, poligono: a.poligono.map((q) => [q[0], q[1]]), ...(a.tira ? { tira: true as const } : {}) }));
+  if (cimentacion.porLosa.length)
+    mapeo.cimentacion = Object.fromEntries(
+      cimentacion.porLosa.map((x) => {
+        const lc = ctx.losas[x.losa]!;
+        const ns = [...x.areas].map(([n, a]) => [nuevo[n]!, a] as const).sort((p, q) => p[0] - q[0]);
+        const apoyos = [...x.apoyados].map((n) => nuevo[n]!).sort((p, q) => p - q);
+        return [lc.losa.id, { balasto: lc.losa.cimentacion!.balasto, nudos: ns.map((v) => v[0]), areas: ns.map((v) => v[1]), ...(apoyos.length ? { apoyos } : {}) }];
+      }),
+    );
   if (panos.viguetas.length) {
     const porPano: Record<string, string[]> = {};
     ctx.panos.forEach((p, i) => panos.porPano[i]!.length && (porPano[p.pano.id] = panos.porPano[i]!.map((v) => panos.viguetas[v]!.id)));
@@ -486,6 +505,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     // VS1: las puntuales del viento van al diafragma como las de SP-5, pero se dicen en su hipótesis
     hipotesis: [
       ...hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma.filter((id) => !delViento.has(id)), planas),
+      ...[hipotesisCimentacion(ctx, cimentacion.porLosa)].filter((h): h is string => h !== null),
       ...(viento.calculo?.viento ? [hipotesisViento(viento.calculo.viento)] : []),
       ...(sismo ? [hipotesisSismo(sismo)] : []),
       ...(espectro ? [hipotesisEspectro(espectro)] : []),

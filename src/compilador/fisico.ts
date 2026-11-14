@@ -387,6 +387,25 @@ export interface Losa {
    * según el `eje1` y la perpendicular.
    */
   reticular?: Reticular;
+  /**
+   * Losa de cimentación sobre el terreno (fase LC, `docs/fem3d/losa-cimentacion.md`): un muelle
+   * vertical por nudo de su malla (Winkler, cálculo lineal). Los pilares y muros sin `base` escrita
+   * que arrancan en ella se apoyan en ella (LC-c). Sólo una losa maciza.
+   */
+  cimentacion?: Cimentacion;
+}
+
+/** Losa de cimentación (fase LC). */
+export interface Cimentacion {
+  /** Módulo de balasto vertical, kN/m³, ya corregido por tamaño y forma (lo decide el ingeniero). */
+  balasto: number;
+  /**
+   * Lo horizontal (CB-a). "coartado" (por defecto): ux y uy coartados en todos los nudos de la losa.
+   * `{ kh }`: muelles en ux y uy con un balasto horizontal kh, kN/m³, por el área tributaria.
+   */
+  horizontal?: "coartado" | { kh: number };
+  /** Tensión admisible del terreno, kN/m² (LC-f): sólo para el aviso `cimentacion/tension`. */
+  tensionAdmisible?: number;
 }
 
 /** Ábacos en los pilares de un reticular (MA2): cuadrados de `lado` o rectángulos de `lados` m. */
@@ -908,6 +927,12 @@ export const ANCHO_FRANJA = 1;
  * objetivo cabe en D9.
  */
 export const TAMANO_MALLA = 0.75;
+/**
+ * n de la malla de las losas de cimentación (fase LC, LC-e): h = min(tamanoMalla, l/n). Medido en LC1
+ * (`validacion/lc/out_malla.txt`): con 4, σ máxima a ≤ 0,7 %, las caras de los pilares a ≤ 1,6 % y la
+ * armadura de los vanos a ≤ 1,7 % de la malla convergida, también con l = 1,3 m; con 3, un 10 % en los vanos.
+ */
+export const MALLA_CIMENTACION = 4;
 
 /**
  * Plantilla de esquina (fase LV2, §8 de la cabecera de `rejilla.ts`): la graduada parte el elemento de
@@ -1090,6 +1115,12 @@ export interface OpcionesCompilacion {
    * se mueve. Por defecto, sí (compilador TB1, 2026-10-28); sin ellas, esa franja se malla como losa.
    */
   tirasBorde?: boolean;
+  /**
+   * Malla de las losas de cimentación (fase LC, LC-e): h = min(`tamanoMalla`, l/n), con
+   * l = (D/k)^¼ la longitud característica de la losa sobre su balasto. Es n. Por defecto,
+   * `MALLA_CIMENTACION`.
+   */
+  mallaCimentacion?: number;
 }
 
 export interface OpcionesResueltas {
@@ -1117,6 +1148,8 @@ export interface OpcionesResueltas {
   jacobianoRefino?: number;
   zonaRigidaBase: boolean;
   tirasBorde: boolean;
+  /** Sólo si se da, como `plantillaEsquina`: con el de por defecto, la huella no cambia. */
+  mallaCimentacion?: number;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -1145,5 +1178,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     ...(o.jacobianoRefino !== undefined ? { jacobianoRefino: o.jacobianoRefino } : {}),
     zonaRigidaBase: o.zonaRigidaBase ?? true,
     tirasBorde: o.tirasBorde ?? true,
+    ...(o.mallaCimentacion !== undefined ? { mallaCimentacion: o.mallaCimentacion } : {}),
   };
 }

@@ -25,6 +25,7 @@
  * las líneas de la rejilla, que la rompían (×4 nudos en el edificio objetivo, sin plantillas). Con la
  * opción `franjas: false` no se siembra nada.
  */
+import { tamanoMallaPlanta } from "./cimentacion.ts";
 import { ejesNervios } from "./abacos.ts";
 import { carasComunes, pilaresEnLosa, semiextension } from "./bandas.ts";
 import { radioHuella, type Huella } from "./geometria2d.ts";
@@ -313,7 +314,8 @@ export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
   const r: CaraFranja[] = [];
   for (const k of [1, 2] as const) {
     const { d, n } = ejes[k];
-    const h = ctx.op.tamanoMalla;
+    // Fase LC: el tamaño de la malla de su planta (en una losa de cimentación, min(h, l/n))
+    const h = tamanoMallaPlanta(ctx, ctx.planta.get(l.losa.planta)!);
     const todos = pilares.filter((p) => semiextension(p.huella, d) > 0 && semiextension(p.huella, n) > 0);
     // Una viga a menos de h/2 de la huella (enrasada con una cara del pilar) también es su apoyo
     const dentro = (p: (typeof todos)[number]) => puntoEnRegion(p.p, l.region) && [l.region.contorno, ...l.region.huecos].every((q) => distanciaABorde(p.p, q) > radioHuella(p.huella) + ctx.op.epsSnap);

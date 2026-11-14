@@ -40,6 +40,7 @@
  * por muro, tramo, planta (de abajo arriba), columna y fila: sus índices ya son los del modelo
  * analítico (primero las losas).
  */
+import { tamanoMallaPlanta } from "./cimentacion.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
 import { CUANTO_ORDEN, cortarTramos, poligonoDeHuella, tramo } from "./geometria2d.ts";
@@ -472,7 +473,7 @@ interface PlantaL extends PlantaMuros {
  * puntuales y los lados de las lineales que caen en ellos los reparten ellos.
  */
 export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly CargaFisica[], diag: Diagnosticos, puntosMuros: readonly Vec2[][], panos: PanosU | null = null): Losas {
-  const { epsGeom, epsSnap, tamanoMalla: h, rejilla } = ctx.op;
+  const { epsGeom, epsSnap, rejilla } = ctx.op;
   // Fase DN: lo que ocupa una losa por debajo y por encima del plano del forjado (sin desnivel, t y 0
   // con el plano en la cara superior, t/2 y t/2 con el medio: los mismos bits que el espesor)
   const medio = ctx.op.planoForjado === "medio";
@@ -1140,7 +1141,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         const { A, u } = x.tramo.t;
         return { trazo: t, A: [A[0] + x.desde * u[0], A[1] + x.desde * u[1]], B: [A[0] + x.hasta * u[0], A[1] + x.hasta * u[1]], b: x.b };
       });
-      const res = mallarPlanta(a, mallar, h, epsGeom, est?.presembrados.get(k), rejilla, refino, anchosM, [...huellasK.values()]);
+      const res = mallarPlanta(a, mallar, tamanoMallaPlanta(ctx, k), epsGeom, est?.presembrados.get(k), rejilla, refino, anchosM, [...huellasK.values()]);
       if (!res.ok) {
         diag.error("malla/triangulacion", `La triangulación de la planta ${idPlanta} ha fallado (${res.mensaje}). Es un fallo del compilador.`, [idPlanta, ...mallar.map((x) => x.id)]);
         continue;

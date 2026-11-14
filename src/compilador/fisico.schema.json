@@ -682,6 +682,40 @@
       ],
       "additionalProperties": false
     },
+    "Cimentacion": {
+      "type": "object",
+      "properties": {
+        "balasto": {
+          "type": "number"
+        },
+        "horizontal": {
+          "anyOf": [
+            {
+              "const": "coartado"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kh": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "kh"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "tensionAdmisible": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "balasto"
+      ],
+      "additionalProperties": false
+    },
     "Duracion": {
       "enum": [
         "corta",
@@ -882,6 +916,9 @@
         },
         "reticular": {
           "$ref": "#/$defs/Reticular"
+        },
+        "cimentacion": {
+          "$ref": "#/$defs/Cimentacion"
         }
       },
       "required": [
@@ -1326,6 +1363,9 @@
         },
         "tirasBorde": {
           "type": "boolean"
+        },
+        "mallaCimentacion": {
+          "type": "number"
         }
       },
       "additionalProperties": false

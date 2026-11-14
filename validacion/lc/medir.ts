@@ -93,7 +93,7 @@ for (const c of CASOS) {
     let ew = 0;
     for (let v = 0; v < mo.nudos.length; v++) ew = Math.max(ew, Math.abs((r!.u[6 * v + 2]! * c.k) / -50 - 1));
     let mmax = 0;
-    for (let e = 0; e < mo.laminas.length; e++) for (const k of [3, 4, 5]) mmax = Math.max(mmax, Math.abs(r!.esfuerzosLaminas[8 * e + k]!));
+    for (let e = 0; e < mo.laminas!.length; e++) for (const k of [3, 4, 5]) mmax = Math.max(mmax, Math.abs(r!.esfuerzosLaminas[8 * e + k]!));
     lineas.push(`t = ${c.t} m, k = ${c.k} kN/m³, h = ${h}: ${ew.toExponential(2)}, ${mmax.toExponential(2)} kN·m/m`);
   }
 }

@@ -53,6 +53,8 @@ export type Caso = [nombre: string, mutar: (f: Record<string, unknown> & ModeloF
 const m = (o: unknown) => o as never;
 const losa = (f: ModeloFisico) => f.losas![0] as unknown as Record<string, unknown>;
 const carga = (f: ModeloFisico, id: string) => f.cargas!.find((c) => c.id === id) as unknown as Record<string, unknown>;
+/** Una losa de cimentación bajo los pilares, en la planta C (fase LC). */
+const cimentacion = (c: unknown) => ({ id: "LC", planta: "C", contorno: rect(-0.5, -0.5, 6.5, 5.5), espesor: 0.6, material: "HA", cimentacion: c }) as never;
 
 export const CATALOGO: Caso[] = [
   // Losas
@@ -123,6 +125,14 @@ export const CATALOGO: Caso[] = [
     "losa/escalon-sin-apoyo",
     "L2",
   ],
+  // Losas de cimentación (fase LC)
+  ["cimentación con balasto nulo", (f) => (f.losas = [...f.losas!, cimentacion({ balasto: 0 })]), "fisico/valor-no-valido", "LC"],
+  ["cimentación con lo horizontal desconocido", (f) => (f.losas = [...f.losas!, cimentacion({ balasto: 30000, horizontal: "libre" })]), "fisico/valor-no-valido", "LC"],
+  ["cimentación con kh negativo", (f) => (f.losas = [...f.losas!, cimentacion({ balasto: 30000, horizontal: { kh: -1 } })]), "fisico/valor-no-valido", "LC"],
+  ["cimentación con tensión admisible nula", (f) => (f.losas = [...f.losas!, cimentacion({ balasto: 30000, tensionAdmisible: 0 })]), "fisico/valor-no-valido", "LC"],
+  ["cimentación reticular", (f) => (f.losas = [...f.losas!, { ...cimentacion({ balasto: 30000 }), espesor: 0.3, reticular: { intereje: 0.8, nervio: 0.12, capa: 0.05 } } as never]), "fisico/valor-no-valido", "LC"],
+  ["pilar empotrado escrito sobre la cimentación", (f) => ((f.losas = [...f.losas!, cimentacion({ balasto: 30000 })]), (((f.pilares as unknown as Record<string, unknown>[])[0]!.base = "empotrado"))), "pilar/apoyo-sobre-cimentacion", "A0"],
+  ["diafragma rígido escrito en la planta de la cimentación", (f) => ((f.losas = [...f.losas!, cimentacion({ balasto: 30000 })]), (((f.plantas as unknown as Record<string, unknown>[])[1]!.diafragma = "rigido"))), "cimentacion/diafragma", "C"],
   // Cargas lineales
   ["lineal de un punto", (f) => (carga(f, "t").puntos = [[1, 1]]), "fisico/valor-no-valido", "t"],
   ["lineal con dos puntos iguales", (f) => (carga(f, "t").puntos = [[1, 1], [1, 1], [2, 2]]), "fisico/valor-no-valido", "t"],
@@ -141,4 +151,5 @@ export const CATALOGO: Caso[] = [
   ["plantilla de esquina con 5 niveles", () => undefined, "opciones/no-validas", undefined, { plantillaEsquina: { tipo: "graduada", niveles: 5 } }],
   ["plantilla de esquina con más niveles sin pilar que con pilar", () => undefined, "opciones/no-validas", undefined, { plantillaEsquina: { tipo: "graduada", niveles: 2, nivelesSinPilar: 3 } }],
   ["jacobiano del refinamiento nulo", () => undefined, "opciones/no-validas", undefined, { jacobianoRefino: 0 }],
+  ["n de la malla de cimentación nulo", () => undefined, "opciones/no-validas", undefined, { mallaCimentacion: 0 }],
 ];

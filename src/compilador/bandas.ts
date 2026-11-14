@@ -100,8 +100,10 @@ export function pilaresEnLosa(ctx: Contexto, l: LosaCompilada): PilarEnLosa[] {
   for (const p of ctx.pilares) {
     const kh = ctx.planta.get(p.hasta)!;
     const kb = ctx.planta.get(p.desde)!;
-    if (!(k >= kh && k < kb)) continue;
-    const forma = ctx.secciones.get(seccionEn(p, l.losa.planta))?.huella ?? null;
+    // Fase LC: en una losa de cimentación, los pilares que arrancan en ella (con la sección de su primer tramo)
+    const arranca = kb === k && l.losa.cimentacion !== undefined && p.base === "ninguno";
+    if (!(k >= kh && k < kb) && !arranca) continue;
+    const forma = ctx.secciones.get(arranca ? (p.tramos?.find((t) => t.planta === ctx.plantas[k - 1]?.id)?.seccion ?? p.seccion) : seccionEn(p, l.losa.planta))?.huella ?? null;
     const P = ejePilar(p, medidasForma(forma));
     const huella = huellaPilar(P[0], P[1], p.giro ?? 0, forma);
     if (puntoEnRegion(P, l.region) || distanciaABorde(P, l.region.contorno) <= radioHuella(huella) + ctx.op.epsSnap) r.push({ id: p.id, p: P, huella });

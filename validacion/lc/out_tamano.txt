@@ -1,0 +1,5 @@
+| Modelo | Ecuaciones sin la losa | Con la losa de cimentación | Cambio | Nudos de la losa | Perfil móvil (200 000) |
+|---|---|---|---|---|---|
+| edificio objetivo con vigas | 149814 | 192674 | +28.6 % | 11189 | cabe |
+| edificio reticular objetivo | 199962 | 242822 | +21.4 % | 11189 | no cabe |
+| edificio objetivo con losa plana | 193809 | 236669 | +22.1 % | 11189 | no cabe |

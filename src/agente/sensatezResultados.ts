@@ -21,6 +21,7 @@ import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { ModeloFisico, OpcionesCompilacion, Pilar } from "../compilador/fisico.ts";
 import { bajadaTributaria, type TramoTributario } from "./tributaria.ts";
+import { avisosTerreno, terreno } from "./terreno.ts";
 import { ACCIONES_NO_GRAVITATORIAS, anchoSeccion, areaSeccion, cantoSeccion, num, Plantas, Registro, separacion, tipoCaso, UMBRALES, type Comprobacion } from "./sensatez.ts";
 
 /** Puntos de más (uniformes) en el muestreo de la deformada de cada tramo flexible. */
@@ -180,6 +181,8 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
     return Math.max(d(c[0]!, c[1]!), d(c[2]!, c[3]!), d(c[0]!, c[2]!), d(c[1]!, c[3]!));
   };
   for (const l of f.losas ?? []) {
+    // Fase LC: una losa de cimentación no tiene flecha entre pilares ni esbeltez de forjado (su terreno, abajo)
+    if (l.cimentacion) continue;
     const f0 = cjFlechas?.factores[0] ?? new Float64Array(q.nl);
     const geo = q.flechas(l.id, f0);
     if (!geo.valido || !geo.valor.recuadros.length) continue;
@@ -338,8 +341,23 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
     }
   }
 
+  // ─── Losas de cimentación (fase LC): el despegue y la tensión admisible ──────────────────────
+  const cimentadas = (f.losas ?? []).filter((l) => l.cimentacion);
+  const cjTerreno = cjFlechas ?? conjunto(q, { tipo: "casos" });
+  const dsp = new Registro("cimentacion/despegue", "Despegue de las losas de cimentación", `un nudo de una losa de cimentación en tracción (el cálculo es lineal; combinaciones: ${cjTerreno?.descripcion ?? "ninguna"})`);
+  const ten = new Registro("cimentacion/tension", "Tensión en el terreno", `σ máxima más que la tensión admisible de la losa, si se da (combinaciones: ${cjTerreno?.descripcion ?? "ninguna"})`);
+  if (cimentadas.length && cjTerreno) {
+    const t = terreno(q, cjTerreno);
+    if (t.valido)
+      for (const x of t.valor) {
+        dsp.peor(x.despegue?.fraccion ?? 0, `${x.losa}: σ mín ${num(x.sigmaMin.v)} kN/m²`);
+        if (x.tensionAdmisible !== undefined) ten.peor(x.sigmaMax.v / x.tensionAdmisible, `${x.losa}: ${num(x.sigmaMax.v)} kN/m²`);
+        for (const d of avisosTerreno(x)) (d.codigo === "cimentacion/despegue" ? dsp : ten).aviso(d.mensaje, d.ids ?? [x.losa], d.detalles);
+      }
+  }
+
   return {
-    comprobaciones: [trib, ev, el, fl, de, ax, ...(traccion.length ? [ct] : [])].map((r) => r.c),
+    comprobaciones: [trib, ev, el, fl, de, ax, ...(traccion.length ? [ct] : []), ...(cimentadas.length ? [dsp, ten] : [])].map((r) => r.c),
     gravedad: grav,
     combinaciones: { flechas: cjFlechas?.descripcion ?? "ninguna", desplomes: cjDesplome?.descripcion ?? "ninguna", axil: cjAxil?.descripcion ?? "ninguna" },
     tributaria: comparados,

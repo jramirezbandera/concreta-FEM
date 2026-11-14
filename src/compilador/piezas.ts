@@ -648,7 +648,8 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
 }
 
 export function diafragmaDe(ctx: Contexto, k: number): "rigido" | "ninguno" {
-  return ctx.plantas[k]!.diafragma ?? (k === ctx.plantaBaja ? "ninguno" : "rigido");
+  // Fase LC: en la planta de una losa de cimentación, por defecto ninguno (sus nudos van al terreno)
+  return ctx.plantas[k]!.diafragma ?? (k === ctx.plantaBaja || ctx.losas.some((l) => l.losa.cimentacion !== undefined && ctx.planta.get(l.losa.planta) === k) ? "ninguno" : "rigido");
 }
 
 /** ¿Al nudo de arranque de un pilar «ninguno» le llega otra pieza (una viga, otro pilar, o una losa o un muro por su huella)? */

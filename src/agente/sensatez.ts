@@ -492,7 +492,12 @@ function cargasPorM2(f: ModeloFisico, P: Plantas, res: Resumen): Registro[] {
   }
 
   const falta = new Registro("sensatez/planta-sin-caso", "Plantas sin la carga de un caso", "una planta con losas o paños sin carga de un caso que carga a la mayoría (salvo la más alta y las cubiertas)");
-  const conArea = P.ids.filter((id) => P.area.get(id)! > 0);
+  // Fase LC: una planta cuyas losas son todas de cimentación no recibe las cargas de los forjados
+  const soloCimentacion = (id: string) => {
+    const ls = (f.losas ?? []).filter((l) => l.planta === id);
+    return ls.length > 0 && ls.every((l) => l.cimentacion) && !(f.panos ?? []).some((x) => x.planta === id);
+  };
+  const conArea = P.ids.filter((id) => P.area.get(id)! > 0 && !soloCimentacion(id));
   const masAlta = conArea[0];
   for (const c of f.casos) {
     const t = tipos.get(c.id);
@@ -941,6 +946,8 @@ export function bordesSinViga(f: ModeloFisico, P: Plantas, eps: number): { pieza
   const r: { pieza: string; planta: string; tramos: [Vec2, Vec2][] }[] = [];
   for (const x of [...(f.losas ?? []), ...(f.panos ?? [])]) {
     if (!P.indice.has(x.planta)) continue;
+    // Fase LC: una losa de cimentación no lleva zunchos (apoya en el terreno)
+    if ("cimentacion" in x && x.cimentacion) continue;
     const ejes = ejesQueAtan(f, P, x);
     const libres: [Vec2, Vec2][] = [];
     for (const [ia, an] of anillosForjado(x).entries()) {

@@ -37,10 +37,11 @@ import type { ConjuntoCombinaciones, Proposito } from "./combinaciones.ts";
 import type { Proyecto } from "./proyecto.ts";
 import type { ArmadoProyecto } from "./armaduraBase.ts";
 import { ARMADURAS, losasDe, refuerzosDe, type Armadura, type ZonaRefuerzo } from "./refuerzos.ts";
+import { terreno } from "./terreno.ts";
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
-export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "modos", "sismo", "segundo-orden", "combinaciones"] as const;
+export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "terreno", "pieza", "banda", "franjas", "franja", "refuerzos", "modos", "sismo", "segundo-orden", "combinaciones"] as const;
 export type NombreConsulta = (typeof CONSULTAS)[number];
 
 /** Elementos de una lista que se dan por defecto (los mayores); `todos` los da todos. */
@@ -533,10 +534,9 @@ export function reacciones(q: Consultas, conjunto: ConjuntoCombinaciones, o: { o
     const v = comb(T, 6, f);
     return { comb: conjunto.nombres[kc]!, F: v.slice(0, 3), M: v.slice(3) };
   });
-  const f = q.fisico;
   const candidatos = o.objeto
     ? [o.objeto]
-    : [...(f.pilares ?? []).filter((p) => p.base !== "ninguno").map((p) => p.id), ...(f.muros ?? []).filter((m) => m.base !== "ninguno").map((m) => m.id), ...(f.apoyos ?? []).map((a) => a.id), ...(f.apoyosLineales ?? []).map((a) => a.id)];
+    : q.objetosReaccion().map((x) => x.id);
   const objetos: Reacciones["objetos"] = [];
   const diags: Diagnostico[] = [];
   for (const id of candidatos) {
@@ -1135,6 +1135,8 @@ const PROPOSITO: Record<NombreConsulta, Proposito> = {
   flechas: "desplazamientos",
   deriva: "desplazamientos",
   reacciones: "lineal",
+  // LC: la tensión en el terreno, en la ELS característica (como la tensión admisible)
+  terreno: "reacciones",
   pieza: "esfuerzos",
   banda: "esfuerzos",
   franjas: "esfuerzos",
@@ -1165,6 +1167,8 @@ export function consultar(q: Consultas, consulta: NombreConsulta, o: OpcionesCon
       return deriva(q, conjunto, o);
     case "reacciones":
       return reacciones(q, conjunto, o);
+    case "terreno":
+      return terreno(q, conjunto, { losa: o.losa });
     case "pieza":
       return pieza(q, conjunto, o.id, o);
     case "banda":
