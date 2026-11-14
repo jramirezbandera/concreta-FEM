@@ -1,6 +1,6 @@
 # Fase LC: la losa de cimentación sobre balasto
 
-Plan del 2026-11-14, desde la propuesta de `cimentacion-y-arriostramientos.md` §2 (2026-10-13). El orden lo decidió el usuario el 2026-11-08: DN, luego LC y luego CO. Estado: **plan, con lo medido para CB-b (§3); las decisiones de §5 son del usuario.**
+Plan del 2026-11-14, desde la propuesta de `cimentacion-y-arriostramientos.md` §2 (2026-10-13). El orden lo decidió el usuario el 2026-11-08: DN, luego LC y luego CO. Estado: **plan, con lo medido para CB-b (§3); CB-a, CB-b y LC-c…LC-i decididas por el usuario el 2026-11-14 como se recomendaban (§5).** **LC1 hecho el 2026-11-14** (§8); faltan LC2 y la sombra.
 
 ## 1. Qué se pide
 
@@ -99,6 +99,8 @@ cimentacion?: {
 
 ## 5. Decisiones del usuario
 
+**Decididas el 2026-11-14:** todas como se recomendaban; LC-h, a falta del modelo de CYPECAD.
+
 - **CB-a, lo horizontal.** Recomendado: **`"coartado"` por defecto y `{ kh }` como opción**. Coartado es lo más simple, no deja mecanismos, manda la masa sísmica al terreno y fija el nivel del segundo orden; los esfuerzos de membrana de la losa salen nulos (es lo rígido). Con kh (rozamiento, empuje pasivo) la losa se estira y los pilares de la planta baja se reparten algo distinto el cortante. Qué hace CYPECAD no lo he podido confirmar: se ve en la sombra (LC-h).
 - **CB-b, muelles por nudo o matriz consistente.** Recomendado: **por nudo** (§3: lo que pierde es ≤ 1,2 % bajo la carga con h ≤ 0,4·l; lo que pesa es la malla, LC-e). El motor no cambia.
 - **LC-c, los pilares sobre la losa.** Recomendado: **sin `base` escrita, se apoyan en la losa; escrita, error**. La alternativa es exigir `"ninguno"` y que el editor lo escriba al dibujar la losa; obliga a tocar todos los pilares y falla en silencio si se olvida uno (quedaría empotrado al terreno a través de la losa).
@@ -125,3 +127,52 @@ cimentacion?: {
 - **LC1, el compilador y las consultas:** el campo, los muelles, lo horizontal, la malla por l, los pilares y muros, el diafragma, `terreno`, los avisos, la hipótesis y la referencia congelada, con los criterios 1 a 7.
 - **LC2, la app y el agente:** la tabla y la plantilla, los mapas de σ y asiento, el despegue, el informe, la skill y `fem consultar terreno`.
 - **LC3:** la sombra (criterio 8).
+
+## 8. LC1 hecho (2026-11-14)
+
+Pasan los criterios 1 a 7; el 8 (la sombra) espera al modelo de CYPECAD del usuario.
+
+**Ya en el repo:**
+
+- **Modelo físico** (`fisico.ts`, esquemas regenerados): `Losa.cimentacion` (`balasto`, `horizontal`, `tensionAdmisible`) y la opción `mallaCimentacion` (n, por defecto `MALLA_CIMENTACION` = 4; sólo entra en la huella si se da).
+- **`src/compilador/cimentacion.ts`:**
+  - `resolverCimentacion` (dentro de `fisicoResuelto`): los pilares y muros sin `base` escrita que arrancan en una losa de cimentación, con base "ninguno" (LC-c);
+  - `erroresCimentacion` (al final de `validar`, sobre el modelo tal como se escribió): `pilar/apoyo-sobre-cimentacion` y `muro/apoyo-sobre-cimentacion` con la base escrita, `cimentacion/pilar-debajo` y `cimentacion/muro-debajo`, `cimentacion/diafragma` (un diafragma rígido escrito en su planta) y `cimentacion/kh-con-sismo`;
+  - `tamanoMallaPlanta`: h = min(h, l/n) en `mallarPlanta` y en las caras de las franjas de esa planta;
+  - `construirCimentacion`: un `Muelle` a tierra por nudo, con k·∫Nₐ dA de sus láminas (la integral del vector de cargas de superficie del motor) más lo del ancho de las vigas, a los dos nudos del eje que rodean el centroide de cada pieza (LC-g); con lo horizontal coartado, ux y uy en cada nudo o, en uno de un enlace, ux, uy y rz en el maestro de su cadena;
+  - la hipótesis.
+- **Diafragma:** por defecto ninguno en la planta de una losa de cimentación; la planta no cuenta para `sismo/planta-sin-diafragma`.
+- **Mapeo:** `cimentacion` por losa (balasto, nudos, áreas y los nudos con apoyo).
+- **Consultas:** `Consultas.terreno` (uz por caso base, áreas, pilares que arrancan en ella), `objetosReaccion` (la losa es el objeto con reacciones; sus pilares, no) y las reacciones de la losa; `fem consultar terreno` (`src/agente/terreno.ts`: σ máx y mín, asiento, despegue y distorsión angular entre pilares, en la ELS característica; con el sismo, la parte estática ± la amplitud).
+- **Revisión (A3):** las comprobaciones `cimentacion/despegue` y `cimentacion/tension`; la losa de cimentación sale de las de flecha y esbeltez, del aviso de zunchos y de «plantas sin la carga de un caso». En el informe, la losa en las cargas en cimentación.
+
+**Criterios:**
+
+1. Sin `cimentacion`, los mismos bits: pasan las 104 pruebas del compilador con sus referencias congeladas idénticas.
+2. `cimentacion.test.ts`: la prueba del parche (w = q/k a 1e-9 y momentos ≤ 1e-8, las áreas suman la losa a 1e-9); la franja en flexión cilíndrica frente a la serie de Mindlin sobre Winkler (w ≤ 0,5 %, Mx ≤ 2 %); la losa casi rígida frente al sólido rígido de sus muelles (≤ 0,1 %); los pilares y muros que arrancan en ella, kh, los errores, el ancho de una viga y las consultas.
+3. `oraculo-lc.test.ts` frente a OpenSeesPy (`validacion/lc/oraculo_balasto.py`, ASDShellQ4 y `zeroLength`): el asiento de cada nudo a ≤ 0,5 % del mayor y la misma suma de reacciones de los muelles.
+4. `validacion/lc/malla.ts` (`out_malla.txt`), una retícula de 3 × 3 vanos de 6 m sobre dos losas de cimentación, frente a n = 16: con n = 4, σ máx a ≤ 0,7 %, el asiento a ≤ 0,5 %, las caras de los pilares a ≤ 1,6 % y el máximo superior de las franjas (los vanos) a ≤ 1,7 %, también con l = 1,3 m. Con n = 3, un 10 % en los vanos del caso duro; con h = 0,75, un 4,7 %. n = 4 queda por defecto.
+5. El equilibrio de cada cálculo lo comprueba el motor con los muelles; el despegue sale con una carga que levanta la losa y no sin ella; trasladar el modelo y cambiar el orden de pilares y cargas no mueve σ, el asiento ni la distorsión.
+6. Siete entradas nuevas en el catálogo de no válidos de C2 y una de opciones.
+7. El coste, en §8.1.
+
+**Hallazgos:**
+
+- **LC-1, la inercia de giro de los muelles por nudo:** es la de la regla del trapecio, ∫x²dA + A·h²/12 en una malla regular; en una losa casi rígida de 6 m con h = 0,75, un 3 % más que la continua, así que el giro sale un 3 % menor. Con las losas y las mallas de LC (l/4) es menos del 1 %. Es lo que pierde CB-b, y queda en la prueba de la losa rígida.
+- **LC-2, el pico inferior junto a la huella:** el máximo de la armadura inferior de una franja junto a la esquina de un pilar no converge (de n = 12 a 16, un 9 %): es la singularidad de la esquina de la huella rígida, como en los forjados. Lo que dimensiona, las caras, converge (≤ 1,6 %).
+- **LC-3, los pilares que arrancan en la losa no tenían caras de franja:** `pilaresEnLosa` sólo tomaba los que llegan a la losa desde abajo o la atraviesan. Ahora, en una losa de cimentación, también los que arrancan en ella (con la sección de su primer tramo); en las demás losas, nada cambia (un pilar apeado sigue sin caras).
+- **LC-4, el ruido en las referencias congeladas:** con cargas sólo verticales y pilares de cabeza libre, sus momentos (1e-16) y los de los apoyos horizontales de la losa (1e-13) son ruido, y su error relativo de grupo en `errorPorGrupos` cambia entre V8 y JSC (1,45 frente a 3e-13 con los mismos números). La prueba congelada de LC los pone a cero por debajo de 1e-9.
+
+**Cambios frente al plan:** el diafragma rígido escrito en la planta es un error, no un aviso (sus nudos llevan apoyo); kh con el sismo, un error (la masa de la losa no tendría adónde ir); una losa de cimentación reticular, también.
+
+### 8.1 El coste (criterio 7, LC-i; `validacion/lc/tamano.ts`, `out_tamano.txt`)
+
+Los tres edificios objetivo de 7 plantas con una losa de cimentación de 0,8 m sobre k = 40 000 kN/m³ (l = 2,24 m, malla de 0,56 m) bajo toda la planta, con los pilares apoyados en ella: la losa son 11 189 nudos y 42 860 ecuaciones más.
+
+| Modelo | Ecuaciones sin la losa | Con ella | Cambio | Perfil móvil (200 000) |
+|---|---|---|---|---|
+| Con vigas | 149 814 | 192 674 | +28,6 % | cabe |
+| Reticular | 199 962 | 242 822 | +21,4 % | no cabe |
+| Losa plana | 193 809 | 236 669 | +22,1 % | no cabe |
+
+Como se aceptó en LC-i, el reticular y la losa plana con su losa de cimentación pasan del perfil móvil (ya iban a menos de un 1 % de él sin ella).
