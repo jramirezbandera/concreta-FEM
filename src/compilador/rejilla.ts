@@ -981,6 +981,74 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       i = i1 + 1;
     }
   }
+  // A2-46: la red de una plantilla lleva el punto medio de una columna (o fila) de su bloque si alguna
+  // de sus líneas va partida, y en el borde del bloque ese punto es el de la arista de la rejilla. Si el
+  // bloque tiene celdas fuera de las losas que parten la columna en dos tramos de celdas cubiertas, cada
+  // tramo se partía por su cuenta: en el que no, la celda regular de al lado y el borde de la plantilla
+  // no partían igual su arista (malla/conformidad, y la planta iba por la triangulación sola). Se
+  // igualan: en el bloque, todas sus líneas si alguna; en cada tramo, todas si alguna; hasta que no
+  // cambie nada (sólo se añaden particiones, así que acaba y la interfaz sigue partida)
+  {
+    const tramos = (lineas: Uint8Array, columnaU: boolean) => {
+      let cambio = false;
+      const [na, nb] = columnaU ? [nu - 1, nv - 1] : [nv - 1, nu - 1];
+      for (let a = 0; a < na; a++)
+        for (let b = 0; b < nb; ) {
+          const cub = (x: number) => cubierta(columnaU ? est(a, x) : est(x, a));
+          if (!cub(b)) {
+            b++;
+            continue;
+          }
+          let b1 = b;
+          while (cub(b1 + 1)) b1++;
+          const idx = (m: number) => (columnaU ? a + m * (nu - 1) : m + a * nu);
+          let p = false;
+          for (let m = b; m <= b1 + 1 && !p; m++) p = lineas[idx(m)] === 1;
+          if (p)
+            for (let m = b; m <= b1 + 1; m++)
+              if (lineas[idx(m)] !== 1) {
+                lineas[idx(m)] = 1;
+                cambio = true;
+              }
+          b = b1 + 1;
+        }
+      return cambio;
+    };
+    const enBloques = () => {
+      let cambio = false;
+      for (const x of elegidas) {
+        const [ju0, ju1] = [Math.min(...x.mv.celdas), Math.max(...x.mv.celdas) + 1];
+        const [iv0, iv1] = [Math.min(...x.mu.celdas), Math.max(...x.mu.celdas) + 1];
+        for (const a of x.mu.celdas) {
+          let p = false;
+          for (let m = ju0; m <= ju1 && !p; m++) p = partidaH[a + m * (nu - 1)] === 1;
+          if (p)
+            for (let m = ju0; m <= ju1; m++)
+              if (partidaH[a + m * (nu - 1)] !== 1) {
+                partidaH[a + m * (nu - 1)] = 1;
+                cambio = true;
+              }
+        }
+        for (const b of x.mv.celdas) {
+          let p = false;
+          for (let m = iv0; m <= iv1 && !p; m++) p = partidaV[m + b * nu] === 1;
+          if (p)
+            for (let m = iv0; m <= iv1; m++)
+              if (partidaV[m + b * nu] !== 1) {
+                partidaV[m + b * nu] = 1;
+                cambio = true;
+              }
+        }
+      }
+      return cambio;
+    };
+    for (let vueltas = 0; vueltas < 1000; vueltas++) {
+      const c1 = enBloques();
+      const c2 = tramos(partidaH, true);
+      const c3 = tramos(partidaV, false);
+      if (!c1 && !c2 && !c3) break;
+    }
+  }
 
   const posicion = (n: number): Vec2 => {
     const p = puntoNudo[n]!;
