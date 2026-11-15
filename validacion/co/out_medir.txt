@@ -1,0 +1,18 @@
+Fase CO, lo medido antes de empezar: pilares del edificio objetivo de losas (7 plantas), viento y sismo del programa
+80 pilares, 86796 nudos; compilar y calcular, 18.4 s (información)
+Tabla de armados: 4Ø12, 4Ø16, 8Ø12, 4Ø20, 12Ø12, 8Ø16, 16Ø12, 4Ø25, 12Ø16, 8Ø20, 16Ø16, 12Ø20, 8Ø25, 16Ø20, 12Ø25, 16Ø25
+
+── ELU-PT: 16 combinaciones, 1120 extremos de tramo, 16 ternas por extremo
+   con alguna terna en tracción (fuera del motor de pilares): 0; sin armado en la tabla: 2
+   η con los cuatro extremos / η con todas (mismo armado): mediana 1.000, p10 1.000, mínimo 0.986
+   los cuatro extremos no contienen la pésima: 15 de 1118 (1 %); la subestiman más de un 5 %: 0 (0 %)
+   armando con los cuatro extremos sale un armado menor que con todas: 0 de 1118 (0.0 %)
+   coste (información): comprobar un armado dado con todas, 17888 llamadas y 2.5 s (140 µs por llamada); todo lo de esta medida, 57261 llamadas y 9.3 s
+
+── ELU-PT + ELU-SIS: 80 combinaciones, 1120 extremos de tramo, 144 ternas por extremo
+   con alguna terna en tracción (fuera del motor de pilares): 66; sin armado en la tabla: 413
+   η con los cuatro extremos / η con todas (mismo armado): mediana 0.999, p10 0.968, mínimo 0.745
+   los cuatro extremos no contienen la pésima: 453 de 707 (64 %); la subestiman más de un 5 %: 40 (6 %)
+   armando con los cuatro extremos sale un armado menor que con todas: 57 de 707 (8.1 %); con él, η de todas: mediana 1.02, máximo 1.53
+   coste (información): comprobar un armado dado con todas, 99868 llamadas y 14.2 s (142 µs por llamada); todo lo de esta medida, 489867 llamadas y 70.5 s
+
