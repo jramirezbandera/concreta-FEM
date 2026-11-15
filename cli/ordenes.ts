@@ -35,6 +35,7 @@ import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.
 import { Consultas } from "../src/compilador/consultas.ts";
 import { traducirDiagnosticos } from "../src/compilador/mapeo.ts";
 import { tieneEspectro } from "../src/compilador/sismo.ts";
+import { fraccionInclinacion } from "../src/compilador/imperfeccion.ts";
 import { emplazamiento, LIMITE_EMPLAZAMIENTO } from "../src/agente/emplazamiento.ts";
 import { calcular } from "../src/motor/calcular.ts";
 import type { Diagnostico } from "../src/motor/diagnosticos.ts";
@@ -334,6 +335,8 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       // SO: el coeficiente de estabilidad global de cada hipótesis horizontal (el detalle, con `fem consultar segundo-orden`)
       const so = qc.segundoOrden();
       const soValor = so.valido && so.valor.hipotesis.length ? so.valor : null;
+      // IG: la imperfección geométrica global que lleva el cálculo (su θ y sus casos)
+      const ig = qc.imperfeccion();
       return {
         codigo: sismo && !sismo.valido ? CODIGO.errores : CODIGO.bien,
         json: {
@@ -346,6 +349,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           // VS2: con el sismo en las acciones, los modos (el detalle, con `fem consultar modos`)
           ...(r.modal ? { modos: { numero: r.modal.modos.length, T1: r.modal.modos[0]?.periodo ?? null, masa: r.modal.masas.diafragmas, equilibrio: Math.max(0, ...r.modal.modos.flatMap((m) => [m.equilibrio.fuerzas, m.equilibrio.momentos])) } } : {}),
           ...(sismo?.valido ? { sismo: { casos: sismo.valor.casos, periodo: sismo.valor.direcciones.map((d) => d.dominante.periodo), cortanteBasal: sismo.valor.direcciones.map((d) => d.basal), coeficiente: sismo.valor.direcciones.map((d) => d.coeficiente) } } : {}),
+          ...(ig ? { imperfeccion: { inclinacion: ig.inclinacion, fraccion: fraccionInclinacion(ig.inclinacion), origen: ig.origen, altura: ig.altura, alfaH: ig.alfaH, elementos: ig.elementos, alfaM: ig.alfaM, casos: ig.casos.map((c) => c.id) } } : {}),
           ...(soValor ? { segundoOrden: { amplificar: soValor.amplificar, multiplicador: soValor.multiplicador, maximos: soValor.maximos } } : {}),
           estadisticas: { nudos: est.nudos, ecuaciones: est.ecuaciones, barras: r.compilacion.estadisticas.barras, laminas: r.compilacion.estadisticas.laminas },
           segundos: r.tiempos,

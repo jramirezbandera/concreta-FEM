@@ -138,7 +138,9 @@ export function firmaModelo(m: ModeloAnalitico): FirmaModelo {
       mezclar(FIN);
     } else mezclar(0);
   };
-  ir({ ...m, casos: m.casos.map((c) => c.id) }, "", false, null);
+  // IG: de un caso derivado, también de quién deriva, en qué GDL y con qué factor (no lleva cargas
+  // propias, así que su resultante de abajo es nula)
+  ir({ ...m, casos: m.casos.map((c) => (c.derivado ? { id: c.id, derivado: c.derivado } : c.id)) }, "", false, null);
   const cargas = m.casos.map((_, c) => {
     const r = resultanteAnalitica(m, c, [0, 0, 0]);
     return [...r.F, ...r.M, r.escalaF, r.escalaM];

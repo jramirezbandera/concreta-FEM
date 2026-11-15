@@ -28,6 +28,7 @@ import { esHipotesisHorizontal, hipotesisSegundoOrden } from "./segundoOrden.ts"
 import { calcularSismo, CASOS_SISMO, hipotesisEspectro, hipotesisSismo } from "./sismo.ts";
 import { avisosNieve, hipotesisNieve } from "./nieve.ts";
 import { hipotesisViento, resolverViento } from "./viento.ts";
+import { esCasoImperfeccion, hipotesisImperfeccion, resolverImperfeccion } from "./imperfeccion.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
 import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PERDIDAS } from "./cargas.ts";
@@ -49,7 +50,7 @@ import type { ModificadoresBarra } from "../elementos/barra.ts";
 import { puntoEnRegion } from "./poligonos.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "PB1";
+export const VERSION_COMPILADOR = "IG1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -203,7 +204,12 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const viento = resolverViento(resolverBordes(abacos.modelo, op.epsSnap).modelo);
   for (const a of viento.calculo?.avisos ?? []) diag.aviso(a.codigo, a.mensaje, a.ids);
   const delViento = new Set(viento.calculo?.viento ? (viento.modelo.cargas ?? []).filter((c) => viento.calculo!.viento!.casos.includes(c.caso)).map((c) => c.id) : []);
-  const ctx = validar(viento.modelo, op, diag);
+  // IG: detrás de los del viento, los casos de la imperfección geométrica global (sin cargas en el
+  // modelo físico: en el analítico, derivados de su caso vertical)
+  const imperfeccion = resolverImperfeccion(viento.modelo);
+  for (const a of imperfeccion.calculo.avisos) diag.aviso(a.codigo, a.mensaje, a.ids);
+  const resuelto = imperfeccion.modelo;
+  const ctx = validar(resuelto, op, diag);
   // AC-d: un reticular lleva un ábaco en cada pilar (detrás de la validación, para que sus errores vayan antes)
   if (ctx) errorPilaresSinAbaco(abacos.modelo, abacos.porLosa, diag);
   // DN-b: los escalones entre forjados con desniveles distintos
@@ -211,13 +217,13 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
   // VS2: las masas del sismo, de los casos (con los del viento); sus errores ya los ha dado `validar`
-  const calculoSismo = calcularSismo(viento.modelo);
+  const calculoSismo = calcularSismo(resuelto);
   const sismo = calculoSismo?.masas ?? null;
   // VS3: el espectro y los casos del sismo no cambian el modelo analítico (son casos lógicos sobre los modos)
   const espectro = calculoSismo?.espectro ?? null;
   for (const a of calculoSismo?.avisos ?? []) diag.aviso(a.codigo, a.mensaje, a.ids);
   // La nieve: el ψ de sus casos frente a la altitud de la obra (sus cargas las pone el usuario)
-  for (const a of avisosNieve(viento.modelo)) diag.aviso(a.codigo, a.mensaje, a.ids);
+  for (const a of avisosNieve(resuelto)) diag.aviso(a.codigo, a.mensaje, a.ids);
   if (sismo) {
     // VS-h: una planta con forjado y sin diafragma rígido tiene masa que no va a ningún diafragma
     // Fase LC: la planta de una losa de cimentación tampoco (sus nudos van coartados al terreno)
@@ -397,6 +403,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   marca("cargas");
   if (diag.hayErrores) return fallo();
   const casos: CasoCarga[] = ctx.casos.map((c, k) => {
+    // IG: un caso de la imperfección, derivado de su caso vertical: θ·P en cada nudo, en su dirección
+    if (esCasoImperfeccion(c)) return { id: c.id, derivado: { de: c.accion!.derivadoDe!, gdl: c.accion!.direccion === "Y" ? 1 : 0, factor: c.accion!.inclinacion! } };
     const cc = cargas.casos[k]!;
     const nodales = [...cc.nodales]
       .map(([n, f]) => ({ nudo: nuevo[n]!, f: f as unknown as readonly [number, number, number, number, number, number] }))
@@ -509,9 +517,10 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       ...(viento.calculo?.viento ? [hipotesisViento(viento.calculo.viento)] : []),
       ...(sismo ? [hipotesisSismo(sismo)] : []),
       ...(espectro ? [hipotesisEspectro(espectro)] : []),
-      ...[hipotesisNieve(viento.modelo)].filter((h): h is string => h !== null),
+      ...[hipotesisNieve(resuelto)].filter((h): h is string => h !== null),
+      ...(imperfeccion.calculo.imperfeccion ? [hipotesisImperfeccion(imperfeccion.calculo.imperfeccion)] : []),
       // SO: el segundo orden global, con las hipótesis horizontales (las del sismo del programa las añaden las consultas)
-      ...[hipotesisSegundoOrden(viento.modelo.acciones?.segundoOrden, [...viento.modelo.casos.filter(esHipotesisHorizontal).map((c) => c.id), ...(espectro ? CASOS_SISMO.map((c) => c.id) : [])])].filter((h): h is string => h !== null),
+      ...[hipotesisSegundoOrden(resuelto.acciones?.segundoOrden, [...resuelto.casos.filter(esHipotesisHorizontal).map((c) => c.id), ...(espectro ? CASOS_SISMO.map((c) => c.id) : [])])].filter((h): h is string => h !== null),
     ],
     huella,
     estadisticas: {

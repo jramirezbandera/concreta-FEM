@@ -5,7 +5,8 @@
  *
  * Con el cálculo de primer orden de cada caso base (sus desplazamientos y, del motor, la resultante
  * de sus cargas y el trabajo P·δ de cada caso del modelo en ellos: `CargasCaso`), de cada **hipótesis
- * horizontal** h (un caso lógico con acción de viento, W, o de sismo, E; los del programa también):
+ * horizontal** h (un caso lógico con acción de viento, W, de sismo, E, o nocional, N: la imperfección
+ * geométrica global; los del programa también):
  * - su dirección e: la de su acción (`direccion`) o, si no la lleva, la de su cortante en la base; el
  *   sentido, el de ese cortante, para que lo que sigue salga positivo;
  * - su **momento volcador** M_H = Σ_v (F_v·e)·(z_v − z₀), con las fuerzas nodales equivalentes del caso
@@ -64,8 +65,12 @@ export function erroresSegundoOrden(s: SegundoOrdenEdificio | undefined): { codi
   return [];
 }
 
-/** ¿Es el caso una hipótesis horizontal (viento o sismo)? */
-export const esHipotesisHorizontal = (c: CasoFisico): boolean => c.accion?.tipo === "W" || c.accion?.tipo === "E";
+/**
+ * ¿Es el caso una hipótesis horizontal? Viento, sismo y, desde la fase IG, las nocionales (N): la
+ * imperfección geométrica global son fuerzas horizontales, y el F_H,0Ed que amplifica el CE A19 H.2 es
+ * el «del viento, las imperfecciones, etc.».
+ */
+export const esHipotesisHorizontal = (c: CasoFisico): boolean => c.accion?.tipo === "W" || c.accion?.tipo === "E" || c.accion?.tipo === "N";
 
 export interface HipotesisHorizontal {
   caso: string;

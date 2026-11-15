@@ -12,6 +12,7 @@ import type { Consultas } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { modos as consultaModos, resumen, segundoOrden as consultaSegundoOrden, sismo as consultaSismo, type ModosAgente, type Resumen, type SegundoOrdenAgente, type SismoAgente } from "./consultas.ts";
 import { calcularViento, type VientoCalculado } from "../compilador/viento.ts";
+import type { ImperfeccionCalculada } from "../compilador/imperfeccion.ts";
 import { documentoInforme, html, markdown, type Bloque, type ReaccionBase } from "./informe.ts";
 import type { Proyecto } from "./proyecto.ts";
 import { sensatezModelo, type Comprobacion, type DesglosePesoPropio, type PesoCalculado } from "./sensatez.ts";
@@ -40,7 +41,7 @@ export interface RevisionPreparada {
   figuras: { titulo: string; svg: string }[];
   cimentacion: ReaccionBase[];
   /** VS4: las acciones del programa (null sin ellas). */
-  programa: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null; /** SO: con hipótesis horizontales (del programa o escritas). */ segundoOrden: SegundoOrdenAgente | null } | null;
+  programa: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null; /** IG: la imperfección geométrica global del cálculo, si la lleva. */ imperfeccion?: ImperfeccionCalculada | null; /** SO: con hipótesis horizontales (del programa o escritas). */ segundoOrden: SegundoOrdenAgente | null } | null;
   otros: Omit<DatosRevisar, "resumen">;
 }
 
@@ -131,9 +132,10 @@ function programa(p: Proyecto, q: Consultas): RevisionPreparada["programa"] {
   const a = p.modelo.acciones;
   // SO: el segundo orden global, también con hipótesis horizontales escritas a mano
   const so = consultaSegundoOrden(q, { top: 12 });
-  if (!a?.viento && !a?.sismo && !so.valido) return null;
+  const imperfeccion = q.imperfeccion();
+  if (!a?.viento && !a?.sismo && !so.valido && !imperfeccion) return null;
   const viento = a?.viento ? (calcularViento(p.modelo)?.viento ?? null) : null;
   const m = a?.sismo ? consultaModos(q, { top: 12 }) : null;
   const s = a?.sismo ? consultaSismo(q, { todos: true }) : null;
-  return { viento, modos: m?.valido ? m.valor : null, sismo: s?.valido ? s.valor : null, segundoOrden: so.valido ? so.valor : null };
+  return { viento, modos: m?.valido ? m.valor : null, sismo: s?.valido ? s.valor : null, ...(imperfeccion ? { imperfeccion } : {}), segundoOrden: so.valido ? so.valor : null };
 }

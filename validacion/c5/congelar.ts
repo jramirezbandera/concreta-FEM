@@ -44,7 +44,7 @@ import { conAcciones, conPropuesta, losaPilaresMezclados, reticularH25 } from ".
 
 export const MODELOS_CONGELADOS_C5: Record<string, () => ModeloCongelado> = {
   // SO: sin el segundo orden global (sus bandas van con las combinaciones del generador, y el viento del modelo las amplificaría)
-  "pilares-mezclados": () => ({ fisico: { ...conAcciones(conPropuesta(losaPilaresMezclados())), acciones: { segundoOrden: { amplificar: false } } }, opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "pilares-mezclados": () => ({ fisico: { ...conAcciones(conPropuesta(losaPilaresMezclados())), acciones: { segundoOrden: { amplificar: false }, imperfeccion: { aplicar: false } } }, opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   "reticular-h25": () => ({ fisico: conPropuesta(reticularH25()), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.5, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   "etabs-15c-3-60": () => ({ fisico: fisicoEtabs(murosEtabs15().find((m) => m.id === "15c-3-60")!), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   "aleatorio-3": () => ({ fisico: conPropuesta(conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" })), opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),

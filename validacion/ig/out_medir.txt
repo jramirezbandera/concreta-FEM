@@ -1,0 +1,68 @@
+── Edificio de SO (3 plantas, 9 pilares de 40 × 40, sólo barras, viento ±X)
+   θ = 1/402 (2,485 mm/m): α_h = 0,667 (l = 9,00 m), α_m = 0,745 (m = 9, bajo F3)
+   casos: 4 → 8; ecuaciones: 90 → 90
+   IMP-X(G)     H = 6,71 kN (θ·2700 kN), desplazamiento máximo 0,107 mm, equilibrio 4.1e-16 / 1.0e-16
+   IMP-Y(G)     H = 6,71 kN (θ·2700 kN), desplazamiento máximo 0,107 mm, equilibrio 3.5e-16 / 2.0e-17
+   IMP-X(Q)     H = 3,35 kN (θ·1350 kN), desplazamiento máximo 0,054 mm, equilibrio 4.1e-16 / 1.0e-16
+   IMP-Y(Q)     H = 3,35 kN (θ·1350 kN), desplazamiento máximo 0,054 mm, equilibrio 3.5e-16 / 2.0e-17
+   combinaciones: ELU-PT 16 → 28; ELS-C 8 → 8; ELS-F 6 → 6; ELS-CP 2 → 2; GEO 8 → 8
+   segundo orden (desplazamientos × 2): γz máx. de la imperfección 1,021 (IMP-X(G), ELU-PT-5); de las demás hipótesis horizontales 1,021 (W+)
+   pilares (ELU-PT, el mayor |My| y |Mz| de la base y la cabeza de cada tramo; 108 valores):
+     lo que sube: mediana 1,04 kN·m, percentil 90 2,49, máximo 3,01 (P5/F1/base/Mz: 0,00 → 3,01)
+     sobre el valor con ella: mediana 8,5 %, percentil 90 100,0 %, máximo 100,0 %
+     frente al momento de la excentricidad mínima, N·máx(h/30; 2 cm): mediana 0,14, percentil 90 0,24, máximo 0,25
+   tiempo (información; mínimo de 3, alternando): compilar 0,01 → 0,01 s; calcular 0,00 → 0,00 s
+   envolventes de todas las piezas (una pasada, con las consultas recién hechas): 16 combinaciones, 0,0 s → 28 combinaciones, 0,0 s
+
+── Vivienda de Alhaurín (ejemplos/vivienda: 1 planta y 2 cubiertas reticulares, sin viento)
+   θ = 1/283 (3,539 mm/m): α_h = 0,964 (l = 4,30 m), α_m = 0,734 (m = 13, bajo CUB-S)
+   casos: 4 → 12; ecuaciones: 8772 → 8772
+   IMP-X(G)     H = 5,04 kN (θ·1423 kN), desplazamiento máximo 0,064 mm, equilibrio 9.0e-14 / 2.4e-14
+   IMP-Y(G)     H = 5,04 kN (θ·1423 kN), desplazamiento máximo 0,068 mm, equilibrio 5.8e-14 / 1.1e-13
+   IMP-X(CM)    H = 2,71 kN (θ·765 kN), desplazamiento máximo 0,037 mm, equilibrio 9.9e-14 / 2.5e-14
+   IMP-Y(CM)    H = 2,71 kN (θ·765 kN), desplazamiento máximo 0,037 mm, equilibrio 7.7e-14 / 1.2e-13
+   IMP-X(Q)     H = 0,79 kN (θ·222 kN), desplazamiento máximo 0,011 mm, equilibrio 1.0e-13 / 2.5e-14
+   IMP-Y(Q)     H = 0,79 kN (θ·222 kN), desplazamiento máximo 0,011 mm, equilibrio 6.8e-14 / 1.2e-13
+   IMP-X(N)     H = 0,16 kN (θ·44 kN), desplazamiento máximo 0,002 mm, equilibrio 1.0e-13 / 2.6e-14
+   IMP-Y(N)     H = 0,16 kN (θ·44 kN), desplazamiento máximo 0,002 mm, equilibrio 6.8e-14 / 1.2e-13
+   combinaciones: ELU-PT 8 → 32; ELS-C 4 → 4; ELS-F 2 → 2; ELS-CP 1 → 1; GEO 4 → 4
+   segundo orden (desplazamientos × 2): γz máx. de la imperfección 1,021 (IMP-X(N), ELU-PT-9); de las demás hipótesis horizontales —
+   pilares (ELU-PT, el mayor |My| y |Mz| de la base y la cabeza de cada tramo; 144 valores):
+     lo que sube: mediana 0,53 kN·m, percentil 90 1,22, máximo 2,15 (P5/CUB/base/My: 9,41 → 11,57)
+     sobre el valor con ella: mediana 10,0 %, percentil 90 35,7 %, máximo 97,1 %
+     frente al momento de la excentricidad mínima, N·máx(h/30; 2 cm): mediana 0,24, percentil 90 0,64, máximo 1,36
+   tiempo (información; mínimo de 3, alternando): compilar 0,20 → 0,19 s; calcular 0,27 → 0,32 s
+   envolventes de todas las piezas (una pasada, con las consultas recién hechas): 8 combinaciones, 0,1 s → 32 combinaciones, 0,3 s
+
+── Edificio objetivo con vigas (7 plantas, 80 pilares por planta; viento Vx y Vy)
+   θ = 1/422 (2,372 mm/m): α_h = 0,667 (l = 19,50 m), α_m = 0,712 (m = 80, bajo N7)
+   casos: 4 → 8; ecuaciones: 149814 → 149814
+   IMP-X(G)     H = 316,37 kN (θ·133394 kN), desplazamiento máximo 0,474 mm, equilibrio 4.0e-13 / 4.7e-14
+   IMP-Y(G)     H = 316,37 kN (θ·133394 kN), desplazamiento máximo 0,458 mm, equilibrio 1.1e-12 / 2.0e-13
+   IMP-X(Q)     H = 67,16 kN (θ·28318 kN), desplazamiento máximo 0,104 mm, equilibrio 4.1e-13 / 4.8e-14
+   IMP-Y(Q)     H = 67,16 kN (θ·28318 kN), desplazamiento máximo 0,104 mm, equilibrio 1.0e-12 / 2.0e-13
+   combinaciones: ELU-PT 26 → 38; ELS-C 13 → 13; ELS-F 6 → 6; ELS-CP 2 → 2; GEO 13 → 13
+   segundo orden (desplazamientos × 2): γz máx. de la imperfección 1,040 (IMP-X(G), ELU-PT-5); de las demás hipótesis horizontales 1,041 (Vx)
+   pilares (ELU-PT, el mayor |My| y |Mz| de la base y la cabeza de cada tramo; 2240 valores):
+     lo que sube: mediana 3,57 kN·m, percentil 90 6,74, máximo 9,92 (P6-10/N2/base/My: 23,94 → 33,86)
+     sobre el valor con ella: mediana 35,2 %, percentil 90 42,0 %, máximo 71,5 %
+     frente al momento de la excentricidad mínima, N·máx(h/30; 2 cm): mediana 0,14, percentil 90 0,23, máximo 0,42
+   tiempo (información; mínimo de 3, alternando): compilar 3,43 → 3,49 s; calcular 5,92 → 6,21 s
+   envolventes de todas las piezas (una pasada, con las consultas recién hechas): 26 combinaciones, 10,0 s → 38 combinaciones, 16,0 s
+
+── Edificio reticular objetivo (7 plantas; viento Vx y Vy)
+   θ = 1/422 (2,372 mm/m): α_h = 0,667 (l = 19,50 m), α_m = 0,712 (m = 80, bajo N7)
+   casos: 4 → 8; ecuaciones: 199962 → 199962
+   IMP-X(G)     H = 265,33 kN (θ·111872 kN), desplazamiento máximo 0,384 mm, equilibrio 8.1e-13 / 1.5e-13
+   IMP-Y(G)     H = 265,33 kN (θ·111872 kN), desplazamiento máximo 0,374 mm, equilibrio 6.1e-13 / 5.1e-14
+   IMP-X(Q)     H = 67,16 kN (θ·28318 kN), desplazamiento máximo 0,100 mm, equilibrio 7.7e-13 / 1.4e-13
+   IMP-Y(Q)     H = 67,16 kN (θ·28318 kN), desplazamiento máximo 0,101 mm, equilibrio 5.7e-13 / 4.5e-14
+   combinaciones: ELU-PT 26 → 38; ELS-C 13 → 13; ELS-F 6 → 6; ELS-CP 2 → 2; GEO 13 → 13
+   segundo orden (desplazamientos × 2): γz máx. de la imperfección 1,034 (IMP-X(G), ELU-PT-5); de las demás hipótesis horizontales 1,035 (Vx)
+   pilares (ELU-PT, el mayor |My| y |Mz| de la base y la cabeza de cada tramo; 2240 valores):
+     lo que sube: mediana 3,03 kN·m, percentil 90 5,76, máximo 8,51 (P6-10/N2/base/My: 23,65 → 32,16)
+     sobre el valor con ella: mediana 32,3 %, percentil 90 38,8 %, máximo 60,5 %
+     frente al momento de la excentricidad mínima, N·máx(h/30; 2 cm): mediana 0,14, percentil 90 0,23, máximo 0,41
+   tiempo (información; mínimo de 3, alternando): compilar 8,27 → 8,30 s; calcular 6,94 → 7,55 s
+   envolventes de todas las piezas (una pasada, con las consultas recién hechas): 26 combinaciones, 9,1 s → 38 combinaciones, 16,3 s
+

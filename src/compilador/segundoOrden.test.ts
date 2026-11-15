@@ -17,9 +17,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { edificioSO as edificio, type VarianteSO as Variante } from "../../validacion/so/modelos.ts";
+import { edificioSO, type VarianteSO as Variante } from "../../validacion/so/modelos.ts";
 import { calcular } from "../motor/calcular.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
+import type { ModeloFisico } from "./fisico.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { valido } from "../pruebas/metamorficasFisicas.ts";
 import { compilar } from "./compilar.ts";
@@ -29,6 +30,15 @@ import { GAMMA_TRASLACIONAL, MULTIPLICADOR_POR_DEFECTO } from "./segundoOrden.ts
 beforeAll(async () => {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
 });
+
+/**
+ * El edificio de SO sin la imperfección geométrica global (fase IG): estas pruebas son las del viento
+ * y el sismo como hipótesis horizontales; las de la imperfección, en `imperfeccion.test.ts`.
+ */
+function edificio(v: Variante = {}): ModeloFisico {
+  const f = edificioSO(v);
+  return { ...f, acciones: { ...f.acciones, imperfeccion: { aplicar: false } } };
+}
 
 function calculado(v: Variante = {}) {
   const f = edificio(v);

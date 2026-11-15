@@ -20,6 +20,7 @@
  * casos.
  */
 import { equivalentesEnNudos, cargasDeBarrasDelCaso, type BarraPreparada } from "./barras.ts";
+import { cargasDerivadas, origenesDerivados, pesosNodales } from "./derivados.ts";
 import { Diagnosticos } from "./diagnosticos.ts";
 import { elementosDelModelo, esMuelleATierra, geometria, rigidezGlobal, type ElementoMotor, type Geometria } from "./elementos.ts";
 import { cargasDeLaminasDelCaso, rigidezLamina, type LaminaPreparada } from "./laminas.ts";
@@ -72,6 +73,9 @@ export class FuerzasNodales {
   /** El vector de cargas nodales de los casos que no tienen (compartido, nulo). */
   private sinNodales?: Float64Array;
   private incidencia: { ptr: Uint32Array; idx: Uint32Array } | null = null;
+  /** IG: el caso de origen de cada caso derivado (−1 en los demás) y la carga vertical por nudo de cada origen, ya hecha. */
+  private readonly origen: Int32Array;
+  private readonly pesosOrigen = new Map<number, Float64Array>();
 
   constructor(modelo: ModeloAnalitico) {
     this.modelo = modelo;
@@ -85,6 +89,8 @@ export class FuerzasNodales {
       else if (e.tipo === "lamina") this.porLamina[e.indice] = e;
     }
     this.cargas = new Array(modelo.casos.length);
+    this.origen = origenesDerivados(modelo.casos, diag);
+    if (diag.hayErrores) throw new Error(`FuerzasNodales: el modelo tiene errores (${diag.lista[0]!.mensaje}); calcúlalo antes con calcular()`);
   }
 
   /** Las listas de resultados ya comprobadas con `defectoCasos`. */
@@ -175,7 +181,13 @@ export class FuerzasNodales {
     // Sin cargas nodales (los casos de los modos, VS3), el vector nulo compartido: 6·n ceros por caso
     // eran 4 MB por modo en el edificio objetivo
     let nodales: Float64Array;
-    if (caso.nodales?.length) {
+    if (caso.derivado) {
+      // IG: las de un caso derivado, con la carga vertical por nudo de su origen (las cuentas del cálculo)
+      const o = this.origen[k]!;
+      let pesos = this.pesosOrigen.get(o);
+      if (!pesos) this.pesosOrigen.set(o, (pesos = pesosNodales(this.modelo.casos[o]!, this.modelo, this.geo, preparadasB, preparadasL)));
+      nodales = cargasDerivadas(caso.derivado, pesos);
+    } else if (caso.nodales?.length) {
       nodales = new Float64Array(6 * this.modelo.nudos.length);
       for (const cn of caso.nodales) for (let g = 0; g < 6; g++) nodales[6 * cn.nudo + g]! += cn.f[g]!;
     } else nodales = this.sinNodales ??= new Float64Array(6 * this.modelo.nudos.length);

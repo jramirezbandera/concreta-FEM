@@ -16,6 +16,7 @@ import { sha256 } from "../compilador/huella.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModosAgente, Resumen, SegundoOrdenAgente, SismoAgente } from "./consultas.ts";
 import type { VientoCalculado } from "../compilador/viento.ts";
+import { fraccionInclinacion, type ImperfeccionCalculada } from "../compilador/imperfeccion.ts";
 import type { Proyecto } from "./proyecto.ts";
 import { num, separacion, type Comprobacion, type SensatezModelo } from "./sensatez.ts";
 import type { SensatezResultados } from "./sensatezResultados.ts";
@@ -59,7 +60,7 @@ export interface DatosInforme {
   /** Figuras del render (A4): la planta del modelo y la uz de las losas de cada planta. */
   figuras?: readonly { titulo: string; svg: string }[];
   /** VS4: las acciones del programa, si las hay: el viento por plantas, las masas y los modos, y el sismo por espectros. */
-  programa?: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null; segundoOrden?: SegundoOrdenAgente | null };
+  programa?: { viento: VientoCalculado | null; modos: ModosAgente | null; sismo: SismoAgente | null; imperfeccion?: ImperfeccionCalculada | null; segundoOrden?: SegundoOrdenAgente | null };
 }
 
 const ESTADO: Record<Comprobacion["estado"], string> = { bien: "bien", avisos: "AVISOS", "no-aplica": "no aplica", pendiente: "pendiente" };
@@ -169,8 +170,8 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
 
   // ─── Viento y sismo del programa (VS4) ──────────────────────────────────────────────────────
   const pg = d.programa;
-  if (pg && (pg.viento || pg.modos || pg.sismo || pg.segundoOrden)) {
-    titulo(2, "Viento y sismo del programa");
+  if (pg && (pg.viento || pg.modos || pg.sismo || pg.segundoOrden || pg.imperfeccion)) {
+    titulo(2, pg.viento || pg.modos || pg.sismo || !pg.imperfeccion ? "Viento y sismo del programa" : "Imperfección global y segundo orden");
     if (pg.viento) {
       const v = pg.viento;
       titulo(3, "Viento (DB SE-AE)");
@@ -219,6 +220,16 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
         });
         if (x.simplificado.length) parrafo(`Para contrastar, el método simplificado (art. 3.7): ${x.simplificado.map((y) => `con ${y.periodo} (TF = ${num(y.TF, 3)} s, ${y.modos} ${y.modos === 1 ? "modo" : "modos"}), ${kN(y.cortanteBasal)} kN (el modal, ×${num(y.frente, 3)})`).join("; ")}.`);
       }
+    }
+    // IG: la imperfección geométrica global
+    if (pg.imperfeccion) {
+      const i = pg.imperfeccion;
+      titulo(3, "Imperfección geométrica global (CE Anejo 19 §5.2)");
+      parrafo(
+        `Una inclinación de toda la estructura, θ = ${fraccionInclinacion(i.inclinacion)} (${num(i.inclinacion * 1000, 3)} mm/m)` +
+          (i.origen === "escrita" ? ", escrita en las acciones" : `: θ₀·α_h·α_m con θ₀ = 1/200, α_h = ${num(i.alfaH, 3)} (altura del edificio, ${num(i.altura)} m) y α_m = ${num(i.alfaM, 3)} (${String(i.elementos)} pilares y muros bajo ${i.planta}, la planta que menos tiene)`) +
+          `. Va como fuerzas horizontales θ·P en cada nudo (P, la carga vertical de cada caso en él), en los casos ${i.casos.map((c) => c.id).join(", ")}, que entran en las combinaciones de ELU persistentes y accidentales con el factor de su caso de origen: en el sentido del viento de la combinación o, sin viento, en una combinación por dirección y sentido. Como hipótesis horizontales, llevan su coeficiente de estabilidad global (abajo).`,
+      );
     }
     // SO: el segundo orden global
     if (pg.segundoOrden) {

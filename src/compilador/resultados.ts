@@ -182,7 +182,7 @@ export class EsfuerzosPiezas {
       return P.map((C) => salto(C));
     }
     return this.casos.map((caso, q) => {
-      const [T, M] = salto(this.parCargas(n, q));
+      const [T, M] = salto(this.parCargas(n, q, R[2] === 0 && R[5] === 0));
       if (q >= this.ligeros) {
         // Un caso ligero (sin cargas en las barras): las fuerzas de extremo, las de sus resultados
         const e = caso.esfuerzosBarras;
@@ -213,12 +213,21 @@ export class EsfuerzosPiezas {
     return r;
   }
 
-  /** Par de las cargas nodales del caso q sobre el nudo n y lo que cuelga de él, trasladado a n (global). */
-  private parCargas(n: number, q: number): number[] {
+  /**
+   * Par de las cargas nodales del caso q sobre el nudo n y lo que cuelga de él, trasladado a n (global).
+   * `soloXY`: sólo hacen falta sus componentes X e Y (el salto de una barra horizontal).
+   */
+  private parCargas(n: number, q: number, soloXY = false): number[] {
     const P = this.modelo.nudos[n]!;
     const C = [0, 0, 0];
+    // IG: las de un caso derivado no están en `nodales` (salen de las de su origen): las da
+    // `FuerzasNodales`. Son fuerzas horizontales: con todo lo que cuelga a la cota del nudo no dan par
+    // en X ni en Y, y no hace falta montarlas (lo normal: las caras de la viga, en el plano del forjado)
+    const derivado = this.modelo.casos[q]?.derivado !== undefined;
+    if (derivado && soloXY && this.colgados(n).every((v) => this.modelo.nudos[v]!.z === P.z)) return C;
+    const derivadas = derivado ? (this.fuerzasC ??= new FuerzasNodales(this.modelo)).cargasNodales(q) : null;
     for (const v of this.colgados(n)) {
-      const f = this.nodales[q]!.get(v);
+      const f = derivadas ? derivadas.subarray(6 * v, 6 * v + 6) : this.nodales[q]!.get(v);
       if (!f) continue;
       const Q = this.modelo.nudos[v]!;
       const [dx, dy, dz] = [Q.x - P.x, Q.y - P.y, Q.z - P.z];

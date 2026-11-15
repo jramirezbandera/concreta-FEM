@@ -83,5 +83,7 @@ export function recuadros(n: number, m: number, op: OpcionesRecuadros = {}): Mod
       { id: "Q", nombre: "Uso", accion: { tipo: "Q", psi: "uso-A" } },
     ],
     cargas: plantas.map((p) => ({ tipo: "superficie", id: `Q-${p}`, caso: "Q", planta: p, q: [0, 0, -q], losa: `L-${p}` })),
+    // IG: sin la imperfección global (las medidas de PB son de G y Q, con sus factores escritos)
+    acciones: { imperfeccion: { aplicar: false } },
   } as unknown as ModeloFisico;
 }

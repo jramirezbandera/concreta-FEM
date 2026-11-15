@@ -58,6 +58,7 @@ import { amplificar, calcularSegundoOrden, coeficientes, diagnosticosSegundoOrde
 import { calcularSismo, sismoDelCalculo, tieneEspectro, type EspectroSismo, type SismoCalculado } from "./sismo.ts";
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 import { dimensionesPlanta, resolverViento } from "./viento.ts";
+import { calcularImperfeccion, resolverImperfeccion, type ImperfeccionCalculada } from "./imperfeccion.ts";
 import { DESPLAZAMIENTO_SIN_SEGUNDO_ORDEN, LIMITE_SEGUNDO_ORDEN, periodoFundamental, simplificado } from "../normas/ncse02.ts";
 
 /** A2-60: los cortes de machones o dinteles que no valen (sus esfuerzos son NaN), en un aviso. */
@@ -350,7 +351,8 @@ export class Consultas {
   constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion = {}, modal?: ResultadoModal | null) {
     // VS1: con los casos y las cargas del viento del programa, al final, como en la compilación: los
     // casos del modelo físico casan uno a uno con los resultados
-    fisico = resolverViento(fisico).modelo;
+    // IG: y detrás, los de la imperfección geométrica global
+    fisico = resolverImperfeccion(resolverViento(fisico).modelo).modelo;
     this.mapeo = compilado.mapeo;
     this.compilado = compilado.modelo;
     this.modal = modal ?? null;
@@ -1354,6 +1356,13 @@ export class Consultas {
     } catch (e) {
       return this.no("consulta/combinaciones", `No se pueden generar las combinaciones: ${e instanceof Error ? e.message : String(e)}.`, logicos.map((c) => c.id));
     }
+  }
+
+  // ─── Imperfección global (IG) ───────────────────────────────────────────────────────────────
+
+  /** IG: la imperfección geométrica global de este cálculo (su θ y sus casos); null si no la hay. */
+  imperfeccion(): ImperfeccionCalculada | null {
+    return calcularImperfeccion(this.fisico).imperfeccion;
   }
 
   // ─── Segundo orden (SO) ─────────────────────────────────────────────────────────────────────

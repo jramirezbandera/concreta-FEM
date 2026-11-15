@@ -63,3 +63,38 @@ describe("SO: la pestaña «Segundo orden» de la ficha de acciones", () => {
     expect(screen.getByText(/no mayor que 10/)).toBeTruthy();
   });
 });
+
+describe("IG: la imperfección geométrica global, en la misma pestaña", () => {
+  it("por defecto está aplicada con la inclinación calculada, y así no escribe nada", () => {
+    const { escrito } = montar({ viento: { aspereza: "IV", zona: "A" } });
+    expect((screen.getByRole("checkbox", { name: /Imperfección geométrica global/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Inclinación θ") as HTMLInputElement).value).toBe("");
+    aplicar();
+    expect(escrito()?.imperfeccion).toBeUndefined();
+  });
+
+  it("quitarla, o poner otra inclinación por su denominador, escribe sólo eso", () => {
+    const { escrito } = montar(undefined);
+    fireEvent.change(screen.getByLabelText("Inclinación θ"), { target: { value: "300" } });
+    aplicar();
+    expect(escrito()).toEqual({ imperfeccion: { inclinacion: 1 / 300 } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Imperfección geométrica global/ }));
+    fireEvent.change(screen.getByLabelText("Inclinación θ"), { target: { value: "" } });
+    aplicar();
+    expect(escrito()).toEqual({ imperfeccion: { aplicar: false } });
+  });
+
+  it("lee lo del fichero (con sus bits) y una inclinación mayor que 1/20 no se aplica", () => {
+    const theta = 0.0037;
+    const { escrito, editar } = montar({ imperfeccion: { inclinacion: theta } });
+    expect((screen.getByLabelText("Inclinación θ") as HTMLInputElement).value).toBe(String(Math.round((1 / theta) * 1e6) / 1e6).replace(".", ","));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Segundo orden global/ }));
+    aplicar();
+    expect(escrito()).toEqual({ segundoOrden: { amplificar: false }, imperfeccion: { inclinacion: theta } });
+    const veces = editar.mock.calls.length;
+    fireEvent.change(screen.getByLabelText("Inclinación θ"), { target: { value: "10" } });
+    aplicar();
+    expect(editar.mock.calls.length).toBe(veces);
+    expect(screen.getByText(/no puede pasar de 1\/20/)).toBeTruthy();
+  });
+});

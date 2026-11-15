@@ -97,6 +97,9 @@
               ]
             }
           ]
+        },
+        "inclinacion": {
+          "type": "number"
         }
       },
       "required": [
@@ -121,6 +124,9 @@
         },
         "segundoOrden": {
           "$ref": "#/$defs/SegundoOrdenEdificio"
+        },
+        "imperfeccion": {
+          "$ref": "#/$defs/ImperfeccionEdificio"
         }
       },
       "additionalProperties": false
@@ -841,6 +847,18 @@
         "z0",
         "z1"
       ],
+      "additionalProperties": false
+    },
+    "ImperfeccionEdificio": {
+      "type": "object",
+      "properties": {
+        "aplicar": {
+          "type": "boolean"
+        },
+        "inclinacion": {
+          "type": "number"
+        }
+      },
       "additionalProperties": false
     },
     "Liberacion": {

@@ -120,7 +120,7 @@
             "X",
             "Y"
           ],
-          "description": "W, E y N: dirección horizontal; W y N, además, el signo."
+          "description": "W, E y N: dirección horizontal; W y N, además, el signo. Una N sin signo es reversible: el\ngenerador la pone en el sentido que toque, con el factor de su origen o con su opuesto."
         },
         "signo": {
           "enum": [
@@ -157,6 +157,10 @@
             }
           ],
           "description": "ψ de la tabla 4.2 del DB SE (Q, S, W y T). Mejor por su nombre, para no escribir los números de\nla norma: \"uso-A\" … \"uso-G\" (la categoría de uso de la tabla 3.1 del DB SE-AE), \"nieve-hasta-1000\"\no \"nieve-mas-de-1000\" (por la altitud del emplazamiento), \"viento\" o \"temperatura\". O sus valores,\n{ psi0, psi1, psi2 }, si son otros."
+        },
+        "inclinacion": {
+          "type": "number",
+          "description": "Fase IG (`docs/fem3d/imperfeccion.md`), sólo en una nocional (N): la inclinación θ, en radianes,\nde la imperfección geométrica global. Con ella el caso no lleva cargas: las pone el programa, una\nfuerza horizontal θ·P en su `direccion` en cada nudo, con P la carga vertical que el caso\n`derivadoDe` pone en él. Así son los casos que el programa añade por defecto\n(`acciones.imperfeccion`); sin ella, una nocional lleva las cargas que se le escriban."
         }
       },
       "required": [
@@ -185,6 +189,10 @@
         "segundoOrden": {
           "$ref": "#/$defs/SegundoOrdenEdificio",
           "description": "Fase SO (`docs/fem3d/segundo-orden.md`): el segundo orden global (P-Δ) por el coeficiente de\nestabilidad global de cada hipótesis horizontal (viento y sismo, casos con acción W o E) en cada\ncombinación, γz = 1 / (1 − Q), que multiplica el factor de esa hipótesis en la combinación. Por\ndefecto, activado en cuanto hay hipótesis horizontales. Basta con no escribirlo."
+        },
+        "imperfeccion": {
+          "$ref": "#/$defs/ImperfeccionEdificio",
+          "description": "Fase IG (`docs/fem3d/imperfeccion.md`): la imperfección geométrica global del Código Estructural\n(Anejo 19 §5.2): una inclinación θ de toda la estructura, como fuerzas horizontales θ·P en casos\ndel programa que entran en las combinaciones de ELU persistentes y accidentales. Por defecto,\naplicada en cuanto hay casos verticales (G, Q o S) y pilares o muros. Basta con no escribirlo."
         }
       },
       "additionalProperties": false,
@@ -1066,6 +1074,21 @@
       ],
       "additionalProperties": false,
       "description": "Hueco de un muro (C3): rectángulo en su alzado, dentro de un tramo."
+    },
+    "ImperfeccionEdificio": {
+      "type": "object",
+      "properties": {
+        "aplicar": {
+          "type": "boolean",
+          "description": "¿Se añaden los casos de la imperfección? Por defecto, sí."
+        },
+        "inclinacion": {
+          "type": "number",
+          "description": "La inclinación θ, en radianes. Por defecto, la del CE A19 §5.2(5): θ = θ₀·α_h·α_m, con θ₀ = 1/200,\nα_h = 2/√l entre 2/3 y 1 (l, la altura del edificio en m) y α_m = √(0,5·(1 + 1/m)) (m, los pilares\ny muros de la planta que menos tiene)."
+        }
+      },
+      "additionalProperties": false,
+      "description": "La imperfección geométrica global (IG). De cada caso vertical (G, Q o S) salen dos casos del\nprograma, `IMP-X(<caso>)` e `IMP-Y(<caso>)`, nocionales (N) con `inclinacion`: en cada nudo, una\nfuerza horizontal θ·P con P la carga vertical que el caso pone en él (H_i = θ_i·(N_b − N_a), CE A19\n§5.2(8)). El generador los pone en las combinaciones de ELU-PT y ELU-ACC con el factor de su caso de\norigen: en el sentido del viento de la combinación o, sin viento, una combinación por sentido."
     },
     "Liberacion": {
       "type": "array",

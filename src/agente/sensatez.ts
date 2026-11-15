@@ -426,7 +426,8 @@ function cargas(f: ModeloFisico): Registro[] {
   const usados = new Set((f.cargas ?? []).map((c) => c.caso));
   for (const c of f.casos) {
     vacio.aplica();
-    if (!c.pesoPropio && !usados.has(c.id)) vacio.aviso(`El caso ${c.id} no tiene ninguna carga.`, [c.id]);
+    // IG: una nocional con su inclinación no lleva cargas: las pone el programa
+    if (!c.pesoPropio && !usados.has(c.id) && c.accion?.inclinacion === undefined) vacio.aviso(`El caso ${c.id} no tiene ninguna carga.`, [c.id]);
   }
 
   const dup = new Registro("sensatez/carga-duplicada", "Cargas duplicadas", "una carga igual a otra salvo el id, en el mismo caso");

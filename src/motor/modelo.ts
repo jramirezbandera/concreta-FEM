@@ -249,12 +249,31 @@ export type CargaLamina =
       M?: Vec3;
     };
 
+/**
+ * Un caso **derivado** de otro (fase IG, `docs/fem3d/imperfeccion.md`): en cada nudo, una fuerza
+ * horizontal proporcional a la carga vertical hacia abajo que el caso de origen pone en él,
+ * F_gdl = factor · P_v, con P_v = −Fz de las fuerzas nodales equivalentes del origen (las que ensambla
+ * el cálculo: sus cargas nodales y el reparto de las de barra y de lámina). Es la carga equivalente a
+ * una inclinación `factor` (rad) de toda la estructura bajo las cargas del origen: la imperfección
+ * geométrica global del CE Anejo 19 §5.2, H_i = θ_i·(N_b − N_a).
+ */
+export interface CasoDerivado {
+  /** Id del caso de origen (uno que no sea derivado). */
+  de: string;
+  /** GDL en el que va la fuerza: 0 (X) o 1 (Y). */
+  gdl: 0 | 1;
+  /** La inclinación θ, rad: fuerza horizontal por unidad de carga vertical. */
+  factor: number;
+}
+
 export interface CasoCarga {
   id: string;
   nodales?: readonly CargaNodal[];
   barras?: readonly CargaBarra[];
   laminas?: readonly CargaLamina[];
   impuestos?: readonly DesplazamientoImpuesto[];
+  /** Fase IG: el caso no lleva cargas propias; las suyas salen de las de otro caso (`CasoDerivado`). */
+  derivado?: CasoDerivado;
 }
 
 /** Aceleración de la gravedad normal, m/s²: la que convierte en masa (t) el peso (kN) de las cargas. */

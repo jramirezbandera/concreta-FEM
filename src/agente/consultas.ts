@@ -155,12 +155,26 @@ export function cargasPorPlanta(c: Extract<ResultadoCompilacion, { valido: true 
       ...modelo,
       casos: modelo.casos.map((caso) => ({
         id: caso.id,
+        ...(caso.derivado ? { derivado: caso.derivado } : {}),
         nodales: (caso.nodales ?? []).filter((x) => mapeo.nudos[x.nudo]!.planta === p),
         barras: (caso.barras ?? []).filter((x) => plantaNudos(modelo.barras![x.barra]!.nudos) === p),
         laminas: (caso.laminas ?? []).filter((x) => plantaNudos(modelo.laminas![x.lamina]!.nudos) === p),
       })),
     });
   return r;
+}
+
+/**
+ * La resultante de las fuerzas del caso kc. La de un caso derivado (IG: la imperfección global, sin
+ * cargas propias), con la de su caso de origen: su carga vertical por el factor, en su dirección.
+ */
+function fuerzaCaso(modelo: ModeloAnalitico, kc: number): [number, number, number] {
+  const d = modelo.casos[kc]!.derivado;
+  if (!d) return [...resultanteAnalitica(modelo, kc, [0, 0, 0]).F] as [number, number, number];
+  const o = modelo.casos.findIndex((x) => x.id === d.de);
+  const F: [number, number, number] = [0, 0, 0];
+  if (o >= 0) F[d.gdl] = -d.factor * resultanteAnalitica(modelo, o, [0, 0, 0]).F[2];
+  return F;
 }
 
 /** El modelo en unas líneas por planta (A1). No necesita el cálculo. */
@@ -191,9 +205,9 @@ export function resumen(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: 
     const sub = porPlanta.get(pl.id)!;
     const hz: Record<string, [number, number]> = {};
     c.modelo.casos.forEach((caso, kc) => {
-      const R = resultanteAnalitica(sub, kc, [0, 0, 0]);
-      if (R.F[2] !== 0) r.cargas[caso.id] = -R.F[2];
-      if (R.F[0] !== 0 || R.F[1] !== 0) hz[caso.id] = [R.F[0], R.F[1]];
+      const F = fuerzaCaso(sub, kc);
+      if (F[2] !== 0) r.cargas[caso.id] = -F[2];
+      if (F[0] !== 0 || F[1] !== 0) hz[caso.id] = [F[0], F[1]];
     });
     if (Object.keys(hz).length) r.horizontales = hz;
     return r;
@@ -215,8 +229,7 @@ export function resumen(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: 
     analitico: { nudos: c.estadisticas.nudos, barras: c.estadisticas.barras, laminas: c.estadisticas.laminas },
     plantas,
     casos: f.casos.map((caso, kc) => {
-      const R = resultanteAnalitica(c.modelo, kc, [0, 0, 0]);
-      return { id: caso.id, ...(caso.accion ? { accion: caso.accion.tipo } : {}), ...(caso.pesoPropio ? { pesoPropio: true as const } : {}), F: [...R.F] };
+      return { id: caso.id, ...(caso.accion ? { accion: caso.accion.tipo } : {}), ...(caso.pesoPropio ? { pesoPropio: true as const } : {}), F: fuerzaCaso(c.modelo, kc) };
     }),
     avisos,
     hipotesis: c.hipotesis.length,

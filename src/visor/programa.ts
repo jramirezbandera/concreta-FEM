@@ -17,6 +17,7 @@
  */
 import { modos as consultaModos, segundoOrden as consultaSegundoOrden, sismo as consultaSismo, type ModosAgente, type SegundoOrdenAgente, type SismoAgente } from "../agente/consultas.ts";
 import { opcionesSegundoOrden } from "../compilador/segundoOrden.ts";
+import { calcularImperfeccion, resolverImperfeccion, type ImperfeccionCalculada } from "../compilador/imperfeccion.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { CargaFisica, CasoFisico, ModeloFisico } from "../compilador/fisico.ts";
 import { calcularSismo, CASOS_SISMO, casosSismo, tieneEspectro, type EspectroSismo } from "../compilador/sismo.ts";
@@ -25,7 +26,7 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { coeficienteModal, espectroElastico } from "../normas/ncse02.ts";
 import type { DatosDeformada } from "./datos.ts";
 
-export type Programa = "viento" | "sismo";
+export type Programa = "viento" | "sismo" | "imperfeccion";
 
 export interface CasoVisor {
   id: string;
@@ -36,12 +37,18 @@ export interface CasoVisor {
   programa?: Programa;
 }
 
-/** Los casos del modelo físico y, detrás, los del programa: los del viento y los del sismo (con espectro). */
+/**
+ * Los casos del modelo físico y, detrás, los del programa: los del viento, los de la imperfección
+ * geométrica global (IG) y los del sismo (con espectro), en el orden de los resultados.
+ */
 export function casosPrograma(f: ModeloFisico): CasoVisor[] {
   const r: CasoVisor[] = f.casos.map((x) => ({ id: x.id, ...(x.nombre ? { nombre: x.nombre } : {}), ...(x.accion ? { accion: x.accion.tipo } : {}), ...(x.pesoPropio ? { pesoPropio: true } : {}) }));
   const propios = new Set(f.casos.map((c) => c.id));
   const caso = (c: CasoFisico, programa: Programa): CasoVisor => ({ id: c.id, ...(c.nombre ? { nombre: c.nombre } : {}), ...(c.accion ? { accion: c.accion.tipo } : {}), programa });
-  for (const c of resolverViento(f).modelo.casos) if (!propios.has(c.id)) r.push(caso(c, "viento"));
+  const conViento = resolverViento(f).modelo;
+  const delViento = new Set(conViento.casos.map((c) => c.id));
+  for (const c of conViento.casos) if (!propios.has(c.id)) r.push(caso(c, "viento"));
+  for (const c of resolverImperfeccion(conViento).modelo.casos) if (!delViento.has(c.id)) r.push(caso(c, "imperfeccion"));
   if (tieneEspectro(f)) for (const c of casosSismo()) r.push(caso(c, "sismo"));
   return r;
 }
@@ -56,7 +63,8 @@ export const idCargaSismo = (caso: string, planta: string): string => `${caso}@$
  * hacia +Y con el sismo según X y hacia +X según Y, como en el viento).
  */
 export function fisicoConPrograma(f: ModeloFisico, q: Consultas | null): ModeloFisico {
-  const m = resolverViento(f).modelo;
+  // IG: los casos de la imperfección no llevan cargas que dibujar (son θ·P en cada nudo), pero están
+  const m = resolverImperfeccion(resolverViento(f).modelo).modelo;
   const sc = q?.sismoCalculado;
   const md = q?.modal;
   if (!sc || !md || !sc.logicos.length) return m;
@@ -157,6 +165,8 @@ export interface DatosSegundoOrden {
   multiplicador: number;
   /** ¿Lo escribió el usuario (`acciones.segundoOrden`)? */
   escrito: boolean;
+  /** IG: la imperfección geométrica global del modelo de ahora (su θ y sus casos; sin calcular), o null si no la hay. */
+  imperfeccion: ImperfeccionCalculada | null;
   /** Con resultados: la consulta `segundo-orden` (sus avisos, en `problemas`) o por qué no. */
   resultado: SegundoOrdenAgente | null;
   problemas: Diagnostico[];
@@ -165,7 +175,7 @@ export interface DatosSegundoOrden {
 
 export function datosSegundoOrden(f: ModeloFisico, q: Consultas | null): DatosSegundoOrden {
   const o = opcionesSegundoOrden(f.acciones?.segundoOrden);
-  const base = { amplificar: o.amplificar, multiplicador: o.multiplicador, escrito: o.escrito };
+  const base = { amplificar: o.amplificar, multiplicador: o.multiplicador, escrito: o.escrito, imperfeccion: calcularImperfeccion(resolverViento(f).modelo).imperfeccion };
   if (!q) return { ...base, resultado: null, problemas: [], motivo: "El coeficiente de estabilidad global sale con el cálculo." };
   const r = consultaSegundoOrden(q, { todos: true });
   return r.valido ? { ...base, resultado: r.valor, problemas: r.diagnosticos } : { ...base, resultado: null, problemas: [], motivo: r.diagnosticos.map((d) => d.mensaje).join(" ") };

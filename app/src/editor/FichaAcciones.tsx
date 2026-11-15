@@ -17,7 +17,8 @@
  * el sismo o en el viento pasan al emplazamiento. Los textos no nombran programas comerciales.
  */
 import { useEffect, useMemo, useState } from "react";
-import type { AccionesEdificio, NieveEdificio, SegundoOrdenEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
+import type { AccionesEdificio, ImperfeccionEdificio, NieveEdificio, SegundoOrdenEdificio, SismoEdificio, VientoEdificio } from "../../../src/compilador/fisico.ts";
+import { fraccionInclinacion, INCLINACION_MAXIMA } from "../../../src/compilador/imperfeccion.ts";
 import { MULTIPLICADOR_MAXIMO, MULTIPLICADOR_POR_DEFECTO, opcionesSegundoOrden } from "../../../src/compilador/segundoOrden.ts";
 import { leerNumero } from "../../../src/editor/celdas.ts";
 import { ASPEREZAS, ORDEN_ASPEREZAS, ZONAS_EOLICAS, type GradoAspereza, type ZonaEolica } from "../../../src/normas/cteViento.ts";
@@ -86,6 +87,10 @@ const AYUDA = {
   nieve: "Art. 3.2: la masa de la nieve cuenta la mitad si permanece más de 30 días al año; si no, no cuenta. Por defecto, sí por encima de 1 000 m.",
   amplificar:
     "Segundo orden global (P-Δ) por el coeficiente de estabilidad global: en cada combinación, el factor de cada hipótesis horizontal (viento y sismo, casos con acción W o E) va multiplicado por γz = 1 / (1 − Q), con Q = Σ γ_k·M_Pδ,k / M_H (M_H, el momento volcador de la hipótesis; M_Pδ,k, el de las cargas verticales del caso k en sus desplazamientos, los del sismo por μ). Es el método de la amplificación del CE Anejo 19 H.2. Con él, los pilares se comprueban como intraslacionales (β = 1). Desactivado, las combinaciones son de primer orden y una estructura traslacional pide β > 1.",
+  imperfeccion:
+    "Imperfección geométrica global del Código Estructural (Anejo 19 §5.2): una inclinación θ de toda la estructura, obligatoria en los estados límite últimos de las situaciones persistentes y accidentales. Va como fuerzas horizontales: de cada caso vertical (permanente, uso o nieve) salen dos casos del programa, según X y según Y, con θ·P en cada nudo (P, la carga vertical que el caso pone en él). Entran en las combinaciones de ELU con el factor de su caso, en el sentido del viento de la combinación o, sin viento, en una combinación por sentido. No sustituye a la excentricidad mínima del pilar, que es de su comprobación.",
+  inclinacion:
+    "θ = θ₀·α_h·α_m, con θ₀ = 1/200, α_h = 2/√l entre 2/3 y 1 (l, la altura del edificio en m) y α_m = √(0,5·(1 + 1/m)) (m, los pilares y muros de la planta que menos tiene). Escriba el denominador para poner otra: 200 es 1/200.",
   multiplicador:
     "Los desplazamientos del cálculo son de secciones brutas; este factor los multiplica para tener en cuenta la fisuración en el P·δ. 1 es la rigidez bruta; 2, la rigidez al 50 % del Código Modelo CEB-FIP 1990 (por defecto); 3, la rigidez nominal del hormigón fisurado del CE Anejo 19 H.1.2(3), 0,4·Ecd·Ic (1,5 sin fisurar, 0,8·Ecd·Ic). Con 2, el coeficiente de estabilidad global no debería pasar de 1,5.",
 } as const;
@@ -150,6 +155,9 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
   const so0 = opcionesSegundoOrden(a.segundoOrden);
   const [amplificar, setAmplificar] = useState(so0.amplificar);
   const [multiplicador, setMultiplicador] = useState(texto(a.segundoOrden?.multiplicadorDesplazamientos));
+  // IG: la imperfección geométrica global (por defecto aplicada, con la θ del CE); la θ, por su denominador
+  const [conImperfeccion, setConImperfeccion] = useState(a.imperfeccion?.aplicar ?? true);
+  const [denominador, setDenominador] = useState(a.imperfeccion?.inclinacion ? texto(Math.round((1 / a.imperfeccion.inclinacion) * 1e6) / 1e6) : "");
 
   /** Lo que se escribirá, o por qué no. */
   const acciones = useMemo((): { valor: AccionesEdificio | null } | { error: string } => {
@@ -233,8 +241,19 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
       if (nM !== MULTIPLICADOR_POR_DEFECTO) so.multiplicadorDesplazamientos = nM;
     }
     if (Object.keys(so).length) r.segundoOrden = so;
-    return { valor: r.viento || r.sismo || r.emplazamiento || r.nieve || r.segundoOrden ? r : null };
-  }, [emp.valor, municipio, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, zonaInv, origenSk, skEscrita, exposicion, amplificar, multiplicador]);
+    // IG: sólo se escribe lo que no es lo de por defecto
+    const ig: ImperfeccionEdificio = {};
+    if (!conImperfeccion) ig.aplicar = false;
+    const nD = numeroOpcional(denominador);
+    if (typeof nD === "string") return { error: `La inclinación de la imperfección: ${nD}.` };
+    if (nD !== undefined) {
+      if (!(nD > 0 && 1 / nD <= INCLINACION_MAXIMA)) return { error: `La inclinación de la imperfección se escribe por su denominador (200 es 1/200) y no puede pasar de 1/${Math.round(1 / INCLINACION_MAXIMA)}.` };
+      // (la misma que estaba escrita, con sus bits)
+      ig.inclinacion = a.imperfeccion?.inclinacion !== undefined && Math.abs(1 / a.imperfeccion.inclinacion - nD) <= 1e-6 ? a.imperfeccion.inclinacion : 1 / nD;
+    }
+    if (Object.keys(ig).length) r.imperfeccion = ig;
+    return { valor: r.viento || r.sismo || r.emplazamiento || r.nieve || r.segundoOrden || r.imperfeccion ? r : null };
+  }, [conImperfeccion, denominador, emp.valor, municipio, conViento, zonaForzada, prov, aspereza, modoQb, qb, rasante, a, conSismo, nieve, ab, K, terreno, C, t0, muX, muY, importancia, omega, excentricidad, regla, sistema, zonaInv, origenSk, skEscrita, exposicion, amplificar, multiplicador]);
 
   // Lo que sale en el modelo aplicado (la sesión del worker tiene el proyecto guardado): lo escrito se ve al aplicar
   const viento = usePedido(proyecto.cliente, { tipo: "viento" });
@@ -314,6 +333,25 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
             </span>
           </div>
           <ResumenSegundoOrden d={segundoOrden.datos ?? null} aplicado={!cambiado} />
+          <label className="mt-2 flex items-start gap-2 border-t border-border-main pt-3">
+            <input type="checkbox" className="mt-[3px]" checked={conImperfeccion} onChange={(e) => setConImperfeccion(e.target.checked)} />
+            <span>
+              Imperfección geométrica global: una inclinación de toda la estructura, como fuerzas horizontales
+              <span className="block text-[12px] text-text-secondary">De cada caso vertical salen dos casos del programa (según X y según Y) que entran en las combinaciones de ELU. La pide el Código Estructural (Anejo 19 §5.2).</span>
+            </span>
+            <Ayuda texto={AYUDA.imperfeccion} />
+          </label>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+            <Etiqueta htmlFor="ig-theta" ayuda={AYUDA.inclinacion}>
+              Inclinación θ
+            </Etiqueta>
+            <span className="flex items-center gap-2">
+              <span className="mono">1 /</span>
+              <input id="ig-theta" className="sel mono w-[7rem]" value={denominador} inputMode="decimal" placeholder="calculada" disabled={!conImperfeccion} onChange={(e) => setDenominador(e.target.value)} />
+              <span className="text-text-secondary">vacío: la del Código Estructural, θ₀·α_h·α_m</span>
+            </span>
+          </div>
+          <ResumenImperfeccion d={segundoOrden.datos ?? null} aplicado={!cambiado} />
         </div>
       ) : pestana === "viento" ? (
         <div className="grid gap-3">
@@ -604,6 +642,40 @@ function Cifra({ n, v, t }: { n: string; v: string; t?: string }) {
   );
 }
 
+/** IG: la imperfección geométrica global del modelo de la sesión. */
+function ResumenImperfeccion({ d, aplicado }: { d: DatosSegundoOrden | null; aplicado: boolean }) {
+  if (!d) return <p className="nota">…</p>;
+  const i = d.imperfeccion;
+  return (
+    <div className="rounded border border-border-main p-2 text-[12px]">
+      <p className="mb-1 font-medium">En el modelo {aplicado ? "aplicado" : "aplicado (lo de arriba, al aplicar)"}:</p>
+      {!i ? (
+        <p className="text-text-secondary">Sin imperfección global: está desactivada, o el modelo no tiene casos verticales con su acción (permanente, uso o nieve) o no tiene pilares ni muros.</p>
+      ) : (
+        <>
+          <p>
+            θ = <span className="mono">{fraccionInclinacion(i.inclinacion)}</span> ({fmt(i.inclinacion * 1000, 2)} mm/m)
+            {i.origen === "escrita" ? (
+              ", escrita"
+            ) : (
+              <>
+                {" "}
+                = 1/200 · α_h {fmt(i.alfaH, 3)} · α_m {fmt(i.alfaM, 3)}{" "}
+                <span className="text-text-secondary">
+                  (altura {fmt(i.altura, 2)} m; {i.elementos} pilares y muros bajo {i.planta})
+                </span>
+              </>
+            )}
+          </p>
+          <p className="mt-1 text-text-secondary">
+            Casos: <span className="mono">{i.casos.map((c) => c.id).join(", ")}</span>. Su coeficiente de estabilidad global, en la tabla de arriba.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** SO: lo que el segundo orden global da en el modelo de la sesión (con resultados). */
 function ResumenSegundoOrden({ d, aplicado }: { d: DatosSegundoOrden | null; aplicado: boolean }) {
   if (!d) return <p className="nota">…</p>;
@@ -616,7 +688,7 @@ function ResumenSegundoOrden({ d, aplicado }: { d: DatosSegundoOrden | null; apl
       {!r ? (
         <p className="text-text-secondary">{d.motivo ? textoApp(d.motivo) : "…"}</p>
       ) : !r.hipotesis.length ? (
-        <p className="text-text-secondary">El modelo no tiene hipótesis horizontales (viento o sismo): no hay segundo orden global que calcular.</p>
+        <p className="text-text-secondary">El modelo no tiene hipótesis horizontales (viento, sismo o imperfección global): no hay segundo orden global que calcular.</p>
       ) : (
         <>
           <table className="w-full">

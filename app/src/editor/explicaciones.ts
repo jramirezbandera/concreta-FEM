@@ -151,7 +151,7 @@ export const CAMPOS_CASO: Record<string, InfoCampo> = {
   },
   signo: {
     titulo: "signo",
-    que: "Viento y nocional: el sentido, hacia +eje o −eje. El generador empareja la nocional con el viento del mismo sentido.",
+    que: "Viento y nocional: el sentido, hacia +eje o −eje. El generador empareja la nocional con el viento del mismo sentido; una nocional sin signo vale para los dos.",
     opciones: [
       ["1", "hacia +X o +Y"],
       ["-1", "hacia −X o −Y"],

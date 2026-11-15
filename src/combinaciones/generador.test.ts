@@ -244,6 +244,55 @@ describe("reglas", () => {
     expect(soloGQ).toHaveLength(4);
   });
 
+  it("una nocional sin signo es reversible: da las mismas combinaciones que una por sentido, con el factor de su origen o su opuesto", () => {
+    // IG: la imperfección del programa es un caso por dirección (el sentido lo pone el factor)
+    const base: CasoCarga[] = [{ id: "G", tipo: "G" }, { id: "Q", tipo: "Q", psi: psiUso("B") }, ...viento(["X+", "X-", "Y+", "Y-"]), { id: "A", tipo: "A" }];
+    const conSigno: CasoCarga[] = [
+      ...base,
+      ...(["X", "Y"] as const).flatMap((d) => ([1, -1] as const).flatMap((sg) => ["G", "Q"].map((o): CasoCarga => ({ id: `N${d}${sg > 0 ? "+" : "-"}(${o})`, tipo: "N", derivadoDe: o, direccion: d, signo: sg })))),
+    ];
+    const sinSigno: CasoCarga[] = [...base, ...(["X", "Y"] as const).flatMap((d) => ["G", "Q"].map((o): CasoCarga => ({ id: `N${d}(${o})`, tipo: "N", derivadoDe: o, direccion: d })))];
+    const a = generarCombinaciones(conSigno);
+    const b = generarCombinaciones(sinSigno);
+    expect(b.map((c) => c.id)).toEqual(a.map((c) => c.id));
+    const ia = (x: string) => conSigno.findIndex((c) => c.id === x);
+    const ib = (x: string) => sinSigno.findIndex((c) => c.id === x);
+    let conNocional = 0;
+    a.forEach((ca, k) => {
+      const cb = b[k]!;
+      for (const c of base) expect(cb.factores[ib(c.id)]).toBe(ca.factores[ia(c.id)]);
+      for (const d of ["X", "Y"])
+        for (const o of ["G", "Q"]) {
+          const neto = ca.factores[ia(`N${d}+(${o})`)]! - ca.factores[ia(`N${d}-(${o})`)]!;
+          expect(cb.factores[ib(`N${d}(${o})`)]).toBe(neto);
+          if (neto !== 0) {
+            conNocional++;
+            expect(Math.abs(neto)).toBe(ca.factores[ia(o)]);
+          }
+        }
+      expect(cb.duracion).toBe(ca.duracion);
+    });
+    expect(conNocional).toBeGreaterThan(0);
+    // CE A19 §5.2(2)P: en las situaciones persistentes y accidentales; no en la sísmica ni en servicio
+    const situaciones = new Set(b.filter((c) => sinSigno.some((x, i) => x.tipo === "N" && c.factores[i] !== 0)).map((c) => c.situacion));
+    expect([...situaciones].sort()).toEqual(["ELU-ACC", "ELU-PT"]);
+    // Sin viento, las cuatro direcciones; con viento según −Y, sólo −Y
+    const f = (c: (typeof b)[number], x: string) => c.factores[ib(x)]!;
+    const sinViento = b.filter((c) => c.situacion === "ELU-PT" && f(c, "G") === 1.35 && f(c, "Q") === 1.5 && ["WX+", "WX-", "WY+", "WY-"].every((w) => f(c, w) === 0));
+    expect(sinViento.map((c) => [f(c, "NX(G)"), f(c, "NY(G)"), f(c, "NX(Q)"), f(c, "NY(Q)")])).toEqual([
+      [1.35, 0, 1.5, 0],
+      [-1.35, 0, -1.5, 0],
+      [0, 1.35, 0, 1.5],
+      [0, -1.35, 0, -1.5],
+    ]);
+    for (const c of b.filter((x) => x.situacion === "ELU-PT" && f(x, "WY-") > 0)) {
+      expect(f(c, "NX(G)")).toBe(0);
+      expect(f(c, "NY(G)")).toBe(-f(c, "G"));
+      expect(f(c, "NY(Q)")).toBe(f(c, "Q") === 0 ? 0 : -f(c, "Q"));
+    }
+    expect(() => generarCombinaciones([{ id: "G", tipo: "G" }, { id: "N", tipo: "N", derivadoDe: "G" }])).toThrow(/dirección/);
+  });
+
   it("duración de la combinación: la de la acción más corta presente", () => {
     const casos: CasoCarga[] = [
       { id: "G", tipo: "G" },

@@ -126,7 +126,7 @@ Propuestas el 2026-11-08, con la recomendación delante:
 
 - **SO-b:** el segundo orden va siempre activado por defecto.
 - **SO-c:** el 2 se queda. El pórtico 2D de Concreta (`fem2d`) no se va a integrar: era una versión menor anterior a este motor, así que no hay que alinear nada con su rigidez nominal (m = 3). El 3 estricto del CE sigue como opción nombrada.
-- **SO-g:** se aplazan, con una condición. La imperfección geométrica global del CE A19 §5.2 (θᵢ = 1/200·α_h·α_m) es obligatoria en ELU, y la excentricidad mínima de `rcColumns` sólo cubre la del pilar aislado. Por eso tiene que estar hecha (como casos N del generador, §10) antes de que se use el armado de pilares de la fase de comprobaciones (CO1).
+- **SO-g:** se aplazan, con una condición. La imperfección geométrica global del CE A19 §5.2 (θᵢ = 1/200·α_h·α_m) es obligatoria en ELU, y la excentricidad mínima de `rcColumns` sólo cubre la del pilar aislado. Por eso tiene que estar hecha (como casos N del generador, §10) antes de que se use el armado de pilares de la fase de comprobaciones (CO1). **Hecha el 2026-11-15: la fase IG (`imperfeccion.md`).** Sus casos son hipótesis horizontales y llevan su γz.
 
 ## 9. Tramos y criterios
 
@@ -142,7 +142,7 @@ El coste de la fase en ecuaciones es cero (el modelo analítico no cambia). El t
 
 ## 10. Fuera de esta fase
 
-- Las **cargas nocionales de imperfección** del A22 §5.3.2 (H = φ·V por planta) y la imperfección global del A19 §5.2 (θ_i = 1/200·α_h·α_m): `fem2d` las pone; aquí irían como casos N del generador (ya previstos: `TipoAccion` N, `derivadoDe`). Cuando se integren las comprobaciones de acero.
+- Las **cargas nocionales de imperfección** del A22 §5.3.2 (H = φ·V por planta) y la imperfección global del A19 §5.2 (θ_i = 1/200·α_h·α_m): `fem2d` las pone; aquí irían como casos N del generador (ya previstos: `TipoAccion` N, `derivadoDe`). Cuando se integren las comprobaciones de acero. **Hecho el 2026-11-15 (fase IG, `imperfeccion.md`),** sin la exención del acero.
 - El **coeficiente por planta** (θ_i de cada planta en vez del γz global): el A22 §5.2.2(5)B amplifica por planta; CYPECAD, globalmente. Si la sombra enseña plantas blandas (una planta baja diáfana), se mide.
 - El **P-Δ geométrico** (B2) y los **periodos con la rigidez fisurada** (EC8 §4.3.1(7), la mitad de la bruta; NCSE-02 no lo pide).
 - La **reducción de sobrecarga** en P (CYPECAD tampoco la hace).

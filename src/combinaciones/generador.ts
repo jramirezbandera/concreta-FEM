@@ -16,9 +16,12 @@
  *   el mismo estado, cada una con su γ de la tabla 4.1;
  * - una variable favorable no está (γ = 0) y de cada familia excluyente (viento en 4 direcciones,
  *   sismo con ±e) entra como mucho un caso;
- * - las cargas nocionales (casos N, derivados de un caso vertical, RES-17) entran en ELU-PT con el
- *   factor de su caso origen y el signo de la acción lateral presente; sin acción lateral, una
- *   combinación por dirección y signo;
+ * - las cargas nocionales (casos N, derivados de un caso vertical, RES-17: la imperfección geométrica
+ *   global del CE Anejo 19 §5.2) entran en ELU-PT y en ELU-ACC (las situaciones persistentes y
+ *   accidentales de su apartado 5.2(2)P; no en la sísmica ni en servicio) con el factor de su caso
+ *   origen y el signo de la acción lateral presente; sin acción lateral, una combinación por
+ *   dirección y signo. Una nocional sin `signo` vale para los dos sentidos: entra con el factor de su
+ *   origen o con su opuesto;
  * - sin combinaciones repetidas (un ψ = 0 deja una combinación igual a otra).
  *
  * El perfil «cype» reproduce los coeficientes de una memoria CYPE de CE/CTE (P2115, A.3): G
@@ -47,7 +50,10 @@ export interface CasoCarga {
   psi?: Psi;
   /** G: fila de la tabla 4.1 (peso propio y del terreno por defecto). */
   permanente?: "peso" | "empuje" | "agua";
-  /** W, E y N: dirección horizontal; W y N, además, el signo. */
+  /**
+   * W, E y N: dirección horizontal; W y N, además, el signo. Una N sin signo es reversible: el
+   * generador la pone en el sentido que toque, con el factor de su origen o con su opuesto.
+   */
   direccion?: "X" | "Y";
   signo?: 1 | -1;
   /** N: id del caso vertical del que deriva (Hi = φ·Ni). */
@@ -187,7 +193,7 @@ function validar(casos: readonly CasoCarga[]): void {
     if (c.signo !== undefined && c.signo !== 1 && c.signo !== -1) throw new Error(`el signo del caso ${c.id} es 1 o −1 (es ${JSON.stringify(c.signo)})`);
     if (c.tipo === "E" && !c.direccion) throw new Error(`el sismo ${c.id} no tiene dirección`);
     if (c.tipo === "N") {
-      if (!c.direccion || !c.signo) throw new Error(`la nocional ${c.id} no tiene dirección y signo`);
+      if (!c.direccion) throw new Error(`la nocional ${c.id} no tiene dirección`);
       const origen = casos.find((o) => o.id === c.derivadoDe);
       if (!origen || !(origen.tipo === "G" || origen.tipo === "Q" || origen.tipo === "S")) {
         throw new Error(`la nocional ${c.id} no deriva de un caso vertical (G, Q o S)`);
@@ -319,19 +325,32 @@ export function generarCombinaciones(casos: readonly CasoCarga[], opciones: Opci
   }
   return salida;
 
-  /** Cargas nocionales: sólo en ELU-PT, con el factor de su caso origen. */
+  /**
+   * Cargas nocionales: sólo en ELU-PT y ELU-ACC (CE A19 §5.2(2)P), con el factor de su caso origen. Con
+   * viento en la combinación, en su dirección y su sentido; sin él, una combinación por dirección y
+   * sentido. Una nocional sin signo entra en los dos sentidos de su dirección, con el factor de su
+   * origen o con su opuesto.
+   */
   function conNocionales(s: Situacion, f: Float64Array): Float64Array[] {
-    if (s !== "ELU-PT" || nocionales.length === 0) return [f];
+    if ((s !== "ELU-PT" && s !== "ELU-ACC") || nocionales.length === 0) return [f];
     const laterales = new Set<string>();
     casos.forEach((c, i) => {
       if (c.tipo === "W" && f[i]! > 0 && c.direccion && c.signo) laterales.add(`${c.direccion}${c.signo}`);
     });
-    const pares = laterales.size > 0 ? [laterales] : [...new Set(nocionales.map((i) => `${casos[i]!.direccion}${casos[i]!.signo}`))].map((p) => new Set([p]));
+    const posibles = new Set<string>();
+    for (const i of nocionales) {
+      const c = casos[i]!;
+      for (const sg of c.signo ? [c.signo] : [1, -1]) posibles.add(`${c.direccion}${sg}`);
+    }
+    const pares = laterales.size > 0 ? [laterales] : [...posibles].map((p) => new Set([p]));
     return pares.map((activos) => {
       const g = f.slice();
       for (const i of nocionales) {
         const c = casos[i]!;
-        if (activos.has(`${c.direccion}${c.signo}`)) g[i] = f[indice.get(c.derivadoDe!)!]!;
+        const fo = f[indice.get(c.derivadoDe!)!]!;
+        if (c.signo) {
+          if (activos.has(`${c.direccion}${c.signo}`)) g[i] = fo;
+        } else g[i] = (activos.has(`${c.direccion}1`) ? fo : 0) - (activos.has(`${c.direccion}-1`) ? fo : 0);
       }
       return g;
     });

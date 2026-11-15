@@ -259,6 +259,14 @@ export type AccionCaso = Omit<CasoCarga, "id" | "psi" | "simultaneo"> & {
    * { psi0, psi1, psi2 }, si son otros.
    */
   psi?: Psi | PsiNombrado;
+  /**
+   * Fase IG (`docs/fem3d/imperfeccion.md`), sólo en una nocional (N): la inclinación θ, en radianes,
+   * de la imperfección geométrica global. Con ella el caso no lleva cargas: las pone el programa, una
+   * fuerza horizontal θ·P en su `direccion` en cada nudo, con P la carga vertical que el caso
+   * `derivadoDe` pone en él. Así son los casos que el programa añade por defecto
+   * (`acciones.imperfeccion`); sin ella, una nocional lleva las cargas que se le escriban.
+   */
+  inclinacion?: number;
 };
 
 /**
@@ -658,6 +666,31 @@ export interface AccionesEdificio {
    * defecto, activado en cuanto hay hipótesis horizontales. Basta con no escribirlo.
    */
   segundoOrden?: SegundoOrdenEdificio;
+  /**
+   * Fase IG (`docs/fem3d/imperfeccion.md`): la imperfección geométrica global del Código Estructural
+   * (Anejo 19 §5.2): una inclinación θ de toda la estructura, como fuerzas horizontales θ·P en casos
+   * del programa que entran en las combinaciones de ELU persistentes y accidentales. Por defecto,
+   * aplicada en cuanto hay casos verticales (G, Q o S) y pilares o muros. Basta con no escribirlo.
+   */
+  imperfeccion?: ImperfeccionEdificio;
+}
+
+/**
+ * La imperfección geométrica global (IG). De cada caso vertical (G, Q o S) salen dos casos del
+ * programa, `IMP-X(<caso>)` e `IMP-Y(<caso>)`, nocionales (N) con `inclinacion`: en cada nudo, una
+ * fuerza horizontal θ·P con P la carga vertical que el caso pone en él (H_i = θ_i·(N_b − N_a), CE A19
+ * §5.2(8)). El generador los pone en las combinaciones de ELU-PT y ELU-ACC con el factor de su caso de
+ * origen: en el sentido del viento de la combinación o, sin viento, una combinación por sentido.
+ */
+export interface ImperfeccionEdificio {
+  /** ¿Se añaden los casos de la imperfección? Por defecto, sí. */
+  aplicar?: boolean;
+  /**
+   * La inclinación θ, en radianes. Por defecto, la del CE A19 §5.2(5): θ = θ₀·α_h·α_m, con θ₀ = 1/200,
+   * α_h = 2/√l entre 2/3 y 1 (l, la altura del edificio en m) y α_m = √(0,5·(1 + 1/m)) (m, los pilares
+   * y muros de la planta que menos tiene).
+   */
+  inclinacion?: number;
 }
 
 /**

@@ -47,7 +47,8 @@ const PILAR = "P0-0";
 /** El edificio de losas con la acción de cada caso y el sismo en las acciones. */
 function edificio(plantas: number, sismoE: SismoEdificio | null = SISMO): ModeloFisico {
   const f = edificioObjetivoLosas(plantas, 3, 2);
-  return { ...f, casos: f.casos.map((c) => ({ ...c, accion: ACCIONES[c.id]! })), ...(sismoE ? { acciones: { sismo: sismoE } } : {}) };
+  // IG: sin la imperfección geométrica global (estas pruebas son las del sismo, con sus cuatro casos estáticos)
+  return { ...f, casos: f.casos.map((c) => ({ ...c, accion: ACCIONES[c.id]! })), acciones: { ...(sismoE ? { sismo: sismoE } : {}), imperfeccion: { aplicar: false } } };
 }
 
 type Compilado = Extract<ResultadoCompilacion, { valido: true }>;

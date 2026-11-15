@@ -430,14 +430,14 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     <>
       <Campo etiqueta="Caso activo" ancho={300}>
         <select className="sel w-full" value={casoValido} onChange={(x) => setCaso(x.target.value)} aria-label="Caso activo" title={textoCaso(e.casos.find((c) => c.id === casoValido))}>
-          {/* VS4: los casos del programa (el viento y el sismo de las acciones), detrás, en su grupo */}
+          {/* VS4: los casos del programa (el viento y el sismo de las acciones, y la imperfección global), detrás, en su grupo */}
           {e.casos.filter((c) => !c.programa).map((c) => (
             <option key={c.id} value={c.id}>
               {textoCaso(c)}
             </option>
           ))}
           {e.casos.some((c) => c.programa) && (
-            <optgroup label="Del programa (viento y sismo)">
+            <optgroup label="Del programa (viento, imperfección y sismo)">
               {e.casos.filter((c) => c.programa).map((c) => (
                 <option key={c.id} value={c.id}>
                   {textoCaso(c)}

@@ -236,6 +236,8 @@ describe("losa plana: plantas, flechas, reacciones, bandas y combinaciones (C5, 
         { tipo: "superficie", id: "q", caso: "Q", planta: "P1", losa: "L", q: [0, 0, -Q] },
         ...pilares.map((p) => ({ tipo: "pilar" as const, id: `w-${p.id}`, caso: "W", pilar: p.id, ejes: "global" as const, q: [2, 0, 0] as const })),
       ],
+      // IG: sin la imperfección geométrica global (las combinaciones de esta prueba son las de sus tres casos)
+      acciones: { imperfeccion: { aplicar: false } },
     };
     return { ...f, bandas: proponerBandas(f).bandas };
   }
@@ -540,6 +542,7 @@ describe("reacciones por objeto con nudos compartidos (A2-47)", () => {
       { id: "Q", accion: { tipo: "Q", psi: "uso-A" } },
       { id: "W", accion: { tipo: "Q", psi: "uso-A" } },
     ];
+    f.acciones = { imperfeccion: { aplicar: false } };
     const { c } = preparar(f);
     const r = c.combinacionesGeneradas({ situaciones: ["ELU-PT"] });
     if (!r.valido) throw new Error("sin combinaciones");

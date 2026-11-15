@@ -36,7 +36,7 @@ let s: Sesion;
 beforeAll(async () => {
   await iniciarNucleo(WASM);
   const f = edificioObjetivoLosas(2, 3, 2);
-  const modelo: ModeloFisico = { ...f, casos: f.casos.map((c) => ({ ...c, accion: ACCIONES[c.id]! })), acciones: { sismo: { ab: 0.16, K: 1.0, terreno: "III", mu: 2 } } };
+  const modelo: ModeloFisico = { ...f, casos: f.casos.map((c) => ({ ...c, accion: ACCIONES[c.id]! })), acciones: { sismo: { ab: 0.16, K: 1.0, terreno: "III", mu: 2 }, imperfeccion: { aplicar: false } } };
   const a = Sesion.abrir(JSON.stringify({ esquema: VERSION_ESQUEMA, modelo }), MOTOR);
   if (!a.valido) throw new Error(JSON.stringify(a.diagnosticos));
   s = a.sesion;
@@ -132,8 +132,11 @@ describe("VS4 en el visor: las acciones del programa a la vista", () => {
     if (!sinCalcular.valido) throw new Error("no abre");
     const e = sinCalcular.sesion.estado();
     const programa = e.casos.filter((c) => c.programa);
-    expect(programa.map((c) => c.id)).toEqual(["W+X+e", "W+X-e", "W-X+e", "W-X-e", "W+Y+e", "W+Y-e", "W-Y+e", "W-Y-e", "EX+e", "EX-e", "EY+e", "EY-e"]);
-    expect(programa.map((c) => c.programa)).toEqual([...Array<string>(8).fill("viento"), ...Array<string>(4).fill("sismo")]);
+    // IG: entre los del viento y los del sismo, los de la imperfección global de G y de Q (el orden de los resultados)
+    expect(programa.map((c) => c.id)).toEqual(["W+X+e", "W+X-e", "W-X+e", "W-X-e", "W+Y+e", "W+Y-e", "W-Y+e", "W-Y-e", "IMP-X(G)", "IMP-Y(G)", "IMP-X(Q)", "IMP-Y(Q)", "EX+e", "EX-e", "EY+e", "EY-e"]);
+    expect(programa.map((c) => c.programa)).toEqual([...Array<string>(8).fill("viento"), ...Array<string>(4).fill("imperfeccion"), ...Array<string>(4).fill("sismo")]);
+    // (sus cargas no se dibujan: son θ·P en cada nudo)
+    expect(sinCalcular.sesion.escenaA4(f.plantas[0]!.id, { vista: "cargas", caso: "IMP-X(G)" }).valido).toBe(true);
     expect(e.casos.slice(0, f.casos.length).every((c) => !c.programa)).toBe(true);
     // el viento, por plantas, y la planta de un caso del viento se dibuja con sus puntuales
     const v = sinCalcular.sesion.viento();

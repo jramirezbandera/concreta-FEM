@@ -6,7 +6,8 @@
  * 2. Numeración de GDL con las restricciones por transformación (u = T·û).
  * 3. Partes del modelo sin ningún apoyo (mecanismo de sólido rígido evidente).
  * 4. Cargas: nodales, de barra (fuerzas nodales equivalentes de sus FER) y de lámina, b = Tᵀ·f
- *    por caso y desplazamientos impuestos.
+ *    por caso y desplazamientos impuestos. Las de un caso derivado (fase IG, `derivados.ts`) salen de
+ *    las fuerzas nodales equivalentes de su caso de origen: van después de las de los demás.
  * 5. Patrón CSC y ensamblado de K' = Tᵀ·K·T.
  * 6. Factorización con diagnóstico de mecanismos, resolución por bloque y refinamiento.
  * 7. Recuperación: u = T·û, reacciones de apoyos y muelles a tierra, esfuerzos de las barras y
@@ -24,6 +25,7 @@ import { cargasDeBarrasDelCaso, desplazamientosLocales, equivalentesEnNudos, esf
 import { Diagnosticos, listaIds } from "./diagnosticos.ts";
 import { elementosDelModelo, esMuelleATierra, geometria, rigidezGlobal, type ElementoMotor, type Geometria } from "./elementos.ts";
 import { ensamblarRigidez, patronSistema } from "./ensamblado.ts";
+import { cargasDerivadas, origenesDerivados } from "./derivados.ts";
 import { desequilibrioCargas, equilibrio, sumaResultantes } from "./equilibrio.ts";
 import { desplazamientosFisicos, fuerzasIndependientes, numerar, TipoGdl, type Numeracion } from "./gdl.ts";
 import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada } from "./laminas.ts";
@@ -178,6 +180,8 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
       }
     }
   });
+  // IG: los casos derivados, con el índice de su caso de origen
+  const origen = origenesDerivados(casos, diag);
   // VS2: los casos que hacen de masa, con su fracción
   const defModal = modelo.modal ? definicionModal(modelo, diag) : null;
   if (diag.hayErrores) return fallo();
@@ -199,10 +203,15 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   /** VS2: masa de cada nudo, t: la componente vertical hacia abajo de las cargas de los casos que hacen de masa, entre g. */
   const masa = defModal ? new Float64Array(nn) : null;
   /** SO: la carga vertical hacia abajo de cada caso en cada nudo (−Fz de sus fuerzas nodales equivalentes), kN, y su resultante. */
-  const pesos: Float64Array[] = [];
-  const resultantes: { F: [number, number, number]; zF: [number, number] }[] = [];
-  casos.forEach((caso, k) => {
-    const t = cargasNodales(caso, P);
+  const pesos: Float64Array[] = new Array(nc);
+  const resultantes: { F: [number, number, number]; zF: [number, number] }[] = new Array(nc);
+  /** Cargas nodales del caso k, 6 por nudo: las suyas o, en un caso derivado, las que salen de su origen (ya montado). */
+  const nodalesDe = (k: number): Float64Array => (casos[k]!.derivado ? cargasDerivadas(casos[k]!.derivado!, pesos[origen[k]!]!) : cargasNodales(casos[k]!, P));
+  // IG: los derivados, detrás de los demás (necesitan las cargas de su origen)
+  const ordenCargas = [...casos.keys()].filter((k) => !casos[k]!.derivado).concat([...casos.keys()].filter((k) => casos[k]!.derivado));
+  for (const k of ordenCargas) {
+    const caso = casos[k]!;
+    const t = nodalesDe(k);
     const porBarra = deBarras[k]!.porBarra;
     const deLamina = deLaminas[k]!.equivalentes;
     if (deLamina) for (let q = 0; q < P; q++) t[q] += deLamina[q]!;
@@ -238,8 +247,8 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
       zF[0] += z * fx;
       zF[1] += z * fy;
     }
-    pesos.push(peso);
-    resultantes.push({ F, zF });
+    pesos[k] = peso;
+    resultantes[k] = { F, zF };
     const b = fuerzasIndependientes(num, t);
     for (let j = 0; j < n; j++) B[n * k + j] = b[num.gdlDeEcuacion[j]!]!;
     for (let i = 0; i < nCoart; i++) bCoartados[nCoart * k + i] = b[num.coartados[i]!]!;
@@ -253,7 +262,7 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         [caso.id, ...new Set(perdidas.map((q) => modelo.nudos[Math.floor(q / 6)]!.id))],
       );
     }
-  });
+  }
   if (diag.hayErrores) return fallo();
   // VS2: la masa, a los diafragmas, y una carga unidad en cada GDL dinámico (los lados nc … nc + nm − 1)
   let plan: PlanModal | null = null;
@@ -441,8 +450,9 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     const u = desplazamientosFisicos(num, uI);
     const reacciones = reaccionesDe(uI, u, k);
     const extra = sumaResultantes(deBarras[k]!.resultante, deLaminas[k]!.resultante);
-    const eq = equilibrio(geo, cargasNodales(caso, P), reacciones, magnitud, extra);
-    const eqCargas = desequilibrioCargas(geo, cargasNodales(caso, P), reacciones, extra);
+    const fNodales = nodalesDe(k);
+    const eq = equilibrio(geo, fNodales, reacciones, magnitud, extra);
+    const eqCargas = desequilibrioCargas(geo, fNodales, reacciones, extra);
     // Esfuerzos de las barras en los extremos de su tramo flexible
     const esfuerzosBarras = new Float64Array(12 * (modelo.barras?.length ?? 0));
     for (const e of elementos) {

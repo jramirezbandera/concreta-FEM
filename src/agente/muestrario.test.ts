@@ -39,7 +39,10 @@ describe("muestrario de la app", () => {
     expect(c.diagnosticos.filter((d) => !["malla/esquina-sin-refinar", "malla/pilar-tapado-sin-refinar"].includes(d.codigo))).toEqual([]);
     if (!c.valido) return;
     const casos = casosValidos(calcular(c.modelo));
-    expect(casos.length).toBe(f.casos.length);
+    // IG: detrás de los del fichero, dos casos de la imperfección global por cada caso vertical
+    const verticales = f.casos.filter((x) => x.accion && ["G", "Q", "S"].includes(x.accion.tipo)).length;
+    expect(verticales).toBeGreaterThan(0);
+    expect(casos.length).toBe(f.casos.length + 2 * verticales);
     const q = new Consultas(f, c, casos);
 
     const sel = seleccionPorDefecto(f.casos, "esfuerzos");

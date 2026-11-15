@@ -1211,7 +1211,7 @@ const casos: DefTabla = {
     { clave: "familia", titulo: "familia", ayuda: "un nombre común a casos que se excluyen (el viento en ±X y ±Y): en cada combinación entra como mucho uno" },
     { clave: "permanente", titulo: "permanente", ayuda: "sólo en G, la fila de la tabla 4.1: peso (γ 1,35 / 0,80, por defecto), empuje del terreno (1,35 / 0,70) o agua (1,20 / 0,90)", opciones: fijas(["peso", "empuje", "agua"], "peso") },
     { clave: "direccion", titulo: "dirección", ayuda: "W, E y N: el eje global en que empuja, X o Y; en sismo, la otra dirección entra al 30 %", opciones: fijas(["X", "Y"], "sin dirección") },
-    { clave: "signo", titulo: "signo", ayuda: "W y N: el sentido, hacia +eje (1) o −eje (-1)", opciones: fijas(["1", "-1"], "sin signo") },
+    { clave: "signo", titulo: "signo", ayuda: "W y N: el sentido, hacia +eje (1) o −eje (-1); una N sin signo vale para los dos sentidos", opciones: fijas(["1", "-1"], "sin signo") },
     { clave: "derivadoDe", titulo: "deriva de", ayuda: "N: el caso vertical (G, Q o S) cuyo peso la genera; entra con su mismo factor", opciones: casos_("ninguno"), referencia: "casos" },
     { clave: "duracion", titulo: "duración", ayuda: "clase de duración (DB SE-M, tabla 2.2), sólo para el kmod de la madera: permanente, larga, media, corta o instantánea; por defecto, la de la acción", opciones: fijas(["permanente", "larga", "media", "corta", "instantanea"], "la del tipo") },
   ],

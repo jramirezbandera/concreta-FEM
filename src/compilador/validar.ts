@@ -14,6 +14,7 @@ import { problemaBorde, resolverBordes } from "./bordes.ts";
 import { erroresSegundoOrden } from "./segundoOrden.ts";
 import { calcularSismo } from "./sismo.ts";
 import { calcularViento, resolverViento } from "./viento.ts";
+import { calcularImperfeccion, INCLINACION_MAXIMA, resolverImperfeccion } from "./imperfeccion.ts";
 import { erroresEmplazamiento } from "./emplazamiento.ts";
 import { erroresNieve } from "./nieve.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
@@ -375,8 +376,9 @@ function lejosDelOrigen(fisico: Record<string, unknown>, diag: Diagnosticos): vo
 /** El modelo con los ábacos de los pilares (MA2) y las cargas de borde (MA4) resueltos, como lo valida y compila el compilador. */
 export function fisicoResuelto(fisico: ModeloFisico, op: Pick<OpcionesResueltas, "tamanoMalla" | "epsGeom" | "epsSnap">): ModeloFisico {
   // VS1: los casos y las cargas del viento del programa, al final de las listas
+  // IG: detrás, los casos de la imperfección geométrica global
   // LC-c: los pilares y muros sin base escrita que arrancan en una losa de cimentación, apoyados en ella
-  return resolverCimentacion(resolverViento(resolverBordes(resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom).modelo, op.epsSnap).modelo).modelo, op.epsSnap);
+  return resolverCimentacion(resolverImperfeccion(resolverViento(resolverBordes(resolverAbacos(fisico, op.tamanoMalla / 2, op.epsGeom).modelo, op.epsSnap).modelo).modelo).modelo, op.epsSnap);
 }
 
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
@@ -397,6 +399,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   if (fisico.acciones?.sismo !== undefined) for (const e of calcularSismo(fisico)?.errores ?? []) diag.error(e.codigo, e.mensaje, e.ids);
   // SO: el segundo orden global
   for (const e of erroresSegundoOrden(fisico.acciones?.segundoOrden)) diag.error(e.codigo, e.mensaje);
+  // IG: la imperfección global (si sus casos no se han podido añadir, por qué)
+  for (const e of calcularImperfeccion(fisico).errores) diag.error(e.codigo, e.mensaje, e.ids);
   if (!(num(op.epsGeom) && op.epsGeom > 0 && num(op.epsSnap) && op.epsSnap >= op.epsGeom && num(op.factorZonaRigida) && op.factorZonaRigida >= 0 && op.factorZonaRigida <= 1)) {
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
     return null;
@@ -742,6 +746,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       conPeso.map((c) => c.id),
     );
   validarAcciones(casos, caso, mal);
+  // IG: una nocional con su inclinación no lleva cargas (las pone el programa) ni el peso propio
+  const inclinados = new Set(casos.filter((c) => (c as unknown as { accion?: { inclinacion?: unknown } }).accion?.inclinacion !== undefined).map((c) => c.id));
+  for (const c of casos) if (inclinados.has(c.id) && c.pesoPropio === true) mal(c.id, "un caso de la imperfección (con su inclinación) no puede llevar el peso propio");
+  for (const c of cargas) if (inclinados.has(c.caso)) mal(c.id, `el caso ${c.caso} es de la imperfección global (lleva su inclinación): sus cargas las pone el programa y no admite otras`);
   const pilarDe = new Map(pilares.map((p) => [p.id, p] as const));
   const vigaDe = new Map(vigas.map((v) => [v.id, v] as const));
   const barraDe = new Map(barras.map((b) => [b.id, b] as const));
@@ -1334,7 +1342,7 @@ const DURACIONES = ["permanente", "larga", "media", "corta", "instantanea"];
 /**
  * La acción de cada caso (C5.4, C5-f): el esquema de `CasoCarga` y las reglas del generador de
  * combinaciones (`src/combinaciones/generador.ts`: ψ en las variables, dirección en el sismo,
- * dirección, signo y caso vertical de origen en las nocionales, familias de un solo tipo), para que
+ * dirección y caso vertical de origen en las nocionales, familias de un solo tipo), para que
  * un dato mal puesto sea un error con el id del caso y no una excepción al combinar.
  */
 function validarAcciones(casos: readonly CasoFisico[], caso: ReadonlyMap<string, number>, mal: (id: string, que: string) => void): void {
@@ -1365,9 +1373,15 @@ function validarAcciones(casos: readonly CasoFisico[], caso: ReadonlyMap<string,
     if (a.duracion !== undefined && (typeof a.duracion !== "string" || !DURACIONES.includes(a.duracion))) mal(c.id, "la duración tiene que ser permanente, larga, media, corta o instantanea");
     if (a.tipo === "E" && a.direccion === undefined) mal(c.id, "el sismo necesita su dirección (X o Y)");
     if (a.tipo === "N") {
-      if (a.direccion === undefined || a.signo === undefined) mal(c.id, "la carga nocional necesita su dirección y su signo");
+      // IG: sin signo, vale para los dos sentidos
+      if (a.direccion === undefined) mal(c.id, "la carga nocional necesita su dirección (X o Y)");
       if (typeof a.derivadoDe !== "string" || !caso.has(a.derivadoDe)) mal(c.id, `la carga nocional deriva de un caso que no existe («${String(a.derivadoDe)}»)`);
-    } else if (a.derivadoDe !== undefined) mal(c.id, "sólo una carga nocional (N) deriva de otro caso");
+      if (a.inclinacion !== undefined && !(num(a.inclinacion) && (a.inclinacion as number) > 0 && (a.inclinacion as number) <= INCLINACION_MAXIMA))
+        mal(c.id, `la inclinación de la imperfección va en radianes y tiene que ser mayor que 0 y no mayor que ${String(INCLINACION_MAXIMA)}`);
+    } else {
+      if (a.derivadoDe !== undefined) mal(c.id, "sólo una carga nocional (N) deriva de otro caso");
+      if (a.inclinacion !== undefined) mal(c.id, "sólo una carga nocional (N) lleva la inclinación de la imperfección");
+    }
   }
   for (const c of casos) {
     const a = (c as unknown as Record<string, unknown>).accion as Record<string, unknown> | undefined;
