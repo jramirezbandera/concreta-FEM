@@ -22,10 +22,13 @@ if (import.meta.main) {
   for (const hA of process.argv.slice(2)) {
     const [th, te] = hA.split("/");
     const proyecto = { esquema: "concreta-fem/proyecto@1", nombre: "x", modelo: modeloPB8(), opciones: { tamanoMalla: Number(th), ...(te ? { epsSnap: Number(te) } : {}) } };
-    const s = Sesion.abrir(JSON.stringify(proyecto), sha256(new Uint8Array(WASM))).sesion;
+    const a = Sesion.abrir(JSON.stringify(proyecto), sha256(new Uint8Array(WASM)));
+    if (!a.valido) throw new Error(`El modelo no abre: ${a.diagnosticos.map((d) => d.mensaje).join(" ")}`);
+    const s = a.sesion;
     await s.calcular();
     for (const f of ["L-N1:X1", "L-N1:Y1"]) {
       const r = s.q!.franja(f);
+      if (!r.valido) throw new Error(`La franja ${f} no se lee: ${r.diagnosticos.map((d) => d.mensaje).join(" ")}`);
       const e = r.valor.estaciones.find((x: any) => x.tipo === "cara" && x.piezas.includes("P0-0") && Math.abs(x.s - 0.4) < 1e-6);
       console.log(hA, f, e ? `${e.metodo} mx ${e.medios[3].toFixed(2)} my ${e.medios[4].toFixed(2)} mxy ${e.medios[5].toFixed(2)} avisos ${e.diagnosticos.map((d: any) => d.codigo).join(",")}` : "sin estación");
     }

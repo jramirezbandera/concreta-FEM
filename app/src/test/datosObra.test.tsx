@@ -135,7 +135,7 @@ describe("DO2: Datos de la obra", () => {
   it("«Más tarde» lleva a las plantas sin escribir nada; después se abre desde «Obra» y desde el nombre de la barra de título", async () => {
     const dlg = await obraNueva("do-tarde");
     fireEvent.click(within(dlg).getByRole("button", { name: "Más tarde" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Plantas" }, { timeout: 10_000 })).getByRole("button", { name: "Cerrar" }));
     expect((deshacer() as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(within(barra()).getByRole("button", { name: "Obra" }));
     let obra = screen.getByRole("dialog", { name: "Datos de la obra" });

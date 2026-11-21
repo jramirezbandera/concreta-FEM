@@ -69,7 +69,7 @@ describe("la herramienta activa (V2c-1)", () => {
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
     fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Plantas" }, { timeout: 10_000 })).getByRole("button", { name: "Cerrar" }));
 
     const pilar = screen.getByRole("button", { name: "Pilar" });
     expect(pilar.getAttribute("aria-pressed")).toBe("false");
@@ -152,7 +152,7 @@ describe("la herramienta activa (V2c-1)", () => {
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
     fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Plantas" }, { timeout: 10_000 })).getByRole("button", { name: "Cerrar" }));
 
     // Forjado: recuadro y maciza por defecto, con el material del proyecto; reticular, 25+5 y el pp que sale solo (obligatorio con un casetón de otro material)
     fireEvent.click(screen.getByRole("button", { name: "Forjado" }));
@@ -234,7 +234,7 @@ describe("la herramienta activa (V2c-1)", () => {
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
     fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Plantas" }, { timeout: 10_000 })).getByRole("button", { name: "Cerrar" }));
 
     const celda = () => document.querySelector<HTMLElement>(".celda")!;
     const alzado = screen.getByRole("button", { name: "Alzado" }) as HTMLButtonElement;

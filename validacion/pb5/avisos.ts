@@ -13,5 +13,5 @@ for (const p of [0.3, 0.35, 0.4, 0.45, 0.5, [0.3, 0.5], [0.5, 0.3], [0.4, 0.6]] 
 for (const [n, op] of V) {
   const c = compilar(recuadros(2, 2, op));
   const av = c.diagnosticos.filter((d) => MALLA.includes(d.codigo)).map((d) => `${d.codigo.replace("malla/", "")} [${(d.ids ?? []).slice(1).join(",")}]`);
-  console.log(n.padEnd(40), c.valido, String(c.modelo?.nudos.length).padStart(6), av.join(" | "));
+  console.log(n.padEnd(40), c.valido, String(c.valido ? c.modelo.nudos.length : undefined).padStart(6), av.join(" | "));
 }

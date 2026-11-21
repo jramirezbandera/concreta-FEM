@@ -70,9 +70,12 @@ async function proyectoNuevo(nombre: string, abierto = false) {
   fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: nombre } });
   fireEvent.click(screen.getByRole("button", { name: "Crear" }));
   await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
-  // DO: primero los datos de la obra; «Más tarde» lleva a las plantas
+  // DO: primero los datos de la obra; «Más tarde» lleva a las plantas. El gestor se espera: si el clic llega
+  // antes de que el gestor abierto se haya suscrito a los pedidos (recién montado con el proyecto), el
+  // de plantas sale un instante después, no en el mismo paso
   fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
-  if (!abierto) fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
+  const plantas = await screen.findByRole("dialog", { name: "Plantas" }, { timeout: 10_000 });
+  if (!abierto) fireEvent.click(within(plantas).getByRole("button", { name: "Cerrar" }));
 }
 
 const barra = () => screen.getByRole("toolbar", { name: "Herramientas de Modelo" });
