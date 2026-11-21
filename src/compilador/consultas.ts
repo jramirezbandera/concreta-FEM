@@ -824,6 +824,19 @@ export class Consultas {
     return r ? { valido: true, valor: r, diagnosticos: [] } : this.noExiste("La franja", id);
   }
 
+  /**
+   * CO3: el mayor cortante medio |v| (kN/m) de cada estación de una franja en las combinaciones dadas,
+   * con la combinación (su índice) que lo da. Con el sismo del programa, el pésimo (VS-o).
+   */
+  cortanteFranja(id: string, combinaciones: readonly ArrayLike<number>[]): Respuesta<{ v: number; comb: number }[]> {
+    for (const f of combinaciones) {
+      const mal = this.factoresMal<{ v: number; comb: number }[]>(f, id);
+      if (mal) return mal;
+    }
+    const r = this.esfuerzosFranjas().envolventeCortante(id, combinaciones);
+    return r ? { valido: true, valor: r, diagnosticos: [] } : this.noExiste("La franja", id);
+  }
+
   private muros(): EsfuerzosMuros {
     return (this.murosC ??= new EsfuerzosMuros(this.fisico, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { ...this.opciones, campos: this.campos, cortes: this.cortes, efimeros: this.efimeros ?? undefined }));
   }

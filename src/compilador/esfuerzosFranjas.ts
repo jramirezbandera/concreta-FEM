@@ -146,6 +146,12 @@ export interface EstacionFranja {
   anchoEnLosa: number;
   /** [mx, my, mxy] medios por caso (3·nc), kN·m/m, en los ejes de la franja. */
   medios: Float64Array;
+  /**
+   * CO3: el cortante medio por caso (nc), kN/m: el Vz del corte de la estación entre su ancho en losa.
+   * Su signo es el del corte (el del lado tomado): vale su valor absoluto tras combinar. En el metro de
+   * un pilar es el de la losa que entra en su ventana (punzonamiento, CO4), no un cortante de viga.
+   */
+  cortantes: Float64Array;
   metodo: "fuerzas-nodales" | "campos";
   /** Distancia a la cara o al apoyo de la recta de campos de my y mxy, m (LV2-h: un canto con un borde rígido detrás, si no δ); 0 en una de paso. */
   distanciaMuestras: number;
@@ -198,6 +204,8 @@ const RECTAS_POR_SUELTA = 48;
 /** Lo que una recta da a cada franja de un grupo: Σ peso·[Mx, My, Mxy] por caso, el peso (ancho) y el de los ábacos. */
 interface PorFranja {
   m: Float64Array;
+  /** CO3: Σ peso·Qx por caso (el Vz del corte en el ancho), kN. */
+  v: Float64Array;
   w: number;
   wAbaco: number;
   /** En las muestras de una cara o un apoyo, la distancia a la que se tomaron (LV2-h). */
@@ -334,6 +342,32 @@ export class EsfuerzosFranjas {
     });
   }
 
+  /**
+   * CO3: el mayor |v| (kN/m) de cada estación de la franja en unas combinaciones, con la que lo da
+   * (−1 si es 0 en todas; NaN en una estación que no vale). Con el sismo del programa, el valor
+   * absoluto de la parte estática más la amplitud del sismo (VS-o). null si la franja no existe.
+   */
+  envolventeCortante(id: string, combinaciones: readonly ArrayLike<number>[]): { v: number; comb: number }[] | null {
+    const r = this.estaciones(id);
+    if (!r) return null;
+    const conSismo = combinaciones.map((f) => !!this.logicos && !this.logicos.esLineal(f));
+    return r.estaciones.map((e) => {
+      if (!e.valido) return { v: NaN, comb: -1 };
+      const porLogico = this.logicos?.porLogico(e.cortantes, 1);
+      const m = { v: 0, comb: -1 };
+      combinaciones.forEach((f, c) => {
+        let v: number;
+        if (porLogico && conSismo[c]) {
+          const p = this.logicos!.partirLogico(porLogico, 1, f);
+          v = Math.abs(p.estatica[0]!) + Math.abs(p.sismo[0]!);
+        } else v = Math.abs((porLogico ? this.logicos!.combinarLogico(porLogico, 1, f) : this.combinar(e.cortantes, 1, f))[0]!);
+        if (!Number.isFinite(v)) m.v = NaN;
+        else if (v > m.v) [m.v, m.comb] = [v, c];
+      });
+      return Number.isNaN(m.v) ? { v: NaN, comb: -1 } : m;
+    });
+  }
+
   /** Las estaciones de todas las franjas de una losa en una dirección. */
   private calcularGrupo(l: LosaCompilada, k: 1 | 2): void {
     this.efimeros?.trabajarEn(l.losa.planta);
@@ -376,7 +410,7 @@ export class EsfuerzosFranjas {
       return { corte: { id: `${l.losa.id}:${k}@${s.toFixed(3)}`, origen: [O[0], O[1], z], x: [sx * d[0], sx * d[1], 0], vz: [0, 0, 1], y: [Math.min(0, yb), Math.max(0, yb)], z: [0, 0], soloLaminas: true, ...extra }, sigma };
     };
 
-    const vacio = (): PorFranja => ({ m: new Float64Array(3 * nc), w: 0, wAbaco: 0 });
+    const vacio = (): PorFranja => ({ m: new Float64Array(3 * nc), v: new Float64Array(nc), w: 0, wAbaco: 0 });
 
     /**
      * Campos por la recta s, repartidos entre las franjas (`r`) y, si se dan, entre otras ventanas
@@ -396,6 +430,7 @@ export class EsfuerzosFranjas {
         for (let kc = 0; kc < nc; kc++) {
           const v = ms!.valores[kc]!;
           for (let a = 0; a < 3; a++) q.m[3 * kc + a]! += w * v[8 * j + 3 + a]!;
+          q.v[kc]! += w * v[8 * j + 6]!;
         }
       };
       const ms = res.muestras;
@@ -426,7 +461,7 @@ export class EsfuerzosFranjas {
      * tira entre las dos rectas da a los enlaces de la cara de una viga (`esclavos`, PB-11), y los
      * momentos se trasladan a la recta s + dx·x.
      */
-    const porNodales = (s: number, lado: -1 | 1, ta: number, tb: number, ventanas: readonly (readonly [number, number])[] = [], escalon?: { restricciones: string[]; esclavos?: number[]; dx: number }, excluir: readonly (readonly [number, number])[] = []): { r: PorFranja[]; rv: PorFranja[]; resto: Float64Array; diag: Diagnostico[] } | null => {
+    const porNodales = (s: number, lado: -1 | 1, ta: number, tb: number, ventanas: readonly (readonly [number, number])[] = [], escalon?: { restricciones: string[]; esclavos?: number[]; dx: number }, excluir: readonly (readonly [number, number])[] = []): { r: PorFranja[]; rv: PorFranja[]; resto: Float64Array; restoV: Float64Array; diag: Diagnostico[] } | null => {
       const sx = lado === -1 ? 1 : -1;
       const { corte: c, sigma } = corte(s, sx, ta, tb, { metodo: "fuerzas-nodales", porLamina: true, ...(escalon ? { restricciones: escalon.restricciones, soloEsclavos: true, ...(escalon.esclavos ? { esclavos: escalon.esclavos } : {}) } : {}) });
       const res: ResultadoCorte = this.cortes.cortar(c, this.casos);
@@ -436,9 +471,13 @@ export class EsfuerzosFranjas {
       // de la viga, con la huella entera en el plano o al otro lado) no transmite nada: resto 0
       const dx = escalon?.dx ?? 0;
       const resto = new Float64Array(nc);
+      /** CO3: lo mismo con el cortante. */
+      const restoV = new Float64Array(nc);
       if (escalon && res.restricciones.length) {
         for (let kc = 0; kc < nc; kc++) resto[kc] = res.esfuerzos[6 * kc + 4]! - dx * res.esfuerzos[6 * kc + 2]!;
         for (const p of res.porLamina) for (let kc = 0; kc < nc; kc++) resto[kc]! -= p.esfuerzos[6 * kc + 4]! - dx * p.esfuerzos[6 * kc + 2]!;
+        for (let kc = 0; kc < nc; kc++) restoV[kc] = res.esfuerzos[6 * kc + 2]!;
+        for (const p of res.porLamina) for (let kc = 0; kc < nc; kc++) restoV[kc]! -= p.esfuerzos[6 * kc + 2]!;
       }
       const r = fr.map(vacio);
       const rv = ventanas.map(vacio);
@@ -466,6 +505,7 @@ export class EsfuerzosFranjas {
             if (!(f > 0)) continue;
             if (escalon) for (let kc = 0; kc < nc; kc++) q.m[3 * kc]! += f * (z.e[6 * kc + 4]! - dx * z.e[6 * kc + 2]!);
             else for (let kc = 0; kc < nc; kc++) q.m[3 * kc]! += f * z.e[6 * kc + 4]!;
+            for (let kc = 0; kc < nc; kc++) q.v[kc]! += f * z.e[6 * kc + 2]!;
           }
         };
         if (!(largo > EPS)) {
@@ -475,7 +515,12 @@ export class EsfuerzosFranjas {
           if (!excluir.some(([lo, hi]) => m > lo + EPS && m < hi - EPS)) {
             const j = bordes.findIndex((x, q) => q > 0 && q < fr.length && Math.abs(x - m) <= EPS);
             const pesos: [number, number][] = j > 0 ? [[j - 1, 0.5], [j, 0.5]] : franjaDe(m) >= 0 ? [[franjaDe(m), 1]] : [];
-            for (const [i, w] of pesos) for (const z of trozos) for (let kc = 0; kc < nc; kc++) r[i]!.m[3 * kc]! += w * (escalon ? z.e[6 * kc + 4]! - dx * z.e[6 * kc + 2]! : z.e[6 * kc + 4]!);
+            for (const [i, w] of pesos)
+              for (const z of trozos)
+                for (let kc = 0; kc < nc; kc++) {
+                  r[i]!.m[3 * kc]! += w * (escalon ? z.e[6 * kc + 4]! - dx * z.e[6 * kc + 2]! : z.e[6 * kc + 4]!);
+                  r[i]!.v[kc]! += w * z.e[6 * kc + 2]!;
+                }
           }
           ventanas.forEach(([lo, hi], v) => sumar(rv[v]!, lo, hi, m > lo && m < hi));
           continue;
@@ -484,7 +529,7 @@ export class EsfuerzosFranjas {
         for (let i = Math.max(0, franjaDe(a)); i < fr.length && bordes[i]! < b + EPS; i++) for (const [lo, hi] of menos(bordes[i]!, bordes[i + 1]!, excluir)) sumar(r[i]!, lo, hi, false);
         ventanas.forEach(([lo, hi], v) => sumar(rv[v]!, lo, hi, m > lo && m < hi));
       }
-      return { r, rv, resto, diag: res.diagnosticos.filter((x) => x.codigo !== "corte/borde-no-sigue-malla" && x.codigo !== "corte/vacio") };
+      return { r, rv, resto, restoV, diag: res.diagnosticos.filter((x) => x.codigo !== "corte/borde-no-sigue-malla" && x.codigo !== "corte/vacio") };
     };
 
     /** Estación a partir de lo que dan las rectas: mx de `principal` (nodales o campos), my y mxy de `muestras` (campos). */
@@ -492,19 +537,22 @@ export class EsfuerzosFranjas {
       const f = fr[i]!;
       const b = principal.w;
       const medios = new Float64Array(3 * nc);
+      const cortantes = new Float64Array(nc);
       let valido = b > EPS && muestras.w > EPS;
       for (let kc = 0; kc < nc; kc++) {
+        cortantes[kc] = valido ? principal.v[kc]! / b : NaN;
         medios[3 * kc] = valido ? principal.m[3 * kc]! / b : NaN;
         medios[3 * kc + 1] = valido ? muestras.m[3 * kc + 1]! / muestras.w : NaN;
         medios[3 * kc + 2] = valido ? muestras.m[3 * kc + 2]! / muestras.w : NaN;
       }
       // Regla de oro 2: una estación con un momento que no es un número no se presenta como válida (A2-1)
-      if (valido && !medios.every(Number.isFinite)) {
+      if (valido && !(medios.every(Number.isFinite) && cortantes.every(Number.isFinite))) {
         valido = false;
         medios.fill(NaN);
+        cortantes.fill(NaN);
         diag = [...diag, { codigo: "franja/no-finito", severidad: "error", mensaje: `La estación s = ${s.toFixed(3)} m de la franja ${f.id} da un momento que no es un número: no es válida. Es un fallo del programa.`, ids: [f.id] }];
       }
-      return { s, tipo, lado, punto: punto(s, (f.t0 + f.t1) / 2), anchoEnLosa: b, medios, metodo, distanciaMuestras: muestras.d ?? 0, piezas, ...(ventana ? { ventana } : {}), fraccionAbaco: reticular ? (b > EPS ? Math.min(1, principal.wAbaco / b) : NaN) : null, valido, diagnosticos: diag };
+      return { s, tipo, lado, punto: punto(s, (f.t0 + f.t1) / 2), anchoEnLosa: b, medios, cortantes, metodo, distanciaMuestras: muestras.d ?? 0, piezas, ...(ventana ? { ventana } : {}), fraccionAbaco: reticular ? (b > EPS ? Math.min(1, principal.wAbaco / b) : NaN) : null, valido, diagnosticos: diag };
     };
 
     // Caras: una recta por cara, del lado de su vano; my y mxy a δ de ese lado
@@ -739,6 +787,7 @@ export class EsfuerzosFranjas {
       if (!nod) return null;
       const principal = nod.rv[0]!;
       for (let kc = 0; kc < nc; kc++) principal.m[3 * kc]! += nod.resto[kc]!;
+      for (let kc = 0; kc < nc; kc++) principal.v[kc]! += nod.restoV[kc]!;
       principal.w = ancho;
       if (this.lateralEscalon && sp !== c.s) {
         // PB-12: los bordes de la ventana en la tira, con la losa a los dos lados. x_l va de fuera hacia
@@ -802,6 +851,7 @@ export class EsfuerzosFranjas {
         q.w += o.w;
         q.wAbaco += o.wAbaco;
         for (let j = 0; j < q.m.length; j++) q.m[j]! += o.m[j]!;
+        for (let j = 0; j < q.v.length; j++) q.v[j]! += o.v[j]!;
       };
       for (const x of partes) {
         if (!x.nod) continue;
@@ -999,6 +1049,7 @@ export class EsfuerzosFranjas {
               suma.w += q.w;
               suma.wAbaco += q.wAbaco;
               for (let a = 0; a < suma.m.length; a++) suma.m[a]! += q.m[a]!;
+              for (let a = 0; a < suma.v.length; a++) suma.v[a]! += q.v[a]!;
             }
           }
           const enLosaF = tramos.reduce((a, [p, q]) => a + Math.max(0, Math.min(q, f.t1) - Math.max(p, f.t0)), 0);

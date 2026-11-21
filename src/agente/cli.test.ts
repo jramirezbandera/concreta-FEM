@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { reticulaConNucleo } from "../../validacion/c3/modelos.ts";
+import { losaPlana } from "../../validacion/co/modelosLosas.ts";
 import { edificioSO } from "../../validacion/so/modelos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
@@ -421,12 +422,51 @@ describe("CO1 y CO2: comprobar y armar", () => {
     const soloVigas = fem(["comprobar", ruta, "--tipo", "vigas"]);
     expect(soloVigas.json.pilares).toBeUndefined();
     expect((soloVigas.json.resumen as Cuentas).pilares).toBeUndefined();
-    expect(fem(["comprobar", ruta, "--tipo", "losas"]).codigo).not.toBe(0);
+    // CO3: este edificio no tiene losas; un tipo que no existe, error
+    const soloLosas = fem(["comprobar", ruta, "--tipo", "losas"]);
+    expect(soloLosas.codigo).toBe(0);
+    expect((soloLosas.json.resumen as { losas?: Record<string, number> }).losas).toMatchObject({ losas: 0 });
+    expect(soloLosas.json.pilares).toBeUndefined();
+    expect(fem(["comprobar", ruta, "--tipo", "muros"]).codigo).not.toBe(0);
     expect(fem(["comprobar", ruta, "P99"]).codigo).toBe(1);
     // Un armado que no vale es un error del proyecto
     escrito.armado.pilares.P1!.F1 = { esquinas: 14, cercos: { diametro: 6, separacion: 100 } };
     writeFileSync(ruta, JSON.stringify(escrito));
     expect(fem(["comprobar", ruta]).codigo).toBe(1);
+  });
+
+  it("CO3: las losas: sin armado no cumplen; armar propone la base, los refuerzos y los cercos; con --escribir va a armado.forjados y comprobar lo da por bueno", () => {
+    const ruta = escribir(losaPlana({ reticular: true }));
+    type Losa = { losa: string; tipo: string; origen: string; cumple: boolean; aprovechamiento: number | null; texto?: string; filas?: unknown[]; armado?: { base: unknown; abacos?: unknown; refuerzos?: unknown[]; cercos?: unknown[] } };
+    const cuentas = (j: Record<string, unknown>) => (j.resumen as { losas: Record<string, number> }).losas;
+    const sin = fem(["comprobar", ruta, "--tipo", "losas"]);
+    expect(cuentas(sin.json)).toMatchObject({ losas: 1, cumplen: 0, sinArmado: 1 });
+    const a = fem(["armar", ruta, "--tipo", "losas", "--escribir"]);
+    expect(a.codigo).toBe(0);
+    expect(a.json.escrito).toBe(true);
+    expect(cuentas(a.json)).toMatchObject({ losas: 1, cumplen: 1, noCumplen: 0 });
+    const l = (a.json.losas as Losa[])[0]!;
+    expect([l.losa, l.tipo, l.origen, l.cumple]).toEqual(["L", "reticular", "propuesto", true]);
+    expect(l.armado!.abacos).toBeDefined();
+    expect(l.armado!.refuerzos!.length).toBeGreaterThan(0);
+    expect(l.armado!.cercos!.length).toBeGreaterThan(0);
+    expect((a.json.diagnosticos as { codigo: string }[]).map((d) => d.codigo)).toEqual(expect.arrayContaining(["comprobacion/punzonamiento-aparte", "comprobacion/losas-por-defecto"]));
+    const escrito = JSON.parse(readFileSync(ruta, "utf8")) as { armado: { forjados: Record<string, unknown>; pilares?: unknown } };
+    expect(Object.keys(escrito.armado.forjados)).toEqual(["L"]);
+    expect(escrito.armado.pilares).toBeUndefined();
+    expect(fem(["validar", ruta]).json.ok).toBe(true);
+    // Con el armado guardado: la misma huella, cumple, y con la losa detrás, sus filas
+    const c = fem(["comprobar", ruta, "L"]);
+    expect(c.json.huella).toBe(a.json.huella);
+    const lc = (c.json.losas as Losa[])[0]!;
+    expect([lc.origen, lc.cumple, lc.texto]).toEqual(["proyecto", true, l.texto]);
+    expect(lc.aprovechamiento).toBe(l.aprovechamiento);
+    expect(lc.filas!.length).toBeGreaterThan(50);
+    expect(c.json.pilares).toBeUndefined();
+    // Sin --tipo, los tres: los pilares, sin armado
+    const todo = fem(["comprobar", ruta]);
+    expect((todo.json.resumen as { pilares: Record<string, number> }).pilares).toMatchObject({ pilares: 9, cumplen: 0 });
+    expect(cuentas(todo.json)).toMatchObject({ losas: 1, cumplen: 1 });
   });
 });
 

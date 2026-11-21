@@ -23,6 +23,12 @@
       "sha256Origen": "8bd7dfec8c1c59077f2816252644f518d6ddc0a7c355d500a6742e6dc07fab10"
     },
     {
+      "origen": "src/data/forjadoTipologias.ts",
+      "destino": "src/comprobaciones/concreta/data/forjadoTipologias.ts",
+      "sha256": "c5194fd56cfb267de4a6f8d8a1e656cf04d1d537bbe10ea38f8d94ce9845d09c",
+      "sha256Origen": "ad49ada2f888a10e0dd64eb305024762f2018fd708ce9772b0e58e41e54e9051"
+    },
+    {
       "origen": "src/data/materials.ts",
       "destino": "src/comprobaciones/concreta/data/materials.ts",
       "sha256": "b08c2929ee86a7afd344c5ac80a18e629a047a54fe3e64715d42c41da74490df",
@@ -81,6 +87,18 @@
       "destino": "src/comprobaciones/concreta/lib/calculations/rcColumns.ts",
       "sha256": "cc96c989468a094601567deba3c786f89e58f7d8ab0be497340ef5d3284fb75f",
       "sha256Origen": "8a68bb0b8a711007e9fa3635ceb665cd60b26615fa37c0829aa76ecef2f1b815"
+    },
+    {
+      "origen": "src/lib/calculations/rcSlabs.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/rcSlabs.ts",
+      "sha256": "6f67f84c455045981f31bbff0e2612f9f07f0a7c1d8ddd062af6be97bdffb22c",
+      "sha256Origen": "62c3328a10f614e40f61294234b5a903f865014fe4d87f05b3a0cf6ece7a54d6"
+    },
+    {
+      "origen": "src/lib/calculations/rcTSection.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/rcTSection.ts",
+      "sha256": "fd6a969741e7288f4af7604cb780cfc9ff14b68b90ea9360eb83bb87e0f54cbc",
+      "sha256Origen": "fd6a969741e7288f4af7604cb780cfc9ff14b68b90ea9360eb83bb87e0f54cbc"
     },
     {
       "origen": "src/lib/calculations/types.ts",
@@ -159,6 +177,12 @@
       "destino": "src/comprobaciones/concreta/test/calc/rcColumnsCircular.test.ts",
       "sha256": "b03d95e66895cbee5adf7272c7639e0e96aa52b4078093ffe3cd256a048786c0",
       "sha256Origen": "4e47c3a5bd29647ee04b5110672ce6d237f7a4e5d2ae75ac9e5ff2a52d07cc33"
+    },
+    {
+      "origen": "src/test/calc/rcSlabs.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/rcSlabs.test.ts",
+      "sha256": "34a61a3a676d41606d969a368141005185df6490f1f07f4a9a3a33d134a00956",
+      "sha256Origen": "9945651b37286689cc78b2a353f1efa0b23e8715bd367f829ac9ceba2fb9885d"
     }
   ],
   "parches": [],

@@ -355,6 +355,104 @@ Hecho en otra sesión que la de §8.4, a la vez. Pasan los criterios 5 a 14 en l
 
 **Pendiente de CO2:** la sombra con el armado de vigas de CYPECAD (CO7); en la app, nada todavía (CO6); un modelo real con torsión de equilibrio (un voladizo de viguetas sin vano detrás) de punta a punta, que hoy sólo se prueba con demandas hechas a mano.
 
+### 8.6 CO3, las losas (2026-11-21)
+
+Pasan los criterios 5 a 14 en lo de las losas; falta su parte de la app (CO6), la sombra (CO7) y el punzonamiento (CO4), que es de donde sale el cortante junto a los pilares. Las decisiones CO3-a…CO3-j, de Claude, **por confirmar por el usuario** (abajo).
+
+**El cortante de las franjas** (lo único que cambia fuera de `src/comprobaciones/`):
+
+- **`EstacionFranja.cortantes`** (`esfuerzosFranjas.ts`): el cortante medio por caso, kN/m. Sale de los mismos cortes que el momento: en las caras y los apoyos, el Vz de las fuerzas nodales, repartido entre las franjas como el My; en las de paso, la integral de Qx de los campos. En el escalón de un pilar, con lo que transmite su enlace. Los momentos no cambian ni un bit (la referencia congelada de F, idéntica).
+- **`Consultas.cortanteFranja(id, combinaciones)`:** el mayor |v| de cada estación con su combinación; con el sismo del programa, |estática| + amplitud del sismo (VS-o).
+- **Validado** (`franjas.test.ts`): en una losa en flexión cilíndrica, q·(L/2 − s) en las estaciones de paso a ≤ 2 % de q·L/2 con h = 0,25, y 5·q·L/8 a cada lado del apoyo interior de dos vanos a ≤ 0,5 % (por fuerzas nodales).
+
+**Las copias:** `rcSlabs.ts` (`calcForjados`), `rcTSection.ts`, `forjadoTipologias.ts` y sus pruebas; 30 ficheros, y las 427 pruebas de Concreta pasan aquí.
+
+**Las demandas** (`demandas/losas.ts`, `demandasLosa`): las de las franjas de armado de la losa (fase F). De cada estación válida, para la armadura de la dirección de su franja: en ELU, el momento de Wood–Armer de cada cara (`Consultas.armadoFranja`; con el sismo, el pésimo) y el cortante; en la ELS cuasipermanente, los mismos momentos. Además:
+
+- **su sección:** `maciza`, o en un reticular `nervio` o `abaco` (si al menos la mitad de su ancho es de ábaco: el nervio de la franja está en él, CO3-b);
+- **`ancho`:** lo que lleva un nervio (el ancho de su franja o, en el metro de un pilar, el de su ventana);
+- **`luz`:** la menor distancia entre apoyos de su franja, para el ancho eficaz de la T;
+- **`cortante: null`** en el metro de un pilar y donde la recta de la estación pasa a menos de dos cantos de un pilar que llega a la planta (también del que está en el ancho de una viga): ahí es del punzonamiento (CO3-c).
+
+**Comprobar** (`comprobar/losas.ts`, `comprobarLosa`): las estaciones de cada dirección se agrupan por la sección que trabaja en ellas (clase, refuerzos que las cubren en cada cara y, en los nervios, sus cercos y su luz) y el módulo se llama una vez por grupo con el mayor de cada esfuerzo. Como cada fila depende de un solo esfuerzo, es la peor de las que darían sus estaciones una a una, y lleva la franja, la estación y la combinación que la dan.
+
+- **Maciza:** un metro, con la parrilla base y los refuerzos que cubren la estación (varios, como uno del mayor diámetro con la suma de sus áreas).
+- **Nervio:** la T del módulo con las barras por nervio; los esfuerzos, por el ancho que lleva el nervio. Con cercos en su zona, el cortante con ellos.
+- **Ábaco:** una maciza del canto total con la parrilla de los ábacos; las barras de los nervios que lo cruzan no se cuentan (CO3-d).
+- **La dirección Y va por dentro de la X** (CO3-e): pierde el mayor diámetro de la base X, en el recubrimiento (maciza y ábacos) o en el canto (nervios, porque el recubrimiento del módulo es también el lateral y las barras dejarían de caber).
+- **Filas:** `<armadura>/bending`, `as-min`, `cracking` (sólo si la cara tracciona en alguna estación del grupo), `bar-spacing…`, `as-max`, y `<x|y>/shear` (y las de los cercos). Cada una, con su `grupo`: la base, la parrilla de los ábacos, un refuerzo, unos cercos, `cortante` (sin cercos) o `seccion`.
+- **No se toman** las longitudes de anclaje ni las filas informativas del módulo (esbeltez, reparto).
+- **Pendientes** (la losa no cumple): un material que no es hormigón, un reticular sin la parrilla de los ábacos, refuerzos de distinto diámetro solapados en un nervio, sin combinaciones de ELS, una entrada que el módulo rechaza.
+- **Avisos:** `comprobacion/punzonamiento-aparte`, `comprobacion/losas-por-defecto` (la exposición), `comprobacion/estaciones-sin-valor` y `armado/refuerzo-sin-estaciones`; y los de las franjas (`franja/esquina-entrante`, `franja/pilar-sin-cara`).
+
+**El armado como dato** (`armado.ts`, `agente/armaduraBase.ts`): `armado.forjados.<losa>` = `{ base, abacos?, refuerzos?, cercos? }`, fuera de la huella.
+
+- `base`: las cuatro armaduras (`x-inf`, `x-sup`, `y-inf`, `y-sup`). En una maciza, `{ diametro, separacion }`; en un reticular, `{ diametro, n }` por nervio.
+- `abacos` (reticular): la parrilla de los ábacos, `{ diametro, separacion }`.
+- `refuerzos`: `{ armadura, s, t, barras, en? }`: un rectángulo en los ejes de su armadura (s a lo largo de las barras, t en transversal; los de las franjas) en el que se suman a la base. Cubre las estaciones con s dentro y el centro de su franja dentro. En un reticular, `en: "abacos"` o `"nervios"`.
+- `cercos` (reticular): `{ direccion, s, t, cercos }`, por zonas.
+- Convive con la armadura base de AB (`armado.base` y `armado.losas`, kN·m/m), sigue a su losa al renombrarla o borrarla y se valida (`armado/losa`, `armado/barras`).
+
+**Proponer** (`armar/losas.ts`, `proponerLosa`), en este orden:
+
+1. **La base** de cada armadura (x-inf, x-sup, y-inf, y-sup): la primera de su tabla con la que no falla ninguna regla suya (cuantía mínima donde la cara tracciona, separación máxima, que quepa en el nervio). Con la armadura base de AB, además la primera cuyo momento resistente no es menor. En un reticular, lo mismo con la parrilla de los ábacos.
+2. **Los cercos de los nervios:** las estaciones de nervio sin cortante se agrupan en zonas y cada una recibe los primeros cercos con los que cumple.
+3. **Los refuerzos:** las estaciones en las que la flexión o la fisuración no cumplen con la base se agrupan en zonas con la misma regla que las de AB (`zonasRefuerzo`), y cada zona recibe, en el rectángulo que la envuelve, el primer refuerzo de la tabla con el que no falla ninguna fila de esa armadura (en un reticular, uno para sus ábacos y otro para sus nervios).
+4. **Otra pasada de cercos:** un refuerzo en segunda capa baja el canto útil del nervio y, con él, su cortante sin cercos.
+
+- **Las tablas (CO3-f):** parrillas de Ø8 a Ø25 a 300…100 mm; nervios, de 1 a 4 barras de Ø8 a Ø25; cercos de dos ramas de Ø6 a Ø10 a 200…75 mm. De menos a más acero.
+- Una zona sin refuerzo de la tabla que valga va a `sinRefuerzo` y la losa no cumple.
+- En una maciza y en los ábacos no propone armadura transversal.
+
+**CLI, MCP y skill:** `fem comprobar` y `fem armar` dan también `losas` (todas, cada una con la fila que manda; con la losa detrás, todas sus filas), con `resumen.losas` y `--tipo losas`; `--escribir` guarda `armado.forjados`.
+
+**Criterios:**
+
+| Criterio | Resultado |
+|---|---|
+| 5 y 6. las copias y sus pruebas | Pasa (`copias.test.ts`; 427 pruebas de Concreta) |
+| 7. identidad con las llamadas a mano | Pasa (`losas.test.ts`): cada fila, el máximo de las del módulo llamado estación a estación con la entrada escrita campo a campo; el cortante, además, con la fórmula del CE escrita aparte, a 1e-9 |
+| 8. girar 90° | Pasa: sin la imperfección global, a 1e-9; con ella, a 1e-3 (CO3-5) |
+| 9. con el sismo, nunca menos | Pasa, estación a estación |
+| 10. nadie aplica factores | Pasa (`src/pruebas/factores.test.ts`) |
+| 11. oráculo que no es de Concreta | Pasa: `validacion/co/oraculo_losa.py` en 4 macizas y 3 nervios (MRd con el integrador de la sección, a ≤ 1,5 %; VRd,c con su fórmula, a ≤ 0,3 %; wk, a ≤ 2 %). Las demandas, contra la viga biapoyada (p·L²/8 a ≤ 1 %, el cortante a ≤ 2 %) |
+| 12. el propuesto cumple y un puesto menos no | Pasa: la base de cada armadura y cada refuerzo |
+| 13. determinista y sin cambiar la huella | Pasa |
+| 14. referencia congelada | Pasa: `congelado-co3.test.ts` (`validacion/co/congelarLosas.ts`), cuatro modelos: losa en dos apoyos, losa plana con sismo, reticular y la vivienda. Los aprovechamientos, a 1e-4 (CO3-6) |
+| 15. en la app, lo de Node | Sin hacer: es de CO6 |
+
+**Hallazgos:**
+
+- **CO3-1, el reticular necesita cercos junto a los ábacos.** En la losa de 2 × 2 vanos de 6 m (25+5, nervio de 12), los nervios que salen del ábaco llevan de 2 a 4,7 veces su VRd,c (unos 15 kN). Sin cercos de nervio en el armado, ningún reticular cumplía: por eso entran en este tramo.
+- **CO3-2, un refuerzo en segunda capa deja al nervio sin cortante.** En la cubierta superior de la vivienda, un refuerzo de 2Ø12 que no cabe con la base en una capa baja el canto útil y el VRd,c del nervio (1,02 de aprovechamiento sin cercos). Por eso hay una segunda pasada de cercos tras los refuerzos.
+- **CO3-3, el ancho eficaz del módulo** es mín(intereje; l0/5), que no pasa del de la fórmula del Código (Anejo 19 §5.3.2.1): del lado seguro en la flexión, y da una cuantía mínima algo menor en la cara superior.
+- **CO3-4, la constante de vmín:** los módulos de vigas y de forjados usan 0,051/γc·k^(3/2)·√fck. El oráculo la toma del módulo; **hay que contrastarla con el texto del Anejo 19 §6.2.2** (la EHE-08 daba 0,075/γc).
+- **CO3-5, la imperfección global no es simétrica frente a un giro de 90°:** en la losa plana simétrica, las demandas de ELU cambian hasta 3e-4 de la mayor al girar la planta; sin `imperfeccion`, 1e-11, y las de ELS, 1e-12. Es de las combinaciones con los casos `IMP-X` e `IMP-Y` (fase IG), no de las franjas. Por investigar.
+- **CO3-6, Bun y Node difieren 1,2e-5 en una demanda de franja del reticular** (el fixture se escribe con Bun y la prueba corre en Node). En las vigas, 1e-9. Por investigar: puede ser una elección discreta de las franjas (el cociente de A2-2) que cae distinto con el último bit.
+- **CO3-7, el esquema se quedó atrás** al añadir los cercos (lo cazó la prueba del proyecto): tras tocar los tipos del armado hay que pasar `bun run esquema`.
+
+**Decisiones de Claude, por confirmar por el usuario:**
+
+- **CO3-a, el armado de una losa:** una base por cara y dirección en toda la losa y refuerzos en rectángulos; en un reticular, además la parrilla de los ábacos y cercos por zonas. Los rectángulos van en coordenadas de la planta: si la losa se mueve o se gira en el editor, no la siguen (se avisa si un refuerzo se queda sin estaciones).
+- **CO3-b, nervio o ábaco:** una estación es de ábaco si al menos la mitad de su ancho lo es.
+- **CO3-c, el cortante junto a los pilares** (su metro y a menos de dos cantos de ellos) no se comprueba aquí: es del punzonamiento (CO4). Hasta que CO4 esté, ese cortante no lo comprueba nadie, y se dice en un aviso.
+- **CO3-d, en los ábacos sólo cuenta su parrilla,** no las barras de los nervios que los cruzan (del lado seguro).
+- **CO3-e, la dirección Y va por dentro de la X,** en las dos caras. No se puede elegir todavía.
+- **CO3-f, las tablas** de parrillas, de barras de nervio y de cercos.
+- **CO3-g, la base propuesta** es la mínima que cumple las reglas de armado (o la que cubre la armadura base de AB, si se dio); lo demás va a refuerzos. Sale una base pequeña y muchos refuerzos.
+- **CO3-h, un refuerzo por zona, en el rectángulo que la envuelve:** una zona alargada (la línea de pilares de una losa plana) recibe el refuerzo de su peor estación en todo su rectángulo. No se parte ni se iguala.
+- **CO3-i, la cuantía mínima** se exige en cuanto la cara tracciona en alguna estación del grupo, por poco que sea (como CO2-g).
+- **CO3-j, el cortante se toma en la estación** (en la cara del apoyo, no a un canto útil), contra VRd,c con el menor canto útil y la menor armadura de las dos caras, que es lo que hace el módulo.
+
+**Medido** (`validacion/co/medirLosas.ts`, `out_medirLosas.txt`; el tiempo, como información):
+
+- **Losa plana maciza de 25, 2 × 2 vanos de 5 m:** base Ø12/250 en las cuatro y 8 refuerzos superiores sobre las líneas de pilares; cumple (flexión 0,99, fisuración 0,94, cortante 0,72). Con el sismo del programa, lo mismo: no manda en la losa.
+- **Reticular 25+5 de 2 × 2 vanos de 6 m:** base de 2Ø8 abajo y 1Ø16 arriba por nervio, parrilla de ábacos Ø8/100, 16 refuerzos y 24 zonas de cercos Ø6/150; cumple. Con ábacos de 2 m en vez de 2,8, también, con una zona más de cercos.
+- **La vivienda** (dos cubiertas reticulares con vigas planas): las dos losas cumplen con lo propuesto (13 y 17 refuerzos, 11 y 15 zonas de cercos); `fem armar --tipo losas`, 1,5 s.
+- **El edificio objetivo de losas de 7 plantas, con viento** (losas macizas con vigas en todos los ejes): cada losa tiene unas 16 000 estaciones; sus demandas tardan de 2,5 a 6,6 s (la primera calienta los campos) y proponer, 0,1 s. Basta la base (Ø12/250), sin refuerzos: 3 llamadas al módulo por losa. En ecuaciones, el coste de la fase es cero.
+
+**Pendiente de CO3:** el punzonamiento (CO4), sin el que el cortante junto a los pilares no lo comprueba nadie; la sombra con el armado de losas de CYPECAD (CO7); la app (CO6); CO3-4, CO3-5 y CO3-6.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.
@@ -364,6 +462,7 @@ Hecho en otra sesión que la de §8.4, a la vez. Pasan los criterios 5 a 14 en l
 - La comprobación geotécnica completa de la losa de cimentación (LC-f).
 - Los planos de armado y su DXF (A6), y los PDF de cada pieza que hace Concreta.
 - La resistencia al fuego.
+- De las losas (CO3): el punzonamiento (CO4); la flecha de la losa fisurada (CO-k); los anclajes, los solapes y las longitudes de los refuerzos; la armadura de reparto, la de borde y la de las esquinas entrantes; la armadura transversal de una maciza; las viguetas de un unidireccional (CO-b); la membrana de la losa (con diafragma rígido no tiene valor); elegir qué dirección va por fuera (CO3-e); que los refuerzos sigan a la losa al moverla o girarla en el editor; partir o igualar las zonas de refuerzo (CO3-h).
 - De las vigas (CO2): mezclar diámetros en una cara (CO2-b), las longitudes, los solapes y los anclajes de los refuerzos y el decalaje de la ley de momentos (el refuerzo de un apoyo se entiende que cubre su cuarto de vano), el momento mínimo de empotramiento en los apoyos del §9.2.1.2(1) (el modelo ya da el del pórtico), el cortante a un canto útil de la cara (se toma el de la cara), la armadura de piel que no sea por torsión, igualar el armado entre vanos y vigas, y las vigas en T o con la losa como cabeza.
 
 ## 10. Riesgos

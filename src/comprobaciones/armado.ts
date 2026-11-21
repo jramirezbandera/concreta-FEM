@@ -238,3 +238,120 @@ export function erroresArmadoViga(t: ArmadoVanoViga): string[] {
   }
   return r;
 }
+
+// ─── Forjados (CO3) ─────────────────────────────────────────────────────────────────────────────
+
+/** Las cuatro armaduras de una losa: X (su dirección 1) o Y (la 2), inferior o superior (las de `agente/armaduraBase.ts`). */
+export type ArmaduraForjado = "x-inf" | "x-sup" | "y-inf" | "y-sup";
+export const ARMADURAS_FORJADO: readonly ArmaduraForjado[] = ["x-inf", "x-sup", "y-inf", "y-sup"];
+
+/**
+ * Barras de una armadura de un forjado: en una losa maciza y en los ábacos de un reticular, un
+ * diámetro a una separación (mm); en los nervios de un reticular, `n` barras por nervio.
+ */
+export interface BarrasForjado {
+  /** Ø, mm. */
+  diametro: number;
+  /** Separación entre barras, mm (maciza y ábacos). */
+  separacion?: number;
+  /** Barras por nervio (reticular). */
+  n?: number;
+}
+
+/**
+ * Un refuerzo: barras que se suman a la base en un rectángulo de la losa, en los ejes de su armadura
+ * (s a lo largo de las barras y t en transversal: s = p·d y t = p·n, con d según el eje 1 de la losa
+ * en las armaduras X y según el 2 en las Y; m). Cubre las estaciones de las franjas de esa dirección
+ * con s en [s0, s1] y el centro de la franja en [t0, t1].
+ */
+export interface RefuerzoForjado {
+  armadura: ArmaduraForjado;
+  s: [number, number];
+  t: [number, number];
+  barras: BarrasForjado;
+  /** En un reticular (obligatorio): el refuerzo es de los ábacos (Ø y separación) o de los nervios (n por nervio). */
+  en?: "abacos" | "nervios";
+}
+
+/**
+ * Cercos de los nervios de un reticular en un rectángulo de la losa, en los ejes de los nervios de su
+ * dirección (como un refuerzo: s a lo largo de los nervios X o Y, t en transversal; m). Fuera de
+ * ellos, los nervios van sin armadura transversal.
+ */
+export interface CercosForjado {
+  direccion: "x" | "y";
+  s: [number, number];
+  t: [number, number];
+  cercos: CercosViga;
+}
+
+/** El armado de una losa maciza o reticular (CO3). */
+export interface ArmadoForjado {
+  /** La armadura base de cada cara y dirección, en toda la losa: la parrilla de una maciza (Ø y separación) o el montaje de los nervios de un reticular (n por nervio). */
+  base: Record<ArmaduraForjado, BarrasForjado>;
+  /** En un reticular: la parrilla de los ábacos (Ø y separación). En ellos no se cuentan las barras de los nervios. */
+  abacos?: Record<ArmaduraForjado, BarrasForjado>;
+  refuerzos?: RefuerzoForjado[];
+  /** En un reticular: los cercos de los nervios, por zonas. */
+  cercos?: CercosForjado[];
+}
+
+export const areaBarra = area;
+
+/** mm² por metro (con separación) o por nervio (con n). */
+export function areaBarrasForjado(b: BarrasForjado): number {
+  return b.n !== undefined ? b.n * area(b.diametro) : (area(b.diametro) * 1000) / (b.separacion ?? Infinity);
+}
+
+/** «Ø12/200» o «2Ø12». */
+export const textoBarrasForjado = (b: BarrasForjado): string => (b.n !== undefined ? `${b.n}Ø${b.diametro}` : `Ø${b.diametro}/${b.separacion}`);
+
+/** «x-inf Ø10/200 · x-sup Ø10/200 · … · 6 refuerzos», para una tabla o un texto. */
+export function textoArmadoForjado(a: ArmadoForjado): string {
+  const cuatro = (r: Record<ArmaduraForjado, BarrasForjado>) => ARMADURAS_FORJADO.map((k) => `${k} ${r[k] ? textoBarrasForjado(r[k]) : "—"}`).join(" · ");
+  const n = a.refuerzos?.length ?? 0;
+  const c = a.cercos?.length ?? 0;
+  return [cuatro(a.base), ...(a.abacos ? [`ábacos: ${cuatro(a.abacos)}`] : []), ...(n ? [`${n} refuerzo${n > 1 ? "s" : ""}`] : []), ...(c ? [`${c} zona${c > 1 ? "s" : ""} de cercos`] : [])].join(" · ");
+}
+
+/** Lo que no vale del armado de una losa, en palabras; vacío si es un dato admisible. */
+export function erroresArmadoForjado(a: ArmadoForjado, reticular: boolean): string[] {
+  const r: string[] = [];
+  const barras = (b: BarrasForjado | undefined, que: string, porNervio: boolean) => {
+    if (!b || typeof b !== "object") return void r.push(`falta ${que}`);
+    if (!DIAMETROS.includes(b.diametro)) r.push(`${que}: Ø${String(b.diametro)} no es un diámetro de barra (${DIAMETROS.join(", ")})`);
+    if (porNervio) {
+      if (!(Number.isInteger(b.n) && b.n! >= 1)) r.push(`${que}: ${String(b.n)} barras por nervio no vale (un entero ≥ 1)`);
+      if (b.separacion !== undefined) r.push(`${que}: en los nervios van n barras por nervio, no una separación`);
+    } else {
+      if (!(Number.isFinite(b.separacion) && b.separacion! > 0)) r.push(`${que}: la separación ${String(b.separacion)} no vale (mm, > 0)`);
+      if (b.n !== undefined) r.push(`${que}: lleva una separación, no n barras por nervio`);
+    }
+  };
+  if (!a.base || typeof a.base !== "object") r.push("falta la armadura base");
+  else for (const k of ARMADURAS_FORJADO) barras(a.base[k], `la base ${k}`, reticular);
+  if (a.abacos !== undefined) {
+    if (!reticular) r.push("la parrilla de los ábacos es de un reticular");
+    else for (const k of ARMADURAS_FORJADO) barras(a.abacos[k], `la parrilla ${k} de los ábacos`, false);
+  }
+  (a.refuerzos ?? []).forEach((x, i) => {
+    const que = `el refuerzo ${i + 1}`;
+    if (!ARMADURAS_FORJADO.includes(x.armadura)) return void r.push(`${que}: «${String(x.armadura)}» no es una armadura (${ARMADURAS_FORJADO.join(", ")})`);
+    for (const [k, v] of [["s", x.s], ["t", x.t]] as const) if (!(Array.isArray(v) && v.length === 2 && v.every(Number.isFinite) && v[1] > v[0])) r.push(`${que}: ${k} tiene que ser [desde, hasta] en m, con hasta > desde`);
+    if (reticular && x.en !== "abacos" && x.en !== "nervios") r.push(`${que}: en un reticular hay que decir si es de los ábacos o de los nervios (en)`);
+    if (!reticular && x.en !== undefined) r.push(`${que}: «en» es de los reticulares`);
+    barras(x.barras, `${que} (${x.armadura})`, reticular && x.en === "nervios");
+  });
+  if (a.cercos !== undefined && !reticular) r.push("los cercos son de los nervios de un reticular");
+  (a.cercos ?? []).forEach((x, i) => {
+    const que = `los cercos ${i + 1}`;
+    if (x.direccion !== "x" && x.direccion !== "y") r.push(`${que}: la dirección tiene que ser x o y`);
+    for (const [k, v] of [["s", x.s], ["t", x.t]] as const) if (!(Array.isArray(v) && v.length === 2 && v.every(Number.isFinite) && v[1] > v[0])) r.push(`${que}: ${k} tiene que ser [desde, hasta] en m, con hasta > desde`);
+    const c = x.cercos;
+    if (!c || typeof c !== "object") return void r.push(`${que}: faltan el diámetro y la separación`);
+    if (!DIAMETROS.includes(c.diametro)) r.push(`${que}: Ø${String(c.diametro)} no es un diámetro de barra (${DIAMETROS.join(", ")})`);
+    if (!(Number.isFinite(c.separacion) && c.separacion > 0)) r.push(`${que}: la separación ${String(c.separacion)} no vale (mm, > 0)`);
+    if (c.ramas !== undefined && !(Number.isInteger(c.ramas) && c.ramas >= 2)) r.push(`${que}: ${String(c.ramas)} ramas no vale (un entero ≥ 2)`);
+  });
+  return r;
+}

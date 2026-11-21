@@ -47,6 +47,9 @@ const ENTRADAS: readonly string[] = [
   "src/test/calc/rcBeamsDetalle.test.ts",
   "src/test/calc/crackedDeflection.test.ts",
   "src/test/calc/cuantiaMinima.test.ts",
+  // CO3, forjados (losa maciza por metro y nervio de reticular)
+  "src/lib/calculations/rcSlabs.ts",
+  "src/test/calc/rcSlabs.test.ts",
 ];
 
 /**

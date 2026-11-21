@@ -8,7 +8,7 @@
  *
  * Puro: sin IO.
  */
-import { erroresArmado, erroresArmadoViga, type ArmadoTramoPilar, type ArmadoVanoViga } from "../comprobaciones/armado.ts";
+import { erroresArmado, erroresArmadoForjado, erroresArmadoViga, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga } from "../comprobaciones/armado.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 
@@ -43,6 +43,11 @@ export interface ArmadoProyecto {
    * caras de sus apoyos); null, el vano que no lo tiene.
    */
   vigas?: Record<string, (ArmadoVanoViga | null)[]>;
+  /**
+   * CO3: el armado en barras de cada losa maciza o reticular (su id): la base de cada cara y
+   * dirección, la parrilla de los ábacos y los refuerzos.
+   */
+  forjados?: Record<string, ArmadoForjado>;
 }
 
 /** La base de una losa en una armadura (kN·m/m), o null si no hay. */
@@ -99,6 +104,19 @@ export function comprobarArmado(a: ArmadoProyecto | undefined, m: ModeloFisico):
       for (const e of erroresArmadoViga(t)) r.push({ codigo: "armado/barras", severidad: "error", mensaje: `El armado de la viga ${id} en su vano ${i} no vale: ${e}.`, ids: [id], detalles: { vano: i } });
     });
   }
+  const deLosa = new Map((m.losas ?? []).map((l) => [l.id, l]));
+  for (const [id, f] of Object.entries(a.forjados ?? {})) {
+    const l = deLosa.get(id);
+    if (!l) {
+      r.push({ codigo: "armado/losa", severidad: "error", mensaje: `Hay un armado de «${id}», que no es una losa del modelo (se arman las losas macizas y reticulares).`, ids: [id] });
+      continue;
+    }
+    if (!f || typeof f !== "object") {
+      r.push({ codigo: "armado/barras", severidad: "error", mensaje: `El armado de la losa ${id} no vale.`, ids: [id] });
+      continue;
+    }
+    for (const e of erroresArmadoForjado(f, l.reticular !== undefined)) r.push({ codigo: "armado/barras", severidad: "error", mensaje: `El armado de la losa ${id} no vale: ${e}.`, ids: [id] });
+  }
   return r;
 }
 
@@ -122,7 +140,9 @@ export function limpiarArmado(a: ArmadoProyecto | undefined): ArmadoProyecto | u
   for (const id of Object.keys(a.pilares ?? {}).sort()) if (Object.keys(a.pilares![id]!).length) pilares[id] = a.pilares![id]!;
   const vigas: Record<string, (ArmadoVanoViga | null)[]> = {};
   for (const id of Object.keys(a.vigas ?? {}).sort()) if (a.vigas![id]!.some((v) => v !== null)) vigas[id] = a.vigas![id]!;
-  const r: ArmadoProyecto = { ...(base ? { base } : {}), ...(Object.keys(losas).length ? { losas } : {}), ...(Object.keys(pilares).length ? { pilares } : {}), ...(Object.keys(vigas).length ? { vigas } : {}) };
+  const forjados: Record<string, ArmadoForjado> = {};
+  for (const id of Object.keys(a.forjados ?? {}).sort()) forjados[id] = a.forjados![id]!;
+  const r: ArmadoProyecto = { ...(base ? { base } : {}), ...(Object.keys(losas).length ? { losas } : {}), ...(Object.keys(pilares).length ? { pilares } : {}), ...(Object.keys(vigas).length ? { vigas } : {}), ...(Object.keys(forjados).length ? { forjados } : {}) };
   return Object.keys(r).length ? r : undefined;
 }
 
@@ -132,16 +152,21 @@ export function limpiarArmado(a: ArmadoProyecto | undefined): ArmadoProyecto | u
  * antes se queda como está (lo dice `comprobarArmado`; no se pierde en silencio).
  */
 export function seguirLosas(a: ArmadoProyecto | undefined, renombres: ReadonlyMap<string, string>, antes: ModeloFisico, despues: ModeloFisico): ArmadoProyecto | undefined {
-  if (!a?.losas) return a;
+  if (!a?.losas && !a?.forjados) return a;
   const eran = new Set((antes.losas ?? []).map((l) => l.id));
   const son = new Set((despues.losas ?? []).map((l) => l.id));
-  const losas: Record<string, BasesArmado> = {};
-  for (const [id, b] of Object.entries(a.losas)) {
-    const n = renombres.get(id) ?? id;
-    if (eran.has(id) && !son.has(n)) continue;
-    losas[n] = b;
-  }
-  return limpiarArmado({ ...a, losas });
+  const seguir = <T,>(de: Record<string, T> | undefined): Record<string, T> | undefined => {
+    if (!de) return undefined;
+    const r: Record<string, T> = {};
+    for (const [id, b] of Object.entries(de)) {
+      const n = renombres.get(id) ?? id;
+      if (eran.has(id) && !son.has(n)) continue;
+      r[n] = b;
+    }
+    return r;
+  };
+  const [losas, forjados] = [seguir(a.losas), seguir(a.forjados)];
+  return limpiarArmado({ ...a, ...(losas ? { losas } : {}), ...(forjados ? { forjados } : {}) });
 }
 
 /**

@@ -98,8 +98,8 @@ fem calcular proyecto.json                   # calcula (o reutiliza los resultad
 fem consultar proyecto.json <consulta> …     # resultados acotados
 fem render proyecto.json [--vista V] [--planta P]   # PNG y SVG de cada planta, para mirarlos
 fem revisar proyecto.json                    # sensatez e informe de revisión (Markdown y HTML) de esta huella
-fem comprobar proyecto.json [pieza…]         # los pilares y las vigas de hormigón con el armado del proyecto
-fem armar proyecto.json [--escribir]         # propone el armado de pilares y vigas (sólo propone sin --escribir)
+fem comprobar proyecto.json [pieza…]         # los pilares, las vigas y las losas de hormigón con el armado del proyecto
+fem armar proyecto.json [--escribir]         # propone el armado de pilares, vigas y losas (sólo propone sin --escribir)
 ```
 
 - `fem` es la orden que deja `bun run instalar` en el repo del motor (lanza su `cli/fem.ts` con bun). Si `fem` no existe, díselo al ingeniero; mientras, `bun "<repo>/cli/fem.ts"` o, dentro del repo, `bun run fem`.
@@ -147,6 +147,19 @@ Por ahora, los **pilares de hormigón** rectangulares y circulares y las **vigas
 - **Lo que no se comprueba sale en `pendientes` y no cumple:** una viga que no es de hormigón rectangular, una con compresión de pilar o con flexión lateral, una sin apoyos (su flecha) y la fisuración y la flecha si los casos no llevan su acción (sin ELS). Nunca lo des por comprobado.
 - **Lo propuesto** es, armadura a armadura, la primera de su tabla con la que no falla nada (barras de 12 a 25, cercos de 6 a 10 con 2, 3, 4 o 6 ramas). No iguala vanos ni vigas, no da longitudes ni anclajes de los refuerzos (se entiende que el de un apoyo cubre su cuarto de vano), no mira la ductilidad de la norma sísmica y en una viga plana puede pedir cercos de 3 ramas (la separación transversal de 0,75·d). Dilo al dar el resultado.
 - **La flecha activa** descuenta sólo la flecha instantánea del peso propio (el caso `pesoPropio`, si no lleva cargas del usuario): es del lado seguro. Si el ingeniero tiene el proceso constructivo, que la contraste.
+
+### Comprobación y armado de las losas
+
+- **Qué se comprueba:** cada losa maciza o reticular (también la de cimentación), con las demandas de sus franjas de armado (las de `fem consultar franja`): en cada estación y para la armadura de su dirección (`x-inf`, `x-sup`, `y-inf`, `y-sup`; X es el eje 1 de la losa), la flexión con el momento de Wood–Armer de ELU, la fisuración con el de la ELS cuasipermanente, la cuantía mínima, la separación de barras y el cortante sin armadura transversal. El juez es el módulo de forjados de Concreta (Código Estructural): un metro de losa maciza o un nervio en T. En un reticular, cada estación es de **nervio** o de **ábaco** (macizo, del canto total).
+- **El armado es un dato del proyecto:** `armado.forjados.<losa>` = `{ base, abacos?, refuerzos?, cercos? }` (mm):
+  - `base`: las cuatro armaduras, en toda la losa. En una maciza, `{ diametro, separacion }` (la parrilla); en un reticular, `{ diametro, n }` (barras por nervio).
+  - `abacos` (reticular): la parrilla de los ábacos, `{ diametro, separacion }` en las cuatro. En los ábacos no se cuentan las barras de los nervios.
+  - `refuerzos`: `{ armadura, s: [desde, hasta], t: [desde, hasta], barras, en? }`. Se suman a la base en un rectángulo, en los ejes de su armadura: `s` a lo largo de las barras y `t` en transversal (m; para las X, s es la coordenada según el eje 1 de la losa y t según el 2; para las Y, al revés: s según el eje 2 y t según el 1, como en `fem consultar franja`). En un reticular, `en: "abacos"` (con separación) o `en: "nervios"` (con n).
+  - `cercos` (reticular): `{ direccion: "x" | "y", s, t, cercos: { diametro, separacion, ramas? } }`, los cercos de los nervios de una zona.
+  - No es la armadura base de AB (`armado.base` y `armado.losas`, en kN·m/m, la del mapa de armado). Si la hay, `fem armar` propone una base en barras que cubre al menos ese momento.
+- **Lo común, en `obra.armado`:** `fyk`, `recubrimiento` (hasta la barra de fuera) y `exposicion` (con `"XC1"` la fisuración no se comprueba). Mientras la exposición no esté escrita, el aviso `comprobacion/losas-por-defecto`.
+- **Lo que no se comprueba, dilo siempre:** el **punzonamiento** (el cortante no se mira en el metro de un pilar ni a menos de dos cantos de él: aviso `comprobacion/punzonamiento-aparte`), la flecha de la losa fisurada, los anclajes y solapes, la armadura de reparto y de borde, las viguetas de un unidireccional, y las estaciones junto a una esquina entrante (`franja/esquina-entrante`) o sin valor (`comprobacion/estaciones-sin-valor`), que hay que mirar a mano.
+- **Lo propuesto:** la base de cada armadura es la primera de la tabla que cumple sus reglas (cuantía mínima, separación); cada zona en la que la flexión o la fisuración no cumplen con la base recibe un refuerzo en el rectángulo que la envuelve, y cada zona de nervios sin cortante, cercos. La dirección Y va por dentro de la X. Una zona sin refuerzo de la tabla que valga sale en `sinRefuerzo` y la losa no cumple: suele pedir más canto o ábacos mayores. No iguala zonas ni da longitudes de anclaje. Dilo al dar el resultado.
 
 ### Render
 

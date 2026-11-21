@@ -302,6 +302,79 @@
       "additionalProperties": false,
       "description": "Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa o del eje de un muro (C3)."
     },
+    "ArmadoForjado": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "type": "object",
+          "properties": {
+            "x-inf": {
+              "$ref": "#/$defs/BarrasForjado"
+            },
+            "x-sup": {
+              "$ref": "#/$defs/BarrasForjado"
+            },
+            "y-inf": {
+              "$ref": "#/$defs/BarrasForjado"
+            },
+            "y-sup": {
+              "$ref": "#/$defs/BarrasForjado"
+            }
+          },
+          "required": [
+            "x-inf",
+            "x-sup",
+            "y-inf",
+            "y-sup"
+          ],
+          "additionalProperties": false,
+          "description": "La armadura base de cada cara y dirección, en toda la losa: la parrilla de una maciza (Ø y separación) o el montaje de los nervios de un reticular (n por nervio)."
+        },
+        "abacos": {
+          "type": "object",
+          "properties": {
+            "x-inf": {
+              "$ref": "#/$defs/BarrasForjado"
+            },
+            "x-sup": {
+              "$ref": "#/$defs/BarrasForjado"
+            },
+            "y-inf": {
+              "$ref": "#/$defs/BarrasForjado"
+            },
+            "y-sup": {
+              "$ref": "#/$defs/BarrasForjado"
+            }
+          },
+          "required": [
+            "x-inf",
+            "x-sup",
+            "y-inf",
+            "y-sup"
+          ],
+          "additionalProperties": false,
+          "description": "En un reticular: la parrilla de los ábacos (Ø y separación). En ellos no se cuentan las barras de los nervios."
+        },
+        "refuerzos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RefuerzoForjado"
+          }
+        },
+        "cercos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CercosForjado"
+          },
+          "description": "En un reticular: los cercos de los nervios, por zonas."
+        }
+      },
+      "required": [
+        "base"
+      ],
+      "additionalProperties": false,
+      "description": "El armado de una losa maciza o reticular (CO3)."
+    },
     "ArmadoProyecto": {
       "type": "object",
       "properties": {
@@ -342,6 +415,13 @@
             }
           },
           "description": "CO2: el armado de cada viga (su id), vano a vano en su orden a lo largo de la viga (entre las\ncaras de sus apoyos); null, el vano que no lo tiene."
+        },
+        "forjados": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ArmadoForjado"
+          },
+          "description": "CO3: el armado en barras de cada losa maciza o reticular (su id): la base de cada cara y\ndirección, la parrilla de los ábacos y los refuerzos."
         }
       },
       "additionalProperties": false,
@@ -417,6 +497,15 @@
       ],
       "additionalProperties": false,
       "description": "El armado de un vano de viga (CO2). El módulo de vigas toma, en cada cara, n barras de un mismo\ndiámetro: no se mezclan diámetros en una cara.\n\nEl vano va en tres zonas: el cuarto de su luz junto a cada apoyo (`inicio` y `fin`, en el sentido\nde la viga) y el centro. La armadura inferior y la superior son corridas en todo el vano; en los\napoyos, la superior puede ser otra (`superiorInicio`, `superiorFin`: el total de esa zona, no un\nrefuerzo que se suma), y los cercos, otros."
+    },
+    "ArmaduraForjado": {
+      "enum": [
+        "x-inf",
+        "x-sup",
+        "y-inf",
+        "y-sup"
+      ],
+      "description": "Las cuatro armaduras de una losa: X (su dirección 1) o Y (la 2), inferior o superior (las de `agente/armaduraBase.ts`)."
     },
     "Banda": {
       "type": "object",
@@ -545,6 +634,28 @@
       ],
       "additionalProperties": false,
       "description": "Barras intermedias de una cara, entre las de esquina; o las del anillo de un pilar circular."
+    },
+    "BarrasForjado": {
+      "type": "object",
+      "properties": {
+        "diametro": {
+          "type": "number",
+          "description": "Ø, mm."
+        },
+        "separacion": {
+          "type": "number",
+          "description": "Separación entre barras, mm (maciza y ábacos)."
+        },
+        "n": {
+          "type": "number",
+          "description": "Barras por nervio (reticular)."
+        }
+      },
+      "required": [
+        "diametro"
+      ],
+      "additionalProperties": false,
+      "description": "Barras de una armadura de un forjado: en una losa maciza y en los ábacos de un reticular, un\ndiámetro a una separación (mm); en los nervios de un reticular, `n` barras por nervio."
     },
     "BasesArmado": {
       "type": "object",
@@ -960,6 +1071,56 @@
         "separacion"
       ],
       "additionalProperties": false
+    },
+    "CercosForjado": {
+      "type": "object",
+      "properties": {
+        "direccion": {
+          "enum": [
+            "x",
+            "y"
+          ]
+        },
+        "s": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "t": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "cercos": {
+          "$ref": "#/$defs/CercosViga"
+        }
+      },
+      "required": [
+        "direccion",
+        "s",
+        "t",
+        "cercos"
+      ],
+      "additionalProperties": false,
+      "description": "Cercos de los nervios de un reticular en un rectángulo de la losa, en los ejes de los nervios de su\ndirección (como un refuerzo: s a lo largo de los nervios X o Y, t en transversal; m). Fuera de\nellos, los nervios van sin armadura transversal."
     },
     "CercosViga": {
       "type": "object",
@@ -2319,6 +2480,60 @@
         "mitad-superior"
       ],
       "description": "Punto fijo de un pilar (fase PF): el punto de su sección que está en (x, y) en\ntodas las plantas. Los lados, en los ejes de la sección girados con ella: «derecha» según el canto\nh y «superior» a 90° (con giro 0, +X y +Y). Lo explica `puntoFijo.ts`."
+    },
+    "RefuerzoForjado": {
+      "type": "object",
+      "properties": {
+        "armadura": {
+          "$ref": "#/$defs/ArmaduraForjado"
+        },
+        "s": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "t": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "barras": {
+          "$ref": "#/$defs/BarrasForjado"
+        },
+        "en": {
+          "enum": [
+            "abacos",
+            "nervios"
+          ],
+          "description": "En un reticular (obligatorio): el refuerzo es de los ábacos (Ø y separación) o de los nervios (n por nervio)."
+        }
+      },
+      "required": [
+        "armadura",
+        "s",
+        "t",
+        "barras"
+      ],
+      "additionalProperties": false,
+      "description": "Un refuerzo: barras que se suman a la base en un rectángulo de la losa, en los ejes de su armadura\n(s a lo largo de las barras y t en transversal: s = p·d y t = p·n, con d según el eje 1 de la losa\nen las armaduras X y según el 2 en las Y; m). Cubre las estaciones de las franjas de esa dirección\ncon s en [s0, s1] y el centro de la franja en [t0, t1]."
     },
     "Relleno": {
       "type": "object",

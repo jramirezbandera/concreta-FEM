@@ -321,6 +321,41 @@ describe("F: flexión cilíndrica (criterio 2)", () => {
     }
   }, 60_000);
 
+  it("CO3: el cortante medio de las estaciones es el de la viga: q·(L/2 − s) en las de paso y 5·q·L/8 a cada lado del apoyo interior de dos vanos", () => {
+    const [L, B, q] = [6, 4, 10];
+    const base = (apoyos: number[], largo: number): ModeloFisico => ({
+      plantas: [{ id: "P0", altura: null }],
+      materiales: [{ id: "H", tipo: "hormigon", fck: 25, nu: 0, peso: 0 }],
+      secciones: [],
+      losas: [{ id: "L", planta: "P0", contorno: rect(0, 0, largo, B), espesor: 0.2, material: "H" }],
+      apoyosLineales: apoyos.map((x, i) => ({ id: `A${i}`, planta: "P0", puntos: [[x, 0], [x, B]] as Vec2[], coartados: [i === 0, i === 0, true, false, false, false] })),
+      casos: [{ id: "Q" }],
+      cargas: [{ tipo: "superficie", id: "q", caso: "Q", planta: "P0", losa: "L", q: [0, 0, -q] }],
+    });
+    // Un vano: por campos (Q por equilibrio, S5 #3)
+    const c = calculado(base([0, L], L), { tamanoMalla: 0.25 });
+    for (const fr of c.ef.franjas("L").filter((x) => x.direccion === 1)) {
+      const r = c.ef.estaciones(fr.id)!;
+      const env = c.ef.envolventeCortante(fr.id, [[1]])!;
+      r.estaciones.forEach((e, i) => {
+        expect(e.tipo).toBe("paso");
+        if (e.s < 0.5 || e.s > L - 0.5) return;
+        const exacto = q * Math.abs(L / 2 - e.s);
+        expect(Math.abs(Math.abs(e.cortantes[0]!) - exacto)).toBeLessThanOrEqual(0.02 * ((q * L) / 2));
+        expect(env[i]!.v).toBe(Math.abs(e.cortantes[0]!));
+      });
+    }
+    // Dos vanos: a cada lado del apoyo interior, por fuerzas nodales (exacto por equilibrio)
+    const c2 = calculado(base([0, L, 2 * L], 2 * L), { tamanoMalla: 0.25 });
+    for (const fr of c2.ef.franjas("L").filter((x) => x.direccion === 1)) {
+      const ap = c2.ef.estaciones(fr.id)!.estaciones.filter((e) => e.tipo === "apoyo");
+      expect(ap.map((e) => e.lado)).toEqual([-1, 1]);
+      for (const e of ap) expect(Math.abs(Math.abs(e.cortantes[0]!) / ((5 * q * L) / 8) - 1)).toBeLessThanOrEqual(5e-3);
+    }
+    // Y las franjas de la otra dirección no llevan cortante
+    for (const fr of c.ef.franjas("L").filter((x) => x.direccion === 2)) for (const e of c.ef.estaciones(fr.id)!.estaciones) expect(Math.abs(e.cortantes[0]!)).toBeLessThanOrEqual(0.02 * ((q * L) / 2));
+  }, 60_000);
+
   it("en una losa continua de dos vanos, my en la cara del apoyo interior es ν·M a un canto de la cara (LV2-h), y mxy, 0", () => {
     // Flexión cilíndrica con ν ≠ 0: los bordes largos con el giro θx coartado (en w = w(x) es 0, así
     // que no reacciona) para que my = ν·mx. Dos vanos de L: M(x) = (3qL/8)·x − q·x²/2 en el primero.

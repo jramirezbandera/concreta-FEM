@@ -1,0 +1,87 @@
+
+== losa en dos apoyos: 61 nudos
+losa L: 57 + 55 estaciones, 4 combinaciones de ELU; demandas 0.1 s, proponer 0.0 s (27 armados probados)
+  base: x-inf Ø12/300 · x-sup Ø8/300 · y-inf Ø12/300 · y-sup Ø12/300
+  refuerzos x-inf: 1 (1 × Ø10/300)
+  cumple: true; aprovechamiento 1.000; 3 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 0.99, fisuración 0.90, cortante 0.43
+
+== losa plana maciza de 25, 2 × 2 vanos de 5 m: 823 nudos
+losa L: 514 + 514 estaciones, 16 combinaciones de ELU; demandas 0.3 s, proponer 0.0 s (92 armados probados)
+  base: x-inf Ø12/250 · x-sup Ø12/250 · y-inf Ø12/250 · y-sup Ø12/250
+  refuerzos x-sup: 3 (1 × Ø12/150, 2 × Ø8/200)
+  refuerzos y-sup: 5 (2 × Ø10/250, 1 × Ø10/100, 2 × Ø8/300)
+  cumple: true; aprovechamiento 0.988; 10 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 0.99, fisuración 0.94, cortante 0.72
+
+== losa plana reticular 25+5, 2 × 2 vanos de 6 m: 1223 nudos
+losa L: 930 + 930 estaciones, 16 combinaciones de ELU; demandas 0.4 s, proponer 0.1 s (239 armados probados)
+  base: x-inf 2Ø8 · x-sup 1Ø16 · y-inf 2Ø8 · y-sup 1Ø16
+  ábacos: x-inf Ø8/100 · x-sup Ø8/100 · y-inf Ø8/100 · y-sup Ø8/100
+  refuerzos x-inf (nervios): 2 (2 × 2Ø12)
+  refuerzos x-sup (abacos): 3 (1 × Ø12/125, 2 × Ø10/250)
+  refuerzos x-sup (nervios): 1 (1 × 1Ø16)
+  refuerzos y-inf (nervios): 2 (2 × 1Ø20)
+  refuerzos y-sup (abacos): 3 (1 × Ø12/125, 2 × Ø10/250)
+  refuerzos y-sup (nervios): 5 (1 × 1Ø20, 4 × 1Ø8)
+  cercos de nervios: 24 zonas (x c6/150, y c6/150)
+  cumple: true; aprovechamiento 1.045; 60 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 1.00, fisuración 0.81, cortante 1.00
+
+== la misma reticular con ábacos de 2 m: 1223 nudos
+losa L: 930 + 930 estaciones, 16 combinaciones de ELU; demandas 0.4 s, proponer 0.1 s (237 armados probados)
+  base: x-inf 2Ø8 · x-sup 1Ø16 · y-inf 2Ø8 · y-sup 1Ø16
+  ábacos: x-inf Ø8/100 · x-sup Ø8/100 · y-inf Ø8/100 · y-sup Ø8/100
+  refuerzos x-inf (nervios): 2 (2 × 2Ø12)
+  refuerzos x-sup (abacos): 3 (1 × Ø12/150, 2 × Ø8/200)
+  refuerzos x-sup (nervios): 5 (1 × 1Ø16, 2 × 1Ø10, 2 × 1Ø8)
+  refuerzos y-inf (nervios): 2 (2 × 2Ø12)
+  refuerzos y-sup (abacos): 3 (1 × Ø16/250, 2 × Ø10/250)
+  refuerzos y-sup (nervios): 5 (1 × 1Ø16, 2 × 1Ø12, 2 × 1Ø8)
+  cercos de nervios: 25 zonas (x c6/150, y c6/150, y c6/100)
+  cumple: true; aprovechamiento 1.000; 69 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 1.00, fisuración 0.86, cortante 0.95
+
+== losa plana maciza con sismo: 823 nudos
+losa L: 514 + 514 estaciones, 80 combinaciones de ELU; demandas 0.4 s, proponer 0.0 s (92 armados probados)
+  base: x-inf Ø12/250 · x-sup Ø12/250 · y-inf Ø12/250 · y-sup Ø12/250
+  refuerzos x-sup: 3 (1 × Ø12/150, 2 × Ø8/200)
+  refuerzos y-sup: 5 (2 × Ø10/250, 1 × Ø10/100, 2 × Ø8/300)
+  cumple: true; aprovechamiento 0.988; 10 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 0.99, fisuración 0.94, cortante 0.72
+
+== la vivienda: 3342 nudos
+losa L-CUB: 661 + 757 estaciones, 32 combinaciones de ELU; demandas 0.5 s, proponer 0.1 s (154 armados probados)
+  base: x-inf 2Ø8 · x-sup 1Ø16 · y-inf 2Ø8 · y-sup 1Ø16
+  ábacos: x-inf Ø12/200 · x-sup Ø12/200 · y-inf Ø12/200 · y-sup Ø12/200
+  refuerzos x-inf (nervios): 4 (1 × 1Ø12, 1 × 2Ø12, 1 × 1Ø10, 1 × 1Ø8)
+  refuerzos x-sup (abacos): 3 (1 × Ø8/300, 1 × Ø10/300, 1 × Ø8/250)
+  refuerzos y-inf (nervios): 2 (1 × 1Ø8, 1 × 1Ø25)
+  refuerzos y-sup (abacos): 3 (1 × Ø10/125, 2 × Ø8/300)
+  refuerzos y-sup (nervios): 1 (1 × 1Ø8)
+  cercos de nervios: 11 zonas (x c6/150, y c6/150)
+  cumple: true; aprovechamiento 1.000; 40 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 1.00, fisuración 0.97, cortante 0.97
+losa L-CUB-S: 604 + 572 estaciones, 32 combinaciones de ELU; demandas 0.7 s, proponer 0.0 s (150 armados probados)
+  base: x-inf 2Ø8 · x-sup 1Ø10 · y-inf 1Ø10 · y-sup 1Ø12
+  ábacos: x-inf Ø12/200 · x-sup Ø12/200 · y-inf Ø12/200 · y-sup Ø12/200
+  refuerzos x-inf (nervios): 2 (1 × 1Ø10, 1 × 2Ø12)
+  refuerzos x-sup (nervios): 2 (2 × 1Ø16)
+  refuerzos x-sup (abacos): 4 (4 × Ø8/300)
+  refuerzos y-inf (nervios): 3 (1 × 1Ø20, 1 × 1Ø8, 1 × 2Ø10)
+  refuerzos y-sup (nervios): 4 (4 × 1Ø8)
+  refuerzos y-sup (abacos): 2 (2 × Ø8/300)
+  cercos de nervios: 15 zonas (x c6/150, y c6/150)
+  cumple: true; aprovechamiento 1.000; 45 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 0.98, fisuración 0.97, cortante 1.00
+
+== el edificio objetivo de losas de 7 plantas, con viento (la losa de arriba y la de abajo): 86796 nudos
+losa L-N1: 8090 + 7854 estaciones, 28 combinaciones de ELU; demandas 6.6 s, proponer 0.1 s (46 armados probados)
+  base: x-inf Ø8/100 · x-sup Ø8/100 · y-inf Ø8/100 · y-sup Ø8/100
+  refuerzos x-sup: 1 (1 × Ø8/300)
+  cumple: true; aprovechamiento 0.994; 3 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 0.99, fisuración 0.75, cortante 0.35
+losa L-N7: 8090 + 7854 estaciones, 28 combinaciones de ELU; demandas 2.5 s, proponer 0.1 s (45 armados probados)
+  base: x-inf Ø8/100 · x-sup Ø8/100 · y-inf Ø8/100 · y-sup Ø8/100
+  cumple: true; aprovechamiento 0.955; 2 llamadas; sin refuerzo 0; pendientes —
+  peores: flexión 0.96, fisuración 0.79, cortante 0.33
