@@ -12,6 +12,8 @@
     "nucleo:verificar": "bun scripts/compilar-nucleo.mjs --verificar",
     "fem": "bun cli/fem.ts",
     "esquema": "bun scripts/generar-esquema.ts",
+    "concreta:copiar": "bun scripts/copiar-concreta.ts",
+    "concreta:verificar": "bun scripts/copiar-concreta.ts --verificar",
     "visor": "bun app/visor.ts",
     "instalar": "bun cli/instalar.ts",
     "visor:dev": "bun --cwd app run dev"

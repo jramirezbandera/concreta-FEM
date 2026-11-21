@@ -98,6 +98,8 @@ fem calcular proyecto.json                   # calcula (o reutiliza los resultad
 fem consultar proyecto.json <consulta> …     # resultados acotados
 fem render proyecto.json [--vista V] [--planta P]   # PNG y SVG de cada planta, para mirarlos
 fem revisar proyecto.json                    # sensatez e informe de revisión (Markdown y HTML) de esta huella
+fem comprobar proyecto.json [pieza…]         # los pilares y las vigas de hormigón con el armado del proyecto
+fem armar proyecto.json [--escribir]         # propone el armado de pilares y vigas (sólo propone sin --escribir)
 ```
 
 - `fem` es la orden que deja `bun run instalar` en el repo del motor (lanza su `cli/fem.ts` con bun). Si `fem` no existe, díselo al ingeniero; mientras, `bun "<repo>/cli/fem.ts"` o, dentro del repo, `bun run fem`.
@@ -121,6 +123,30 @@ fem revisar proyecto.json                    # sensatez e informe de revisión (
 - luz/canto de vigas y losas, flechas, desplomes y axil reducido.
 
 Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe en `.fem/<huella>/informe.md` e `informe.html`. Un aviso legítimo (una transición, un voladizo) se explica; uno que delata un error del modelo, se corrige en el fichero.
+
+### Comprobación y armado de los pilares
+
+Por ahora, los **pilares de hormigón** rectangulares y circulares y las **vigas de hormigón** rectangulares (abajo); losas, punzonamiento y zapatas, más adelante. Las dos órdenes dan las dos listas (`pilares` y `vigas`, con su `resumen` cada una); con ids detrás, sólo esas piezas, y con `--tipo pilares` o `--tipo vigas`, sólo ese tipo.
+
+- **`fem comprobar proyecto.json`** comprueba cada tramo de pilar con el armado que lleva el proyecto, en **todas** las combinaciones de ELU (con el segundo orden global y la imperfección ya en los esfuerzos, β = 1): flexocompresión esviada, esbeltez, cuantías, separaciones y cercos (el módulo de pilares de Concreta, Código Estructural), cortante en las dos direcciones y flexotracción. Da, por tramo, si cumple, el aprovechamiento y la fila y la combinación que mandan; con uno o más pilares detrás (`fem comprobar proyecto.json P5 P7`), todas sus filas.
+- **`fem armar proyecto.json`** propone el armado de cada tramo: el primero de una tabla (de menos a más acero; barras de 12 a 25, cercos según la norma) con el que no falla ninguna comprobación. **Sólo propone.** Con `--escribir` lo guarda en `armado.pilares` (deja el proyecto de antes en `.bak`); no cambia la huella ni recalcula.
+- **El armado es un dato del proyecto,** fuera del modelo: `armado.pilares.<pilar>.<planta de la cabeza del tramo>` = `{ esquinas, caraB: { n, diametro }, caraH: { n, diametro }, cercos: { diametro, separacion } }` (mm; `caraB`, las intermedias de cada cara de ancho b; en circular, `anillo: { n, diametro }`). Lo común, en `obra.armado`: `fyk` (500), `recubrimiento` hasta el cerco (30 mm) y `phiEf` (2). **El recubrimiento y el acero los da el ingeniero** (dependen de la clase de exposición): pregúntalos; no los des por buenos por defecto sin decirlo.
+- **Un tramo sin armado no cumple,** y lo que no se comprueba sale en `pendientes` y tampoco cumple: lo que no es hormigón, y todos los pilares si el segundo orden está desactivado y la estructura es traslacional. Nunca lo des por comprobado.
+- **El cortante de un pilar circular** se comprueba con el cuadrado inscrito, una simplificación del lado seguro: dilo al ingeniero si es el que manda.
+- **Lo propuesto lleva reglas de obra:** un tramo no lleva menos barras ni de menor diámetro que el de encima, y en cada planta los pilares de la misma sección con un armado parecido llevan el del mayor (`ajuste`: `continuidad` o `agrupado`). Sólo suben armado.
+- **El aviso `comprobacion/recubrimiento-por-defecto`:** sin `obra.armado.recubrimiento` se comprueba con 30 mm hasta el cerco. Pregunta al ingeniero el recubrimiento (o la clase de exposición) y escríbelo; no lo saques de memoria.
+- **No decides el armado por el ingeniero.** Lo propuesto es el mínimo de la tabla que pasa las comprobaciones, pilar a pilar y tramo a tramo: no agrupa pilares, no iguala tramos, no mira esperas ni solapes entre plantas ni las reglas de ductilidad de la norma sísmica. Dilo al dar el resultado. Si la sección no basta («ningún armado de la tabla cumple»), no la cambies tú: díselo.
+- Los números (aprovechamientos, armados) salen de estas órdenes, como cualquier otro (regla 1).
+
+### Comprobación y armado de las vigas
+
+- **Qué se comprueba:** cada **vano** de cada viga de hormigón rectangular (entre las caras de sus apoyos), en tres zonas: el cuarto de la luz junto a cada apoyo (`inicio` y `fin`, en el sentido en que está dibujada la viga) y el `centro`. En cada zona y cada cara que tracciona: flexión, cuantías, separación de barras y fisuración (con la ELS cuasipermanente); cortante y cercos; y, del vano, la **flecha** total a plazo infinito (L/300) y la activa (L/400 por defecto), sacadas de la deformada del modelo con la sección fisurada y la fluencia. El juez es el módulo de vigas de Concreta (Código Estructural).
+- **El armado es un dato del proyecto:** `armado.vigas.<viga>` es la lista de sus vanos, en su orden (`null`, el que no lo tiene). Cada vano: `{ inferior: { n, diametro }, superior: { n, diametro }, superiorInicio?, superiorFin?, cercos: { diametro, separacion, ramas? }, cercosInicio?, cercosFin?, piel? }` (mm). `inferior` y `superior` son corridas en todo el vano; `superiorInicio` y `superiorFin` son **el total** de la cara superior en el cuarto junto a ese apoyo (no un refuerzo que se suma), y los cercos de los apoyos, igual. **Una cara lleva n barras de un solo diámetro:** no se mezclan diámetros.
+- **Lo común, en `obra.armado`:** además de lo de los pilares, `exposicion` (`"XC1"` … `"XC4"`; por defecto `"XC2"`, fisura admisible de 0,3 mm; con XC1, 0,4) y `flechaActiva` (300, 400 o 500: L/400 por defecto; L/500 con tabiques frágiles). **Pregúntalos al ingeniero** con el recubrimiento: no los des por buenos por defecto sin decirlo (mientras no estén escritos, las órdenes dan el aviso `comprobacion/vigas-por-defecto`).
+- **La torsión:** la de compatibilidad (la normal de una viga con losa) no se comprueba y sale como una fila informativa con su valor; la de equilibrio (las vigas que el cálculo marca con `torsionEquilibrio`: sujetan un voladizo de viguetas sin vano detrás) sí, con el cortante y la flexión, y puede pedir barras en las caras laterales (`piel`).
+- **Lo que no se comprueba sale en `pendientes` y no cumple:** una viga que no es de hormigón rectangular, una con compresión de pilar o con flexión lateral, una sin apoyos (su flecha) y la fisuración y la flecha si los casos no llevan su acción (sin ELS). Nunca lo des por comprobado.
+- **Lo propuesto** es, armadura a armadura, la primera de su tabla con la que no falla nada (barras de 12 a 25, cercos de 6 a 10 con 2, 3, 4 o 6 ramas). No iguala vanos ni vigas, no da longitudes ni anclajes de los refuerzos (se entiende que el de un apoyo cubre su cuarto de vano), no mira la ductilidad de la norma sísmica y en una viga plana puede pedir cercos de 3 ramas (la separación transversal de 0,75·d). Dilo al dar el resultado.
+- **La flecha activa** descuenta sólo la flecha instantánea del peso propio (el caso `pesoPropio`, si no lleva cargas del usuario): es del lado seguro. Si el ingeniero tiene el proceso constructivo, que la contraste.
 
 ### Render
 

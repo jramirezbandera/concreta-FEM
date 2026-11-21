@@ -131,6 +131,33 @@ export const HERRAMIENTAS: Herramienta[] = [
     ),
   },
   { name: "revisar", description: "Sensatez e informe de revisión (Markdown y HTML) de esta huella. Ningún resultado se da por bueno sin él.", inputSchema: obj({ proyecto: PROYECTO, recalcular: { type: "boolean" } }, ["proyecto"]) },
+  {
+    name: "comprobar",
+    description:
+      "Comprueba los pilares y las vigas de hormigón con el armado del proyecto (armado.pilares, armado.vigas): por tramo de pilar y por vano de viga, si cumple, su aprovechamiento y la fila y la combinación que mandan. Con «piezas» (ids de pilares o de vigas), todas las filas de ésas; «tipo», sólo pilares o sólo vigas. Una pieza sin armado no cumple.",
+    inputSchema: obj(
+      { proyecto: PROYECTO, piezas: { type: "array", items: { type: "string" } }, pilares: { type: "array", items: { type: "string" } }, tipo: { enum: ["pilares", "vigas"] }, top: { type: "integer" }, todos: { type: "boolean" }, recalcular: { type: "boolean" } },
+      ["proyecto"],
+    ),
+  },
+  {
+    name: "armar",
+    description:
+      "Propone el armado de cada tramo de pilar y de cada vano de viga: el primero de las tablas (de menos a más acero) con el que no falla ninguna comprobación. Sólo propone; con «escribir», lo guarda en armado.pilares y armado.vigas (deja el proyecto de antes en .bak). No cambia la huella ni recalcula. «piezas» y «tipo», como en comprobar.",
+    inputSchema: obj(
+      {
+        proyecto: PROYECTO,
+        piezas: { type: "array", items: { type: "string" } },
+        pilares: { type: "array", items: { type: "string" } },
+        tipo: { enum: ["pilares", "vigas"] },
+        top: { type: "integer" },
+        todos: { type: "boolean" },
+        escribir: { type: "boolean" },
+        recalcular: { type: "boolean" },
+      },
+      ["proyecto"],
+    ),
+  },
   { name: "seleccion", description: "Lo que el ingeniero tiene elegido en la app (planta, espacio y objetos, tal como están en el fichero): para «esta viga» o «lo que tengo elegido».", inputSchema: obj({ proyecto: PROYECTO }, ["proyecto"]) },
   {
     name: "emplazamiento",
@@ -200,7 +227,7 @@ function argv(orden: string, a: Record<string, unknown>, posicionales: string[])
     else r.push(`--${n}`, String(v));
   };
   for (const [k, v] of Object.entries(a)) {
-    if (["proyecto", "plano", "consulta", "id", "imagenes", "abrir", "nuevo", "plantas"].includes(k)) continue;
+    if (["proyecto", "plano", "consulta", "id", "imagenes", "abrir", "nuevo", "plantas", "pilares", "piezas"].includes(k)) continue;
     bandera(k.replace(/_/g, "-"), v);
   }
   return r;
@@ -346,11 +373,15 @@ export async function llamar(nombre: string, a: Record<string, unknown> = {}): P
     case "calcular":
     case "revisar":
     case "seleccion":
+    case "comprobar":
+    case "armar":
     case "consultar":
     case "render": {
       const f = absoluta(a.proyecto, "proyecto");
       if (typeof f !== "string") return fallo(f.error);
-      const pos = [f, ...(nombre === "consultar" ? [String(a.consulta ?? ""), ...(typeof a.id === "string" ? [a.id] : [])] : [])];
+      // Las piezas de comprobar y armar: pilares o vigas (`pilares`, el nombre de antes de CO2)
+      const pilares = nombre === "comprobar" || nombre === "armar" ? [...(Array.isArray(a.piezas) ? a.piezas : []), ...(Array.isArray(a.pilares) ? a.pilares : [])].map(String) : [];
+      const pos = [f, ...(nombre === "consultar" ? [String(a.consulta ?? ""), ...(typeof a.id === "string" ? [a.id] : [])] : []), ...pilares];
       const exacto = a.exacto === true;
       const r = await orden(argv(nombre, { ...a, exacto: false }, pos), dirname(f));
       const content: Contenido[] = [texto(r.json, exacto ? null : 6)];

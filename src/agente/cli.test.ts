@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { reticulaConNucleo } from "../../validacion/c3/modelos.ts";
+import { edificioSO } from "../../validacion/so/modelos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import { calcular } from "../motor/calcular.ts";
@@ -358,6 +359,74 @@ describe("MA: vigas-borde", () => {
     expect((fem(["vigas-borde", ruta]).json.losas as { vigas?: unknown[] }[]).every((l) => !l.vigas?.length)).toBe(true);
     expect(fem(["vigas-borde", ruta, "--losa", "NO"]).codigo).toBe(2);
     expect(fem(["vigas-borde", ruta, "--ancho", "ancho"]).codigo).toBe(2);
+  });
+});
+
+describe("CO1 y CO2: comprobar y armar", () => {
+  it("sin armado no cumple; armar sólo propone; con --escribir lo guarda sin cambiar la huella, y comprobar lo da por bueno", () => {
+    const ruta = escribir(edificioSO());
+    const antes = readFileSync(ruta, "utf8");
+    type Tramo = { planta: string; origen: string; texto?: string; cumple: boolean; aprovechamiento: number | null; filas?: unknown[] };
+    type Pilar = { pilar: string; cumple: boolean; tramos: Tramo[] };
+    type Vano = { vano: number; origen: string; texto?: string; cumple: boolean; aprovechamiento: number | null; filas?: unknown[] };
+    type Viga = { viga: string; cumple: boolean; vanos: Vano[] };
+    type Cuentas = { pilares?: Record<string, number>; vigas?: Record<string, number> };
+    const sin = fem(["comprobar", ruta]);
+    expect(sin.codigo).toBe(0);
+    expect((sin.json.resumen as Cuentas).pilares).toMatchObject({ pilares: 9, tramos: 27, cumplen: 0, sinArmado: 27 });
+    // CO2: las 18 vigas, de dos vanos cada una
+    expect((sin.json.resumen as Cuentas).vigas).toMatchObject({ vigas: 18, vanos: 36, cumplen: 0, sinArmado: 36 });
+    expect((sin.json.diagnosticos as { codigo: string }[]).some((d) => d.codigo === "comprobacion/sin-armado")).toBe(true);
+    // Por defecto, los 10 peores tramos y los 10 peores vanos
+    expect(sin.json.sinListar).toEqual({ pilares: 17, vigas: 26 });
+
+    const a = fem(["armar", ruta, "--todos"]);
+    expect(a.codigo).toBe(0);
+    expect(a.json.escrito).toBe(false);
+    expect((a.json.resumen as Cuentas).pilares).toMatchObject({ tramos: 27, cumplen: 27, noCumplen: 0 });
+    expect((a.json.resumen as Cuentas).vigas).toMatchObject({ vanos: 36, cumplen: 36, noCumplen: 0 });
+    expect(readFileSync(ruta, "utf8")).toBe(antes);
+    const b = fem(["armar", ruta, "--escribir", "--top", "3"]);
+    expect(b.json.escrito).toBe(true);
+    expect(b.json.huella).toBe(a.json.huella);
+    expect((b.json.pilares as Pilar[]).reduce((n, p) => n + p.tramos.length, 0)).toBe(3);
+    expect((b.json.vigas as Viga[]).reduce((n, p) => n + p.vanos.length, 0)).toBe(3);
+    expect(readFileSync(`${ruta}.bak`, "utf8")).toBe(antes);
+    const escrito = JSON.parse(readFileSync(ruta, "utf8")) as { armado: { pilares: Record<string, Record<string, unknown>>; vigas: Record<string, unknown[]> } };
+    expect(Object.keys(escrito.armado.pilares).length).toBe(9);
+    expect(Object.keys(escrito.armado.vigas).length).toBe(18);
+    expect(Object.values(escrito.armado.vigas).every((v) => v.length === 2 && v.every((x) => x !== null))).toBe(true);
+    expect(fem(["validar", ruta]).json.ok).toBe(true);
+
+    const c = fem(["comprobar", ruta, "--todos"]);
+    expect(c.json.huella).toBe(a.json.huella);
+    expect((c.json.resumen as Cuentas).pilares).toMatchObject({ tramos: 27, cumplen: 27, sinArmado: 0 });
+    expect((c.json.resumen as Cuentas).vigas).toMatchObject({ vanos: 36, cumplen: 36, sinArmado: 0 });
+    const vanos = (j: Record<string, unknown>) => (j.vigas as Viga[]).flatMap((g) => g.vanos.map((v) => `${g.viga}/${v.vano}: ${v.texto} ${v.aprovechamiento}`));
+    expect(vanos(c.json)).toEqual(vanos(a.json));
+    const propuesto = (a.json.pilares as Pilar[]).flatMap((p) => p.tramos.map((t) => `${p.pilar}/${t.planta}: ${t.texto} ${t.aprovechamiento}`));
+    expect((c.json.pilares as Pilar[]).flatMap((p) => p.tramos.map((t) => `${p.pilar}/${t.planta}: ${t.texto} ${t.aprovechamiento}`))).toEqual(propuesto);
+    // Un pilar: todas sus filas; uno que no existe, error
+    const uno = fem(["comprobar", ruta, "P5"]);
+    expect((uno.json.pilares as Pilar[]).map((p) => p.pilar)).toEqual(["P5"]);
+    expect((uno.json.pilares as Pilar[])[0]!.tramos.every((t) => t.origen === "proyecto" && t.filas!.length > 10)).toBe(true);
+    expect(uno.json.vigas).toBeUndefined();
+    // Una viga: todas las filas de sus vanos; con un pilar, las dos listas; --tipo, sólo ese tipo
+    const viga = fem(["comprobar", ruta, "F1-H0"]);
+    expect(viga.json.pilares).toBeUndefined();
+    expect((viga.json.vigas as Viga[]).map((g) => g.viga)).toEqual(["F1-H0"]);
+    expect((viga.json.vigas as Viga[])[0]!.vanos.every((v) => v.origen === "proyecto" && v.filas!.length > 20)).toBe(true);
+    const dos = fem(["comprobar", ruta, "F1-H0", "P5"]);
+    expect([(dos.json.pilares as Pilar[]).length, (dos.json.vigas as Viga[]).length]).toEqual([1, 1]);
+    const soloVigas = fem(["comprobar", ruta, "--tipo", "vigas"]);
+    expect(soloVigas.json.pilares).toBeUndefined();
+    expect((soloVigas.json.resumen as Cuentas).pilares).toBeUndefined();
+    expect(fem(["comprobar", ruta, "--tipo", "losas"]).codigo).not.toBe(0);
+    expect(fem(["comprobar", ruta, "P99"]).codigo).toBe(1);
+    // Un armado que no vale es un error del proyecto
+    escrito.armado.pilares.P1!.F1 = { esquinas: 14, cercos: { diametro: 6, separacion: 100 } };
+    writeFileSync(ruta, JSON.stringify(escrito));
+    expect(fem(["comprobar", ruta]).codigo).toBe(1);
   });
 });
 

@@ -44,14 +44,22 @@ export type EntradaDemandaPilar =
 /** Compresión mínima que admite el módulo de pilares, kN. */
 export const ND_MINIMO = 1;
 
-export function entradaPilar(t: DemandasTramo, d: Demanda): EntradaDemandaPilar {
-  if (t.material.tipo !== "hormigon") return { tipo: "pendiente", motivo: `el material ${t.material.id} no es hormigón` };
-  const [N, , , , My, Mz] = d.esfuerzos as [number, number, number, number, number, number];
+/** La sección y el hormigón del tramo, en las unidades del módulo; o por qué no se comprueba. */
+export type GeometriaPilar = Pick<EntradaPilar, "sectionType" | "b" | "h" | "D" | "fck">;
+
+export function geometriaPilar(t: DemandasTramo): GeometriaPilar | { motivo: string } {
+  if (t.material.tipo !== "hormigon") return { motivo: `el material ${t.material.id} no es hormigón` };
   const s = t.seccion;
-  let geom: Pick<EntradaPilar, "sectionType" | "b" | "h" | "D">;
-  if (s.forma === "rectangular") geom = { sectionType: "rectangular", b: 1000 * s.b, h: 1000 * s.h };
-  else if (s.forma === "circular") geom = { sectionType: "circular", b: 1000 * s.D, h: 1000 * s.D, D: 1000 * s.D };
-  else return { tipo: "pendiente", motivo: `la sección ${s.id} (${s.forma}) no es rectangular ni circular` };
+  const fck = t.material.fck;
+  if (s.forma === "rectangular") return { sectionType: "rectangular", b: 1000 * s.b, h: 1000 * s.h, fck };
+  if (s.forma === "circular") return { sectionType: "circular", b: 1000 * s.D, h: 1000 * s.D, D: 1000 * s.D, fck };
+  return { motivo: `la sección ${s.id} (${s.forma}) no es rectangular ni circular` };
+}
+
+export function entradaPilar(t: DemandasTramo, d: Demanda): EntradaDemandaPilar {
+  const geom = geometriaPilar(t);
+  if ("motivo" in geom) return { tipo: "pendiente", motivo: geom.motivo };
+  const [N, , , , My, Mz] = d.esfuerzos as [number, number, number, number, number, number];
   if (-N < ND_MINIMO) return { tipo: "traccion", N, My, Mz };
-  return { tipo: "flexocompresion", entrada: { ...geom, fck: t.material.fck, Nd: -N, MEdy: Math.abs(My), MEdz: Math.abs(Mz), L: t.longitudLibre, beta: 1 } };
+  return { tipo: "flexocompresion", entrada: { ...geom, Nd: -N, MEdy: Math.abs(My), MEdz: Math.abs(Mz), L: t.longitudLibre, beta: 1 } };
 }

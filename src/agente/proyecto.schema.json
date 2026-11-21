@@ -315,10 +315,108 @@
             "$ref": "#/$defs/BasesArmado"
           },
           "description": "Por losa (su id), lo que difiere de la común."
+        },
+        "pilares": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ArmadoTramoPilar"
+            }
+          },
+          "description": "CO: el armado de cada pilar (su id), por tramo: la clave es la planta de la cabeza del tramo.\nLos datos comunes (acero, recubrimiento), en `obra.armado`."
+        },
+        "vigas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/ArmadoVanoViga"
+                }
+              ]
+            }
+          },
+          "description": "CO2: el armado de cada viga (su id), vano a vano en su orden a lo largo de la viga (entre las\ncaras de sus apoyos); null, el vano que no lo tiene."
         }
       },
       "additionalProperties": false,
-      "description": "AB: la armadura base de las losas (kN·m/m). No entra en la huella ni en el cálculo."
+      "description": "AB: la armadura base de las losas (kN·m/m). CO: el armado en barras de los pilares y de las vigas.\nNo entra en la huella ni en el cálculo."
+    },
+    "ArmadoTramoPilar": {
+      "type": "object",
+      "properties": {
+        "esquinas": {
+          "type": "number",
+          "description": "Ø de las cuatro barras de esquina, mm."
+        },
+        "caraB": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Intermedias en cada una de las dos caras de ancho b (las que trabajan con My, el canto h)."
+        },
+        "caraH": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Intermedias en cada una de las dos caras de canto h (las que trabajan con Mz)."
+        },
+        "anillo": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Barras repartidas en el anillo de una sección circular."
+        },
+        "cercos": {
+          "$ref": "#/$defs/Cercos"
+        }
+      },
+      "required": [
+        "cercos"
+      ],
+      "additionalProperties": false,
+      "description": "El armado de un tramo de pilar. Rectangular: `esquinas`, `caraB` y `caraH`; circular: `anillo`."
+    },
+    "ArmadoVanoViga": {
+      "type": "object",
+      "properties": {
+        "inferior": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Cara inferior, en todo el vano."
+        },
+        "superior": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Cara superior, corrida: la de la zona central (el montaje)."
+        },
+        "superiorInicio": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Cara superior en el cuarto del vano junto a su apoyo de inicio; sin ella, `superior`."
+        },
+        "superiorFin": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Cara superior en el cuarto junto al apoyo del fin; sin ella, `superior`."
+        },
+        "cercos": {
+          "$ref": "#/$defs/CercosViga",
+          "description": "Cercos de la zona central (y de todo el vano, si no se dan los de los apoyos)."
+        },
+        "cercosInicio": {
+          "$ref": "#/$defs/CercosViga"
+        },
+        "cercosFin": {
+          "$ref": "#/$defs/CercosViga"
+        },
+        "piel": {
+          "$ref": "#/$defs/BarrasCara",
+          "description": "Barras en cada cara lateral, entre la armadura superior y la inferior (n por cara). Sólo cuentan\npara la separación de las barras de una viga con torsión de equilibrio (CE A19 §9.2.3(4))."
+        }
+      },
+      "required": [
+        "inferior",
+        "superior",
+        "cercos"
+      ],
+      "additionalProperties": false,
+      "description": "El armado de un vano de viga (CO2). El módulo de vigas toma, en cada cara, n barras de un mismo\ndiámetro: no se mezclan diámetros en una cara.\n\nEl vano va en tres zonas: el cuarto de su luz junto a cada apoyo (`inicio` y `fin`, en el sentido\nde la viga) y el centro. La armadura inferior y la superior son corridas en todo el vano; en los\napoyos, la superior puede ser otra (`superiorInicio`, `superiorFin`: el total de esa zona, no un\nrefuerzo que se suma), y los cercos, otros."
     },
     "Banda": {
       "type": "object",
@@ -429,6 +527,24 @@
       ],
       "additionalProperties": false,
       "description": "Barra entre dos puntos del edificio (fase BN, `docs/fem3d/barras.md`): inclinada, horizontal (los\ndos extremos en la misma planta) o vertical. Cada extremo se une a lo que encuentra en su planta\ncomo un apoyo puntual: un pilar, un nudo, una viga, una losa o un muro."
+    },
+    "BarrasCara": {
+      "type": "object",
+      "properties": {
+        "n": {
+          "type": "number"
+        },
+        "diametro": {
+          "type": "number",
+          "description": "Ø, mm."
+        }
+      },
+      "required": [
+        "n",
+        "diametro"
+      ],
+      "additionalProperties": false,
+      "description": "Barras intermedias de una cara, entre las de esquina; o las del anillo de un pilar circular."
     },
     "BasesArmado": {
       "type": "object",
@@ -827,6 +943,46 @@
       ],
       "description": "Categorías de uso del DB SE-AE (tabla 3.1). F (cubiertas transitables) toma la del uso desde el que se accede."
     },
+    "Cercos": {
+      "type": "object",
+      "properties": {
+        "diametro": {
+          "type": "number",
+          "description": "Ø, mm."
+        },
+        "separacion": {
+          "type": "number",
+          "description": "Separación, mm."
+        }
+      },
+      "required": [
+        "diametro",
+        "separacion"
+      ],
+      "additionalProperties": false
+    },
+    "CercosViga": {
+      "type": "object",
+      "properties": {
+        "ramas": {
+          "type": "number"
+        },
+        "diametro": {
+          "type": "number",
+          "description": "Ø, mm."
+        },
+        "separacion": {
+          "type": "number",
+          "description": "Separación, mm."
+        }
+      },
+      "required": [
+        "diametro",
+        "separacion"
+      ],
+      "additionalProperties": false,
+      "description": "Los cercos de una viga: con sus ramas verticales (por defecto, 2)."
+    },
     "Cimentacion": {
       "type": "object",
       "properties": {
@@ -864,6 +1020,38 @@
       ],
       "additionalProperties": false,
       "description": "Losa de cimentación (fase LC)."
+    },
+    "DatosArmado": {
+      "type": "object",
+      "properties": {
+        "fyk": {
+          "type": "number",
+          "description": "Límite elástico del acero de las armaduras, MPa."
+        },
+        "recubrimiento": {
+          "type": "number",
+          "description": "Recubrimiento geométrico hasta el cerco, mm."
+        },
+        "phiEf": {
+          "type": "number",
+          "description": "Coeficiente de fluencia efectivo φef: el de los pilares (CE A19 5.37) y el de la flecha diferida de las vigas (§7.4.3)."
+        },
+        "exposicion": {
+          "enum": [
+            "XC1",
+            "XC2",
+            "XC3",
+            "XC4"
+          ],
+          "description": "CO2: clase de exposición, para la abertura de fisura admisible de las vigas (XC1, 0,4 mm; las demás, 0,3 mm)."
+        },
+        "flechaActiva": {
+          "type": "number",
+          "description": "CO2: el denominador del límite de la flecha activa de las vigas, L/… (DB SE 4.3.3.1(1)): 300, 400 o 500."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Lo común a todas las piezas de hormigón de la obra (`obra.armado`). Lo que falta, `DATOS_ARMADO`."
     },
     "Duracion": {
       "enum": [
@@ -1608,6 +1796,10 @@
         "materiales": {
           "$ref": "#/$defs/MaterialesObra",
           "description": "El material por defecto de cada tipo de elemento, para lo que se crea."
+        },
+        "armado": {
+          "$ref": "#/$defs/DatosArmado",
+          "description": "CO: lo común a las armaduras de la obra: acero, recubrimiento y fluencia. Lo que falta, por defecto."
         }
       },
       "additionalProperties": false,

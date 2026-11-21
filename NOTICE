@@ -124,6 +124,23 @@ Licencia Apache-2.0. Copyright 2011 Google Inc. Ficheros sin modificar en cli/fu
 licencia en cli/fuentes/LICENSE-Roboto.txt.
 
 --------------------------------------------------------------------------------
+Módulos de comprobación de Concreta (fase CO), en src/comprobaciones/concreta/. Su código no se
+modifica, salvo un cambio mecánico: las importaciones relativas llevan la extensión .ts, que Node
+exige (el manifiesto guarda el sha256 del original de cada fichero). El fichero
+lib/frame-core/sections.ts de esa carpeta no es de Concreta: es propio de este repositorio y va en
+el sitio del original (manifiesto, «sustituciones»).
+
+Copiados de https://github.com/wh0am1-dev/concreta en el commit
+6fdc7e782113ddc00c67cb29b7978383ca0269f2 por scripts/copiar-concreta.ts, con el origen y el sha256
+de cada fichero en src/comprobaciones/concreta/manifiesto.json. Publicados aquí con el permiso de
+Carlos Aguilar (2026-11-21, decisión CO-a de docs/fem3d/comprobaciones.md).
+
+Esa carpeta, y sólo ella, se distribuye con la licencia de Concreta, PolyForm Noncommercial 1.0.0:
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+Required Notice: Copyright Javier Ramírez Bandera
+
+--------------------------------------------------------------------------------
 Visor de sólo lectura (fase V1, app/), sin modificar salvo lo que se indica.
 
 Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a

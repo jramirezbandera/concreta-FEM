@@ -1,0 +1,31 @@
+CO2: las vigas del edificio objetivo de losas (7 plantas), con viento y el sismo del programa
+demandas: 567 vigas, 1435 vanos, 92 combinaciones de ELU, 41.5 s (la primera vez: hace los diagramas)
+proponer: 41.4 s, 1435 vanos, 1254 cumplen, 181 no, 181 sin propuesta
+
+Lo pendiente o sin propuesta, por motivo:
+  167  ningún armado de las tablas cumple «…»: la sección no basta
+  14  ningún armado de las tablas cumple «…» (…): la sección no basta
+
+La fila que manda en los que cumplen:
+  609  zona/sup-bending
+  366  zona/shear
+  257  zona/inf-bending
+  15  zona/sup-cracking
+  7  zona/inf-cracking
+
+Probados por vano (armados comprobados hasta dar con el propuesto): 40.6 de media
+
+Los armados más repetidos, por sección:
+  v3060:
+    181  sin propuesta
+    18  inf 3Ø20 · sup 3Ø12 (inicio 3Ø25, fin 3Ø25) · cØ6/200 (inicio cØ6/75, fin cØ6/75)
+    18  inf 3Ø25 · sup 4Ø12 (inicio 4Ø25, fin 4Ø25) · cØ6/200 (inicio cØ6/60, fin cØ6/60)
+    12  inf 3Ø12 · sup 3Ø12 (inicio 2Ø16, fin 2Ø16) · cØ6/200
+    11  inf 3Ø12 · sup 3Ø12 (inicio 4Ø12) · cØ6/200
+    10  inf 3Ø20 · sup 3Ø12 (inicio 3Ø25, fin 3Ø25) · cØ6/200 (inicio cØ8/150, fin cØ6/75)
+    8  inf 3Ø20 · sup 3Ø12 (inicio 3Ø25, fin 3Ø25) · cØ6/200 (inicio cØ6/75, fin cØ8/150)
+    7  inf 3Ø12 · sup 3Ø12 (inicio 2Ø16, fin 5Ø12) · cØ6/200
+  v2540:
+    441  inf 2Ø12 · sup 2Ø12 · cØ6/250
+
+Filas informativas de torsión de compatibilidad: 783 vanos

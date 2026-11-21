@@ -1,0 +1,287 @@
+{
+ "descripcion": "Oráculo de las vigas (validacion/co/oraculo_viga.py)",
+ "casos": [
+  {
+   "id": "30x50-3d16-2d12",
+   "b": 300,
+   "h": 500,
+   "fck": 25,
+   "fyk": 500,
+   "recubrimiento": 30,
+   "cercos": [
+    8,
+    150,
+    2
+   ],
+   "inferior": [
+    3,
+    16
+   ],
+   "superior": [
+    2,
+    12
+   ],
+   "Ms": [
+    45,
+    20
+   ],
+   "MRdPositivo": 111.54076605769018,
+   "MRdNegativo": 43.36620118945309,
+   "MRdPositivoSinLimite": 112.21029562866426,
+   "MRdNegativoSinLimite": 45.07468510716419,
+   "cortantePositivo": {
+    "VRds": 238.1272595027088,
+    "VRdmax": 441.288
+   },
+   "cortanteNegativo": {
+    "VRds": 239.17627826703787,
+    "VRdmax": 443.2320000000002
+   },
+   "fisuraPositivo": {
+    "wk": 0.15881921674995728,
+    "sigmaS": 176.74233592274874,
+    "x": 95.68405167620762
+   },
+   "fisuraNegativo": {
+    "wk": 0.2599678057655185,
+    "sigmaS": 203.0270074386946,
+    "x": 61.48299109127755
+   }
+  },
+  {
+   "id": "30x50-4d20-3d16-c30",
+   "b": 300,
+   "h": 500,
+   "fck": 30,
+   "fyk": 500,
+   "recubrimiento": 30,
+   "cercos": [
+    8,
+    100,
+    2
+   ],
+   "inferior": [
+    4,
+    20
+   ],
+   "superior": [
+    3,
+    16
+   ],
+   "Ms": [
+    110,
+    80
+   ],
+   "MRdPositivo": 225.9265351074059,
+   "MRdNegativo": 111.77918642943021,
+   "MRdPositivoSinLimite": 226.89578038666417,
+   "MRdNegativoSinLimite": 113.06183386825391,
+   "cortantePositivo": {
+    "VRds": 355.61736110756954,
+    "VRdmax": 515.4969600000001
+   },
+   "cortanteNegativo": {
+    "VRds": 357.1908892540633,
+    "VRdmax": 517.77792
+   },
+   "fisuraPositivo": {
+    "wk": 0.1967870558548847,
+    "sigmaS": 213.93232566834402,
+    "x": 128.48258167051927
+   },
+   "fisuraNegativo": {
+    "wk": 0.34236362161902023,
+    "sigmaS": 313.76948141028754,
+    "x": 93.91186108550306
+   }
+  },
+  {
+   "id": "50x30-plana-5d16-5d12",
+   "b": 500,
+   "h": 300,
+   "fck": 25,
+   "fyk": 500,
+   "recubrimiento": 30,
+   "cercos": [
+    6,
+    150,
+    4
+   ],
+   "inferior": [
+    5,
+    16
+   ],
+   "superior": [
+    5,
+    12
+   ],
+   "Ms": [
+    30,
+    20
+   ],
+   "MRdPositivo": 100.51274438675841,
+   "MRdNegativo": 59.395657592092505,
+   "MRdPositivoSinLimite": 100.66817498757304,
+   "MRdNegativoSinLimite": 60.12151051908296,
+   "cortantePositivo": {
+    "VRds": 151.05870206339236,
+    "VRdmax": 414.72000000000014
+   },
+   "cortanteNegativo": {
+    "VRds": 152.2388481732626,
+    "VRdmax": 417.9600000000001
+   },
+   "fisuraPositivo": {
+    "wk": 0.09321427891034458,
+    "sigmaS": 128.0944694604095,
+    "x": 69.10444372572404
+   },
+   "fisuraNegativo": {
+    "wk": 0.1194893192408573,
+    "sigmaS": 147.39244440240665,
+    "x": 54.1307025961473
+   }
+  },
+  {
+   "id": "40x70-5d25-3d20-c35",
+   "b": 400,
+   "h": 700,
+   "fck": 35,
+   "fyk": 500,
+   "recubrimiento": 35,
+   "cercos": [
+    10,
+    100,
+    4
+   ],
+   "inferior": [
+    5,
+    25
+   ],
+   "superior": [
+    3,
+    20
+   ],
+   "Ms": [
+    350,
+    200
+   ],
+   "MRdPositivo": 632.7008045214739,
+   "MRdNegativo": 251.0813928618236,
+   "MRdPositivoSinLimite": 636.3335154192846,
+   "MRdNegativoSinLimite": 255.2820706804451,
+   "cortantePositivo": {
+    "VRds": 1579.6747408159113,
+    "VRdmax": 1113.9408
+   },
+   "cortanteNegativo": {
+    "VRds": 1585.821335138152,
+    "VRdmax": 1118.2752
+   },
+   "fisuraPositivo": {
+    "wk": 0.26202550872641334,
+    "sigmaS": 245.10607796937708,
+    "x": 182.09861878878448
+   },
+   "fisuraNegativo": {
+    "wk": 0.4715546529625259,
+    "sigmaS": 350.84122872838054,
+    "x": 120.44766054148907
+   }
+  },
+  {
+   "id": "25x40-2d12-2d12-fyk400",
+   "b": 250,
+   "h": 400,
+   "fck": 25,
+   "fyk": 400,
+   "recubrimiento": 25,
+   "cercos": [
+    6,
+    200,
+    2
+   ],
+   "inferior": [
+    2,
+    12
+   ],
+   "superior": [
+    2,
+    12
+   ],
+   "Ms": [
+    15,
+    10
+   ],
+   "MRdPositivo": 27.43782612942809,
+   "MRdNegativo": 27.43782612942809,
+   "MRdPositivoSinLimite": 28.18785547227063,
+   "MRdNegativoSinLimite": 28.18785547227063,
+   "cortantePositivo": {
+    "VRds": 64.25895568243526,
+    "VRdmax": 294.03
+   },
+   "cortanteNegativo": {
+    "VRds": 64.25895568243526,
+    "VRdmax": 294.03
+   },
+   "fisuraPositivo": {
+    "wk": 0.18194260936660675,
+    "sigmaS": 193.1700649902827,
+    "x": 59.11123915666262
+   },
+   "fisuraNegativo": {
+    "wk": 0.12129507291107113,
+    "sigmaS": 128.7800433268551,
+    "x": 59.11123915666262
+   }
+  },
+  {
+   "id": "30x40-sobrearmada-6d25",
+   "b": 300,
+   "h": 400,
+   "fck": 25,
+   "fyk": 500,
+   "recubrimiento": 30,
+   "cercos": [
+    8,
+    100,
+    2
+   ],
+   "inferior": [
+    6,
+    25
+   ],
+   "superior": [
+    2,
+    12
+   ],
+   "Ms": [
+    150,
+    20
+   ],
+   "MRdPositivo": 266.85108081203185,
+   "MRdNegativo": 34.661712749505654,
+   "MRdPositivoSinLimite": 266.85108081203185,
+   "MRdNegativoSinLimite": 35.98668731965747,
+   "cortantePositivo": {
+    "VRds": 274.9740435997689,
+    "VRdmax": 339.71400000000006
+   },
+   "cortanteNegativo": {
+    "VRds": 280.0880100758734,
+    "VRdmax": 346.0320000000001
+   },
+   "fisuraPositivo": {
+    "wk": 0.1283485307481083,
+    "sigmaS": 171.1064026410153,
+    "x": 155.55418961572465
+   },
+   "fisuraNegativo": {
+    "wk": 0.33490009615526073,
+    "sigmaS": 261.5468639015308,
+    "x": 53.80990599696629
+   }
+  }
+ ]
+}

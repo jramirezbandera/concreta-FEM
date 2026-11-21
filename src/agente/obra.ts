@@ -11,6 +11,7 @@
  * Puro: sin IO.
  */
 import type { CategoriaUso } from "../combinaciones/psi.ts";
+import { EXPOSICIONES, FLECHAS_ACTIVAS, type DatosArmado } from "../comprobaciones/armado.ts";
 import type { Material, ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 
@@ -35,6 +36,8 @@ export interface ObraProyecto {
   uso?: CategoriaUso;
   /** El material por defecto de cada tipo de elemento, para lo que se crea. */
   materiales?: MaterialesObra;
+  /** CO: lo común a las armaduras de la obra: acero, recubrimiento y fluencia. Lo que falta, por defecto. */
+  armado?: DatosArmado;
 }
 
 /** La familia de material de cada tipo: la que se propone y la que lista su desplegable. */
@@ -52,6 +55,18 @@ export function comprobarObra(o: ObraProyecto | undefined, m: ModeloFisico): Dia
     if (id !== undefined && !hay.has(id))
       r.push({ codigo: "obra/material-inexistente", severidad: "error", mensaje: `El material por defecto de los ${NOMBRE_TIPO_OBRA[t]} es «${id}», que no es un material del modelo.`, ids: [id], detalles: { tipo: t } });
   }
+  const a = o?.armado;
+  const rango = (v: number | undefined, que: string, min: number, max: number, unidad: string) => {
+    if (v !== undefined && !(Number.isFinite(v) && v >= min && v <= max))
+      r.push({ codigo: "obra/armado", severidad: "error", mensaje: `${que} de las armaduras de la obra tiene que estar entre ${min} y ${max}${unidad}, y es ${String(v)}.` });
+  };
+  rango(a?.fyk, "El límite elástico (fyk)", 400, 600, " MPa");
+  rango(a?.recubrimiento, "El recubrimiento", 10, 100, " mm");
+  rango(a?.phiEf, "El coeficiente de fluencia efectivo (phiEf)", 0, 4, "");
+  if (a?.exposicion !== undefined && !EXPOSICIONES.includes(a.exposicion))
+    r.push({ codigo: "obra/armado", severidad: "error", mensaje: `La clase de exposición de las armaduras de la obra tiene que ser una de ${EXPOSICIONES.join(", ")}, y es ${String(a.exposicion)}.` });
+  if (a?.flechaActiva !== undefined && !(FLECHAS_ACTIVAS as readonly number[]).includes(a.flechaActiva))
+    r.push({ codigo: "obra/armado", severidad: "error", mensaje: `El límite de la flecha activa de la obra (flechaActiva) tiene que ser ${FLECHAS_ACTIVAS.join(", ")} (L/…), y es ${String(a.flechaActiva)}.` });
   return r;
 }
 

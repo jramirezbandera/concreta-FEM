@@ -1,0 +1,15 @@
+CO1-a: el cortante esviado como suma, en el edificio objetivo de losas (7 plantas), viento y sismo del programa
+proponer sin las reglas de obra: 38.2 s, 560 tramos, 258 cumplen, 302 sin propuesta, 79756 llamadas
+proponer con las reglas de obra: 48.5 s, 560 tramos, 258 cumplen, 302 sin propuesta, 79756 llamadas, 142 subidos
+tramos con propuesta: 258; con cortante en las dos direcciones a la vez (fila «cortante-esviado»): 258
+la suma sube las barras en 5 tramos y los cercos en 58 (24.4 %)
+  P0-0 en N7: cercos subidos por la suma (6/140 → 8/140)
+  P0-5 en N7: cercos subidos por la suma (6/180 → 8/100)
+  P0-10 en N7: cercos subidos por la suma (6/180 → 8/100)
+  P0-15 en N7: cercos subidos por la suma (6/180 → 8/180)
+  P0-20 en N7: cercos subidos por la suma (6/180 → 8/180)
+  P0-25 en N7: cercos subidos por la suma (6/180 → 8/100)
+  P0-30 en N7: cercos subidos por la suma (6/180 → 8/180)
+  P0-35 en N7: cercos subidos por la suma (6/140 → 8/140)
+  P6-0 en N6: cercos subidos por la suma (8/180 → 8/100)
+  P6-5 en N7: cercos subidos por la suma (6/180 → 8/100)

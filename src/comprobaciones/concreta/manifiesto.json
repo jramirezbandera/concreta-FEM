@@ -1,0 +1,173 @@
+{
+  "repositorio": "https://github.com/wh0am1-dev/concreta",
+  "commit": "6fdc7e782113ddc00c67cb29b7978383ca0269f2",
+  "licencia": "PolyForm Noncommercial 1.0.0 — Required Notice: Copyright Javier Ramírez Bandera",
+  "transformacion": "las importaciones relativas, con la extensión de su fichero (.ts), que Node exige; sha256Origen es el del fichero de Concreta",
+  "ficheros": [
+    {
+      "origen": "src/data/anchorBars.ts",
+      "destino": "src/comprobaciones/concreta/data/anchorBars.ts",
+      "sha256": "a52374dccc3b7c05e9d5b2cdc9c9ff05d69b2bcfa8e21374f9aabfdb0d947634",
+      "sha256Origen": "a52374dccc3b7c05e9d5b2cdc9c9ff05d69b2bcfa8e21374f9aabfdb0d947634"
+    },
+    {
+      "origen": "src/data/defaults.ts",
+      "destino": "src/comprobaciones/concreta/data/defaults.ts",
+      "sha256": "7f51663dd5de4d8c6b0cf16b6aaf22e08b753152145ae85bc4a636febc1a162c",
+      "sha256Origen": "148f49cc8e81a88263f05152fa19700f73f7d5b52806021f1b9b6c4b1fbbf7d3"
+    },
+    {
+      "origen": "src/data/factors.ts",
+      "destino": "src/comprobaciones/concreta/data/factors.ts",
+      "sha256": "8bd7dfec8c1c59077f2816252644f518d6ddc0a7c355d500a6742e6dc07fab10",
+      "sha256Origen": "8bd7dfec8c1c59077f2816252644f518d6ddc0a7c355d500a6742e6dc07fab10"
+    },
+    {
+      "origen": "src/data/materials.ts",
+      "destino": "src/comprobaciones/concreta/data/materials.ts",
+      "sha256": "b08c2929ee86a7afd344c5ac80a18e629a047a54fe3e64715d42c41da74490df",
+      "sha256Origen": "b08c2929ee86a7afd344c5ac80a18e629a047a54fe3e64715d42c41da74490df"
+    },
+    {
+      "origen": "src/data/micropileLookups.ts",
+      "destino": "src/comprobaciones/concreta/data/micropileLookups.ts",
+      "sha256": "642bbae09b11ad6bf0a455e40bc3749c086a003e194aecb20ed356ef5fcf3908",
+      "sha256Origen": "642bbae09b11ad6bf0a455e40bc3749c086a003e194aecb20ed356ef5fcf3908"
+    },
+    {
+      "origen": "src/data/rebar.ts",
+      "destino": "src/comprobaciones/concreta/data/rebar.ts",
+      "sha256": "f8333c0ce590e1a587c0292e8dd8f41d6414468729d7fc7caebeb6ac651126dc",
+      "sha256Origen": "f8333c0ce590e1a587c0292e8dd8f41d6414468729d7fc7caebeb6ac651126dc"
+    },
+    {
+      "origen": "src/lib/calculations/crackedDeflection.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/crackedDeflection.ts",
+      "sha256": "4df60444ad6ceba05238ac976b06d6bb9e841a82a566f9ebb10513a1669b33a0",
+      "sha256Origen": "6785fcee1a5cc9ede26ae265911c8e6b265239284ac3ccd5368c52a6579e0f56"
+    },
+    {
+      "origen": "src/lib/calculations/cuantiaMinima.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/cuantiaMinima.ts",
+      "sha256": "c1d001f243a2d9b778f908ebd79d9dfb69b79184d445465a747c5c4a1d4e94b9",
+      "sha256Origen": "c1d001f243a2d9b778f908ebd79d9dfb69b79184d445465a747c5c4a1d4e94b9"
+    },
+    {
+      "origen": "src/lib/calculations/rcBeamMN.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/rcBeamMN.ts",
+      "sha256": "b85d257c7e0d4b636bde203116a011baa2bb3162e6ed8fe2d1951d6c4aa0c5ff",
+      "sha256Origen": "7300d57a65e5e6b2cf781b12ac27728e93984c8783b0dd44e19708490081b3cd"
+    },
+    {
+      "origen": "src/lib/calculations/rcBeams.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/rcBeams.ts",
+      "sha256": "ebb5895d13de56312e7652ac124ed8c3b4ee10cc49e3cc2dfe8b7974656b2034",
+      "sha256Origen": "079be7dbd71460a079a6ca9930f6d69970b63761ddf3245d87dcb56feca679a7"
+    },
+    {
+      "origen": "src/lib/calculations/rcBeamsDetalle.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/rcBeamsDetalle.ts",
+      "sha256": "45268ca9d54a5019744f2e75822197c4c2fbae1250e6435f7d6d32072aa057a5",
+      "sha256Origen": "746d0e067f3cea3a0fa8d7ec2f25f098c2e6cf842877e947b45e569adbfcee6a"
+    },
+    {
+      "origen": "src/lib/calculations/rcBeamsSection.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/rcBeamsSection.ts",
+      "sha256": "12439e361c91128133ef47b1537def36477e0487296f86a580946c8c9e89b906",
+      "sha256Origen": "ab683128ba44e7bdf7434efe1cd9f430ba9c2ffb27d03440550b858bda099844"
+    },
+    {
+      "origen": "src/lib/calculations/rcColumns.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/rcColumns.ts",
+      "sha256": "cc96c989468a094601567deba3c786f89e58f7d8ab0be497340ef5d3284fb75f",
+      "sha256Origen": "8a68bb0b8a711007e9fa3635ceb665cd60b26615fa37c0829aa76ecef2f1b815"
+    },
+    {
+      "origen": "src/lib/calculations/types.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/types.ts",
+      "sha256": "36459679b047051723d9af41fb74dbacde56d42d61fbcbc2f16b79cdabf556ac",
+      "sha256Origen": "8928b42bdf184004ce4338a84b88e6afeedf46adf400365c91edb9c527aaa167"
+    },
+    {
+      "origen": "src/lib/units/catalog.ts",
+      "destino": "src/comprobaciones/concreta/lib/units/catalog.ts",
+      "sha256": "f077682324e40044bd584b1dd0a56977e3714f0695b2fcdb68daedb1a80bb72b",
+      "sha256Origen": "778ed427f02467c697b004700f4b3c948a57364044a564f2b8ea147574be5bee"
+    },
+    {
+      "origen": "src/lib/units/convert.ts",
+      "destino": "src/comprobaciones/concreta/lib/units/convert.ts",
+      "sha256": "7754a6c2736b35a174c9f0ca273c6752fdf4468f7600c47315a2529a8861f2ba",
+      "sha256Origen": "11893ca828efffbc0d97b83e033eb2bc33f9b1e3de1bce32a2d642297a8f61ab"
+    },
+    {
+      "origen": "src/lib/units/format.ts",
+      "destino": "src/comprobaciones/concreta/lib/units/format.ts",
+      "sha256": "78c96af61b750a7e40992e360dd92ad63011c1b18676ae87de6f24fc1f078322",
+      "sha256Origen": "84e345b96963ff5c314c6e0db44f9a0b344e560001a09bf94ca402f931e7f816"
+    },
+    {
+      "origen": "src/lib/units/types.ts",
+      "destino": "src/comprobaciones/concreta/lib/units/types.ts",
+      "sha256": "7efcdcc45914419da42f56a247acfd4998c167ae378a132973f336999d8ba394",
+      "sha256Origen": "7efcdcc45914419da42f56a247acfd4998c167ae378a132973f336999d8ba394"
+    },
+    {
+      "origen": "src/test/calc/crackedDeflection.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/crackedDeflection.test.ts",
+      "sha256": "d4ff0f0ffe53caafddcbc67b3b418382cd14f002adc4aa5277afc6e96f4cfe14",
+      "sha256Origen": "85950280d49a3c1030f29fede91a6353c168bae70db7a92984c5600cfe23117f"
+    },
+    {
+      "origen": "src/test/calc/cuantiaMinima.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/cuantiaMinima.test.ts",
+      "sha256": "12c496c3c6835fcabc2acc1ae2fdd83e3e4ee904aa5f28f9c3bfef5a4af95c11",
+      "sha256Origen": "d294ffb75b6924dbad48b1af46951bbaf96cf4c3d6a8a1093cb9cfa111ebcc5e"
+    },
+    {
+      "origen": "src/test/calc/rcBeamMN.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/rcBeamMN.test.ts",
+      "sha256": "666407689de4114ed4859fd1c4930f3072ca4c2bf5bc729f8a35f60cae1e7d47",
+      "sha256Origen": "0e3cda0ec28da842fae78b0bc5bba3002dd0c763cd8f4efa967c063d23d6625d"
+    },
+    {
+      "origen": "src/test/calc/rcBeams.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/rcBeams.test.ts",
+      "sha256": "301371d4a012c93403f17b6e201800c16de97a2d4f5f3f59d3e6cfea5f2360d3",
+      "sha256Origen": "456edcc32d4fc0ff08b86fbf56a91bd908a589825f68f5e4b9f7e65042cd2244"
+    },
+    {
+      "origen": "src/test/calc/rcBeamsDetalle.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/rcBeamsDetalle.test.ts",
+      "sha256": "c75d2e743eb42098bcb003c55aa6adb92f607d85218ad3843d2b4a51162c19f4",
+      "sha256Origen": "d90188fb85de711287c5a0f3f94e2671145c57a474e5d980a564f85a2586ee70"
+    },
+    {
+      "origen": "src/test/calc/rcBeamsSection.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/rcBeamsSection.test.ts",
+      "sha256": "f17cff2db2ee8a15e4953d2e88a55d69a09c4fae18020fda187f80ac04b21bdf",
+      "sha256Origen": "a06adc1fd1c706d8551101e6ecbdbefc2118bb8d6824ffec75a6da151747e27e"
+    },
+    {
+      "origen": "src/test/calc/rcColumns.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/rcColumns.test.ts",
+      "sha256": "59ad8920c498cc0c2d4e36fda7edcf8e4369b681e0e32c9aef8085791d052531",
+      "sha256Origen": "e73f657d0d99670109f08e95ddedaffaba61d0df55791a5a46a11ca954f71968"
+    },
+    {
+      "origen": "src/test/calc/rcColumnsCircular.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/rcColumnsCircular.test.ts",
+      "sha256": "b03d95e66895cbee5adf7272c7639e0e96aa52b4078093ffe3cd256a048786c0",
+      "sha256Origen": "4e47c3a5bd29647ee04b5110672ce6d237f7a4e5d2ae75ac9e5ff2a52d07cc33"
+    }
+  ],
+  "parches": [],
+  "sustituciones": [
+    {
+      "fichero": "src/lib/frame-core/sections.ts",
+      "destino": "src/comprobaciones/concreta/lib/frame-core/sections.ts",
+      "motivo": "rcElasticModulusMPa es en Concreta el E de la EHE-08 (8500·∛(fck + 8)), el de su solver; aquí, el Ecm del Código Estructural con el que calcula este motor (CY-a), para que la flecha fisurada parta del mismo E",
+      "sha256": "b9433b037fdce742e000fd478e82a65b2c948a45dd1e58c4549ab266863c66e0"
+    }
+  ]
+}

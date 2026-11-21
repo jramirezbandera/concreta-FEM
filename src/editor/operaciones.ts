@@ -20,7 +20,7 @@
  *
  * Puro: sin IO, sin React ni DOM.
  */
-import { comprobarArmado, limpiarArmado, seguirLosas, type ArmadoProyecto } from "../agente/armaduraBase.ts";
+import { comprobarArmado, limpiarArmado, seguirLosas, seguirPilares, seguirVigas, type ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { comprobarObra, limpiarObra, seguirMateriales, type ObraProyecto } from "../agente/obra.ts";
 import { comprobarProyecto, type PlantillaDxf, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import type { AccionesEdificio, ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
@@ -295,8 +295,8 @@ function mover(m: ModeloFisico, o: Extract<Operacion, { op: "mover" }>): Paso {
 function conArmado(s: Paso, antes: ModeloFisico, datos: DatosProyecto, renombres: ReadonlyMap<string, string> = new Map()): Paso {
   if (!s.ok) return s;
   let d = s.proyecto ?? datos;
-  if (d.armado?.losas) {
-    const armado = seguirLosas(d.armado, renombres, antes, s.modelo);
+  if (d.armado?.losas || d.armado?.pilares || d.armado?.vigas) {
+    const armado = seguirVigas(seguirPilares(seguirLosas(d.armado, renombres, antes, s.modelo), renombres, antes, s.modelo), renombres, antes, s.modelo);
     if (armado !== d.armado) {
       const { armado: _a, ...resto } = d;
       d = armado ? { ...resto, armado } : resto;

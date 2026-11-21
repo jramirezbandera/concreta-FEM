@@ -8,6 +8,7 @@
  *
  * Puro: sin IO.
  */
+import { erroresArmado, erroresArmadoViga, type ArmadoTramoPilar, type ArmadoVanoViga } from "../comprobaciones/armado.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 
@@ -23,12 +24,25 @@ export interface BasesArmado {
   "y-sup"?: number;
 }
 
-/** AB: la armadura base de las losas (kN·m/m). No entra en la huella ni en el cálculo. */
+/**
+ * AB: la armadura base de las losas (kN·m/m). CO: el armado en barras de los pilares y de las vigas.
+ * No entra en la huella ni en el cálculo.
+ */
 export interface ArmadoProyecto {
   /** La base común a todas las losas, por armadura. */
   base?: BasesArmado;
   /** Por losa (su id), lo que difiere de la común. */
   losas?: Record<string, BasesArmado>;
+  /**
+   * CO: el armado de cada pilar (su id), por tramo: la clave es la planta de la cabeza del tramo.
+   * Los datos comunes (acero, recubrimiento), en `obra.armado`.
+   */
+  pilares?: Record<string, Record<string, ArmadoTramoPilar>>;
+  /**
+   * CO2: el armado de cada viga (su id), vano a vano en su orden a lo largo de la viga (entre las
+   * caras de sus apoyos); null, el vano que no lo tiene.
+   */
+  vigas?: Record<string, (ArmadoVanoViga | null)[]>;
 }
 
 /** La base de una losa en una armadura (kN·m/m), o null si no hay. */
@@ -58,6 +72,33 @@ export function comprobarArmado(a: ArmadoProyecto | undefined, m: ModeloFisico):
     if (!losas.has(id)) r.push({ codigo: "armado/losa", severidad: "error", mensaje: `La armadura base es de «${id}», que no es una losa del modelo (las franjas son de las losas macizas y reticulares).`, ids: [id] });
     else valores(b, `la losa ${id}`, [id]);
   }
+  const pilares = new Set((m.pilares ?? []).map((p) => p.id));
+  const plantas = new Set(m.plantas.map((p) => p.id));
+  for (const [id, tramos] of Object.entries(a.pilares ?? {})) {
+    if (!pilares.has(id)) {
+      r.push({ codigo: "armado/pilar", severidad: "error", mensaje: `Hay un armado de «${id}», que no es un pilar del modelo.`, ids: [id] });
+      continue;
+    }
+    for (const [planta, t] of Object.entries(tramos)) {
+      if (!plantas.has(planta)) r.push({ codigo: "armado/planta", severidad: "error", mensaje: `El armado del pilar ${id} tiene un tramo en «${planta}», que no es una planta del modelo (cada tramo va por la planta de su cabeza).`, ids: [id] });
+      for (const e of erroresArmado(t)) r.push({ codigo: "armado/barras", severidad: "error", mensaje: `El armado del pilar ${id} en ${planta} no vale: ${e}.`, ids: [id], detalles: { planta } });
+    }
+  }
+  const vigas = new Set((m.vigas ?? []).map((v) => v.id));
+  for (const [id, vanos] of Object.entries(a.vigas ?? {})) {
+    if (!vigas.has(id)) {
+      r.push({ codigo: "armado/viga", severidad: "error", mensaje: `Hay un armado de «${id}», que no es una viga del modelo.`, ids: [id] });
+      continue;
+    }
+    if (!Array.isArray(vanos)) {
+      r.push({ codigo: "armado/barras", severidad: "error", mensaje: `El armado de la viga ${id} tiene que ser la lista de sus vanos, en su orden.`, ids: [id] });
+      continue;
+    }
+    vanos.forEach((t, i) => {
+      if (t === null) return;
+      for (const e of erroresArmadoViga(t)) r.push({ codigo: "armado/barras", severidad: "error", mensaje: `El armado de la viga ${id} en su vano ${i} no vale: ${e}.`, ids: [id], detalles: { vano: i } });
+    });
+  }
   return r;
 }
 
@@ -77,7 +118,11 @@ export function limpiarArmado(a: ArmadoProyecto | undefined): ArmadoProyecto | u
     const b = limpio(a.losas![id]);
     if (b) losas[id] = b;
   }
-  const r: ArmadoProyecto = { ...(base ? { base } : {}), ...(Object.keys(losas).length ? { losas } : {}) };
+  const pilares: Record<string, Record<string, ArmadoTramoPilar>> = {};
+  for (const id of Object.keys(a.pilares ?? {}).sort()) if (Object.keys(a.pilares![id]!).length) pilares[id] = a.pilares![id]!;
+  const vigas: Record<string, (ArmadoVanoViga | null)[]> = {};
+  for (const id of Object.keys(a.vigas ?? {}).sort()) if (a.vigas![id]!.some((v) => v !== null)) vigas[id] = a.vigas![id]!;
+  const r: ArmadoProyecto = { ...(base ? { base } : {}), ...(Object.keys(losas).length ? { losas } : {}), ...(Object.keys(pilares).length ? { pilares } : {}), ...(Object.keys(vigas).length ? { vigas } : {}) };
   return Object.keys(r).length ? r : undefined;
 }
 
@@ -97,4 +142,57 @@ export function seguirLosas(a: ArmadoProyecto | undefined, renombres: ReadonlyMa
     losas[n] = b;
   }
   return limpiarArmado({ ...a, losas });
+}
+
+/**
+ * Lo mismo con el armado de los pilares: el pilar renombrado, con su nuevo id; el borrado, fuera; y
+ * los tramos, con el nuevo id de su planta (sin los de una planta borrada).
+ */
+export function seguirPilares(a: ArmadoProyecto | undefined, renombres: ReadonlyMap<string, string>, antes: ModeloFisico, despues: ModeloFisico): ArmadoProyecto | undefined {
+  if (!a?.pilares) return a;
+  const eran = new Set((antes.pilares ?? []).map((p) => p.id));
+  const son = new Set((despues.pilares ?? []).map((p) => p.id));
+  const eranPlantas = new Set(antes.plantas.map((p) => p.id));
+  const sonPlantas = new Set(despues.plantas.map((p) => p.id));
+  const pilares: Record<string, Record<string, ArmadoTramoPilar>> = {};
+  let cambia = false;
+  for (const [id, tramos] of Object.entries(a.pilares)) {
+    const n = eran.has(id) ? (renombres.get(id) ?? id) : id;
+    if (n !== id) cambia = true;
+    if (eran.has(id) && !son.has(n)) {
+      cambia = true;
+      continue;
+    }
+    const t: Record<string, ArmadoTramoPilar> = {};
+    for (const [planta, x] of Object.entries(tramos)) {
+      const np = eranPlantas.has(planta) ? (renombres.get(planta) ?? planta) : planta;
+      if (np !== planta) cambia = true;
+      if (eranPlantas.has(planta) && !sonPlantas.has(np)) {
+        cambia = true;
+        continue;
+      }
+      t[np] = x;
+    }
+    pilares[n] = t;
+  }
+  return cambia ? limpiarArmado({ ...a, pilares }) : a;
+}
+
+/** Lo mismo con el armado de las vigas: la renombrada, con su nuevo id; la borrada, fuera. */
+export function seguirVigas(a: ArmadoProyecto | undefined, renombres: ReadonlyMap<string, string>, antes: ModeloFisico, despues: ModeloFisico): ArmadoProyecto | undefined {
+  if (!a?.vigas) return a;
+  const eran = new Set((antes.vigas ?? []).map((v) => v.id));
+  const son = new Set((despues.vigas ?? []).map((v) => v.id));
+  const vigas: Record<string, (ArmadoVanoViga | null)[]> = {};
+  let cambia = false;
+  for (const [id, vanos] of Object.entries(a.vigas)) {
+    const n = eran.has(id) ? (renombres.get(id) ?? id) : id;
+    if (n !== id) cambia = true;
+    if (eran.has(id) && !son.has(n)) {
+      cambia = true;
+      continue;
+    }
+    vigas[n] = vanos;
+  }
+  return cambia ? limpiarArmado({ ...a, vigas }) : a;
 }

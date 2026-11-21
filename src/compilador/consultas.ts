@@ -647,24 +647,36 @@ export class Consultas {
   }
 
   /** Esfuerzos de la pieza en s con su diagrama combinado; null si s cae fuera de sus tramos flexibles. */
-  private seccion(id: string, f: ArrayLike<number>, s: number, lado: -1 | 1): SeccionPieza | null {
+  private seccion(id: string, f: ArrayLike<number>, s: number, lado: -1 | 1, diagrama: (b: number) => DiagramaLeible = (b) => this.diagramaCombinado(b, f)): SeccionPieza | null {
     const ts = this.piezas()
       .tramos(id)
       .filter((t) => s >= t.s0 - 1e-9 && s <= t.s1 + 1e-9);
     if (!ts.length) return null;
     const t = lado < 0 ? ts[0]! : ts[ts.length - 1]!;
     const x = Math.min(t.s1 - t.s0, Math.max(0, s - t.s0));
-    return { s, esfuerzos: Float64Array.from(this.diagramaCombinado(t.barra, f).esfuerzosEn(x, lado)) };
+    return { s, esfuerzos: Float64Array.from(diagrama(t.barra).esfuerzosEn(x, lado)) };
   }
 
   /** Esfuerzos del vano i de la viga en una combinación (sus factores por caso, o `factoresCaso`). */
   vano(id: string, i: number, factores: ArrayLike<number>): Respuesta<EsfuerzosVano> {
+    const r = this.vanoZonas(id, i, factores);
+    return r.valido ? { valido: true, valor: r.valor[0]!, diagnosticos: r.diagnosticos } : r;
+  }
+
+  /**
+   * Fase CO2: como `vano`, con el vano partido en zonas por unas fracciones de su longitud (crecientes,
+   * entre 0 y 1: [0,25; 0,75] da el cuarto junto a cada apoyo y el centro). De cada zona, los esfuerzos
+   * en sus dos extremos y los máximos y mínimos dentro de ella, con el diagrama de la combinación
+   * hecho una vez por tramo. Sin fracciones, el vano entero (lo de `vano`).
+   */
+  vanoZonas(id: string, i: number, factores: ArrayLike<number>, fracciones: readonly number[] = []): Respuesta<EsfuerzosVano[]> {
     const r = this.viga(id);
     if (!r.valido) return r;
-    const mal = this.factoresMal<EsfuerzosVano>(factores, id);
+    const mal = this.factoresMal<EsfuerzosVano[]>(factores, id);
     if (mal) return mal;
     const v = r.valor.vanos[i];
     if (!v) return this.no("consulta/no-existe", `La viga ${id} no tiene vano ${i} (tiene ${r.valor.vanos.length}).`, [id]);
+    if (fracciones.some((x, k) => !(x > (k ? fracciones[k - 1]! : 0) && x < 1))) return this.no("consulta/fracciones", `Las fracciones de las zonas de un vano tienen que ser crecientes y estar entre 0 y 1 (${fracciones.join(", ")}).`, [id]);
     const ts = this.piezas()
       .tramos(id)
       .filter((t) => t.s1 > v.desde + 1e-9 && t.s0 < v.hasta - 1e-9);
@@ -672,36 +684,46 @@ export class Consultas {
     // Extremos: la cara, o el extremo del tramo flexible si la cara cae en una zona rígida
     const desde = Math.max(v.desde, ts[0]!.s0);
     const hasta = Math.min(v.hasta, ts[ts.length - 1]!.s1);
-    const inicio = this.seccion(id, factores, desde, 1)!;
-    const fin = this.seccion(id, factores, hasta, -1)!;
+    const limites = [desde, ...fracciones.map((x) => desde + x * (hasta - desde)), hasta];
+    // El diagrama de la combinación, una vez por tramo
+    const hechos = new Map<number, DiagramaLeible>();
+    const diagrama = (b: number): DiagramaLeible => {
+      let D = hechos.get(b);
+      if (!D) hechos.set(b, (D = this.diagramaCombinado(b, factores)));
+      return D;
+    };
     // Cada extremo con el punto donde está, para partir allí sus esfuerzos al final (VS-o)
     type Donde = { s: number; valor: number; D: DiagramaLeible | null; x: number; lado: -1 | 1 };
-    const nuevo = (valor: number): Donde => ({ s: desde, valor, D: null, x: 0, lado: 1 });
-    const ext = { maxMy: nuevo(-Infinity), minMy: nuevo(Infinity), maxVz: nuevo(-Infinity), minVz: nuevo(Infinity), maxT: nuevo(-Infinity), minT: nuevo(Infinity) };
-    for (const t of ts) {
-      const D = this.diagramaCombinado(t.barra, factores);
-      const [a, b] = [Math.max(desde, t.s0) - t.s0, Math.min(hasta, t.s1) - t.s0];
-      const xs = [a, b, ...D.estaciones().filter((x) => x > a && x < b)];
-      for (const x of xs)
-        for (const lado of [-1, 1] as const) {
-          if ((x === a && lado < 0) || (x === b && lado > 0)) continue;
-          const e = D.esfuerzosEn(x, lado);
-          const s = t.s0 + x;
-          const aqui = (valor: number): Donde => ({ s, valor, D, x, lado });
-          if (e[4]! > ext.maxMy.valor) ext.maxMy = aqui(e[4]!);
-          if (e[4]! < ext.minMy.valor) ext.minMy = aqui(e[4]!);
-          if (e[2]! > ext.maxVz.valor) ext.maxVz = aqui(e[2]!);
-          if (e[2]! < ext.minVz.valor) ext.minVz = aqui(e[2]!);
-          if (e[3]! > ext.maxT.valor) ext.maxT = aqui(e[3]!);
-          if (e[3]! < ext.minT.valor) ext.minT = aqui(e[3]!);
-        }
-    }
     const partido = (d: Donde): ExtremoDiagrama => ({ s: d.s, valor: d.valor, partes: d.D ? esfuerzosPartidos(d.D, d.x, d.lado) : { estatica: new Float64Array(6), sismo: new Float64Array(6) } });
-    return {
-      valido: true,
-      valor: { inicio, fin, maxMy: partido(ext.maxMy), minMy: partido(ext.minMy), maxVz: partido(ext.maxVz), minVz: partido(ext.minVz), maxT: partido(ext.maxT), minT: partido(ext.minT) },
-      diagnosticos: [],
-    };
+    const zonas: EsfuerzosVano[] = [];
+    for (let z = 0; z + 1 < limites.length; z++) {
+      const [za, zb] = [limites[z]!, limites[z + 1]!];
+      const inicio = this.seccion(id, factores, za, 1, diagrama)!;
+      const fin = this.seccion(id, factores, zb, -1, diagrama)!;
+      const nuevo = (valor: number): Donde => ({ s: za, valor, D: null, x: 0, lado: 1 });
+      const ext = { maxMy: nuevo(-Infinity), minMy: nuevo(Infinity), maxVz: nuevo(-Infinity), minVz: nuevo(Infinity), maxT: nuevo(-Infinity), minT: nuevo(Infinity) };
+      for (const t of ts) {
+        const [a, b] = [Math.max(za, t.s0) - t.s0, Math.min(zb, t.s1) - t.s0];
+        if (!(b > a)) continue;
+        const D = diagrama(t.barra);
+        const xs = [a, b, ...D.estaciones().filter((x) => x > a && x < b)];
+        for (const x of xs)
+          for (const lado of [-1, 1] as const) {
+            if ((x === a && lado < 0) || (x === b && lado > 0)) continue;
+            const e = D.esfuerzosEn(x, lado);
+            const s = t.s0 + x;
+            const aqui = (valor: number): Donde => ({ s, valor, D, x, lado });
+            if (e[4]! > ext.maxMy.valor) ext.maxMy = aqui(e[4]!);
+            if (e[4]! < ext.minMy.valor) ext.minMy = aqui(e[4]!);
+            if (e[2]! > ext.maxVz.valor) ext.maxVz = aqui(e[2]!);
+            if (e[2]! < ext.minVz.valor) ext.minVz = aqui(e[2]!);
+            if (e[3]! > ext.maxT.valor) ext.maxT = aqui(e[3]!);
+            if (e[3]! < ext.minT.valor) ext.minT = aqui(e[3]!);
+          }
+      }
+      zonas.push({ inicio, fin, maxMy: partido(ext.maxMy), minMy: partido(ext.minMy), maxVz: partido(ext.maxVz), minVz: partido(ext.minVz), maxT: partido(ext.maxT), minT: partido(ext.minT) });
+    }
+    return { valido: true, valor: zonas, diagnosticos: [] };
   }
 
   /**
