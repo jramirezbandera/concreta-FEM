@@ -52,6 +52,7 @@ const MODOS: { id: ModoResultados; nombre: string; claves: string }[] = [
   { id: "deformada", nombre: "Deformada y desplomes", claves: "deriva desplome viento sismo" },
   { id: "modal", nombre: "Modal: masas, modos y sismo", claves: "modos vibracion periodo masa sismo espectro cortante" },
   { id: "reacciones", nombre: "Reacciones", claves: "cimentacion apoyos cargas en cimentacion" },
+  { id: "comprobacion", nombre: "Comprobación y armado", claves: "comprobar armar armado barras cercos aprovechamiento pilares vigas losas punzonamiento" },
 ];
 
 /** Pausa tras un cambio de lo elegido antes de dejarlo para el agente (`.fem/app.json`). */

@@ -22,6 +22,7 @@ import type { Cargas3D } from "./cargas3d.ts";
 import type { DatosArmado, DatosFranja } from "./franjas.ts";
 import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
+import type { DatosArmar, DatosComprobaciones, FichaComprobacion, PedidoArmar, TipoComprobacion } from "./comprobaciones.ts";
 import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
@@ -84,7 +85,11 @@ export type Pedido =
   | { tipo: "modal" }
   | { tipo: "modo"; modo: number }
   /** SO: el segundo orden global (con resultados). */
-  | { tipo: "segundo-orden" };
+  | { tipo: "segundo-orden" }
+  /** CO6: la tabla de comprobaciones de un tipo de pieza con el armado dado, la ficha de una parte y el armado que proponen las tablas. */
+  | { tipo: "comprobaciones"; de: TipoComprobacion; armado?: ArmadoProyecto }
+  | { tipo: "comprobacion"; de: TipoComprobacion; clave: string; armado?: ArmadoProyecto }
+  | ({ tipo: "armar" } & PedidoArmar);
 
 /** Lo que devuelve cada pedido cuando sale bien. */
 export interface Respuestas {
@@ -129,6 +134,9 @@ export interface Respuestas {
   modal: DatosModal;
   modo: DatosDeformada;
   "segundo-orden": DatosSegundoOrden;
+  comprobaciones: DatosComprobaciones;
+  comprobacion: FichaComprobacion;
+  armar: DatosArmar;
 }
 
 export type TipoPedido = Pedido["tipo"];

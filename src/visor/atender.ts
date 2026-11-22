@@ -4,6 +4,7 @@
  *
  * Puro: el núcleo WASM ya iniciado por quien lo crea.
  */
+import { datosArmar, datosComprobacion, datosComprobaciones } from "./comprobaciones.ts";
 import type { OpcionesCompilacion, ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
@@ -178,6 +179,13 @@ export class Atendedor {
       // SO: el segundo orden global
       case "segundo-orden":
         return bien("segundo-orden", s.segundoOrdenDatos());
+      // CO6: las comprobaciones con el armado en barras
+      case "comprobaciones":
+        return de(datosComprobaciones(s, p.de, p.armado));
+      case "comprobacion":
+        return de(datosComprobacion(s, p.de, p.clave, p.armado));
+      case "armar":
+        return de(datosArmar(s, p));
     }
   }
 }

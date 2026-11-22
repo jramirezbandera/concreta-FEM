@@ -71,6 +71,12 @@
       "sha256Origen": "c1d001f243a2d9b778f908ebd79d9dfb69b79184d445465a747c5c4a1d4e94b9"
     },
     {
+      "origen": "src/lib/calculations/isolatedFooting.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/isolatedFooting.ts",
+      "sha256": "48f356febbdee6b2a0d1d2a7167d46e738f3754fd3da7c83da423ec5477df9ce",
+      "sha256Origen": "0f697c56e1ef0f996b6a8ae2f388fdbea02bab5599c9140ebb0c0ffc4836b3d3"
+    },
+    {
       "origen": "src/lib/calculations/punching.ts",
       "destino": "src/comprobaciones/concreta/lib/calculations/punching.ts",
       "sha256": "4ff427a16d824df42c23859dfe9590ae643d5e2e9da76b79e67303d4839b056a",
@@ -165,6 +171,18 @@
       "destino": "src/comprobaciones/concreta/test/calc/cuantiaMinima.test.ts",
       "sha256": "12c496c3c6835fcabc2acc1ae2fdd83e3e4ee904aa5f28f9c3bfef5a4af95c11",
       "sha256Origen": "d294ffb75b6924dbad48b1af46951bbaf96cf4c3d6a8a1093cb9cfa111ebcc5e"
+    },
+    {
+      "origen": "src/test/calc/isolatedFooting.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/isolatedFooting.test.ts",
+      "sha256": "4010a84793b7c6d47c7fb5255df324c9cf706c035d8af19ccbd0315e24718ed4",
+      "sha256Origen": "f0f522b838657e88514caa4854b830945463dbcf5a525948fcdb81ebc7a9292e"
+    },
+    {
+      "origen": "src/test/calc/isolatedFootingMedianera.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/isolatedFootingMedianera.test.ts",
+      "sha256": "f0da623899a2daa6052fa6154525525c5e053bc176f0f6e223e6fc0faa8ff02b",
+      "sha256Origen": "472b63bab4af8f5a90fefeef7d1ba11f5940cca3aed283ed193a713327ecf5e4"
     },
     {
       "origen": "src/test/calc/punching.test.ts",

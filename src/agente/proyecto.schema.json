@@ -432,6 +432,13 @@
             }
           },
           "description": "CO4: la armadura de punzonamiento de la losa junto a cada pilar (su id), por la planta de la\nlosa. Sin ella, la losa se comprueba ahí sin armadura de punzonamiento."
+        },
+        "zapatas": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Zapata"
+          },
+          "description": "CO5: la zapata aislada de cada pilar (su id) que la lleva: su posición (linderos, vigas\ncentradoras), sus dimensiones y sus parrillas. El terreno, en `obra.terreno`."
         }
       },
       "additionalProperties": false,
@@ -690,6 +697,25 @@
       ],
       "additionalProperties": false,
       "description": "Barras de una armadura de un forjado: en una losa maciza y en los ábacos de un reticular, un\ndiámetro a una separación (mm); en los nervios de un reticular, `n` barras por nervio."
+    },
+    "BarrasZapata": {
+      "type": "object",
+      "properties": {
+        "diametro": {
+          "type": "number",
+          "description": "Ø, mm."
+        },
+        "separacion": {
+          "type": "number",
+          "description": "Separación, mm."
+        }
+      },
+      "required": [
+        "diametro",
+        "separacion"
+      ],
+      "additionalProperties": false,
+      "description": "Las barras de una dirección de la parrilla de una zapata."
     },
     "BasesArmado": {
       "type": "object",
@@ -1243,10 +1269,41 @@
         "flechaActiva": {
           "type": "number",
           "description": "CO2: el denominador del límite de la flecha activa de las vigas, L/… (DB SE 4.3.3.1(1)): 300, 400 o 500."
+        },
+        "recubrimientoZapatas": {
+          "type": "number",
+          "description": "CO5: recubrimiento geométrico de las parrillas de las zapatas, mm (hasta la cara de la barra)."
         }
       },
       "additionalProperties": false,
       "description": "Lo común a todas las piezas de hormigón de la obra (`obra.armado`). Lo que falta, `DATOS_ARMADO`."
+    },
+    "DatosTerreno": {
+      "type": "object",
+      "properties": {
+        "tensionAdmisible": {
+          "type": "number",
+          "description": "Tensión admisible del terreno, kPa (la presión total bruta sobre el área equivalente, DB SE-C 4.3.1.3)."
+        },
+        "tensionAdmisibleSismo": {
+          "type": "number",
+          "description": "En las combinaciones sísmicas (GEO-SIS), kPa; sin ella, la de arriba."
+        },
+        "pesoEspecifico": {
+          "type": "number",
+          "description": "Peso específico de las tierras sobre las zapatas, kN/m³."
+        },
+        "rozamiento": {
+          "type": "number",
+          "description": "Coeficiente de rozamiento entre la zapata y el terreno, para el deslizamiento."
+        },
+        "tierras": {
+          "type": "number",
+          "description": "Tierras sobre la cara superior de las zapatas, m (la de cada zapata puede ser otra)."
+        }
+      },
+      "additionalProperties": false,
+      "description": "CO5: el terreno bajo las zapatas, del estudio geotécnico. Sin la tensión admisible no se comprueba\nninguna zapata; lo demás tiene valor por defecto (`DATOS_TERRENO`)."
     },
     "Duracion": {
       "enum": [
@@ -1676,6 +1733,10 @@
         "perfiles": {
           "type": "string",
           "description": "Las secciones de acero (perfiles laminados), de pilares, vigas y barras."
+        },
+        "zapatas": {
+          "type": "string",
+          "description": "CO5: el hormigón de las zapatas de los pilares (fuera del modelo: el de sus comprobaciones)."
         }
       },
       "additionalProperties": false,
@@ -1995,6 +2056,10 @@
         "armado": {
           "$ref": "#/$defs/DatosArmado",
           "description": "CO: lo común a las armaduras de la obra: acero, recubrimiento y fluencia. Lo que falta, por defecto."
+        },
+        "terreno": {
+          "$ref": "#/$defs/DatosTerreno",
+          "description": "CO5: el terreno bajo las zapatas."
         }
       },
       "additionalProperties": false,
@@ -2183,6 +2248,23 @@
       ],
       "additionalProperties": false,
       "description": "Paño de forjado unidireccional (C4, D2): viguetas como barras según `direccion`, cada\n`intereje`, dentro de su contorno (sin sus huecos). Vale también para placas alveolares y chapa\ncolaborante (barras unidireccionales con su intereje, H46). Su contorno va a ejes (C2-c): sobre\nlos ejes de las vigas y los muros en los que se apoya."
+    },
+    "ParrillaZapata": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "$ref": "#/$defs/BarrasZapata"
+        },
+        "y": {
+          "$ref": "#/$defs/BarrasZapata"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "additionalProperties": false,
+      "description": "Una parrilla: las barras según x (paralelas a B) y según y (paralelas a L)."
     },
     "PerfilCatalogo": {
       "type": "object",
@@ -3288,6 +3370,57 @@
       ],
       "additionalProperties": false,
       "description": "Una vista guardada del visor (I3): su tipo, lo que enseña, su cámara y sus filtros. Lo que no se\ndice toma el valor por defecto del visor. Una planta o un eje que ya no existen se cambian por el\nprimero al abrirla."
+    },
+    "Zapata": {
+      "type": "object",
+      "properties": {
+        "B": {
+          "type": "number"
+        },
+        "L": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "linderos": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "+x",
+              "+y",
+              "-x",
+              "-y"
+            ]
+          },
+          "description": "Las caras del pilar enrasadas con el borde de la zapata: ninguna, centrada; una, de medianera; dos\ncontiguas («-x» y «-y»…), de esquina."
+        },
+        "centradoras": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Vigas centradoras: el pilar interior al que va cada una, en la dirección perpendicular a un\nlindero (la viga se lleva la excentricidad en esa dirección; el módulo la resuelve analíticamente)."
+        },
+        "material": {
+          "type": "string",
+          "description": "El hormigón de la zapata (un material del modelo); sin él, el de `obra.materiales.zapatas` o HA-25."
+        },
+        "tierras": {
+          "type": "number",
+          "description": "Tierras sobre la cara superior de la zapata, m; sin él, las de la obra (`obra.terreno.tierras`)."
+        },
+        "inferior": {
+          "$ref": "#/$defs/ParrillaZapata",
+          "description": "La parrilla inferior."
+        },
+        "superior": {
+          "$ref": "#/$defs/ParrillaZapata",
+          "description": "La parrilla superior, si la lleva (la pide el despegue)."
+        }
+      },
+      "additionalProperties": false,
+      "description": "La zapata aislada de un pilar (CO5), fuera del modelo: el cálculo sigue con la base del pilar\nempotrada (CO-j). Sus ejes son los del tramo más bajo del pilar: x según su canto h (con giro 0, +X)\ne y a 90°. B es el lado según x y L según y, en m; h, el canto.\n\nLo de la posición (`linderos`, `centradoras`) es del ingeniero y `fem armar` lo respeta; las\ndimensiones y las parrillas, las propone. Sin dimensiones o sin parrilla inferior, la zapata no se da\npor comprobada."
     }
   }
 }

@@ -53,6 +53,10 @@ const ENTRADAS: readonly string[] = [
   // CO4, punzonamiento
   "src/lib/calculations/punching.ts",
   "src/test/calc/punching.test.ts",
+  // CO5, zapatas aisladas
+  "src/lib/calculations/isolatedFooting.ts",
+  "src/test/calc/isolatedFooting.test.ts",
+  "src/test/calc/isolatedFootingMedianera.test.ts",
 ];
 
 /**

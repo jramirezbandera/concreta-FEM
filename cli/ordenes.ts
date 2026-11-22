@@ -31,6 +31,7 @@ import { armadoPropuesto, comprobarPilares } from "../src/comprobaciones/pilares
 import { armadoPropuestoVigas, comprobarVigas } from "../src/comprobaciones/vigas.ts";
 import { armadoPropuestoLosas, comprobarLosas } from "../src/comprobaciones/losas.ts";
 import { armadoPropuestoPunzonamiento, comprobarPunzonamientos } from "../src/comprobaciones/punzonamiento.ts";
+import { armadoPropuestoZapatas, comprobarZapatas } from "../src/comprobaciones/zapatas.ts";
 import { DATOS_ARMADO } from "../src/comprobaciones/armado.ts";
 import { proponerAlinear, textoGrupo, TOLERANCIA_ALINEAR } from "../src/editor/alinear.ts";
 import { operacionVigasBorde, proponerVigasBorde } from "../src/editor/vigasBorde.ts";
@@ -121,14 +122,16 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem vigas-borde <proyecto.json> [--losa L]… [--ancho 0.30] [--canto <el de la losa>] [--escribir]
       los zunchos de los bordes libres de cada losa, como «Vigas de borde» del editor (por el eje de los pilares del lado o enrasados por fuera);
       sólo propone: con --escribir, los pone y reescribe el proyecto (deja el de antes en <proyecto>.json.bak)
-  fem comprobar <proyecto.json> [pieza…] [--tipo pilares|vigas|losas] [--top N] [--todos] [--recalcular]
-      los pilares y las vigas de hormigón con el armado del proyecto (armado.pilares, armado.vigas): por tramo de pilar y por vano de
-      viga, si cumple, su aprovechamiento y la fila y la combinación que mandan; con una o más piezas (pilares o vigas), todas sus filas.
-      Una pieza sin armado no cumple (por defecto lista los --top peores tramos y los --top peores vanos, 10; con --todos, todos)
-  fem armar <proyecto.json> [pieza…] [--tipo pilares|vigas|losas] [--top N] [--todos] [--escribir] [--recalcular]
-      propone el armado de cada tramo de pilar y de cada vano de viga: el primero de las tablas (de menos a más acero) con el que no
-      falla ninguna comprobación; sólo propone: con --escribir, lo guarda en armado.pilares y armado.vigas y reescribe el proyecto
-      (deja el de antes en <proyecto>.json.bak)
+  fem comprobar <proyecto.json> [pieza…] [--tipo pilares|vigas|losas|punzonamiento|zapatas] [--top N] [--todos] [--recalcular]
+      los pilares, las vigas, las losas, su punzonamiento y las zapatas de los pilares con el armado del proyecto (armado.pilares,
+      armado.vigas, armado.forjados, armado.punzonamiento, armado.zapatas, y el terreno en obra.terreno): por tramo de pilar, por
+      vano de viga, por losa, por unión de pilar y losa y por zapata, si cumple, su aprovechamiento y la fila y la combinación que
+      mandan; con una o más piezas, todas sus filas. Una pieza sin armado no cumple (por defecto lista los --top peores tramos y los
+      --top peores vanos, 10; con --todos, todos)
+  fem armar <proyecto.json> [pieza…] [--tipo pilares|vigas|losas|punzonamiento|zapatas] [--top N] [--todos] [--escribir] [--recalcular]
+      propone el armado de cada tramo de pilar, de cada vano de viga, de cada losa y su punzonamiento, y la zapata de cada pilar (lado,
+      canto y parrillas, con su posición del proyecto): lo primero de las tablas con lo que no falla ninguna comprobación; sólo propone:
+      con --escribir, lo guarda en armado.* y reescribe el proyecto (deja el de antes en <proyecto>.json.bak)
   fem emplazamiento <municipio | código INE> [--top N]
       el municipio de la obra para el sismo y el viento: su código INE («ine» de acciones.emplazamiento), ab y K del Anejo 1 de la NCSE-02
       y la zona eólica de la capital de su provincia, con el aviso si la provincia tiene más de una; no lleva proyecto
@@ -674,14 +677,15 @@ function alinearOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
 }
 
 /**
- * `fem comprobar` y `fem armar` (CO1 a CO4, `docs/fem3d/comprobaciones.md` §4.6): los pilares, las
- * vigas, las losas (macizas y reticulares) y su punzonamiento junto a los pilares, con el armado del
- * proyecto o con el que se propone de las tablas. `armar` sólo propone; con `--escribir`, guarda lo
- * propuesto en `armado.pilares`, `armado.vigas`, `armado.forjados` y `armado.punzonamiento` (fuera de
- * la huella: no recalcula), deja el fichero de antes en `.bak` y escribe el formato canónico.
+ * `fem comprobar` y `fem armar` (CO1 a CO5, `docs/fem3d/comprobaciones.md` §4.6): los pilares, las
+ * vigas, las losas (macizas y reticulares), su punzonamiento junto a los pilares y las zapatas de los
+ * pilares, con el armado del proyecto o con el que se propone de las tablas. `armar` sólo propone; con
+ * `--escribir`, guarda lo propuesto en `armado.pilares`, `armado.vigas`, `armado.forjados`,
+ * `armado.punzonamiento` y `armado.zapatas` (fuera de la huella: no recalcula), deja el fichero de
+ * antes en `.bak` y escribe el formato canónico.
  *
  * El punzonamiento (CO4) va con el armado de las losas: el del proyecto o, al armar, el que se acaba
- * de proponer. Con un pilar dado, además de sus tramos, su punzonamiento.
+ * de proponer. Con un pilar dado, además de sus tramos, su punzonamiento y su zapata (CO5).
  */
 async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: boolean): Promise<Salida> {
   const orden = armar ? "armar" : "comprobar";
@@ -691,7 +695,7 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
   const top = a.banderas.get("top")?.[0];
   if (top !== undefined && !(Number.isInteger(Number(top)) && Number(top) > 0)) return mal("--top tiene que ser un entero positivo");
   const tipo = a.banderas.get("tipo")?.[0];
-  if (tipo !== undefined && tipo !== "pilares" && tipo !== "vigas" && tipo !== "losas" && tipo !== "punzonamiento") return mal("--tipo tiene que ser pilares, vigas, losas o punzonamiento");
+  if (tipo !== undefined && tipo !== "pilares" && tipo !== "vigas" && tipo !== "losas" && tipo !== "punzonamiento" && tipo !== "zapatas") return mal("--tipo tiene que ser pilares, vigas, losas, punzonamiento o zapatas");
   const errores = [...comprobarArmado(l.proyecto.armado, l.proyecto.modelo), ...comprobarObra(l.proyecto.obra, l.proyecto.modelo)].filter((d) => d.severidad === "error");
   if (errores.length) return { codigo: CODIGO.errores, json: { orden, ok: false, ...listaDiagnosticos(errores) } };
   // Cada pieza dada, un pilar, una viga o una losa
@@ -709,6 +713,7 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
   const conVigas = (tipo === undefined || tipo === "vigas") && (!ids.length || idsVigas.length > 0);
   const conLosas = (tipo === undefined || tipo === "losas") && (!ids.length || idsLosas.length > 0);
   const conPunzonamiento = (tipo === undefined || tipo === "punzonamiento") && (!ids.length || idsPilares.length > 0);
+  const conZapatas = (tipo === undefined || tipo === "zapatas") && (!ids.length || idsPilares.length > 0);
   const r = await calculado(orden, l.ruta, l.proyecto, a.banderas.has("recalcular"));
   if ("codigo" in r) return r;
   const q = new Consultas(modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal);
@@ -731,6 +736,8 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
   }
   const rz = conPunzonamiento ? comprobarPunzonamientos(q, forjados, l.proyecto.armado?.punzonamiento, datos, { ...(idsPilares.length ? { ids: idsPilares } : {}), proponer: armar, filas }) : null;
   if (rz && !rz.valido) return mala(rz.diagnosticos);
+  const rf = conZapatas ? comprobarZapatas(q, l.proyecto.armado?.zapatas, l.proyecto.obra, { ...(idsPilares.length ? { ids: idsPilares } : {}), proponer: armar, filas }) : null;
+  if (rf && !rf.valido) return mala(rf.diagnosticos);
   // Sin piezas dadas y sin --todos: los peores tramos y los peores vanos (los que no cumplen, primero)
   const limite = ids.length || a.banderas.has("todos") ? Infinity : Number(top ?? TOP_POR_DEFECTO);
   const peso = (t: { cumple: boolean; aprovechamiento: number | null }) => (t.cumple ? 0 : 1e9) + (t.aprovechamiento ?? 1e6);
@@ -750,7 +757,7 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
     ok: true,
     huella: r.compilacion.huella,
     datos: { ...DATOS_ARMADO, ...datos },
-    resumen: { ...(rp?.valido ? { pilares: rp.valor.resumen } : {}), ...(rv?.valido ? { vigas: rv.valor.resumen } : {}), ...(rl?.valido ? { losas: rl.valor.resumen } : {}), ...(rz?.valido ? { punzonamiento: rz.valor.resumen } : {}), segundos: (performance.now() - t0) / 1000 },
+    resumen: { ...(rp?.valido ? { pilares: rp.valor.resumen } : {}), ...(rv?.valido ? { vigas: rv.valor.resumen } : {}), ...(rl?.valido ? { losas: rl.valor.resumen } : {}), ...(rz?.valido ? { punzonamiento: rz.valor.resumen } : {}), ...(rf?.valido ? { zapatas: rf.valor.resumen } : {}), segundos: (performance.now() - t0) / 1000 },
     ...(Object.keys(sinListar).length ? { sinListar } : {}),
     ...(pilares ? { pilares: pilares.lista } : {}),
     ...(vigas ? { vigas: vigas.lista } : {}),
@@ -758,7 +765,9 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
     ...(rl?.valido ? { losas: rl.valor.losas } : {}),
     // El punzonamiento, todas las uniones de pilar y losa (son pocas): cada una, con la fila que manda
     ...(rz?.valido ? { punzonamiento: rz.valor.pilares } : {}),
-    ...listaDiagnosticos([...(rp?.diagnosticos ?? []), ...(rv?.diagnosticos ?? []), ...(rl?.diagnosticos ?? []), ...(rz?.diagnosticos ?? [])]),
+    // Las zapatas, todas (una por pilar con base): cada una, con la fila que manda
+    ...(rf?.valido ? { zapatas: rf.valor.zapatas } : {}),
+    ...listaDiagnosticos([...(rp?.diagnosticos ?? []), ...(rv?.diagnosticos ?? []), ...(rl?.diagnosticos ?? []), ...(rz?.diagnosticos ?? []), ...(rf?.diagnosticos ?? [])]),
   };
   if (!armar) return { codigo: CODIGO.bien, json };
   if (!a.banderas.has("escribir")) return { codigo: CODIGO.bien, json: { ...json, escrito: false } };
@@ -768,6 +777,7 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
     ...(rv?.valido ? { vigas: armadoPropuestoVigas(rv.valor, l.proyecto.armado?.vigas) } : {}),
     ...(rl?.valido ? { forjados: armadoPropuestoLosas(rl.valor, l.proyecto.armado?.forjados) } : {}),
     ...(rz?.valido ? { punzonamiento: armadoPropuestoPunzonamiento(rz.valor, l.proyecto.armado?.punzonamiento) } : {}),
+    ...(rf?.valido ? { zapatas: armadoPropuestoZapatas(rf.valor, l.proyecto.armado?.zapatas) } : {}),
   };
   const ap = aplicar(l.proyecto, { op: "armado", armado });
   if (!ap.ok) return { codigo: CODIGO.errores, json: { ...json, ok: false, escrito: false, ...listaDiagnosticos(ap.errores) } };

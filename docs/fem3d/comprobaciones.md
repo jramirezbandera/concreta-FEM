@@ -576,6 +576,75 @@ Las dos maneras seguras (restar p·d al de la cara, que baja 3–4 kN/m, o corta
 - **La vivienda sigue sin cumplir** por esa estación de L-CUB (un 0,3 % por encima).
 
 
+### 8.10 CO6, la app: Resultados · Comprobación (2026-11-22)
+
+Hecha la parte de la app para CO1–CO4 (pilares, vigas, losas y punzonamiento). Pasa el criterio 15. **Quedan de CO6:** las zapatas (CO5 está a medias en otra sesión: entran como un tipo más cuando esté), la sección de comprobaciones del informe de `fem revisar` y el color por aprovechamiento en el 3D y en el alzado (en planta, hecho: §8.10.1). El cálculo no cambia: nada de esto toca el motor, el compilador ni las funciones de CO1–CO4.
+
+**En el worker** (`src/visor/comprobaciones.ts`, puro; pedidos `comprobaciones`, `comprobacion` y `armar`):
+
+- **Los números son los de `fem comprobar` y `fem armar`:** sólo se llama a `comprobarPilares`, `comprobarVigas`, `comprobarLosas` y `comprobarPunzonamientos` y se cambia la forma: una fila por tramo, vano, losa o unión de pilar y losa (`ParteComprobada`), y su ficha con todas las filas del módulo (`FichaComprobacion`).
+- **El armado va en cada pedido,** como la armadura base de AB: no entra en la huella y el worker no se reabre al cambiarlo. Los datos comunes (`obra.armado`) son de la sesión.
+- **Cambiar el armado de una pieza sólo vuelve a comprobar esa pieza:** lo comprobado se guarda por pieza con el armado con el que se comprobó, por `Consultas`. Con el armado del proyecto cada pieza es independiente (las reglas de obra de CO1-e sólo actúan al proponer); el punzonamiento depende además del armado de todas las losas.
+- **`armar`** propone como `fem armar` (los pilares con sus reglas de obra, las vigas, las losas y, con el armado de las losas que queda, el punzonamiento), en los tipos que se piden, en unas piezas o sólo en lo que no tiene armado, y devuelve el `armado` entero para la operación `armado`. No escribe nada.
+
+**En la app** (`app/src/pantallas/Comprobacion.tsx`, modo «Comprobación» de Resultados, también en la paleta):
+
+- **La tabla** del tipo elegido (Pilares, Vigas, Losas, Punzonamiento): pieza, parte, sección o planta, armado, aprovechamiento, la comprobación que manda con su lugar y su combinación, y el estado (Cumple, No cumple, Sin armado, Sin comprobar). «Los peores, primero». Un clic elige la pieza en las vistas, lleva la planta a la suya y abre la ficha; elegir una pieza en una vista abre la suya.
+- **La ficha:** el armado como formulario por grupos (`src/editor/armadoBarras.ts`, puro: esquinas, caras y cercos de un tramo; inferior, superior, apoyos, cercos y piel de un vano; la base por armadura de una losa y la parrilla de los ábacos; los cercos de punzonamiento), «Aplicar», «Proponer» (esa pieza) y «Quitar»; sus datos (en el punzonamiento, la posición, VEd, β, u1, d) y todas las filas del módulo, las que no cumplen primero. Los refuerzos y los cercos de nervio de una losa no se editan aquí: se proponen y se conservan (CO6-a).
+- **Proponer armado:** «Lo que falta» y «Todo» en el tipo de la pestaña, y «Toda la obra» (los cuatro tipos, en lo que falta). Lo propuesto se escribe con la operación `armado`, un paso de deshacer, y se dice cuánto tiene propuesta y qué no (con su motivo).
+- Sin recalcular: el armado no cambia la huella.
+
+**Criterio 15** (`validacion/co6/chrome.ts`, `out_chrome.txt`), con la vivienda en Chrome:
+
+- sin armado, los 36 tramos, «Sin armado»;
+- «Toda la obra» (2,4 s en el worker): guardado, el proyecto es el de `datosArmar` en Node con la operación `armado`, **byte a byte** (23 pilares, 18 vigas y 2 losas; ninguna unión necesita armadura de punzonamiento);
+- las cuatro tablas, las de `datosComprobaciones` en Node: pieza, armado y estado idénticos, y el aprovechamiento a la centésima que se enseña;
+- la ficha de un tramo, con las 25 filas de Node; con los cercos cada 400 mm deja de cumplir en la ficha y en la tabla sin recalcular, y deshecho vuelve a ser el proyecto guardado;
+- sin tareas largas en el hilo principal.
+
+**Pruebas:** `src/visor/comprobaciones.test.ts` (identidad con las funciones de CO1–CO4 sobre unas consultas montadas aparte; la caché: tras cambiar un pilar se comprueban sólo sus tramos y la tabla es la de comprobarlo todo de nuevo; proponer unas piezas o lo que falta deja lo demás) y `app/src/test/comprobacion.test.tsx` (la tabla, proponer, la ficha, editar, un dato que no vale y quitar).
+
+**Hallazgos:**
+
+- **CO6-1:** una etiqueta `Campo` (un `<label>`) alrededor de un grupo de botones da su texto como nombre accesible del primero; los grupos de botones van en un `role="group"`.
+- **CO6-2:** tras deshacer hasta lo guardado, la app no da el proyecto por cambiado (el banco esperaba poder guardar).
+- **CO6-3:** en la vivienda con lo propuesto, una de las dos losas no cumple (en el banco, «1 cumplen y 1 no»): es lo de §8.9 (el cortante de L-CUB junto a P2, 1,003 de VRd,c), visto ahora en la app.
+
+**Decisiones de Claude, por confirmar por el usuario:**
+
+- **CO6-a:** los refuerzos y los cercos de nervio de las losas no se editan a mano en la ficha (son rectángulos en los ejes de su armadura): se proponen y se conservan; a mano, en el `proyecto.json`.
+- **CO6-b:** «Todo» sustituye el armado que haya en el tipo sin preguntar (es un paso de deshacer).
+- **CO6-c:** el aprovechamiento de la tabla es el de la fila que manda de CO1–CO4 (la que falla; si no, la de agotamiento más alta), no el máximo de todas las filas.
+- **CO6-d:** las piezas no se colorean todavía por su aprovechamiento en las vistas: la tabla elige la pieza y la vista la resalta.
+
+**Confirmadas por el usuario el 2026-11-22** como las recomendaba Claude: CO6-a y CO6-c, como están; CO6-b, con confirmación al sustituir y sin tocar la armadura de punzonamiento escrita al proponer lo que falta; CO6-d, el color, hecho en planta (§8.10.1).
+
+#### 8.10.1 CO6-b y CO6-d, tras las decisiones (2026-11-22)
+
+**CO6-b:**
+
+- **«Todo» pregunta** si alguna parte del tipo ya tiene armado en el proyecto («N de M tramos ya tienen armado…»), con «Cancelar», «Sólo lo que falta» y «Sustituir». Sin nada escrito, propone sin preguntar.
+- **«Sólo lo que falta» (y «Toda la obra») conserva la armadura de punzonamiento escrita** (`datosArmar` con `soloSinArmado`): en las uniones sin ella se propone la que haga falta, o ninguna. Antes se volvía a proponer siempre, porque depende del armado de las losas, y una puesta a mano se sustituía o se quitaba. Con «Todo», como antes: la de las tablas, y fuera la que ya no haga falta.
+- **«Lo que falta» también en la pestaña Punzonamiento,** con ese significado.
+- El resumen de lo propuesto dice además cuántas partes se quedan con su armado («, 36 con el suyo»; en el punzonamiento, «con la suya»).
+
+**CO6-d, en planta** (la vista de planta `comprobacion` de la sesión, `vistaComprobacion` en `src/visor/comprobaciones.ts`; el armado va en el pedido, como en AB): sobre el modelo atenuado, cada parte del color de su aprovechamiento, con su rótulo (el aprovechamiento de la fila que manda, CO6-c):
+
+- los tramos de pilar con la cabeza en la planta, y las uniones de pilar y losa de la planta, en la huella del pilar;
+- cada vano de viga, en su banda entre las caras de sus apoyos (un color por vano);
+- cada losa entera, con sus huecos, en el sitio de su polígono del fondo (sin los ábacos grises), con las vigas, los pilares y los muros encima;
+- colores (`claseAprovechamiento`): verde, cumple con 0,90 o menos; ámbar, cumple con más de 0,90 o sin comprobar del todo (lo pendiente, sin que nada falle); rojo, no cumple; gris, sin armado. La leyenda sólo lista las clases que hay en la planta;
+- un clic en una parte elige su pieza y abre su ficha.
+
+**Queda de CO6-d:** el 3D y el alzado por aprovechamiento.
+
+**Validación:** `src/visor/comprobaciones.test.ts` (la armadura escrita se queda con «sólo lo que falta» y se sustituye sin él; en cada planta, las piezas coloreadas son las de sus partes, con el color de su clase, y un clic elige la pieza) y `app/src/test/comprobacion.test.tsx` (la pregunta de «Todo», «Cancelar», «Sustituir» y «Sólo lo que falta»). El banco de Chrome comprueba además que la planta de cada tipo lleva en la leyenda las clases de sus partes; «Todo bien».
+
+**Hallazgos:**
+
+- **CO6-4:** la leyenda de la app corta cada texto en la primera «, », « (», «; », «. » o «: » (`textoCorto`): los textos de una leyenda tienen que leerse enteros hasta ahí.
+- **CO6-5:** la ficha reiniciaba lo escrito si llegaba otra respuesta con el mismo armado (comparaba por identidad del objeto): con la máquina cargada, «Aplicar» quedaba sin efecto. Ahora compara por contenido.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

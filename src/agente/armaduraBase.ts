@@ -8,7 +8,7 @@
  *
  * Puro: sin IO.
  */
-import { erroresArmado, erroresArmadoForjado, erroresArmadoViga, erroresPunzonamiento, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraPunzonamiento } from "../comprobaciones/armado.ts";
+import { erroresArmado, erroresArmadoForjado, erroresArmadoViga, erroresPunzonamiento, erroresZapata, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraPunzonamiento, type Zapata } from "../comprobaciones/armado.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 
@@ -53,6 +53,11 @@ export interface ArmadoProyecto {
    * losa. Sin ella, la losa se comprueba ahí sin armadura de punzonamiento.
    */
   punzonamiento?: Record<string, Record<string, ArmaduraPunzonamiento>>;
+  /**
+   * CO5: la zapata aislada de cada pilar (su id) que la lleva: su posición (linderos, vigas
+   * centradoras), sus dimensiones y sus parrillas. El terreno, en `obra.terreno`.
+   */
+  zapatas?: Record<string, Zapata>;
 }
 
 /** La base de una losa en una armadura (kN·m/m), o null si no hay. */
@@ -119,6 +124,28 @@ export function comprobarArmado(a: ArmadoProyecto | undefined, m: ModeloFisico):
       for (const e of erroresPunzonamiento(t)) r.push({ codigo: "armado/barras", severidad: "error", mensaje: `La armadura de punzonamiento del pilar ${id} en ${planta} no vale: ${e}.`, ids: [id], detalles: { planta } });
     }
   }
+  const materiales = new Map(m.materiales.map((x) => [x.id, x]));
+  const pilarDe = new Map((m.pilares ?? []).map((p) => [p.id, p]));
+  for (const [id, z] of Object.entries(a.zapatas ?? {})) {
+    const p = pilarDe.get(id);
+    if (!p) {
+      r.push({ codigo: "armado/pilar", severidad: "error", mensaje: `Hay una zapata de «${id}», que no es un pilar del modelo.`, ids: [id] });
+      continue;
+    }
+    if (p.base === "ninguno") r.push({ codigo: "armado/zapata", severidad: "error", mensaje: `El pilar ${id} lleva zapata, pero nace sobre otra pieza (base «ninguno»): no llega a la cimentación.`, ids: [id] });
+    for (const e of erroresZapata(z)) r.push({ codigo: "armado/zapata", severidad: "error", mensaje: `La zapata del pilar ${id} no vale: ${e}.`, ids: [id] });
+    if (z && typeof z === "object") {
+      if (z.material !== undefined) {
+        const mat = materiales.get(z.material);
+        if (!mat) r.push({ codigo: "armado/zapata", severidad: "error", mensaje: `La zapata del pilar ${id} es de «${z.material}», que no es un material del modelo.`, ids: [id, z.material] });
+        else if (mat.tipo !== "hormigon") r.push({ codigo: "armado/zapata", severidad: "error", mensaje: `La zapata del pilar ${id} es de «${z.material}», que no es un hormigón.`, ids: [id, z.material] });
+      }
+      for (const c of Array.isArray(z.centradoras) ? z.centradoras : []) {
+        if (c === id) r.push({ codigo: "armado/zapata", severidad: "error", mensaje: `La viga centradora de la zapata del pilar ${id} va a él mismo: va al pilar interior.`, ids: [id] });
+        else if (!pilarDe.has(c)) r.push({ codigo: "armado/zapata", severidad: "error", mensaje: `La viga centradora de la zapata del pilar ${id} va a «${c}», que no es un pilar del modelo.`, ids: [id] });
+      }
+    }
+  }
   const deLosa = new Map((m.losas ?? []).map((l) => [l.id, l]));
   for (const [id, f] of Object.entries(a.forjados ?? {})) {
     const l = deLosa.get(id);
@@ -159,6 +186,8 @@ export function limpiarArmado(a: ArmadoProyecto | undefined): ArmadoProyecto | u
   for (const id of Object.keys(a.forjados ?? {}).sort()) forjados[id] = a.forjados![id]!;
   const punzonamiento: Record<string, Record<string, ArmaduraPunzonamiento>> = {};
   for (const id of Object.keys(a.punzonamiento ?? {}).sort()) if (Object.keys(a.punzonamiento![id] ?? {}).length) punzonamiento[id] = a.punzonamiento![id]!;
+  const zapatas: Record<string, Zapata> = {};
+  for (const id of Object.keys(a.zapatas ?? {}).sort()) zapatas[id] = a.zapatas![id]!;
   const r: ArmadoProyecto = {
     ...(base ? { base } : {}),
     ...(Object.keys(losas).length ? { losas } : {}),
@@ -166,6 +195,7 @@ export function limpiarArmado(a: ArmadoProyecto | undefined): ArmadoProyecto | u
     ...(Object.keys(vigas).length ? { vigas } : {}),
     ...(Object.keys(forjados).length ? { forjados } : {}),
     ...(Object.keys(punzonamiento).length ? { punzonamiento } : {}),
+    ...(Object.keys(zapatas).length ? { zapatas } : {}),
   };
   return Object.keys(r).length ? r : undefined;
 }
@@ -250,4 +280,50 @@ export function seguirVigas(a: ArmadoProyecto | undefined, renombres: ReadonlyMa
     vigas[n] = vanos;
   }
   return cambia ? limpiarArmado({ ...a, vigas }) : a;
+}
+
+/**
+ * CO5: lo mismo con las zapatas: la del pilar renombrado, con su nuevo id; la del borrado, fuera; las
+ * vigas centradoras, al nuevo id de su pilar (y sin las que iban a uno borrado: la viga ya no existe);
+ * y el hormigón, al nuevo id de su material (sin él, si se borró: va el de la obra).
+ */
+export function seguirZapatas(a: ArmadoProyecto | undefined, renombres: ReadonlyMap<string, string>, antes: ModeloFisico, despues: ModeloFisico): ArmadoProyecto | undefined {
+  if (!a?.zapatas) return a;
+  const eran = new Set((antes.pilares ?? []).map((p) => p.id));
+  const son = new Set((despues.pilares ?? []).map((p) => p.id));
+  const eranMat = new Set(antes.materiales.map((x) => x.id));
+  const sonMat = new Set(despues.materiales.map((x) => x.id));
+  const pilar = (id: string): string | null => {
+    const n = eran.has(id) ? (renombres.get(id) ?? id) : id;
+    return eran.has(id) && !son.has(n) ? null : n;
+  };
+  let cambia = false;
+  const zapatas: Record<string, Zapata> = {};
+  for (const [id, z] of Object.entries(a.zapatas)) {
+    const n = pilar(id);
+    if (n !== id) cambia = true;
+    if (n === null) continue;
+    let w = z;
+    if (z && typeof z === "object" && Array.isArray(z.centradoras)) {
+      const cs = z.centradoras.map(pilar).filter((c): c is string => c !== null);
+      if (cs.length !== z.centradoras.length || cs.some((c, i) => c !== z.centradoras![i])) {
+        cambia = true;
+        const { centradoras: _c, ...resto } = w;
+        w = cs.length ? { ...resto, centradoras: cs } : resto;
+      }
+    }
+    if (w && typeof w === "object" && w.material !== undefined && eranMat.has(w.material)) {
+      const nm = renombres.get(w.material) ?? w.material;
+      if (!sonMat.has(nm)) {
+        cambia = true;
+        const { material: _m, ...resto } = w;
+        w = resto;
+      } else if (nm !== w.material) {
+        cambia = true;
+        w = { ...w, material: nm };
+      }
+    }
+    zapatas[n] = w;
+  }
+  return cambia ? limpiarArmado({ ...a, zapatas }) : a;
 }

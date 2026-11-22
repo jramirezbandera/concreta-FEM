@@ -18,6 +18,7 @@
  *
  * Puro: sin IO (el núcleo WASM lo inicia quien crea la sesión).
  */
+import { vistaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
@@ -88,6 +89,8 @@ export type VistaResultadosPlanta = (
   | { vista: "armado"; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: FiltroArmado }
   /** Las reacciones de los objetos de la planta (I4); `escala`, la de las flechas horizontales. */
   | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number }
+  /** CO6-d: las partes de un tipo de comprobación, del color de su aprovechamiento; el armado va en el pedido, como el de AB. */
+  | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto }
 ) & { malla?: boolean };
 
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
@@ -675,6 +678,11 @@ export class Sesion {
           const textos = r.valor.primitivas.filter((p) => p.tipo === "texto");
           e = { ...r.valor, primitivas: [...r.valor.primitivas.filter((p) => p.tipo !== "texto"), ...m.primitivas, ...textos], leyenda: [...r.valor.leyenda, ...m.leyenda], notas: [...r.valor.notas, ...m.notas] };
         } else if (v.vista === "malla") e = vistaMalla(rr, planta, d);
+        else if (v.vista === "comprobacion") {
+          const c = vistaComprobacion(this, planta, v.de, v.armado, d);
+          if (!c.valido) return c;
+          e = c.valor;
+        }
         else if (v.vista === "reacciones") {
           const conj = this.conjunto(v.combinaciones, "reacciones");
           if (!conj.valido) return conj;

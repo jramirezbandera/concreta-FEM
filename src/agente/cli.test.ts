@@ -511,6 +511,46 @@ describe("CO1 y CO2: comprobar y armar", () => {
   });
 });
 
+describe("CO5: las zapatas", () => {
+  it("sin la tensión admisible no se proponen; con ella, armar las propone con su posición, --escribir las guarda sin cambiar la huella y comprobar las da por buenas", () => {
+    type Zap = { pilar: string; tipo: string; origen: string; texto?: string; cumple: boolean; aprovechamiento: number | null; zapata?: { B: number; linderos?: string[] }; filas?: unknown[]; pendientes: { motivo: string }[] };
+    const cuentas = (j: Record<string, unknown>) => (j.resumen as { zapatas: Record<string, number> }).zapatas;
+    const sinTerreno = escribir(edificioSO());
+    const s = fem(["armar", sinTerreno, "--tipo", "zapatas"]);
+    expect(s.codigo).toBe(0);
+    expect(cuentas(s.json)).toMatchObject({ zapatas: 9, cumplen: 0 });
+    expect((s.json.diagnosticos as { codigo: string }[]).map((d) => d.codigo)).toContain("comprobacion/sin-tension-admisible");
+    // Con el terreno y P1 de esquina (su posición es del proyecto)
+    const ruta = escribir(edificioSO(), undefined, { obra: { terreno: { tensionAdmisible: 200 }, armado: { recubrimientoZapatas: 50 } }, armado: { zapatas: { P1: { linderos: ["-x", "-y"] } } } });
+    const sin = fem(["comprobar", ruta, "--tipo", "zapatas"]);
+    expect(cuentas(sin.json)).toMatchObject({ zapatas: 9, cumplen: 0, sinZapata: 9 });
+    expect(sin.json.pilares).toBeUndefined();
+    const a = fem(["armar", ruta, "--tipo", "zapatas", "--escribir"]);
+    expect(a.codigo).toBe(0);
+    expect(a.json.escrito).toBe(true);
+    expect(cuentas(a.json)).toMatchObject({ zapatas: 9, cumplen: 9, noCumplen: 0 });
+    const zs = a.json.zapatas as Zap[];
+    const p1 = zs.find((z) => z.pilar === "P1")!;
+    expect([p1.tipo, p1.origen, p1.zapata!.linderos]).toEqual(["esquina", "propuesto", ["-x", "-y"]]);
+    const escrito = JSON.parse(readFileSync(ruta, "utf8")) as { armado: { zapatas: Record<string, { B: number; linderos?: string[] }> } };
+    expect(Object.keys(escrito.armado.zapatas).sort()).toEqual(["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]);
+    expect(escrito.armado.zapatas.P1!.linderos).toEqual(["-x", "-y"]);
+    expect(fem(["validar", ruta]).json.ok).toBe(true);
+    // Con las zapatas guardadas: la misma huella y lo mismo; con el pilar detrás, sus filas
+    const c = fem(["comprobar", ruta, "P1"]);
+    expect(c.json.huella).toBe(a.json.huella);
+    const z1 = (c.json.zapatas as Zap[])[0]!;
+    expect([z1.pilar, z1.origen, z1.cumple, z1.texto, z1.aprovechamiento]).toEqual(["P1", "proyecto", true, p1.texto, p1.aprovechamiento]);
+    expect(z1.filas!.length).toBeGreaterThan(8);
+    expect(c.json.pilares).toBeDefined();
+    // Una zapata que no vale la rechaza la validación
+    const mal = JSON.parse(readFileSync(ruta, "utf8")) as { armado: { zapatas: Record<string, { linderos?: string[] }> } };
+    mal.armado.zapatas.P1!.linderos = ["-x", "+x"];
+    writeFileSync(ruta, JSON.stringify(mal));
+    expect(fem(["comprobar", ruta, "--tipo", "zapatas"]).json.ok).toBe(false);
+  });
+});
+
 describe("VS4: emplazamiento", () => {
   type Mun = { ine: string; nombre: string; provincia: string; ab: number; K: number; procedencia: string; viento: { zona: string; qb: number; frontera?: string }; nieve: unknown; capital: boolean };
   it("da el código INE, ab y K del municipio y la zona eólica de su provincia, con el aviso de frontera; no lleva proyecto", () => {

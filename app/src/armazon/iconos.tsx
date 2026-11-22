@@ -241,6 +241,12 @@ export const IcModal = icono(
     <path d="M12 21c6-4 6-8 0-12s-6-8 0-12" />
   </>,
 );
+export const IcComprobacion = icono(
+  <>
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <path d="M8 12.5l3 3 5-6.5" />
+  </>,
+);
 export const IcReacciones = icono(
   <>
     <path d="M3 21h18" />

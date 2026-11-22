@@ -7,6 +7,7 @@ import { ModoPilares } from "../pantallas/Pilares.tsx";
 import { ModoReacciones } from "../pantallas/Reacciones.tsx";
 import { ModoDiagramas } from "../pantallas/Vigas.tsx";
 import { ModoModal } from "../pantallas/Modal.tsx";
+import { ModoComprobacion } from "../pantallas/Comprobacion.tsx";
 
 export function EspacioResultados() {
   const { modo } = useVisor();
@@ -16,5 +17,6 @@ export function EspacioResultados() {
   if (modo === "armado") return <ModoArmado />;
   if (modo === "reacciones") return <ModoReacciones />;
   if (modo === "modal") return <ModoModal />;
+  if (modo === "comprobacion") return <ModoComprobacion />;
   return <ModoDeformada />;
 }

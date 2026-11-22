@@ -69,6 +69,8 @@ function deTipo(m: ModeloFisico, t: TipoObra, coleccion: ConSeccion["coleccion"]
     case "perfiles":
       return coleccion !== "panos" && f === "acero";
     case "muros":
+    // CO5: las zapatas no están en el modelo
+    case "zapatas":
       return false;
   }
 }

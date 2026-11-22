@@ -15,8 +15,8 @@ import { EXPOSICIONES, FLECHAS_ACTIVAS, type DatosArmado } from "../comprobacion
 import type { Material, ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 
-/** Los tipos de elemento con material por defecto (DO-h): las vigas van con los forjados. */
-export const TIPOS_OBRA = ["forjados", "pilares", "muros", "perfiles"] as const;
+/** Los tipos de elemento con material por defecto (DO-h): las vigas van con los forjados. Las zapatas (CO5) no están en el modelo: su hormigón es el de sus comprobaciones. */
+export const TIPOS_OBRA = ["forjados", "pilares", "muros", "perfiles", "zapatas"] as const;
 export type TipoObra = (typeof TIPOS_OBRA)[number];
 
 /** El material por defecto de cada tipo de elemento: el id de un material del modelo. */
@@ -28,7 +28,29 @@ export interface MaterialesObra {
   muros?: string;
   /** Las secciones de acero (perfiles laminados), de pilares, vigas y barras. */
   perfiles?: string;
+  /** CO5: el hormigón de las zapatas de los pilares (fuera del modelo: el de sus comprobaciones). */
+  zapatas?: string;
 }
+
+/**
+ * CO5: el terreno bajo las zapatas, del estudio geotécnico. Sin la tensión admisible no se comprueba
+ * ninguna zapata; lo demás tiene valor por defecto (`DATOS_TERRENO`).
+ */
+export interface DatosTerreno {
+  /** Tensión admisible del terreno, kPa (la presión total bruta sobre el área equivalente, DB SE-C 4.3.1.3). */
+  tensionAdmisible?: number;
+  /** En las combinaciones sísmicas (GEO-SIS), kPa; sin ella, la de arriba. */
+  tensionAdmisibleSismo?: number;
+  /** Peso específico de las tierras sobre las zapatas, kN/m³. */
+  pesoEspecifico?: number;
+  /** Coeficiente de rozamiento entre la zapata y el terreno, para el deslizamiento. */
+  rozamiento?: number;
+  /** Tierras sobre la cara superior de las zapatas, m (la de cada zapata puede ser otra). */
+  tierras?: number;
+}
+
+/** Lo del terreno que tiene valor por defecto. */
+export const DATOS_TERRENO = { pesoEspecifico: 18, rozamiento: 0.5, tierras: 0 } as const;
 
 /** DO: los datos de la obra. No entran en la huella ni en el cálculo. */
 export interface ObraProyecto {
@@ -38,13 +60,15 @@ export interface ObraProyecto {
   materiales?: MaterialesObra;
   /** CO: lo común a las armaduras de la obra: acero, recubrimiento y fluencia. Lo que falta, por defecto. */
   armado?: DatosArmado;
+  /** CO5: el terreno bajo las zapatas. */
+  terreno?: DatosTerreno;
 }
 
 /** La familia de material de cada tipo: la que se propone y la que lista su desplegable. */
-export const FAMILIA_OBRA: Record<TipoObra, Material["tipo"]> = { forjados: "hormigon", pilares: "hormigon", muros: "hormigon", perfiles: "acero" };
+export const FAMILIA_OBRA: Record<TipoObra, Material["tipo"]> = { forjados: "hormigon", pilares: "hormigon", muros: "hormigon", perfiles: "acero", zapatas: "hormigon" };
 
 /** El nombre de cada tipo en un texto. */
-export const NOMBRE_TIPO_OBRA: Record<TipoObra, string> = { forjados: "forjados y vigas", pilares: "pilares", muros: "muros", perfiles: "perfiles de acero" };
+export const NOMBRE_TIPO_OBRA: Record<TipoObra, string> = { forjados: "forjados y vigas", pilares: "pilares", muros: "muros", perfiles: "perfiles de acero", zapatas: "zapatas" };
 
 /** Los materiales que no existen en el modelo. */
 export function comprobarObra(o: ObraProyecto | undefined, m: ModeloFisico): Diagnostico[] {
@@ -63,10 +87,22 @@ export function comprobarObra(o: ObraProyecto | undefined, m: ModeloFisico): Dia
   rango(a?.fyk, "El límite elástico (fyk)", 400, 600, " MPa");
   rango(a?.recubrimiento, "El recubrimiento", 10, 100, " mm");
   rango(a?.phiEf, "El coeficiente de fluencia efectivo (phiEf)", 0, 4, "");
+  rango(a?.recubrimientoZapatas, "El recubrimiento de las zapatas (recubrimientoZapatas)", 20, 150, " mm");
   if (a?.exposicion !== undefined && !EXPOSICIONES.includes(a.exposicion))
     r.push({ codigo: "obra/armado", severidad: "error", mensaje: `La clase de exposición de las armaduras de la obra tiene que ser una de ${EXPOSICIONES.join(", ")}, y es ${String(a.exposicion)}.` });
   if (a?.flechaActiva !== undefined && !(FLECHAS_ACTIVAS as readonly number[]).includes(a.flechaActiva))
     r.push({ codigo: "obra/armado", severidad: "error", mensaje: `El límite de la flecha activa de la obra (flechaActiva) tiene que ser ${FLECHAS_ACTIVAS.join(", ")} (L/…), y es ${String(a.flechaActiva)}.` });
+  // CO5: el terreno
+  const t = o?.terreno;
+  const terreno = (v: number | undefined, que: string, min: number, max: number, unidad: string) => {
+    if (v !== undefined && !(Number.isFinite(v) && v >= min && v <= max))
+      r.push({ codigo: "obra/terreno", severidad: "error", mensaje: `${que} del terreno tiene que estar entre ${min} y ${max}${unidad}, y es ${String(v)}.` });
+  };
+  terreno(t?.tensionAdmisible, "La tensión admisible (tensionAdmisible)", 10, 5000, " kPa");
+  terreno(t?.tensionAdmisibleSismo, "La tensión admisible en las combinaciones sísmicas (tensionAdmisibleSismo)", 10, 5000, " kPa");
+  terreno(t?.pesoEspecifico, "El peso específico de las tierras (pesoEspecifico)", 10, 25, " kN/m³");
+  terreno(t?.rozamiento, "El coeficiente de rozamiento (rozamiento)", 0.1, 1.5, "");
+  terreno(t?.tierras, "El espesor de las tierras sobre las zapatas (tierras)", 0, 10, " m");
   return r;
 }
 

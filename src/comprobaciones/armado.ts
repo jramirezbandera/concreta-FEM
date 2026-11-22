@@ -54,9 +54,11 @@ export interface DatosArmado {
   exposicion?: Exposicion;
   /** CO2: el denominador del límite de la flecha activa de las vigas, L/… (DB SE 4.3.3.1(1)): 300, 400 o 500. */
   flechaActiva?: number;
+  /** CO5: recubrimiento geométrico de las parrillas de las zapatas, mm (hasta la cara de la barra). */
+  recubrimientoZapatas?: number;
 }
 
-export const DATOS_ARMADO: Required<DatosArmado> = { fyk: 500, recubrimiento: 30, phiEf: 2, exposicion: "XC2", flechaActiva: 400 };
+export const DATOS_ARMADO: Required<DatosArmado> = { fyk: 500, recubrimiento: 30, phiEf: 2, exposicion: "XC2", flechaActiva: 400, recubrimientoZapatas: 50 };
 
 /** El armado de un tramo con los datos de la obra: lo que se le da a la comprobación. */
 export interface ArmadoPilar extends ArmadoTramoPilar {
@@ -384,5 +386,120 @@ export function erroresPunzonamiento(a: ArmaduraPunzonamiento): string[] {
   if (!DIAMETROS.includes(a.diametro)) r.push(`Ø${String(a.diametro)} no es un diámetro de barra (${DIAMETROS.join(", ")})`);
   if (!(Number.isInteger(a.ramas) && a.ramas >= 1)) r.push(`${String(a.ramas)} ramas por cara no vale (un entero ≥ 1)`);
   if (!(Number.isFinite(a.separacion) && a.separacion > 0)) r.push(`la separación ${String(a.separacion)} no vale (mm, > 0)`);
+  return r;
+}
+
+// ─── Zapatas (CO5) ──────────────────────────────────────────────────────────────────────────────
+
+/** Una cara del pilar enrasada con el borde de su zapata (el lindero), en los ejes de la zapata. */
+export const LINDEROS = ["+x", "-x", "+y", "-y"] as const;
+export type Lindero = (typeof LINDEROS)[number];
+
+/** Las barras de una dirección de la parrilla de una zapata. */
+export interface BarrasZapata {
+  /** Ø, mm. */
+  diametro: number;
+  /** Separación, mm. */
+  separacion: number;
+}
+
+/** Una parrilla: las barras según x (paralelas a B) y según y (paralelas a L). */
+export interface ParrillaZapata {
+  x: BarrasZapata;
+  y: BarrasZapata;
+}
+
+/**
+ * La zapata aislada de un pilar (CO5), fuera del modelo: el cálculo sigue con la base del pilar
+ * empotrada (CO-j). Sus ejes son los del tramo más bajo del pilar: x según su canto h (con giro 0, +X)
+ * e y a 90°. B es el lado según x y L según y, en m; h, el canto.
+ *
+ * Lo de la posición (`linderos`, `centradoras`) es del ingeniero y `fem armar` lo respeta; las
+ * dimensiones y las parrillas, las propone. Sin dimensiones o sin parrilla inferior, la zapata no se da
+ * por comprobada.
+ */
+export interface Zapata {
+  B?: number;
+  L?: number;
+  h?: number;
+  /**
+   * Las caras del pilar enrasadas con el borde de la zapata: ninguna, centrada; una, de medianera; dos
+   * contiguas («-x» y «-y»…), de esquina.
+   */
+  linderos?: Lindero[];
+  /**
+   * Vigas centradoras: el pilar interior al que va cada una, en la dirección perpendicular a un
+   * lindero (la viga se lleva la excentricidad en esa dirección; el módulo la resuelve analíticamente).
+   */
+  centradoras?: string[];
+  /** El hormigón de la zapata (un material del modelo); sin él, el de `obra.materiales.zapatas` o HA-25. */
+  material?: string;
+  /** Tierras sobre la cara superior de la zapata, m; sin él, las de la obra (`obra.terreno.tierras`). */
+  tierras?: number;
+  /** La parrilla inferior. */
+  inferior?: ParrillaZapata;
+  /** La parrilla superior, si la lleva (la pide el despegue). */
+  superior?: ParrillaZapata;
+}
+
+/** «Ø12/200» de unas barras de zapata. */
+export const textoBarrasZapata = (b: BarrasZapata): string => `Ø${b.diametro}/${b.separacion}`;
+
+const metros = (x: number) => x.toFixed(2).replace(".", ",");
+
+/** «2,00 × 2,00 × 0,60 · inf. x Ø12/200, y Ø12/200 · sup. …», para una tabla o un texto. */
+export function textoZapata(z: Zapata): string {
+  const partes: string[] = [];
+  if (z.B !== undefined && z.L !== undefined && z.h !== undefined) partes.push(`${metros(z.B)} × ${metros(z.L)} × ${metros(z.h)}`);
+  if (z.inferior) partes.push(`inf. x ${textoBarrasZapata(z.inferior.x)}, y ${textoBarrasZapata(z.inferior.y)}`);
+  if (z.superior) partes.push(`sup. x ${textoBarrasZapata(z.superior.x)}, y ${textoBarrasZapata(z.superior.y)}`);
+  return partes.join(" · ");
+}
+
+/** El tipo de una zapata por sus linderos. */
+export function tipoZapata(z: Zapata): "centrada" | "medianera" | "esquina" {
+  const n = z.linderos?.length ?? 0;
+  return n === 0 ? "centrada" : n === 1 ? "medianera" : "esquina";
+}
+
+/** Lo que no vale de una zapata, en palabras (sin mirar el modelo); vacío si es un dato admisible. */
+export function erroresZapata(z: Zapata): string[] {
+  if (!z || typeof z !== "object") return ["no es una zapata"];
+  const r: string[] = [];
+  const dims = [z.B, z.L, z.h];
+  if (dims.some((v) => v !== undefined) && dims.some((v) => v === undefined)) r.push("las dimensiones van juntas: B, L y h");
+  for (const [k, v, max] of [["B", z.B, 20], ["L", z.L, 20], ["h", z.h, 4]] as const)
+    if (v !== undefined && !(Number.isFinite(v) && v > 0 && v <= max)) r.push(`${k} = ${String(v)} no vale (m, entre 0 y ${max})`);
+  const ls = z.linderos ?? [];
+  if (!Array.isArray(ls)) r.push("los linderos van en una lista («-x», «+y»…)");
+  else {
+    for (const l of ls) if (!LINDEROS.includes(l)) r.push(`«${String(l)}» no es un lindero (${LINDEROS.join(", ")})`);
+    if (new Set(ls).size !== ls.length) r.push("hay un lindero repetido");
+    if (ls.length > 2) r.push("una zapata aislada tiene como mucho dos linderos (la de esquina)");
+    if (ls.length === 2 && ls[0]![1] === ls[1]![1]) r.push("los dos linderos de una zapata de esquina son contiguos: uno según x y otro según y");
+  }
+  if (z.centradoras !== undefined) {
+    if (!Array.isArray(z.centradoras) || z.centradoras.some((c) => typeof c !== "string" || !c)) r.push("las vigas centradoras van en una lista con el id del pilar al que va cada una");
+    else {
+      if (new Set(z.centradoras).size !== z.centradoras.length) r.push("hay una viga centradora repetida");
+      if (z.centradoras.length > ls.length) r.push(`una zapata ${tipoZapata(z) === "centrada" ? "centrada no lleva vigas centradoras" : `con ${ls.length} lindero${ls.length > 1 ? "s" : ""} lleva como mucho ${ls.length} viga${ls.length > 1 ? "s" : ""} centradora${ls.length > 1 ? "s" : ""}`}`);
+    }
+  }
+  if (z.tierras !== undefined && !(Number.isFinite(z.tierras) && z.tierras >= 0 && z.tierras <= 10)) r.push(`las tierras sobre la zapata, ${String(z.tierras)}, no valen (m, entre 0 y 10)`);
+  const parrilla = (p: ParrillaZapata | undefined, que: string) => {
+    if (p === undefined) return;
+    if (!p || typeof p !== "object") return void r.push(`la parrilla ${que} no vale`);
+    for (const k of ["x", "y"] as const) {
+      const b = p[k];
+      if (!b || typeof b !== "object") {
+        r.push(`falta la parrilla ${que} según ${k}`);
+        continue;
+      }
+      if (!DIAMETROS.includes(b.diametro)) r.push(`la parrilla ${que} según ${k}: Ø${String(b.diametro)} no es un diámetro de barra (${DIAMETROS.join(", ")})`);
+      if (!(Number.isFinite(b.separacion) && b.separacion > 0)) r.push(`la parrilla ${que} según ${k}: la separación ${String(b.separacion)} no vale (mm, > 0)`);
+    }
+  };
+  parrilla(z.inferior, "inferior");
+  parrilla(z.superior, "superior");
   return r;
 }
