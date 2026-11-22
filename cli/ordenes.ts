@@ -30,6 +30,7 @@ import { serializar } from "../src/editor/serializar.ts";
 import { armadoPropuesto, comprobarPilares } from "../src/comprobaciones/pilares.ts";
 import { armadoPropuestoVigas, comprobarVigas } from "../src/comprobaciones/vigas.ts";
 import { armadoPropuestoLosas, comprobarLosas } from "../src/comprobaciones/losas.ts";
+import { armadoPropuestoPunzonamiento, comprobarPunzonamientos } from "../src/comprobaciones/punzonamiento.ts";
 import { DATOS_ARMADO } from "../src/comprobaciones/armado.ts";
 import { proponerAlinear, textoGrupo, TOLERANCIA_ALINEAR } from "../src/editor/alinear.ts";
 import { operacionVigasBorde, proponerVigasBorde } from "../src/editor/vigasBorde.ts";
@@ -673,11 +674,14 @@ function alinearOrden(a: Argumentos, mal: (m: string) => Salida): Salida {
 }
 
 /**
- * `fem comprobar` y `fem armar` (CO1 a CO3, `docs/fem3d/comprobaciones.md` §4.6): los pilares, las
- * vigas y las losas (macizas y reticulares) de hormigón con el armado del proyecto o con el que se
- * propone de las tablas. `armar` sólo propone; con `--escribir`, guarda lo propuesto en
- * `armado.pilares`, `armado.vigas` y `armado.forjados` (fuera de la huella: no recalcula), deja el
- * fichero de antes en `.bak` y escribe el formato canónico.
+ * `fem comprobar` y `fem armar` (CO1 a CO4, `docs/fem3d/comprobaciones.md` §4.6): los pilares, las
+ * vigas, las losas (macizas y reticulares) y su punzonamiento junto a los pilares, con el armado del
+ * proyecto o con el que se propone de las tablas. `armar` sólo propone; con `--escribir`, guarda lo
+ * propuesto en `armado.pilares`, `armado.vigas`, `armado.forjados` y `armado.punzonamiento` (fuera de
+ * la huella: no recalcula), deja el fichero de antes en `.bak` y escribe el formato canónico.
+ *
+ * El punzonamiento (CO4) va con el armado de las losas: el del proyecto o, al armar, el que se acaba
+ * de proponer. Con un pilar dado, además de sus tramos, su punzonamiento.
  */
 async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: boolean): Promise<Salida> {
   const orden = armar ? "armar" : "comprobar";
@@ -687,7 +691,7 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
   const top = a.banderas.get("top")?.[0];
   if (top !== undefined && !(Number.isInteger(Number(top)) && Number(top) > 0)) return mal("--top tiene que ser un entero positivo");
   const tipo = a.banderas.get("tipo")?.[0];
-  if (tipo !== undefined && tipo !== "pilares" && tipo !== "vigas" && tipo !== "losas") return mal("--tipo tiene que ser pilares, vigas o losas");
+  if (tipo !== undefined && tipo !== "pilares" && tipo !== "vigas" && tipo !== "losas" && tipo !== "punzonamiento") return mal("--tipo tiene que ser pilares, vigas, losas o punzonamiento");
   const errores = [...comprobarArmado(l.proyecto.armado, l.proyecto.modelo), ...comprobarObra(l.proyecto.obra, l.proyecto.modelo)].filter((d) => d.severidad === "error");
   if (errores.length) return { codigo: CODIGO.errores, json: { orden, ok: false, ...listaDiagnosticos(errores) } };
   // Cada pieza dada, un pilar, una viga o una losa
@@ -704,6 +708,7 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
   const conPilares = (tipo === undefined || tipo === "pilares") && (!ids.length || idsPilares.length > 0);
   const conVigas = (tipo === undefined || tipo === "vigas") && (!ids.length || idsVigas.length > 0);
   const conLosas = (tipo === undefined || tipo === "losas") && (!ids.length || idsLosas.length > 0);
+  const conPunzonamiento = (tipo === undefined || tipo === "punzonamiento") && (!ids.length || idsPilares.length > 0);
   const r = await calculado(orden, l.ruta, l.proyecto, a.banderas.has("recalcular"));
   if ("codigo" in r) return r;
   const q = new Consultas(modelo, r.compilacion, r.casos, l.proyecto.opciones, r.modal);
@@ -717,6 +722,15 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
   if (rv && !rv.valido) return mala(rv.diagnosticos);
   const rl = conLosas ? comprobarLosas(q, l.proyecto.armado?.forjados, datos, { ...(idsLosas.length ? { ids: idsLosas } : {}), proponer: armar, filas, ...(l.proyecto.armado ? { bases: l.proyecto.armado } : {}) }) : null;
   if (rl && !rl.valido) return mala(rl.diagnosticos);
+  // El punzonamiento, con el armado de las losas: al armar, el que se propone (el de todas: hace falta el de las losas de los pilares dados)
+  let forjados = l.proyecto.armado?.forjados;
+  if (conPunzonamiento && armar) {
+    const todas = rl?.valido && !idsLosas.length ? rl : comprobarLosas(q, forjados, datos, { proponer: true, ...(l.proyecto.armado ? { bases: l.proyecto.armado } : {}) });
+    if (!todas.valido) return mala(todas.diagnosticos);
+    forjados = armadoPropuestoLosas(todas.valor, forjados);
+  }
+  const rz = conPunzonamiento ? comprobarPunzonamientos(q, forjados, l.proyecto.armado?.punzonamiento, datos, { ...(idsPilares.length ? { ids: idsPilares } : {}), proponer: armar, filas }) : null;
+  if (rz && !rz.valido) return mala(rz.diagnosticos);
   // Sin piezas dadas y sin --todos: los peores tramos y los peores vanos (los que no cumplen, primero)
   const limite = ids.length || a.banderas.has("todos") ? Infinity : Number(top ?? TOP_POR_DEFECTO);
   const peso = (t: { cumple: boolean; aprovechamiento: number | null }) => (t.cumple ? 0 : 1e9) + (t.aprovechamiento ?? 1e6);
@@ -736,13 +750,15 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
     ok: true,
     huella: r.compilacion.huella,
     datos: { ...DATOS_ARMADO, ...datos },
-    resumen: { ...(rp?.valido ? { pilares: rp.valor.resumen } : {}), ...(rv?.valido ? { vigas: rv.valor.resumen } : {}), ...(rl?.valido ? { losas: rl.valor.resumen } : {}), segundos: (performance.now() - t0) / 1000 },
+    resumen: { ...(rp?.valido ? { pilares: rp.valor.resumen } : {}), ...(rv?.valido ? { vigas: rv.valor.resumen } : {}), ...(rl?.valido ? { losas: rl.valor.resumen } : {}), ...(rz?.valido ? { punzonamiento: rz.valor.resumen } : {}), segundos: (performance.now() - t0) / 1000 },
     ...(Object.keys(sinListar).length ? { sinListar } : {}),
     ...(pilares ? { pilares: pilares.lista } : {}),
     ...(vigas ? { vigas: vigas.lista } : {}),
     // Las losas, todas: son pocas, y cada una con la fila que manda (todas sus filas, si se pide la losa)
     ...(rl?.valido ? { losas: rl.valor.losas } : {}),
-    ...listaDiagnosticos([...(rp?.diagnosticos ?? []), ...(rv?.diagnosticos ?? []), ...(rl?.diagnosticos ?? [])]),
+    // El punzonamiento, todas las uniones de pilar y losa (son pocas): cada una, con la fila que manda
+    ...(rz?.valido ? { punzonamiento: rz.valor.pilares } : {}),
+    ...listaDiagnosticos([...(rp?.diagnosticos ?? []), ...(rv?.diagnosticos ?? []), ...(rl?.diagnosticos ?? []), ...(rz?.diagnosticos ?? [])]),
   };
   if (!armar) return { codigo: CODIGO.bien, json };
   if (!a.banderas.has("escribir")) return { codigo: CODIGO.bien, json: { ...json, escrito: false } };
@@ -751,6 +767,7 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
     ...(rp?.valido ? { pilares: armadoPropuesto(rp.valor, l.proyecto.armado?.pilares) } : {}),
     ...(rv?.valido ? { vigas: armadoPropuestoVigas(rv.valor, l.proyecto.armado?.vigas) } : {}),
     ...(rl?.valido ? { forjados: armadoPropuestoLosas(rl.valor, l.proyecto.armado?.forjados) } : {}),
+    ...(rz?.valido ? { punzonamiento: armadoPropuestoPunzonamiento(rz.valor, l.proyecto.armado?.punzonamiento) } : {}),
   };
   const ap = aplicar(l.proyecto, { op: "armado", armado });
   if (!ap.ok) return { codigo: CODIGO.errores, json: { ...json, ok: false, escrito: false, ...listaDiagnosticos(ap.errores) } };

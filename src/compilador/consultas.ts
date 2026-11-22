@@ -53,6 +53,7 @@ import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type Pil
 import { huellaPilar } from "./geometria2d.ts";
 import type { Mapeo } from "./mapeo.ts";
 import { diafragmaDe } from "./piezas.ts";
+import { IndicePunzonamiento, N_TRANSMITIDO, transmitidoPilar, type TransmitidoPilar } from "./punzonamiento.ts";
 import { EsfuerzosPiezas } from "./resultados.ts";
 import { amplificar, calcularSegundoOrden, coeficientes, diagnosticosSegundoOrden, maximos, opcionesSegundoOrden, type CoeficienteHipotesis, type MaximoHipotesis, type SegundoOrdenCalculado } from "./segundoOrden.ts";
 import { calcularSismo, sismoDelCalculo, tieneEspectro, type EspectroSismo, type SismoCalculado } from "./sismo.ts";
@@ -333,6 +334,8 @@ export class Consultas {
   private cortesC?: Cortes;
   private efimerosC?: CasosEfimeros | null;
   private murosC?: EsfuerzosMuros;
+  private punzC?: IndicePunzonamiento;
+  private readonly transmitidos = new Map<string, TransmitidoPilar | null>();
   /** SO: el segundo orden global de este cálculo, una vez (`segundoOrdenCalculado`). */
   private soC?: SegundoOrdenCalculado;
   private readonly flechasGeo = new Map<string, GeometriaFlechas>();
@@ -741,6 +744,40 @@ export class Consultas {
       for (const x of D.estaciones()) r.push({ s: t.s0 + x, izquierda: Float64Array.from(D.esfuerzosEn(x, -1)), derecha: Float64Array.from(D.esfuerzosEn(x, 1)) });
     }
     return { valido: true, valor: r, diagnosticos: [] };
+  }
+
+  // ─── Punzonamiento (CO4) ────────────────────────────────────────────────────────────────────
+
+  /**
+   * CO4: lo que el forjado pasa a un pilar en una planta (la losa por su huella y, aparte, las vigas
+   * planas), por caso base, respecto al nudo del pilar (`punzonamiento.ts`). `valor: null` si el pilar
+   * no se une a ninguna losa en esa planta.
+   */
+  transmitidoPilar(pilar: string, planta: string): Respuesta<TransmitidoPilar | null> {
+    if (!this.ctx.pilarDe.has(pilar)) return this.noExiste("El pilar", pilar);
+    if (!this.ctx.planta.has(planta)) return this.noExiste("La planta", planta);
+    const clave = `${pilar}@${planta}`;
+    if (!this.transmitidos.has(clave))
+      this.transmitidos.set(clave, transmitidoPilar(this.ctx, { modelo: this.modelo, mapeo: this.mapeo }, this.cortes.fuerzas, this.casos, (this.punzC ??= new IndicePunzonamiento(this.modelo)), pilar, planta));
+    return { valido: true, valor: this.transmitidos.get(clave)!, diagnosticos: [] };
+  }
+
+  /**
+   * CO4: lo que el forjado pasa a un pilar en cada combinación (factores por caso lógico): la parte
+   * estática de [Fz, Mx, My] de la losa y de las vigas planas (6, kN y kN·m, sobre el pilar y respecto
+   * a su nudo, en ejes globales) y, con el sismo del programa, la amplitud de cada una (VS-o: sin
+   * signo ni simultaneidad; quien comprueba toma el peor signo de cada una). null si no hay losa.
+   */
+  punzonamiento(pilar: string, planta: string, combinaciones: readonly ArrayLike<number>[]): Respuesta<{ estatica: Float64Array; sismo: Float64Array }[] | null> {
+    for (const f of combinaciones) {
+      const mal = this.factoresMal<{ estatica: Float64Array; sismo: Float64Array }[] | null>(f, pilar);
+      if (mal) return mal;
+    }
+    const t = this.transmitidoPilar(pilar, planta);
+    if (!t.valido) return t;
+    if (!t.valor) return { valido: true, valor: null, diagnosticos: [] };
+    const porBase = t.valor.porBase;
+    return { valido: true, valor: combinaciones.map((f) => this.sup.partir(porBase, N_TRANSMITIDO, f)), diagnosticos: [] };
   }
 
   // ─── Bandas, machones y dinteles ────────────────────────────────────────────────────────────

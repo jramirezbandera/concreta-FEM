@@ -295,7 +295,7 @@ function mover(m: ModeloFisico, o: Extract<Operacion, { op: "mover" }>): Paso {
 function conArmado(s: Paso, antes: ModeloFisico, datos: DatosProyecto, renombres: ReadonlyMap<string, string> = new Map()): Paso {
   if (!s.ok) return s;
   let d = s.proyecto ?? datos;
-  if (d.armado?.losas || d.armado?.pilares || d.armado?.vigas) {
+  if (d.armado?.losas || d.armado?.pilares || d.armado?.vigas || d.armado?.forjados || d.armado?.punzonamiento) {
     const armado = seguirVigas(seguirPilares(seguirLosas(d.armado, renombres, antes, s.modelo), renombres, antes, s.modelo), renombres, antes, s.modelo);
     if (armado !== d.armado) {
       const { armado: _a, ...resto } = d;

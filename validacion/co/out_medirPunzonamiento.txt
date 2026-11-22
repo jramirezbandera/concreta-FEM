@@ -1,0 +1,116 @@
+
+== losa plana maciza 2 × 2 de 5 m, con vuelo de 0,5 m: 823 nudos
+resumen: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0,"llamadas":9}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P1@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+P2@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P3@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+P4@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P5@F1              L        interior   544.2        —      545.6   1.00   4214   208      1.07     0.86 Ø8 2R/150 ×2     cumple
+P6@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P7@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+P8@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P9@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+
+== losa maciza 2 × 2 de 5 m hasta la cara de los pilares: 455 nudos
+resumen: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0,"llamadas":9}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P00@P1             L        esquina     83.2        —       84.6   1.38   1453   208      0.78     0.78 —                cumple
+P01@P1             L        borde      201.5        —      202.8   1.19   2507   208      0.95     0.95 —                cumple
+P02@P1             L        esquina     83.2        —       84.6   1.38   1453   208      0.78     0.78 —                cumple
+P10@P1             L        borde      201.5        —      202.8   1.19   2507   208      0.95     0.95 —                cumple
+P11@P1             L        interior   553.3        —      554.7   1.00   4214   208      1.07     0.86 Ø8 2R/150 ×2     cumple
+P12@P1             L        borde      201.5        —      202.8   1.19   2507   208      0.95     0.95 —                cumple
+P20@P1             L        esquina     83.2        —       84.6   1.38   1453   208      0.78     0.78 —                cumple
+P21@P1             L        borde      201.5        —      202.8   1.19   2507   208      0.95     0.95 —                cumple
+P22@P1             L        esquina     83.2        —       84.6   1.38   1453   208      0.78     0.78 —                cumple
+
+== la misma, de 7 m y 30 cm: 615 nudos
+resumen: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":9,"sinArmadoLosa":0,"pendientes":0,"llamadas":9}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P00@P1             L        esquina    167.7        —      169.3   1.33   1623   262      1.17     0.78 Ø8 2R/150 ×3     cumple
+P01@P1             L        borde      423.8        —      425.4   1.17   2846   262      1.42     0.97 Ø8 2R/150 ×4     cumple
+P02@P1             L        esquina    167.7        —      169.3   1.33   1623   262      1.17     0.78 Ø8 2R/150 ×3     cumple
+P10@P1             L        borde      423.8        —      425.4   1.17   2846   262      1.44     0.97 Ø8 2R/150 ×4     cumple
+P11@P1             L        interior  1227.9        —     1229.5   1.00   4892   262      1.40     0.98 Ø8 3R/125 ×4     cumple
+P12@P1             L        borde      423.8        —      425.4   1.17   2846   262      1.44     0.97 Ø8 2R/150 ×4     cumple
+P20@P1             L        esquina    167.7        —      169.3   1.33   1623   262      1.17     0.78 Ø8 2R/150 ×3     cumple
+P21@P1             L        borde      423.8        —      425.4   1.17   2846   262      1.42     0.97 Ø8 2R/150 ×4     cumple
+P22@P1             L        esquina    167.7        —      169.3   1.33   1623   262      1.17     0.78 Ø8 2R/150 ×3     cumple
+
+== la de 5 m, con un hueco pegado a la esquina del pilar central: 390 nudos
+resumen: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0,"llamadas":9}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P00@P1             L        esquina     83.4        —       84.8   1.38   1453   208      0.78     0.78 —                cumple
+P01@P1             L        borde      206.3        —      207.6   1.20   2507   208      0.97     0.97 —                cumple
+P02@P1             L        esquina     83.1        —       84.4   1.38   1453   208      0.78     0.78 —                cumple
+P10@P1             L        borde      206.3        —      207.6   1.20   2507   208      0.97     0.97 —                cumple
+P11@P1             L        interior   520.9        —      522.3   1.04   3360   208      1.20     0.93 Ø8 2R/125 ×3     cumple
+P12@P1             L        borde      205.3        —      206.7   1.20   2507   208      0.97     0.97 —                cumple
+P20@P1             L        esquina     83.1        —       84.4   1.38   1453   208      0.78     0.78 —                cumple
+P21@P1             L        borde      205.3        —      206.7   1.20   2507   208      0.97     0.97 —                cumple
+P22@P1             L        esquina     82.8        —       84.2   1.38   1453   208      0.77     0.77 —                cumple
+
+== reticular 25+5 de 2 × 2 de 6 m, con vuelo de 0,5 m: 1223 nudos
+resumen: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0,"llamadas":9}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P1@F1              L        esquina    132.8        —      134.4   1.46   2223   262      0.74     0.74 —                cumple
+P2@F1              L        borde      293.3        —      295.0   1.26   3446   262      0.91     0.91 —                cumple
+P3@F1              L        esquina    132.8        —      134.4   1.46   2223   262      0.74     0.74 —                cumple
+P4@F1              L        borde      293.3        —      295.0   1.26   3446   262      0.91     0.91 —                cumple
+P5@F1              L        interior   689.0        —      690.6   1.00   4892   262      1.01     0.82 Ø8 2R/150 ×2     cumple
+P6@F1              L        borde      293.3        —      295.0   1.26   3446   262      0.91     0.91 —                cumple
+P7@F1              L        esquina    132.8        —      134.4   1.46   2223   262      0.74     0.74 —                cumple
+P8@F1              L        borde      293.3        —      295.0   1.26   3446   262      0.91     0.91 —                cumple
+P9@F1              L        esquina    132.8        —      134.4   1.46   2223   262      0.74     0.74 —                cumple
+
+== reticular 25+5 de 2 × 2 de 6 m hasta la cara de los pilares: 863 nudos
+resumen: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0,"llamadas":9}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P00@P1             L        esquina    107.0        —      108.6   1.33   1623   262      0.74     0.74 —                cumple
+P01@P1             L        borde      259.1        —      260.7   1.17   2846   262      0.90     0.90 —                cumple
+P02@P1             L        esquina    107.0        —      108.6   1.33   1623   262      0.74     0.74 —                cumple
+P10@P1             L        borde      259.1        —      260.7   1.17   2846   262      0.90     0.90 —                cumple
+P11@P1             L        interior   698.1        —      699.7   1.00   4892   262      1.02     0.83 Ø8 2R/150 ×2     cumple
+P12@P1             L        borde      259.1        —      260.7   1.17   2846   262      0.90     0.90 —                cumple
+P20@P1             L        esquina    107.0        —      108.6   1.33   1623   262      0.74     0.74 —                cumple
+P21@P1             L        borde      259.1        —      260.7   1.17   2846   262      0.90     0.90 —                cumple
+P22@P1             L        esquina    107.0        —      108.6   1.33   1623   262      0.74     0.74 —                cumple
+
+== losa plana maciza 2 × 2 de 5 m, con sismo: 823 nudos
+resumen: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0,"llamadas":9}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P1@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+P2@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P3@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+P4@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P5@F1              L        interior   544.2        —      545.6   1.00   4214   208      1.07     0.86 Ø8 2R/150 ×2     cumple
+P6@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P7@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+P8@F1              L        borde      231.7        —      233.1   1.34   3107   208      0.98     0.98 —                cumple
+P9@F1              L        esquina    105.5        —      106.8   1.61   2053   208      0.81     0.81 —                cumple
+
+== la vivienda: 3342 nudos
+resumen: {"uniones":12,"cumplen":12,"noCumplen":0,"conArmadura":0,"sinArmadoLosa":0,"pendientes":0,"llamadas":12}
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+P2@CUB             L-CUB    borde       72.9    119.2      194.5   1.16   2521   258      0.26     0.26 —                cumple
+P3@CUB             L-CUB    borde      289.6        —      290.5   1.66   3969   258      0.95     0.95 —                cumple
+P4@CUB             L-CUB    esquina     68.2     18.0       87.6   1.76   2371   258      0.40     0.40 —                cumple
+P5@CUB-S           L-CUB-S  borde      154.8     -5.2      152.7   1.91   3570   258      0.65     0.65 —                cumple
+P6@CUB-S           L-CUB-S  esquina     67.2     29.2       98.8   1.76   2371   258      0.39     0.39 —                cumple
+P8@CUB-S           L-CUB-S  interior   248.0        —      249.0   1.07   4442   258      0.47     0.47 —                cumple
+P9@CUB-S           L-CUB-S  borde       84.8     78.5      165.7   1.18   2521   258      0.31     0.31 —                cumple
+P11@CUB            L-CUB    interior   309.4     -7.8      304.0   1.32   3632   258      0.86     0.86 —                cumple
+P12@CUB-S          L-CUB-S  borde       31.9     53.8       87.9   1.28   2521   258      0.13     0.13 —                cumple
+P12@CUB            L-CUB    borde       95.5      4.1      101.1   1.19   2521   258      0.35     0.35 —                cumple
+P13@CUB-S          L-CUB-S  interior   253.2        —      254.1   1.06   4442   258      0.47     0.47 —                cumple
+P16@CUB-S          L-CUB-S  borde       31.3    101.7      135.4   1.21   2521   258      0.12     0.12 —                cumple
+  [info] comprobacion/punzonamiento-con-vigas: A 8 de los pilares comprobados les llegan vigas (a 8, vigas planas): el punzonamiento se comprueba sólo con lo que la losa les pasa por su huella; lo que les llega por las vigas es el cortante de la viga, que se comprueba con ella. Los pilares a los que la losa no llega (van dentro del ancho de sus vigas) no tienen comprobación de punzonamiento.
+
+== el edificio objetivo de losas de 7 plantas, con viento (losas macizas con vigas en todos los ejes): 86796 nudos
+resumen: {"uniones":280,"cumplen":280,"noCumplen":0,"conArmadura":0,"sinArmadoLosa":0,"pendientes":0,"llamadas":280}; armar las losas 19.6 s, el punzonamiento 0.2 s
+pilar@planta       losa     pos       VEd (planas)   ΔN pilar  β     u1    d    vEd/vRd,c  aprov.  armadura        estado
+  interior: 168 uniones, 0 con armadura, 0 no cumplen; la peor, P24-15@N5: VEd 131.6 kN, β 1.43, vEd/vRd,c 0.50
+  borde: 98 uniones, 0 con armadura, 0 no cumplen; la peor, P0-5@N6: VEd 72.1 kN, β 1.19, vEd/vRd,c 0.31
+  esquina: 14 uniones, 0 con armadura, 0 no cumplen; la peor, P54-35@N6: VEd 47.6 kN, β 1.23, vEd/vRd,c 0.49
+  [info] comprobacion/punzonamiento-con-vigas: A 40 de los pilares comprobados les llegan vigas: el punzonamiento se comprueba sólo con lo que la losa les pasa por su huella; lo que les llega por las vigas es el cortante de la viga, que se comprueba con ella. Los pilares a los que la losa no llega (van dentro del ancho de sus vigas) no tienen comprobación de punzonamiento.

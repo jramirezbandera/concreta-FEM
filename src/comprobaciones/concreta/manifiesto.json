@@ -47,16 +47,40 @@
       "sha256Origen": "f8333c0ce590e1a587c0292e8dd8f41d6414468729d7fc7caebeb6ac651126dc"
     },
     {
+      "origen": "src/data/steelProfiles.ts",
+      "destino": "src/comprobaciones/concreta/data/steelProfiles.ts",
+      "sha256": "6b76565b7657e24076526ced64fed1c261a2c9de4ea02c477c451d57888f5dbe",
+      "sha256Origen": "6b76565b7657e24076526ced64fed1c261a2c9de4ea02c477c451d57888f5dbe"
+    },
+    {
       "origen": "src/lib/calculations/crackedDeflection.ts",
       "destino": "src/comprobaciones/concreta/lib/calculations/crackedDeflection.ts",
       "sha256": "4df60444ad6ceba05238ac976b06d6bb9e841a82a566f9ebb10513a1669b33a0",
       "sha256Origen": "6785fcee1a5cc9ede26ae265911c8e6b265239284ac3ccd5368c52a6579e0f56"
     },
     {
+      "origen": "src/lib/calculations/cruceta.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/cruceta.ts",
+      "sha256": "4868cf7264444a6d7e0d63e37bb27c0c8087d82a9cc1af701589e56fbb2c19a7",
+      "sha256Origen": "1e97c314daad5a2945fd34b5d3465251fa8db14bfc4602b4db39d0cbd6854816"
+    },
+    {
       "origen": "src/lib/calculations/cuantiaMinima.ts",
       "destino": "src/comprobaciones/concreta/lib/calculations/cuantiaMinima.ts",
       "sha256": "c1d001f243a2d9b778f908ebd79d9dfb69b79184d445465a747c5c4a1d4e94b9",
       "sha256Origen": "c1d001f243a2d9b778f908ebd79d9dfb69b79184d445465a747c5c4a1d4e94b9"
+    },
+    {
+      "origen": "src/lib/calculations/punching.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/punching.ts",
+      "sha256": "4ff427a16d824df42c23859dfe9590ae643d5e2e9da76b79e67303d4839b056a",
+      "sha256Origen": "d13abbcb6c1a18d5601de085f39bd87b6351be89cddcb08e90aae0c9f7ad00dc"
+    },
+    {
+      "origen": "src/lib/calculations/punchingGeometria.ts",
+      "destino": "src/comprobaciones/concreta/lib/calculations/punchingGeometria.ts",
+      "sha256": "ca9fcb17a2036340971a255b059731c3c75974d81028ef830266dd30ce40e31d",
+      "sha256Origen": "e15ca3a205a350c20dc259a884fc52910c1e1fe2a930ead75f6f61d851f70f03"
     },
     {
       "origen": "src/lib/calculations/rcBeamMN.ts",
@@ -141,6 +165,12 @@
       "destino": "src/comprobaciones/concreta/test/calc/cuantiaMinima.test.ts",
       "sha256": "12c496c3c6835fcabc2acc1ae2fdd83e3e4ee904aa5f28f9c3bfef5a4af95c11",
       "sha256Origen": "d294ffb75b6924dbad48b1af46951bbaf96cf4c3d6a8a1093cb9cfa111ebcc5e"
+    },
+    {
+      "origen": "src/test/calc/punching.test.ts",
+      "destino": "src/comprobaciones/concreta/test/calc/punching.test.ts",
+      "sha256": "17498bd0299d6c5e2661a81b45741295d82fcf9f9cd5419000df7e2f24ddf154",
+      "sha256Origen": "bff86e165edce8d9d2797597d17c81e912b555ea7ff0e71b8d15c340a90de0e6"
     },
     {
       "origen": "src/test/calc/rcBeamMN.test.ts",

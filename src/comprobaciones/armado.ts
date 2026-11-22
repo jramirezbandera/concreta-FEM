@@ -355,3 +355,34 @@ export function erroresArmadoForjado(a: ArmadoForjado, reticular: boolean): stri
   });
   return r;
 }
+
+// ─── Punzonamiento (CO4) ────────────────────────────────────────────────────────────────────────
+
+/**
+ * La armadura de punzonamiento de una losa junto a un pilar (CO4): cercos verticales en perímetros
+ * alrededor del pilar, como los toma el módulo de punzonamiento (tipo viga, α = 90°). En cada
+ * perímetro, `ramas` ramas por cada cara del pilar que tiene losa delante (4 en un pilar interior, 3
+ * en uno de borde y 2 en uno de esquina); los perímetros, cada `separacion` (sr), el primero a no más
+ * de medio canto útil de la cara y hasta donde ya no hacen falta.
+ */
+export interface ArmaduraPunzonamiento {
+  /** Ø de las ramas, mm. */
+  diametro: number;
+  /** Ramas por cara del pilar con losa, en cada perímetro. */
+  ramas: number;
+  /** Separación radial entre perímetros, mm. */
+  separacion: number;
+}
+
+/** «Ø8 4R/150», para una tabla o un texto. */
+export const textoPunzonamiento = (a: ArmaduraPunzonamiento): string => `Ø${a.diametro} ${a.ramas}R/${a.separacion}`;
+
+/** Lo que no vale de una armadura de punzonamiento, en palabras; vacío si es un dato admisible. */
+export function erroresPunzonamiento(a: ArmaduraPunzonamiento): string[] {
+  const r: string[] = [];
+  if (!a || typeof a !== "object") return ["faltan el diámetro, las ramas y la separación"];
+  if (!DIAMETROS.includes(a.diametro)) r.push(`Ø${String(a.diametro)} no es un diámetro de barra (${DIAMETROS.join(", ")})`);
+  if (!(Number.isInteger(a.ramas) && a.ramas >= 1)) r.push(`${String(a.ramas)} ramas por cara no vale (un entero ≥ 1)`);
+  if (!(Number.isFinite(a.separacion) && a.separacion > 0)) r.push(`la separación ${String(a.separacion)} no vale (mm, > 0)`);
+  return r;
+}

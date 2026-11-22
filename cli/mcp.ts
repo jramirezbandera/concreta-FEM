@@ -134,22 +134,22 @@ export const HERRAMIENTAS: Herramienta[] = [
   {
     name: "comprobar",
     description:
-      "Comprueba los pilares, las vigas y las losas (macizas y reticulares) de hormigón con el armado del proyecto (armado.pilares, armado.vigas, armado.forjados): por tramo de pilar, por vano de viga y por losa, si cumple, su aprovechamiento y la fila y la combinación que mandan. Con «piezas» (ids de pilares, de vigas o de losas), todas las filas de ésas; «tipo», sólo pilares, sólo vigas o sólo losas. Una pieza sin armado no cumple. El punzonamiento todavía no se comprueba.",
+      "Comprueba los pilares, las vigas y las losas (macizas y reticulares) de hormigón con el armado del proyecto (armado.pilares, armado.vigas, armado.forjados): por tramo de pilar, por vano de viga y por losa, si cumple, su aprovechamiento y la fila y la combinación que mandan. Con «piezas» (ids de pilares, de vigas o de losas), todas las filas de ésas; «tipo», sólo pilares, vigas, losas o punzonamiento. Una pieza sin armado no cumple. El punzonamiento de cada losa junto a cada pilar (lo que la losa le pasa por su huella, con β de la fórmula general) sale en «punzonamiento», con la armadura de armado.punzonamiento si la lleva; con un pilar en «piezas», también el suyo.",
     inputSchema: obj(
-      { proyecto: PROYECTO, piezas: { type: "array", items: { type: "string" } }, pilares: { type: "array", items: { type: "string" } }, tipo: { enum: ["pilares", "vigas", "losas"] }, top: { type: "integer" }, todos: { type: "boolean" }, recalcular: { type: "boolean" } },
+      { proyecto: PROYECTO, piezas: { type: "array", items: { type: "string" } }, pilares: { type: "array", items: { type: "string" } }, tipo: { enum: ["pilares", "vigas", "losas", "punzonamiento"] }, top: { type: "integer" }, todos: { type: "boolean" }, recalcular: { type: "boolean" } },
       ["proyecto"],
     ),
   },
   {
     name: "armar",
     description:
-      "Propone el armado de cada tramo de pilar, de cada vano de viga y de cada losa (su armadura base, sus refuerzos por zonas y, en un reticular, la parrilla de los ábacos y los cercos de los nervios): el primero de las tablas (de menos a más acero) con el que no falla ninguna comprobación. Sólo propone; con «escribir», lo guarda en armado.pilares, armado.vigas y armado.forjados (deja el proyecto de antes en .bak). No cambia la huella ni recalcula. «piezas» y «tipo», como en comprobar.",
+      "Propone el armado de cada tramo de pilar, de cada vano de viga y de cada losa (su armadura base, sus refuerzos por zonas y, en un reticular, la parrilla de los ábacos y los cercos de los nervios): el primero de las tablas (de menos a más acero) con el que no falla ninguna comprobación. Propone también la armadura de punzonamiento (cercos por perímetros) donde la losa no basta sin ella, con el armado de losas propuesto. Sólo propone; con «escribir», lo guarda en armado.pilares, armado.vigas, armado.forjados y armado.punzonamiento (deja el proyecto de antes en .bak). No cambia la huella ni recalcula. «piezas» y «tipo», como en comprobar.",
     inputSchema: obj(
       {
         proyecto: PROYECTO,
         piezas: { type: "array", items: { type: "string" } },
         pilares: { type: "array", items: { type: "string" } },
-        tipo: { enum: ["pilares", "vigas", "losas"] },
+        tipo: { enum: ["pilares", "vigas", "losas", "punzonamiento"] },
         top: { type: "integer" },
         todos: { type: "boolean" },
         escribir: { type: "boolean" },

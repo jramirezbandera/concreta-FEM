@@ -50,6 +50,9 @@ const ENTRADAS: readonly string[] = [
   // CO3, forjados (losa maciza por metro y nervio de reticular)
   "src/lib/calculations/rcSlabs.ts",
   "src/test/calc/rcSlabs.test.ts",
+  // CO4, punzonamiento
+  "src/lib/calculations/punching.ts",
+  "src/test/calc/punching.test.ts",
 ];
 
 /**

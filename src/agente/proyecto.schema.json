@@ -422,6 +422,16 @@
             "$ref": "#/$defs/ArmadoForjado"
           },
           "description": "CO3: el armado en barras de cada losa maciza o reticular (su id): la base de cada cara y\ndirección, la parrilla de los ábacos y los refuerzos."
+        },
+        "punzonamiento": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ArmaduraPunzonamiento"
+            }
+          },
+          "description": "CO4: la armadura de punzonamiento de la losa junto a cada pilar (su id), por la planta de la\nlosa. Sin ella, la losa se comprueba ahí sin armadura de punzonamiento."
         }
       },
       "additionalProperties": false,
@@ -506,6 +516,30 @@
         "y-sup"
       ],
       "description": "Las cuatro armaduras de una losa: X (su dirección 1) o Y (la 2), inferior o superior (las de `agente/armaduraBase.ts`)."
+    },
+    "ArmaduraPunzonamiento": {
+      "type": "object",
+      "properties": {
+        "diametro": {
+          "type": "number",
+          "description": "Ø de las ramas, mm."
+        },
+        "ramas": {
+          "type": "number",
+          "description": "Ramas por cara del pilar con losa, en cada perímetro."
+        },
+        "separacion": {
+          "type": "number",
+          "description": "Separación radial entre perímetros, mm."
+        }
+      },
+      "required": [
+        "diametro",
+        "ramas",
+        "separacion"
+      ],
+      "additionalProperties": false,
+      "description": "La armadura de punzonamiento de una losa junto a un pilar (CO4): cercos verticales en perímetros\nalrededor del pilar, como los toma el módulo de punzonamiento (tipo viga, α = 90°). En cada\nperímetro, `ramas` ramas por cada cara del pilar que tiene losa delante (4 en un pilar interior, 3\nen uno de borde y 2 en uno de esquina); los perímetros, cada `separacion` (sr), el primero a no más\nde medio canto útil de la cara y hasta donde ya no hacen falta."
     },
     "Banda": {
       "type": "object",

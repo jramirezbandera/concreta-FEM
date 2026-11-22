@@ -451,7 +451,93 @@ Pasan los criterios 5 a 14 en lo de las losas; falta su parte de la app (CO6), l
 - **La vivienda** (dos cubiertas reticulares con vigas planas): las dos losas cumplen con lo propuesto (13 y 17 refuerzos, 11 y 15 zonas de cercos); `fem armar --tipo losas`, 1,5 s.
 - **El edificio objetivo de losas de 7 plantas, con viento** (losas macizas con vigas en todos los ejes): cada losa tiene unas 16 000 estaciones; sus demandas tardan de 2,5 a 6,6 s (la primera calienta los campos) y proponer, 0,1 s. Basta la base (Ø12/250), sin refuerzos: 3 llamadas al módulo por losa. En ecuaciones, el coste de la fase es cero.
 
-**Pendiente de CO3:** el punzonamiento (CO4), sin el que el cortante junto a los pilares no lo comprueba nadie; la sombra con el armado de losas de CYPECAD (CO7); la app (CO6); CO3-4, CO3-5 y CO3-6.
+**Pendiente de CO3:** el punzonamiento (hecho en CO4, §8.7); la sombra con el armado de losas de CYPECAD (CO7); la app (CO6); CO3-4, CO3-5 y CO3-6.
+
+### 8.7 CO4, el punzonamiento (2026-11-22)
+
+Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO6) y la sombra (CO7). Las decisiones CO4-a…CO4-j, de Claude, **por confirmar por el usuario** (abajo). En ecuaciones, el coste es cero: no cambia el modelo analítico.
+
+**Lo que la losa pasa al pilar** (lo único que cambia fuera de `src/comprobaciones/`):
+
+- **`src/compilador/punzonamiento.ts`** (`transmitidoPilar`): el nudo del pilar en una planta es el maestro del enlace rígido de su huella (C2-d, HR) y, con la unión por las caras, también de los nudos de las caras de las vigas que caen en su zona rígida. Lo que la losa le pasa es, por caso base, la suma de las fuerzas nodales de sus láminas (−g, de `FuerzasNodales`) en esos nudos, reducida al nudo del pilar: [Fz, Mx, My]. Exacta y lineal en los casos. Aparte, lo mismo de las vigas planas que le llegan, sólo como información.
+- **`Consultas.transmitidoPilar(pilar, planta)`** (por caso base, con la losa, su canto, sus ábacos y las vigas que llegan) y **`Consultas.punzonamiento(pilar, planta, combinaciones)`**: la parte estática de cada componente y, con el sismo del programa, su amplitud (VS-o). `null` si el pilar no se une a ninguna losa en esa planta.
+- **Validado** (`punzonamiento.test.ts`): en la losa de 2 × 2 vanos sin vigas, la suma sobre los nueve pilares de lo que les pasa la losa es la carga de la losa caso a caso, en fuerza y en los dos momentos, a 1e-9; y en cada pilar es su axil de cabeza (la diferencia de axiles) a 1e-9 con la sobrecarga.
+
+**Las copias:** `punching.ts` (`calcPunching`), `punchingGeometria.ts`, `cruceta.ts` (lo importa; no se usa) y sus pruebas; 35 ficheros, y las 99 pruebas de punzonamiento de Concreta pasan aquí.
+
+**Las demandas** (`demandas/punzonamiento.ts`, `demandasPunzonamiento`): una por pilar y planta en la que el pilar se une a una losa. De cada una:
+
+- **las combinaciones,** todas las de ELU (H31), cada una con su Fz, Mx y My y sus amplitudes del sismo;
+- **el área cargada:** la sección del tramo de debajo (el que sostiene la losa) y la del de encima (el que carga sobre ella), con su centro (el del punto fijo, PF) y sus ejes;
+- **los bordes:** la distancia libre de cada cara al borde del forjado, por tres rayos normales a la cara. El forjado es la unión de los contornos de las losas de la planta y del ancho de sus vigas y sus tiras de borde (`mapeo.anchos`): con la losa dibujada hasta el eje del zuncho, el hormigón llega a su cara de fuera. Un lado común a dos losas no es un borde. En un reticular, además, la distancia al borde de su ábaco;
+- **los huecos** de las losas de la planta, aparte.
+
+**Comprobar** (`comprobar/punzonamiento.ts`, `comprobarPunzonamiento`): una llamada a `calcPunching` por cara que tracciona, con la combinación de mayor β·VEd. Lo que el módulo no sabe va en el adaptador:
+
+- **La cara:** si la losa cuelga del pilar (Fz < 0), la superior, con el tramo de debajo como área (modo «pilar»); si el pilar carga sobre la losa (un pilar apeado, una losa de cimentación), la inferior, con el tramo de encima (modo «carga puntual»).
+- **La posición, de la geometría:** una cara está libre si el borde queda a menos de c∥/2 + π·d de ella (ahí el perímetro que muere en el borde es más corto que el cerrado, §6.4.2(4)). Ninguna, interior; una, borde; dos contiguas, esquina.
+- **El pilar retranqueado** una distancia a se le da al módulo como enrasado con el área prolongada hasta el borde (c⊥ + a), que es el perímetro de la figura A19.6.15; con la cara fuera de la losa (a < 0), sólo cuenta lo de dentro.
+- **Los huecos** a menos de 6·d quitan del perímetro lo que queda entre sus tangentes desde el centro del área (§6.4.2(3)); lo que el perímetro tenga fuera del forjado (una esquina entrante) tampoco cuenta. La reducción entra por β (β·u1/u1,ef), porque el módulo calcula su u1: vEd en u1 sale exacta y en la cara del pilar, del lado seguro.
+- **β, de la fórmula general** (§6.4.3) con los momentos de la combinación respecto al centro del área: interior, 1 + k·e·u1/W1 en cada dirección, sumadas; circular, 1 + 0,6·π·e/(D + 4d); borde, u1/u1* + k·e∥·u1/W1; esquina, u1/u1*. Con el sismo, cada componente con su peor signo.
+- **La armadura de flexión:** la de la cara que tracciona en las dos direcciones (la base, o la parrilla de los ábacos, más los refuerzos que cubren el centro del área), como una malla igual de cuantía √(ρx·ρy); d, la media de los dos cantos útiles.
+- **En un reticular,** dos filas propias: el perímetro crítico tiene que caber en el ábaco (`abaco-u1`) y, si hace falta armadura, también uout (`abaco-uout`). Los nervios a la salida del ábaco los comprueba CO3.
+- **Filas:** `<cara>/punz-rho-min`, `punz-ved-max` (en la cara del pilar), `punz-ved-vrdc` (sin armadura; con ella, informativa) y, con cercos, `punz-sr-max` y `punz-ved-vrdcs`. Cada una, con su `grupo`: `cercos`, `seccion` o `losa`.
+- **Pendientes** (no cumple): la losa sin armado o sin la parrilla de los ábacos, una sección que no es rectangular ni circular, borde libre en dos caras opuestas o en más de dos, un pilar circular que no es interior, el centro del pilar fuera de la losa o en un hueco, más de la mitad del perímetro fuera del forjado.
+
+**El armado como dato** (`armado.ts`, `agente/armaduraBase.ts`): `armado.punzonamiento.<pilar>.<planta de la losa>` = `{ diametro, ramas, separacion }` (mm), fuera de la huella: cercos verticales en perímetros, con `ramas` por cada cara del pilar con losa delante, cada `separacion` en radial. Se valida (`armado/pilar`, `armado/planta`, `armado/barras`) y sigue a su pilar y a su planta al renombrarlos o borrarlos.
+
+**Proponer** (`armar/punzonamiento.ts`, `proponerPunzonamiento`): si sin armadura no falla nada, ninguna. Si falla sólo lo que arreglan unos cercos, los primeros de la tabla con los que no falla ninguna fila (Ø8, Ø10 o Ø12, de 2 a 4 ramas por cara, cada 200 a 75 mm; de menos a más acero), con los perímetros que pide uout. Si falla lo que no arreglan (vRd,max, la cuantía mínima, el ábaco) o no basta ninguno (vRd,cs no pasa de 1,5·vRd,c), no hay propuesta y se dice qué hay que cambiar.
+
+**CLI, MCP y skill:** `fem comprobar` y `fem armar` dan también `punzonamiento` (todas las uniones, cada una con la fila que manda; con el pilar detrás, todas sus filas), con `resumen.punzonamiento` y `--tipo punzonamiento`. `fem armar` usa el armado de losas que propone en la misma pasada; `--escribir` guarda `armado.punzonamiento`.
+
+**Criterios:**
+
+| Criterio | Resultado |
+|---|---|
+| 5 y 6. las copias y sus pruebas | Pasa (`copias.test.ts`; 99 pruebas de Concreta) |
+| 7. identidad con las llamadas a mano | Pasa: la fila de cada unión es el máximo de las de sus combinaciones una a una, y manda la de mayor β·VEd, no la de mayor VEd |
+| 8. girar 90° | Pasa: sin la imperfección global, las mismas posiciones y armaduras, y VEd, β y aprovechamiento a 1e-6 |
+| 9. con el sismo, nunca menos | Pasa, unión a unión; y con amplitudes dadas, igual que la estática con los valores absolutos aumentados |
+| 10. nadie aplica factores | Pasa (`src/pruebas/factores.test.ts`) |
+| 11. oráculo que no es de Concreta | Pasa: `validacion/co/oraculo_punzonamiento.py`, 12 casos (interior, circular, borde y esquina, enrasados y retranqueados, con y sin cercos): d, u1, u0, β, vEd, vRd,c y uout a 1e-9; vRd,max a ≤ 0,25 % y vRd,cs a ≤ 0,1 % (CO4-1). La geometría, contra cuentas a mano (el perímetro de cada posición, lo que quita un hueco por integración en polares, el cuarto de círculo de una esquina entrante) |
+| 12. el propuesto cumple y los anteriores de la tabla no | Pasa |
+| 13. determinista y sin cambiar la huella | Pasa (`cli.test.ts`: la misma huella tras `--escribir`) |
+| 14. referencia congelada | Pasa: `congelado-co4.test.ts` (`validacion/co/congelarPunzonamiento.ts`), seis modelos: la losa hasta la cara de los pilares, la de 7 m (cercos en los nueve), con un hueco, la losa plana con sismo, un reticular y la vivienda |
+| 15. en la app, lo de Node | Sin hacer: es de CO6 |
+
+**Hallazgos:**
+
+- **CO4-1, el módulo usa valores tabulados redondeados:** fcd = 16,7 MPa con HA-25 (16,667), así que vRd,max sale un 0,2 % alto; y el área del Ø8, 50,3 mm² (50,27), un 0,07 % en vRd,cs. Del lado inseguro, por muy poco.
+- **CO4-2, β general frente al simplificado:** en un pilar interior de una planta simétrica sale 1,00 (el simplificado, 1,15): las combinaciones no alternan la sobrecarga entre vanos, así que el momento que la losa le pasa es nulo. En los de borde, 1,17–1,34 (1,4), y en los de esquina, 1,33–1,61 (1,5). En la vivienda llega a 1,91 en un pilar de borde.
+- **CO4-3, con vigas, la losa pasa poco al pilar:** en la vivienda, de 23 pilares en dos cubiertas sólo 12 uniones tienen losa en su huella, y en los de borde con zuncho la losa lleva de un cuarto a la mitad de lo que le llega al pilar (31 de 86 kN en P12); lo demás va por las vigas planas. En el edificio objetivo de losas (vigas en todos los ejes), 280 uniones de 560, con vEd/vRd,c ≤ 0,50.
+- **CO4-4, queda un hueco entre CO3 y CO4:** el cortante de la losa contra la cara de una viga a menos de dos cantos de un pilar no es de las franjas (CO3-c lo deja al punzonamiento) ni pasa por la huella del pilar (va a la viga). No lo comprueba nadie.
+- **CO4-5, el centro de un pilar de borde cae justo en el contorno** cuando la losa se dibuja por los ejes de los pilares: sin el ancho de las vigas en el forjado, 5 de las 12 uniones de la vivienda quedaban pendientes, y los pilares de esquina del edificio objetivo, también.
+- **CO4-6, vmín:** el módulo de punzonamiento usa 0,035·k^(3/2)·√fck (el del Eurocódigo), y los de vigas y forjados, 0,051/γc = 0,034 (CO3-4). Hay que contrastar los dos con el texto del Anejo 19.
+
+**Decisiones de Claude, por confirmar por el usuario:**
+
+- **CO4-a, sólo cuenta lo que la losa pasa al pilar** (CO-i al pie de la letra). Lo de las vigas planas se da como información y no entra: su cortante se comprueba con la viga (CO2), con sus cercos. La alternativa (contarlas, porque son hormigón del forjado) daría por no cumplido un pórtico de vigas planas armadas a cortante. Un pilar al que la losa no llega no tiene comprobación de punzonamiento.
+- **CO4-b, β general sin suelo:** no se sube a 1,15 / 1,4 / 1,5 cuando sale menor (CO4-2). La alternativa del lado seguro es tomar el mayor de los dos.
+- **CO4-c, la cara libre:** el borde a menos de c∥/2 + π·d; con un borde que no es paralelo a la cara, la menor de sus distancias. El pilar retranqueado, como enrasado con el área prolongada (también en u0).
+- **CO4-d, los huecos, por sus tangentes** desde el centro del área, con todo su contorno (sin la reducción de la figura A19.6.14 para huecos alargados: del lado seguro); y lo que el perímetro tiene fuera del forjado no cuenta, hasta la mitad.
+- **CO4-e, la excentricidad perpendicular al borde hacia fuera** (no la cubre u1/u1*) se suma como en un pilar interior. No es de la norma: es del lado seguro.
+- **CO4-f, la armadura de flexión:** √(ρx·ρy) con los refuerzos que cubren el centro del área (la norma pide la media en el ancho del pilar más 3·d a cada lado), y d la media de las dos direcciones.
+- **CO4-g, la armadura de punzonamiento:** cercos verticales por perímetros, con su tabla. Sin barras levantadas ni pernos.
+- **CO4-h, en un reticular,** el perímetro crítico y uout dentro del ábaco, como filas que fallan; no se propone agrandar el ábaco.
+- **CO4-i, en una losa de cimentación** no se descuenta la reacción del terreno dentro del perímetro (del lado seguro), ni se comprueban perímetros más cercanos que 2·d (§6.4.4(2)).
+- **CO4-j, cuando los cercos no bastan no se propone otra cosa:** ni más armadura de flexión, ni más canto, ni capitel. Se dice.
+
+**Medido** (`validacion/co/medirPunzonamiento.ts`, `out_medirPunzonamiento.txt`; el tiempo, como información):
+
+- **Losa maciza de 25, 2 × 2 vanos de 5 m:** con la losa hasta la cara de los pilares, esquinas 83 kN (β 1,38, 0,78 de vRd,c), bordes 202 kN (β 1,19, 0,95) y el central 553 kN (β 1,00, 1,07): pide Ø8 de 2 ramas cada 150 en 2 perímetros y queda a 0,86. Con 0,5 m de vuelo, los de borde y esquina siguen siéndolo (el borde a 0,3 m), con el área prolongada.
+- **La misma de 7 m y 30 cm:** los nueve pilares piden cercos (1,17 a 1,44 de vRd,c); el central, 1 228 kN, Ø8 de 3 ramas cada 125 en 4 perímetros (0,98).
+- **Con un hueco de 1 × 1 m pegado a la esquina del pilar central:** el perímetro baja de 4 214 a 3 360 mm y vEd/vRd,c sube de 1,07 a 1,20.
+- **Reticular 25+5 de 6 m con ábacos de 2,8 m:** el central, 698 kN, 1,02 de vRd,c: cercos en 2 perímetros; el perímetro crítico, a 524 mm de los 1 200 del ábaco.
+- **La vivienda:** 12 uniones, todas cumplen sin armadura (la peor, P3, 290 kN y 0,95); 1,7 s.
+- **El edificio objetivo de losas de 7 plantas con viento:** 280 uniones, todas cumplen sin armadura; el punzonamiento, 0,2 s (armar antes las losas, 19 s).
+- **Frente a la diferencia de axiles del pilar** (la alternativa de CO-i): sin vigas coinciden (lo separa el peso del pilar en su zona rígida, 1,4 kN); con vigas, la diferencia de axiles es de 1,1 a 4,3 veces lo que pasa la losa.
+
+**Pendiente de CO4:** CO4-4 (el cortante de la losa contra la cara de una viga junto a un pilar); la sombra con el punzonamiento de CYPECAD (CO7); la app (CO6); contrastar CO4-6.
 
 ## 9. Fuera de esta fase
 
@@ -462,7 +548,8 @@ Pasan los criterios 5 a 14 en lo de las losas; falta su parte de la app (CO6), l
 - La comprobación geotécnica completa de la losa de cimentación (LC-f).
 - Los planos de armado y su DXF (A6), y los PDF de cada pieza que hace Concreta.
 - La resistencia al fuego.
-- De las losas (CO3): el punzonamiento (CO4); la flecha de la losa fisurada (CO-k); los anclajes, los solapes y las longitudes de los refuerzos; la armadura de reparto, la de borde y la de las esquinas entrantes; la armadura transversal de una maciza; las viguetas de un unidireccional (CO-b); la membrana de la losa (con diafragma rígido no tiene valor); elegir qué dirección va por fuera (CO3-e); que los refuerzos sigan a la losa al moverla o girarla en el editor; partir o igualar las zonas de refuerzo (CO3-h).
+- Del punzonamiento (CO4): las barras levantadas y los pernos; la disposición de los cercos (la primera fila, la separación tangencial, el anclaje); descontar la reacción del terreno en una losa de cimentación; los pilares de sección que no es rectangular ni circular, los circulares de borde y los que tienen borde libre en dos caras opuestas; el cortante de la losa contra la cara de una viga junto a un pilar (CO4-4).
+- De las losas (CO3): la flecha de la losa fisurada (CO-k); los anclajes, los solapes y las longitudes de los refuerzos; la armadura de reparto, la de borde y la de las esquinas entrantes; la armadura transversal de una maciza; las viguetas de un unidireccional (CO-b); la membrana de la losa (con diafragma rígido no tiene valor); elegir qué dirección va por fuera (CO3-e); que los refuerzos sigan a la losa al moverla o girarla en el editor; partir o igualar las zonas de refuerzo (CO3-h).
 - De las vigas (CO2): mezclar diámetros en una cara (CO2-b), las longitudes, los solapes y los anclajes de los refuerzos y el decalaje de la ley de momentos (el refuerzo de un apoyo se entiende que cubre su cuarto de vano), el momento mínimo de empotramiento en los apoyos del §9.2.1.2(1) (el modelo ya da el del pórtico), el cortante a un canto útil de la cara (se toma el de la cara), la armadura de piel que no sea por torsión, igualar el armado entre vanos y vigas, y las vigas en T o con la losa como cabeza.
 
 ## 10. Riesgos

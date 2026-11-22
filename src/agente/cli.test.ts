@@ -468,6 +468,47 @@ describe("CO1 y CO2: comprobar y armar", () => {
     expect((todo.json.resumen as { pilares: Record<string, number> }).pilares).toMatchObject({ pilares: 9, cumplen: 0 });
     expect(cuentas(todo.json)).toMatchObject({ losas: 1, cumplen: 1 });
   });
+
+  it("CO4: el punzonamiento: sin armado de la losa no se comprueba; armar propone los cercos donde hacen falta, con el armado de losas que propone; con --escribir va a armado.punzonamiento y comprobar lo da por bueno", () => {
+    const ruta = escribir(losaPlana());
+    type Union = { pilar: string; planta: string; losa: string; origen: string; posicion?: string; cumple: boolean; aprovechamiento: number | null; sinArmadura: number | null; armadura?: { diametro: number; ramas: number; separacion: number }; perimetros?: number; filas?: unknown[] };
+    const cuentas = (j: Record<string, unknown>) => (j.resumen as { punzonamiento: Record<string, number> }).punzonamiento;
+    const sin = fem(["comprobar", ruta, "--tipo", "punzonamiento"]);
+    expect(cuentas(sin.json)).toMatchObject({ uniones: 9, cumplen: 0, sinArmadoLosa: 9 });
+    expect(sin.json.pilares).toBeUndefined();
+    // Armar sólo el punzonamiento: propone con el armado de losas que saldría, sin escribirlo
+    const a = fem(["armar", ruta, "--tipo", "punzonamiento"]);
+    expect(a.codigo).toBe(0);
+    expect(a.json.escrito).toBe(false);
+    expect(cuentas(a.json)).toMatchObject({ uniones: 9, cumplen: 9, conArmadura: 1, pendientes: 0 });
+    // Todo, con --escribir: las losas y el punzonamiento van juntos
+    const b = fem(["armar", ruta, "--escribir"]);
+    expect(b.json.escrito).toBe(true);
+    const us = b.json.punzonamiento as Union[];
+    expect(us.length).toBe(9);
+    const central = us.find((u) => u.pilar === "P5")!;
+    expect([central.posicion, central.origen, central.cumple]).toEqual(["interior", "propuesto", true]);
+    expect(central.sinArmadura!).toBeGreaterThan(1);
+    expect(central.perimetros!).toBeGreaterThanOrEqual(2);
+    expect(us.filter((u) => u.armadura).map((u) => u.pilar)).toEqual(["P5"]);
+    const escrito = JSON.parse(readFileSync(ruta, "utf8")) as { armado: { punzonamiento: Record<string, Record<string, unknown>>; forjados: Record<string, unknown> } };
+    expect(escrito.armado.punzonamiento).toEqual({ P5: { F1: central.armadura } });
+    expect(Object.keys(escrito.armado.forjados)).toEqual(["L"]);
+    expect(fem(["validar", ruta]).json.ok).toBe(true);
+    // Con el armado guardado: la misma huella y lo mismo; con el pilar detrás, sus filas (y sus tramos)
+    const c = fem(["comprobar", ruta, "P5"]);
+    expect(c.json.huella).toBe(b.json.huella);
+    const uc = (c.json.punzonamiento as Union[])[0]!;
+    expect([uc.pilar, uc.origen, uc.cumple, uc.aprovechamiento]).toEqual(["P5", "proyecto", true, central.aprovechamiento]);
+    expect(uc.filas!.length).toBeGreaterThanOrEqual(4);
+    expect(c.json.pilares).toBeDefined();
+    expect(c.json.losas).toBeUndefined();
+    // Una armadura que no vale la rechaza la validación
+    const mal = JSON.parse(readFileSync(ruta, "utf8")) as { armado: { punzonamiento: Record<string, Record<string, { diametro: number }>> } };
+    mal.armado.punzonamiento.P5!.F1!.diametro = 9;
+    writeFileSync(ruta, JSON.stringify(mal));
+    expect(fem(["comprobar", ruta, "--tipo", "punzonamiento"]).json.ok).toBe(false);
+  });
 });
 
 describe("VS4: emplazamiento", () => {

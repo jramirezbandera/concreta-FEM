@@ -8,7 +8,7 @@
  *
  * Puro: sin IO.
  */
-import { erroresArmado, erroresArmadoForjado, erroresArmadoViga, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga } from "../comprobaciones/armado.ts";
+import { erroresArmado, erroresArmadoForjado, erroresArmadoViga, erroresPunzonamiento, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraPunzonamiento } from "../comprobaciones/armado.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 
@@ -48,6 +48,11 @@ export interface ArmadoProyecto {
    * dirección, la parrilla de los ábacos y los refuerzos.
    */
   forjados?: Record<string, ArmadoForjado>;
+  /**
+   * CO4: la armadura de punzonamiento de la losa junto a cada pilar (su id), por la planta de la
+   * losa. Sin ella, la losa se comprueba ahí sin armadura de punzonamiento.
+   */
+  punzonamiento?: Record<string, Record<string, ArmaduraPunzonamiento>>;
 }
 
 /** La base de una losa en una armadura (kN·m/m), o null si no hay. */
@@ -104,6 +109,16 @@ export function comprobarArmado(a: ArmadoProyecto | undefined, m: ModeloFisico):
       for (const e of erroresArmadoViga(t)) r.push({ codigo: "armado/barras", severidad: "error", mensaje: `El armado de la viga ${id} en su vano ${i} no vale: ${e}.`, ids: [id], detalles: { vano: i } });
     });
   }
+  for (const [id, porPlanta] of Object.entries(a.punzonamiento ?? {})) {
+    if (!pilares.has(id)) {
+      r.push({ codigo: "armado/pilar", severidad: "error", mensaje: `Hay una armadura de punzonamiento de «${id}», que no es un pilar del modelo.`, ids: [id] });
+      continue;
+    }
+    for (const [planta, t] of Object.entries(porPlanta ?? {})) {
+      if (!plantas.has(planta)) r.push({ codigo: "armado/planta", severidad: "error", mensaje: `La armadura de punzonamiento del pilar ${id} está en «${planta}», que no es una planta del modelo (va por la planta de la losa).`, ids: [id] });
+      for (const e of erroresPunzonamiento(t)) r.push({ codigo: "armado/barras", severidad: "error", mensaje: `La armadura de punzonamiento del pilar ${id} en ${planta} no vale: ${e}.`, ids: [id], detalles: { planta } });
+    }
+  }
   const deLosa = new Map((m.losas ?? []).map((l) => [l.id, l]));
   for (const [id, f] of Object.entries(a.forjados ?? {})) {
     const l = deLosa.get(id);
@@ -142,7 +157,16 @@ export function limpiarArmado(a: ArmadoProyecto | undefined): ArmadoProyecto | u
   for (const id of Object.keys(a.vigas ?? {}).sort()) if (a.vigas![id]!.some((v) => v !== null)) vigas[id] = a.vigas![id]!;
   const forjados: Record<string, ArmadoForjado> = {};
   for (const id of Object.keys(a.forjados ?? {}).sort()) forjados[id] = a.forjados![id]!;
-  const r: ArmadoProyecto = { ...(base ? { base } : {}), ...(Object.keys(losas).length ? { losas } : {}), ...(Object.keys(pilares).length ? { pilares } : {}), ...(Object.keys(vigas).length ? { vigas } : {}), ...(Object.keys(forjados).length ? { forjados } : {}) };
+  const punzonamiento: Record<string, Record<string, ArmaduraPunzonamiento>> = {};
+  for (const id of Object.keys(a.punzonamiento ?? {}).sort()) if (Object.keys(a.punzonamiento![id] ?? {}).length) punzonamiento[id] = a.punzonamiento![id]!;
+  const r: ArmadoProyecto = {
+    ...(base ? { base } : {}),
+    ...(Object.keys(losas).length ? { losas } : {}),
+    ...(Object.keys(pilares).length ? { pilares } : {}),
+    ...(Object.keys(vigas).length ? { vigas } : {}),
+    ...(Object.keys(forjados).length ? { forjados } : {}),
+    ...(Object.keys(punzonamiento).length ? { punzonamiento } : {}),
+  };
   return Object.keys(r).length ? r : undefined;
 }
 
@@ -174,33 +198,39 @@ export function seguirLosas(a: ArmadoProyecto | undefined, renombres: ReadonlyMa
  * los tramos, con el nuevo id de su planta (sin los de una planta borrada).
  */
 export function seguirPilares(a: ArmadoProyecto | undefined, renombres: ReadonlyMap<string, string>, antes: ModeloFisico, despues: ModeloFisico): ArmadoProyecto | undefined {
-  if (!a?.pilares) return a;
+  if (!a?.pilares && !a?.punzonamiento) return a;
   const eran = new Set((antes.pilares ?? []).map((p) => p.id));
   const son = new Set((despues.pilares ?? []).map((p) => p.id));
   const eranPlantas = new Set(antes.plantas.map((p) => p.id));
   const sonPlantas = new Set(despues.plantas.map((p) => p.id));
-  const pilares: Record<string, Record<string, ArmadoTramoPilar>> = {};
   let cambia = false;
-  for (const [id, tramos] of Object.entries(a.pilares)) {
-    const n = eran.has(id) ? (renombres.get(id) ?? id) : id;
-    if (n !== id) cambia = true;
-    if (eran.has(id) && !son.has(n)) {
-      cambia = true;
-      continue;
-    }
-    const t: Record<string, ArmadoTramoPilar> = {};
-    for (const [planta, x] of Object.entries(tramos)) {
-      const np = eranPlantas.has(planta) ? (renombres.get(planta) ?? planta) : planta;
-      if (np !== planta) cambia = true;
-      if (eranPlantas.has(planta) && !sonPlantas.has(np)) {
+  /** Un bloque por pilar y planta (el armado de sus tramos, o la armadura de punzonamiento, CO4). */
+  const seguir = <T,>(de: Record<string, Record<string, T>> | undefined): Record<string, Record<string, T>> | undefined => {
+    if (!de) return undefined;
+    const r: Record<string, Record<string, T>> = {};
+    for (const [id, tramos] of Object.entries(de)) {
+      const n = eran.has(id) ? (renombres.get(id) ?? id) : id;
+      if (n !== id) cambia = true;
+      if (eran.has(id) && !son.has(n)) {
         cambia = true;
         continue;
       }
-      t[np] = x;
+      const t: Record<string, T> = {};
+      for (const [planta, x] of Object.entries(tramos)) {
+        const np = eranPlantas.has(planta) ? (renombres.get(planta) ?? planta) : planta;
+        if (np !== planta) cambia = true;
+        if (eranPlantas.has(planta) && !sonPlantas.has(np)) {
+          cambia = true;
+          continue;
+        }
+        t[np] = x;
+      }
+      r[n] = t;
     }
-    pilares[n] = t;
-  }
-  return cambia ? limpiarArmado({ ...a, pilares }) : a;
+    return r;
+  };
+  const [pilares, punzonamiento] = [seguir(a.pilares), seguir(a.punzonamiento)];
+  return cambia ? limpiarArmado({ ...a, ...(pilares ? { pilares } : {}), ...(punzonamiento ? { punzonamiento } : {}) }) : a;
 }
 
 /** Lo mismo con el armado de las vigas: la renombrada, con su nuevo id; la borrada, fuera. */
