@@ -25,7 +25,8 @@ import { iniciarNucleo } from "../nucleo/index.ts";
 import { Atendedor } from "./atender.ts";
 import type { DatosArmar, DatosComprobaciones, FichaComprobacion, TipoComprobacion } from "./comprobaciones.ts";
 import { claseAprovechamiento, COLOR_APROVECHAMIENTO, TIPOS_COMPROBACION } from "./comprobaciones.ts";
-import type { Escena } from "../agente/render/escena.ts";
+import { dentro, type Escena } from "../agente/render/escena.ts";
+import { barrasDe } from "../comprobaciones/armado.ts";
 import type { Pedido } from "./protocolo.ts";
 
 const ACCIONES: Record<string, AccionCaso> = {
@@ -230,6 +231,68 @@ describe("CO6: las comprobaciones en el worker", () => {
     const t = await tabla("pilares", mezcla);
     expect(t.partes.filter((p) => p.pieza === p1).every((p) => claseAprovechamiento(p) === "no-cumple")).toBe(true);
     expect(t.partes.filter((p) => p.pieza === p2).every((p) => claseAprovechamiento(p) === "sin-armado")).toBe(true);
+  });
+
+  it("§8.11: la planta con el armado dibujado: las barras de cada pilar en su huella, los refuerzos de las losas con su id y el armado de cada vano", async () => {
+    const a = propuesto.armado;
+    const sesion = (at as unknown as { sesion: { escenaA4: (p: string, v: unknown) => { valido: true; valor: Escena } } }).sesion;
+    const escena = (planta: string, de: TipoComprobacion, extra: object = {}) => sesion.escenaA4(planta, { vista: "comprobacion", de, armado: a, dibujo: "armado", ...extra }).valor;
+    const tPilares = await tabla("pilares", a);
+    let [barrasVistas, refuerzosVistos, vanosVistos] = [0, 0, 0];
+    for (const planta of modelo.plantas.map((p) => p.id)) {
+      // Pilares: tantas barras como su armado, todas dentro de su huella
+      const ep = escena(planta, "pilares");
+      for (const p of tPilares.partes.filter((x) => x.planta === planta)) {
+        const ficha = await pedir<FichaComprobacion>({ tipo: "comprobacion", de: "pilares", clave: p.clave, armado: a });
+        const huella = ep.primitivas.find((x): x is Extract<Escena["primitivas"][number], { tipo: "poligono" }> => x.tipo === "poligono" && x.estilo === "contorno" && x.objeto === p.pieza)!;
+        const marcas = ep.primitivas.filter((x): x is Extract<Escena["primitivas"][number], { tipo: "marca" }> => x.tipo === "marca" && x.estilo === "armado-barra" && x.objeto === p.pieza);
+        expect(ficha.armado.tipo === "pilares" && ficha.armado.armado ? barrasDe(ficha.armado.armado) : 0, p.clave).toBe(marcas.length);
+        expect(marcas.length).toBeGreaterThanOrEqual(4);
+        for (const m of marcas) expect(dentro(m.p, huella.anillos[0]!), p.clave).toBe(true);
+        expect(huella.relleno).toBe(COLOR_APROVECHAMIENTO[claseAprovechamiento(p)]);
+        barrasVistas += marcas.length;
+      }
+      // Losas: cada refuerzo de las de la planta, con su id; con una sola cara, sólo los suyos
+      const el = escena(planta, "losas");
+      const inf = escena(planta, "losas", { cara: "inferior" });
+      expect(inf.primitivas.some((x) => "estilo" in x && x.estilo.startsWith("armado-superior"))).toBe(false);
+      for (const l of (modelo.losas ?? []).filter((x) => x.planta === planta)) {
+        const suyo = a.forjados?.[l.id];
+        (suyo?.refuerzos ?? []).forEach((r, i) => {
+          const grueso = r.armadura.endsWith("inf") ? "armado-inferior" : "armado-superior";
+          const lineas = el.primitivas.filter((x) => x.tipo === "linea" && x.objeto === `${l.id}/R${i + 1}`);
+          expect(lineas.some((x) => x.tipo === "linea" && x.estilo === grueso), `${l.id}/R${i + 1}`).toBe(true);
+          expect(inf.primitivas.some((x) => "objeto" in x && x.objeto === `${l.id}/R${i + 1}`)).toBe(r.armadura.endsWith("inf"));
+          refuerzosVistos++;
+        });
+        // La base, en las notas
+        if (suyo) expect(el.notas.some((n) => n.startsWith(`${l.id}, armadura base`))).toBe(true);
+      }
+      // Vigas: cada vano con armado, rotulado con su inferior
+      const ev = escena(planta, "vigas");
+      const tv = await tabla("vigas", a);
+      for (const p of tv.partes.filter((x) => modelo.vigas?.find((v) => v.id === x.pieza)?.planta === planta)) {
+        const textos = ev.primitivas.filter((x) => x.tipo === "texto" && x.objeto === p.pieza).map((x) => (x.tipo === "texto" ? x.texto : ""));
+        expect(textos.some((t) => t.startsWith("inf ")), p.clave).toBe(true);
+        vanosVistos++;
+      }
+      // Punzonamiento: el perímetro crítico de cada unión de la planta
+      const eu = escena(planta, "punzonamiento");
+      const tu = await tabla("punzonamiento", a);
+      for (const p of tu.partes.filter((x) => x.planta === planta)) expect(eu.primitivas.some((x) => x.tipo === "linea" && x.estilo === "armado-critico" && x.objeto === p.pieza), p.clave).toBe(true);
+    }
+    expect(barrasVistas).toBeGreaterThan(0);
+    expect(vanosVistos).toBeGreaterThan(0);
+    expect(refuerzosVistos).toBe(Object.values(a.forjados ?? {}).reduce((t, f) => t + (f.refuerzos?.length ?? 0), 0));
+    // Un clic en un refuerzo lo elige por su id
+    const con = Object.entries(a.forjados ?? {}).find(([, f]) => f.refuerzos?.length);
+    if (con) {
+      const planta = modelo.losas!.find((l) => l.id === con[0])!.planta;
+      const vista = { vista: "comprobacion" as const, de: "losas" as const, armado: a, dibujo: "armado" as const };
+      const marca = escena(planta, "losas").primitivas.find((x): x is Extract<Escena["primitivas"][number], { tipo: "marca" }> => x.tipo === "marca" && !!x.objeto?.startsWith(`${con[0]}/R`))!;
+      const e = await pedir<{ objeto: string } | null>({ tipo: "elegir", fuente: { tipo: "planta", planta, vista }, punto: marca.p, radio: 0.05 });
+      expect(e?.objeto.startsWith(`${con[0]}/R`)).toBe(true);
+    }
   });
 
   it("sin resultados no hay comprobaciones", async () => {

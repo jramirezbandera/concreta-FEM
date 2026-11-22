@@ -99,7 +99,21 @@ export type Estilo =
   | "zona-refuerzo"
   /** LC2: el borde y el rayado de lo que despega de una losa de cimentación (σ < 0). */
   | "despegue"
-  | "despegue-rayado";
+  | "despegue-rayado"
+  /** CO6: el armado en barras, dibujado. Un refuerzo de losa de cada cara: su barra, su línea de reparto y su zona. */
+  | "armado-inferior"
+  | "armado-inferior-fino"
+  | "armado-inferior-zona"
+  | "armado-superior"
+  | "armado-superior-fino"
+  | "armado-superior-zona"
+  /** Las zonas de cercos de los nervios de un reticular. */
+  | "armado-cercos"
+  /** El cerco de un pilar, los perímetros de cercos de punzonamiento y las barras de punta. */
+  | "armado-cerco"
+  | "armado-barra"
+  /** El perímetro crítico de punzonamiento. */
+  | "armado-critico";
 
 export type Primitiva =
   /** Polígono con huecos: el primer anillo es el contorno (relleno par-impar). `relleno` sustituye al del estilo. */

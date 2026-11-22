@@ -34,7 +34,7 @@ const parte = (clave: string, { activo, onCampo }: Pick<Props, "activo" | "onCam
  * La letra del croquis a 11 px de pantalla aunque el panel lo encoja (D-24: con `width: 100%`, un
  * panel de 272 px dejaba los rótulos en 9–10 px). Da la referencia del svg y su `--cq-letra`.
  */
-function useLetra(ancho: number): [React.RefObject<SVGSVGElement | null>, CSSProperties] {
+export function useLetra(ancho: number): [React.RefObject<SVGSVGElement | null>, CSSProperties] {
   const ref = useRef<SVGSVGElement>(null);
   const [k, setK] = useState(1);
   useLayoutEffect(() => {

@@ -93,11 +93,25 @@ export type ArmadoParte =
   | { tipo: "losas"; armado?: ArmadoForjado; reticular?: true }
   | { tipo: "punzonamiento"; armado?: ArmaduraPunzonamiento };
 
+/**
+ * Lo que mide una parte, para dibujar su armado (`comprobaciones/dibujoArmado.ts`), en mm: la sección
+ * del tramo de pilar o de la viga (sin ella, no es rectangular ni circular: no se dibuja), la luz del
+ * vano entre las caras de sus apoyos (m) y la sección de la losa.
+ */
+export type GeometriaParte =
+  | { tipo: "pilares"; seccion?: { b: number; h: number } | { D: number } }
+  | { tipo: "vigas"; seccion?: { b: number; h: number }; luz: number; apoyos: [string | null, string | null] }
+  | { tipo: "losas"; espesor: number; reticular?: { intereje: number; nervio: number; capa: number } }
+  | { tipo: "punzonamiento"; seccion?: { b: number; h: number } | { D: number }; d?: number; perimetros?: number; alcance?: number; posicion?: string };
+
 /** La ficha de una parte: todas las filas del módulo y su armado, como dato. */
 export interface FichaComprobacion extends ParteComprobada {
   filas: FilaModulo[];
   armado: ArmadoParte;
   datos: DatoFicha[];
+  geometria: GeometriaParte;
+  /** El recubrimiento hasta el cerco con el que se ha comprobado, mm. */
+  recubrimiento: number;
 }
 
 export interface ResumenComprobaciones {
@@ -177,12 +191,36 @@ const filaComun = (f: FilaDe, lugar?: string): FilaModulo => ({
 });
 const fallan = (filas: readonly FilaModulo[]) => filas.filter((f) => f.estado === "fail" && !f.informativa).length;
 
+/** La sección de un pilar o de una viga, en mm, si es rectangular o circular. */
+function medidas(q: Consultas, id: string | undefined): { b: number; h: number } | { D: number } | undefined {
+  const s = q.fisico.secciones.find((x) => x.id === id);
+  if (!s || !("forma" in s)) return undefined;
+  if (s.forma === "rectangular") return { b: s.b * 1000, h: s.h * 1000 };
+  if (s.forma === "circular") return { D: s.D * 1000 };
+  return undefined;
+}
+
+const rect = (m: { b: number; h: number } | { D: number } | undefined) => (m && "b" in m ? m : undefined);
+
+function geometriaLosa(q: Consultas, id: string): GeometriaParte {
+  const l = q.fisico.losas?.find((x) => x.id === id);
+  const r = l?.reticular;
+  return { tipo: "losas", espesor: (l?.espesor ?? 0) * 1000, ...(r ? { reticular: { intereje: r.intereje * 1000, nervio: r.nervio * 1000, capa: r.capa * 1000 } } : {}) };
+}
+
+/** La sección del tramo de un pilar que llega a una planta por debajo (la de su huella en la losa). */
+function seccionEnPlanta(q: Consultas, pilar: string, planta: string): { b: number; h: number } | { D: number } | undefined {
+  const p = q.fisico.pilares?.find((x) => x.id === pilar);
+  return p ? medidas(q, p.tramos?.find((t) => t.planta === planta)?.seccion ?? p.seccion) : undefined;
+}
+
 const NOMBRE_ARMADURA: Record<string, string> = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf": "Y inferior", "y-sup": "Y superior" };
 
 /** Comprueba las piezas `ids` de un tipo con el armado dado y da sus fichas, por pieza. */
 function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[], a: ArmadoProyecto | undefined, datos: DatosArmado | undefined): Resultado<{ fichas: Map<string, FichaComprobacion[]>; diagnosticos: Diagnostico[] }> {
   const fichas = new Map<string, FichaComprobacion[]>(ids.map((id) => [id, []]));
-  const a_ = (id: string, f: FichaComprobacion) => (fichas.get(id) ?? fichas.set(id, []).get(id)!).push(f);
+  const recubrimiento = datos?.recubrimiento ?? DATOS_ARMADO.recubrimiento;
+  const a_ = (id: string, f: Omit<FichaComprobacion, "recubrimiento">) => (fichas.get(id) ?? fichas.set(id, []).get(id)!).push({ ...f, recubrimiento });
   if (tipo === "pilares") {
     const r = comprobarPilares(q, a?.pilares, datos, { ids, filas: true });
     if (!r.valido) return r;
@@ -206,6 +244,7 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
           filas,
           armado: { tipo, ...(t.armado ? { armado: t.armado } : {}), ...(circulares.has(t.seccion) ? { circular: true as const } : {}) },
           datos: [{ nombre: "Combinaciones de ELU", valor: p.combinaciones }],
+          geometria: { tipo, ...(medidas(q, t.seccion) ? { seccion: medidas(q, t.seccion)! } : {}) },
         });
       }
     return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
@@ -237,6 +276,7 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
             { nombre: "Hasta", valor: v.hasta, unidad: "m" },
             { nombre: "Combinaciones de ELU", valor: g.combinaciones },
           ],
+          geometria: { tipo, ...(rect(medidas(q, g.seccion)) ? { seccion: rect(medidas(q, g.seccion))! } : {}), luz: v.hasta - v.desde, apoyos: [v.apoyos[0] ?? null, v.apoyos[1] ?? null] },
         });
       }
     return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
@@ -265,6 +305,7 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
           { nombre: "Combinaciones de ELU", valor: l.combinaciones },
           { nombre: "Estaciones comprobadas", valor: l.estaciones },
         ],
+        geometria: geometriaLosa(q, l.losa),
       });
     }
     return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
@@ -300,13 +341,14 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
       filas,
       armado: { tipo, ...(p.armadura ? { armado: p.armadura } : {}) },
       datos: d,
+      geometria: { tipo, ...(seccionEnPlanta(q, p.pilar, p.planta) ? { seccion: seccionEnPlanta(q, p.pilar, p.planta)! } : {}), ...(p.d !== undefined ? { d: p.d } : {}), ...(p.perimetros !== undefined ? { perimetros: p.perimetros } : {}), ...(p.alcance !== undefined ? { alcance: p.alcance } : {}), ...(p.posicion ? { posicion: p.posicion } : {}) },
     });
   }
   return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
 }
 
 /** Lo comprobado de un tipo con el armado dado, de la caché donde vale: las fichas de todas sus piezas, en el orden del modelo. */
-function alDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): Resultado<{ fichas: FichaComprobacion[]; diagnosticos: Diagnostico[]; comprobadas: number }> {
+export function alDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): Resultado<{ fichas: FichaComprobacion[]; diagnosticos: Diagnostico[]; comprobadas: number }> {
   const q = s.q;
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const cache = cacheDe(q)[tipo];
@@ -333,7 +375,7 @@ function alDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undef
   return { valido: true, valor: { fichas: ids.flatMap((id) => cache.piezas.get(id)?.fichas ?? []), diagnosticos: cache.diagnosticos, comprobadas } };
 }
 
-const sinFilas = ({ filas: _f, armado: _a, datos: _d, ...p }: FichaComprobacion): ParteComprobada => p;
+export const sinFilas = ({ filas: _f, armado: _a, datos: _d, geometria: _g, recubrimiento: _r, ...p }: FichaComprobacion): ParteComprobada => p;
 
 /** La tabla de un tipo de pieza (pedido `comprobaciones`). */
 export function datosComprobaciones(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): Resultado<DatosComprobaciones> {
@@ -499,7 +541,7 @@ export const TEXTO_CLASE: Record<ClaseAprovechamiento, string> = {
 };
 
 /** El trozo de una polilínea entre dos estaciones a lo largo de ella (m). */
-function trozo(p: readonly Vec2[], s0: number, s1: number): Vec2[] {
+export function trozo(p: readonly Vec2[], s0: number, s1: number): Vec2[] {
   const r: Vec2[] = [];
   let s = 0;
   for (let i = 1; i < p.length; i++) {

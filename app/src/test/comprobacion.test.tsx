@@ -4,6 +4,7 @@
  * el armado en el proyecto con la operación `armado`; un clic abre la ficha con las filas del módulo;
  * y cambiar el armado en la ficha vuelve a comprobar esa pieza, sin recalcular.
  */
+import { barrasDe } from "../../../src/comprobaciones/armado.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { useState } from "react";
@@ -218,6 +219,26 @@ describe("CO6 · DOM: Resultados · Comprobación", () => {
     const ficha = await pedir<FichaComprobacion>({ tipo: "comprobacion", de: "pilares", clave: tabla.partes[0]!.clave, armado: armado() });
     await waitFor(() => expect(within(document.querySelector("[data-filas-modulo]")!).getAllByRole("row").length).toBe(ficha.filas.length + 1));
     expect(document.querySelector("[data-estado-ficha]")!.textContent).toBe("Cumple");
+    // §8.11: el croquis de la sección, con las barras del armado; sigue a lo que se escribe, sin aplicarlo
+    const dibujadas = (dentro = "") => document.querySelectorAll(`${dentro}[data-croquis-armado="pilar"] .ca-barra`).length;
+    const suyo = ficha.armado.tipo === "pilares" ? ficha.armado.armado! : undefined;
+    expect(dibujadas()).toBe(barrasDe(suyo!));
+    const porCara = screen.getByLabelText("Intermedias en cada cara h: por cara") as HTMLInputElement;
+    const diametroCara = screen.getByLabelText("Intermedias en cada cara h: Ø") as HTMLSelectElement;
+    const [nAntes, oAntes] = [porCara.value, diametroCara.value];
+    fireEvent.change(porCara, { target: { value: "3" } });
+    fireEvent.change(diametroCara, { target: { value: "12" } });
+    const conCara = barrasDe({ ...suyo!, caraH: { n: 3, diametro: 12 } });
+    await waitFor(() => expect(dibujadas()).toBe(conCara));
+    expect(reg.ediciones.length).toBe(1);
+    // El editor ampliado: el mismo borrador, con el dibujo en grande
+    fireEvent.click(screen.getByRole("button", { name: "Ampliar el dibujo" }));
+    expect(dibujadas("[data-editor-armado] ")).toBe(conCara);
+    fireEvent.click(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Cerrar" }).at(-1)!);
+    expect(document.querySelector("[data-editor-armado]")).toBeNull();
+    fireEvent.change(porCara, { target: { value: nAntes } });
+    fireEvent.change(diametroCara, { target: { value: oAntes } });
+    await waitFor(() => expect(dibujadas()).toBe(barrasDe(suyo!)));
     // Los cercos, a 400 mm: deja de cumplir
     const sep = screen.getByLabelText("Cercos: cada (mm)") as HTMLInputElement;
     expect(sep.value).toBe(String(ficha.armado.tipo === "pilares" ? ficha.armado.armado!.cercos.separacion : ""));
@@ -269,5 +290,24 @@ describe("CO6 · DOM: Resultados · Comprobación", () => {
       });
       filasTabla().forEach((tr, i) => expect(celdas(tr).at(-1), `${de} ${t.partes[i]!.clave}`).toBe(t.partes[i]!.cumple ? "Cumple" : t.partes[i]!.origen === "sin-armado" ? "Sin armado" : !t.partes[i]!.fallan && t.partes[i]!.pendientes.length ? "Sin comprobar" : "No cumple"));
     }
+    // §8.11: la planta pide el armado dibujado (por defecto), y con «Aprovechamiento», sólo los colores
+    expect(reg.pedidos.some((p) => p.tipo === "escena" && p.vista.vista === "comprobacion" && p.vista.dibujo === "armado")).toBe(true);
+    // Los refuerzos de una losa, en su ficha: se eligen en la planta y se quitan
+    const conRefuerzos = Object.entries(a.forjados ?? {}).find(([, f]) => f.refuerzos?.length);
+    expect(conRefuerzos).toBeTruthy();
+    const [losa, suyo] = conRefuerzos!;
+    fireEvent.click(within(screen.getByRole("group", { name: "Qué se comprueba" })).getByRole("button", { name: "Losas" }));
+    await waitFor(() => expect(filasTabla().some((tr) => celdas(tr)[0] === losa)).toBe(true));
+    fireEvent.click(filasTabla().find((tr) => celdas(tr)[0] === losa)!);
+    await waitFor(() => expect(document.querySelectorAll('[data-lista-armado="refuerzos"] .elemento-armado').length).toBe(suyo.refuerzos!.length), { timeout: 60_000 });
+    expect(document.querySelector('[data-croquis-armado="losa"]')).toBeTruthy();
+    const primero = document.querySelector('[data-lista-armado="refuerzos"] .elemento-armado') as HTMLElement;
+    fireEvent.click(within(primero).getAllByRole("button")[0]!);
+    expect(reg.elegidos.at(-1)).toEqual([`${losa}/R1`]);
+    await waitFor(() => expect(document.querySelector('[data-lista-armado="refuerzos"] .elemento-armado[data-on]')).toBeTruthy());
+    const antes = reg.ediciones.length;
+    fireEvent.click(within(document.querySelector('[data-lista-armado="refuerzos"] .elemento-armado') as HTMLElement).getByRole("button", { name: /^Quitar: R1 / }));
+    expect(reg.ediciones.length).toBe(antes + 1);
+    expect(reg.proyecto.armado!.forjados![losa]!.refuerzos?.length ?? 0).toBe(suyo.refuerzos!.length - 1);
   }, 240_000);
 });

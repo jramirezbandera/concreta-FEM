@@ -1219,6 +1219,56 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .croquis .cq-cota[data-activo] text { fill: var(--color-accent); font-weight: 600; }
 .cq-cota:hover line { stroke: var(--color-text-primary); }
 .cq-guia { fill: none; stroke: var(--color-text-tertiary); stroke-width: .7; }
+
+/* El armado dibujado (CO6): barras por su grupo, cercos, y la leyenda con el punto de cada grupo */
+.croquis { --ca-inferior: #2563eb; --ca-superior: #dc2626; --ca-caraB: #2563eb; --ca-caraH: #0d9488; --ca-piel: #8b5cf6; }
+:root[data-theme="dark"] .croquis, .dark .croquis { --ca-inferior: #60a5fa; --ca-superior: #f87171; --ca-caraB: #60a5fa; --ca-caraH: #2dd4bf; --ca-piel: #a78bfa; }
+.ca-barra { fill: var(--color-text-primary); stroke: var(--color-bg-surface); stroke-width: .6; }
+.ca-barra[data-grupo="caraB"] { fill: var(--ca-caraB); }
+.ca-barra[data-grupo="caraH"] { fill: var(--ca-caraH); }
+.ca-barra[data-grupo="inferior"] { fill: var(--ca-inferior); }
+.ca-barra[data-grupo="superior"] { fill: var(--ca-superior); }
+.ca-barra[data-grupo="piel"] { fill: var(--ca-piel); }
+.ca-barra[data-activo] { stroke: var(--color-accent); stroke-width: 2.4; paint-order: stroke; }
+.ca-cerco { fill: none; stroke: var(--color-text-secondary); stroke-linejoin: round; }
+.ca-cerco[data-fino] line { stroke: var(--color-text-tertiary); stroke-width: .8; }
+.ca-cerco[data-activo], .ca-cerco[data-activo] line { stroke: var(--color-accent); }
+.ca-linea { fill: none; stroke: var(--color-text-primary); stroke-width: 1.8; stroke-linecap: round; }
+.ca-linea[data-grupo="inferior"] { stroke: var(--ca-inferior); }
+.ca-linea[data-grupo="superior"] { stroke: var(--ca-superior); }
+.ca-linea[data-grupo="piel"] { stroke: var(--ca-piel); stroke-width: 1.1; stroke-dasharray: 5 3; }
+.ca-linea[data-grueso] { stroke-width: 3; }
+.ca-linea[data-activo] { stroke-width: 4; }
+.ca-critico { fill: none; stroke: var(--color-text-tertiary); stroke-width: 1; stroke-dasharray: 5 3; }
+.croquis text.ca-titulo { fill: var(--color-text-primary); font-family: var(--font-sans, inherit); }
+.croquis text.ca-falta { fill: var(--color-text-tertiary); font-style: italic; }
+.croquis text.ca-rotulo[data-grupo="inferior"] { fill: var(--ca-inferior); }
+.croquis text.ca-rotulo[data-grupo="superior"] { fill: var(--ca-superior); }
+.croquis text.ca-rotulo[data-activo] { font-weight: 700; }
+.ca-entrada { display: inline-flex; align-items: center; gap: 5px; margin-right: 12px; white-space: nowrap; color: var(--color-text-primary); }
+.ca-entrada[data-activo] { color: var(--color-accent-text, var(--color-accent)); font-weight: 600; }
+.ca-entrada i { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-primary); }
+.ca-entrada i[data-grupo="caraB"] { background: var(--ca-caraB); }
+.ca-entrada i[data-grupo="caraH"] { background: var(--ca-caraH); }
+.ca-entrada i[data-grupo="inferior"] { background: var(--ca-inferior); }
+.ca-entrada i[data-grupo="superior"] { background: var(--ca-superior); }
+.ca-entrada i[data-grupo="piel"] { background: var(--ca-piel); }
+.ca-entrada i[data-grupo="cercos"] { width: 9px; height: 9px; border-radius: 2px; background: none; border: 1.5px solid var(--color-text-secondary); }
+.ca-dato { display: block; margin-top: 2px; color: var(--color-text-secondary); }
+/* El editor ampliado del armado (el dibujo grande y el formulario al lado) y las filas de refuerzos de una losa */
+.dialogo.dialogo-armado { width: min(1180px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+.editor-armado { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 8px; align-items: start; }
+.editor-armado .croquis { margin: 4px 0 8px; }
+@media (max-width: 900px) { .editor-armado { grid-template-columns: 1fr; } }
+.enlace-armado { font-size: 11.5px; color: var(--color-accent-text, var(--color-accent)); }
+.enlace-armado:hover { text-decoration: underline; }
+.elemento-armado { margin-top: 5px; padding: 4px 6px 5px 8px; border-left: 3px solid var(--color-border-strong); border-radius: 0 6px 6px 0; }
+.elemento-armado[data-cara="inferior"] { border-left-color: #2563eb; }
+.elemento-armado[data-cara="superior"] { border-left-color: #dc2626; }
+.elemento-armado[data-cara="cercos"] { border-left-color: #0f766e; }
+.elemento-armado[data-on] { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.elemento-armado button:hover { text-decoration: underline; }
+.ca-aviso { display: block; margin-top: 2px; color: var(--color-state-warn-text, var(--color-state-warn)); }
 .cq-cota[data-activo] .cq-guia { stroke: var(--color-accent); }
 
 /* Un botón que parece un enlace (ver los demás diagnósticos de un grupo) */

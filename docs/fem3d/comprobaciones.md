@@ -645,6 +645,40 @@ Hecha la parte de la app para CO1–CO4 (pilares, vigas, losas y punzonamiento).
 - **CO6-4:** la leyenda de la app corta cada texto en la primera «, », « (», «; », «. » o «: » (`textoCorto`): los textos de una leyenda tienen que leerse enteros hasta ahí.
 - **CO6-5:** la ficha reiniciaba lo escrito si llegaba otra respuesta con el mismo armado (comparaba por identidad del objeto): con la máquina cargada, «Aplicar» quedaba sin efecto. Ahora compara por contenido.
 
+### 8.11 CO6, el armado dibujado (2026-11-22)
+
+De la puerta de uso de CO6 (el usuario, con la vivienda): el armado sólo se leía como texto («x-inf 2Ø8 · … · 17 refuerzos · 15 zonas de cercos») y como un formulario; «hay que mejorar mucho el apartado visual», con más peso del dibujo, como en los programas que conoce. El cálculo y las comprobaciones no cambian: los mismos bits.
+
+**La geometría** (`src/comprobaciones/dibujoArmado.ts`, pura): de un armado y lo que mide su pieza, dónde va cada barra, con el recubrimiento de las comprobaciones (hasta el cerco). `seccionPilarArmada` y `seccionVigaArmada` (las barras por su grupo, el cerco y sus ramas interiores, y el aviso de las barras a menos de su separación mínima), `alzadoVano` (los cuartos de la luz de CO2-a, con la superior y los cercos de cada zona y la posición de cada cerco), y `refuerzosDibujados` y `cercosDibujados` (los rectángulos (s, t) de una losa, en planta, con los ejes de las franjas del compilador). Un armado a medias (el borrador del formulario) dibuja lo que tiene.
+
+**La ficha** (`app/src/editor/CroquisArmado.tsx`, en Propiedades):
+
+- **Pilar:** la sección a escala, con el cerco y las barras de cada grupo en su color (esquinas, caras b, caras h o anillo), las cotas con su nombre y As y ρ.
+- **Viga:** el alzado del vano entre sus apoyos (la superior corrida y la de cada zona de apoyo, la inferior, los cercos a su separación) y la sección de cada zona (una sola si las tres son iguales).
+- **Losa:** el nervio de cada dirección de un reticular con sus barras y un metro de ábaco o de maciza con su parrilla (las X, de punta; las Y, por dentro, como las toma la comprobación).
+- **Punzonamiento:** la planta del pilar con el perímetro crítico y los perímetros de cercos.
+- El croquis sigue a lo que se escribe, sin aplicarlo (`armadoParcial`), y el grupo con el foco o bajo el ratón se resalta en él.
+- **«Ampliar el dibujo»** (pilares y vigas): el mismo borrador en un diálogo, con el dibujo en grande y el formulario al lado.
+
+**La planta** (`src/visor/armadoPlanta.ts`; vista `comprobacion` con `dibujo: "armado"`, por defecto en la app; «Aprovechamiento» deja la de CO6-d):
+
+- **Losas:** cada refuerzo con su barra (de punta a punta), su línea de reparto (lo que cubre) y su rótulo («Ø12/200 · 2,40 m»), los inferiores en azul y los superiores en rojo; las zonas de cercos de los nervios, rayadas; la armadura base, en la leyenda; todo recortado con la losa. «Refuerzos»: las dos caras, la inferior o la superior.
+- **Pilares:** la sección del tramo que llega a la planta en su huella, con el cerco y las barras a escala (y una marca de tamaño fijo, que se ve sin acercarse), y su armado rotulado.
+- **Vigas:** el armado de cada vano a lo largo de él (la superior a un lado; la inferior y los cercos, al otro) y lo propio de cada zona de apoyo en su cuarto de la luz.
+- **Punzonamiento:** el perímetro crítico (a 2·d) y los perímetros de cercos, cortados en el borde de las losas.
+- El color de cada pieza sigue siendo el de su aprovechamiento.
+
+**Los refuerzos y los cercos de una losa, uno a uno** (cambia CO6-a): cada uno tiene su id en las vistas (`<losa>/R<n>`, `<losa>/C<n>`: `idElemento`), así que un clic en la planta lo elige y abre la ficha de su losa con él a la vista, y un clic en su fila de la ficha lo elige en la planta. En la ficha se cambian sus barras y se quita (`sinElemento`); la zona sigue siendo la que se propuso.
+
+**Validación:** `src/comprobaciones/dibujoArmado.test.ts` (las barras del armado, dentro del cerco y a su recubrimiento; las zonas y los cercos del vano; los ejes, los de `ejesArmado` del compilador en cualquier ángulo; los refuerzos en planta), `src/visor/comprobaciones.test.ts` (en cada planta: tantas barras como el armado de cada pilar y dentro de su huella, cada refuerzo con su id y sólo los de la cara pedida, cada vano rotulado, el perímetro crítico de cada unión, y un clic en un refuerzo lo elige) y `app/src/test/comprobacion.test.tsx` (el croquis sigue al borrador sin escribir nada, el editor ampliado, y elegir y quitar un refuerzo). A mano, en la app, con la vivienda. Los bancos de Chrome no se han pasado.
+
+**Hallazgos:**
+
+- **CO6-6:** dibujados, los refuerzos de las losas enseñan lo que el texto escondía: la propuesta deja refuerzos de 0,16 a 0,40 m de largo (una estación suelta que no cumple) y zonas que se pisan. Es de proponer (CO3-h, AB-5: agrupar e igualar las zonas), no del dibujo.
+- **CO6-7:** `dibujoArmado.ts` repite la cuenta de `direccionEje1` del compilador en vez de importarla: lo carga el hilo principal de la app, que no lleva el compilador.
+
+**Por decidir por el usuario:** CO6-e, si la planta abre con el armado (como queda) o con el aprovechamiento; CO6-f, qué más quiere a la vista (lo que no está: el armado en el 3D y en el alzado, el cuadro de pilares, mover o estirar la zona de un refuerzo con el ratón, añadir uno a mano, y los planos, A6).
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.
