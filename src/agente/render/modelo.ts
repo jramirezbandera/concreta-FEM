@@ -278,7 +278,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
       const r = 1.2; // medio rótulo, m, aproximado: sólo para no ponerse debajo
       const obstaculos = [...anillos.map((a) => [...a, a[0]!]), ...ejesVigas, ...((l.reticular?.abacos ?? []) as Vec2[][]).map((a) => [...a, a[0]!]), [[g[0] - r, g[1]], [g[0] + r, g[1]]] as Vec2[]];
       const sitio = sitioDespejado(anillos, obstaculos);
-      if (sitio) for (const t of simboloDireccion(sitio.p, l.eje1 ?? 0, !!l.reticular, l.contorno, sitio.d)) P.push({ tipo: "linea", puntos: t, estilo: est("forjado-direccion"), objeto: l.id });
+      if (sitio) for (const t of simboloDireccion(sitio.p, l.eje1 ?? 0, l.contorno, sitio.d)) P.push({ tipo: "linea", puntos: t, estilo: est("forjado-direccion"), objeto: l.id });
     }
     texto(g, etiquetaLosa(l), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
   }
@@ -392,7 +392,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   };
   entrada("losa", "Losa maciza (su nombre o el id y el canto, cm)");
   entrada("losa-reticular", "Forjado reticular, zona aligerada (su nombre o el id y canto+capa/intereje, cm)");
-  entrada("forjado-direccion", "Dirección de la losa (eje 1) o, en cruz, de los nervios del reticular");
+  entrada("forjado-direccion", "Direcciones de armado de la losa, en cruz: el eje 1 (X) y su perpendicular (Y); en un reticular, las de los nervios");
   entrada("nervio", "Ejes de los nervios del reticular, por su punto de paso");
   entrada("abaco", "Ábaco macizo");
   entrada("hueco-aspa", "Hueco de losa (con aspa)");
@@ -575,7 +575,8 @@ function sitioDespejado(anillos: readonly (readonly Vec2[])[], obstaculos: reado
   return mejor;
 }
 
-function simboloDireccion(c: Vec2, grados: number, cruz: boolean, contorno: readonly Vec2[], holgura: number): Vec2[][] {
+/** Las dos direcciones de armado de una losa, en cruz (una flecha doble en el eje 1 y otra en su perpendicular): toda losa se arma en las dos, maciza o reticular. */
+function simboloDireccion(c: Vec2, grados: number, contorno: readonly Vec2[], holgura: number): Vec2[][] {
   const [x0, y0, x1, y1] = cajaDe(contorno);
   const l = Math.min(Math.max(0.6, Math.min(2.5, Math.min(x1 - x0, y1 - y0) / 4)) / 2, Math.max(0.3, 0.85 * holgura));
   const flecha = (g: number): Vec2[][] => {
@@ -591,7 +592,7 @@ function simboloDireccion(c: Vec2, grados: number, cruz: boolean, contorno: read
     ];
     return [[a, b], punta(b, 1), punta(a, -1)];
   };
-  return cruz ? [...flecha(grados), ...flecha(grados + 90)] : flecha(grados);
+  return [...flecha(grados), ...flecha(grados + 90)];
 }
 
 /** Tramos del eje de un muro (en planta) que ocupan sus huecos en el piso de debajo de la planta. */

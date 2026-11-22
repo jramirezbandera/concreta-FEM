@@ -30,10 +30,11 @@
  *    circular, 1 + 0,6·π·e/(D + 4d); borde, u1/u1* + k·e∥·u1/W1; esquina, u1/u1*. La excentricidad
  *    perpendicular a un borde hacia fuera (no la cubre u1/u1*) se suma como en un pilar interior. Con
  *    el sismo del programa, cada componente con su peor signo (VS-o). Manda el mayor β·VEd.
- *  - **La armadura de flexión:** la de la cara que tracciona, en las dos direcciones (la base, o la
- *    parrilla de los ábacos de un reticular, más los refuerzos que cubren el centro del área), como
- *    una malla igual de cuantía √(ρx·ρy) con el mayor de sus diámetros; d, la media de los dos cantos
- *    útiles (la Y, por dentro de la X, CO3-e).
+ *  - **La armadura de flexión:** la de la cara que tracciona, en las dos direcciones, media en el
+ *    ancho del pilar más 3·d a cada lado (§6.4.4(1)): la base (o la parrilla de los ábacos de un
+ *    reticular) y, de cada refuerzo que pasa por el pilar, la parte de esa banda que cubre (CO4-f).
+ *    Como una malla igual de cuantía √(ρx·ρy) con el mayor de sus diámetros; d, la media de los dos
+ *    cantos útiles (la Y, por dentro de la X, CO3-e).
  *  - **En un reticular,** el perímetro crítico tiene que caber en el ábaco (fila propia, `abaco-u1`)
  *    y, si hace falta armadura de punzonamiento, también el perímetro uout a partir del que ya no
  *    hace falta (`abaco-uout`). Los nervios a la salida del ábaco los comprueba CO3.
@@ -324,29 +325,50 @@ export function cortanteEficaz(g: Geometria, d: number, V: number, E: Vec2, aE: 
 
 const ARMADURAS: Record<CaraPunzonamiento, [ArmaduraForjado, ArmaduraForjado]> = { superior: ["x-sup", "y-sup"], inferior: ["x-inf", "y-inf"] };
 
-/** La armadura de flexión de una cara en el centro de un área: mm²/m en cada dirección, sus diámetros de base y el canto útil medio (mm); o por qué no. */
-export function flexion(D: Pick<DemandaPunzonamiento, "espesor" | "reticular" | "ejes">, a: ArmadoPunzonamiento, cara: CaraPunzonamiento, c: Vec2): { as: [number, number]; diametro: number; d: number } | { motivo: string } {
+/** Media extensión de un área cargada según una dirección en planta, m. */
+function semiextension(area: Pick<AreaCargada, "forma" | "ez" | "ey">, u: Vec2): number {
+  const f = area.forma;
+  if (!f) return 0;
+  if (f.tipo === "circulo") return f.D / 2;
+  return (Math.abs(punto(area.ez, u)) * f.h + Math.abs(punto(area.ey, u)) * f.b) / 2;
+}
+
+/**
+ * La armadura de flexión de una cara junto a un área cargada: mm²/m en cada dirección, media en el
+ * ancho del área más 3·d a cada lado, transversal a las barras (CE A19 §6.4.4(1)); el mayor diámetro
+ * de la base y el canto útil medio (mm); o por qué no. Un refuerzo cuenta si pasa por el centro del
+ * área a lo largo de sus barras, con la parte de la banda que cubre en transversal.
+ */
+export function flexion(D: Pick<DemandaPunzonamiento, "espesor" | "reticular" | "ejes">, a: ArmadoPunzonamiento, cara: CaraPunzonamiento, area: Pick<AreaCargada, "c" | "forma" | "ez" | "ey">): { as: [number, number]; diametro: number; d: number; bandas: [number, number] } | { motivo: string } {
   const parrilla = D.reticular ? a.losa.abacos : a.losa.base;
   if (!parrilla) return { motivo: "el armado del reticular no tiene la parrilla de los ábacos" };
+  const [kx, ky] = ARMADURAS[cara];
+  const diam = [parrilla[kx]?.diametro ?? 0, parrilla[ky]?.diametro ?? 0];
+  // La Y va por dentro de la X (CO3-e): dx = h − r − Øx/2, dy = h − r − Øx − Øy/2
+  const h = 1000 * D.espesor;
+  const dUtil = h - a.recubrimiento - diam[0]! - diam[1]! / 4 + diam[0]! / 4;
+  const c = area.c;
   const as: number[] = [];
-  const diam: number[] = [];
+  const bandas: number[] = [];
   ARMADURAS[cara].forEach((k, i) => {
     const b = parrilla[k];
     const { d, n } = D.ejes[(i + 1) as 1 | 2];
     const [s, t] = [punto(c, d), punto(c, n)];
+    // La banda, transversal a las barras: el área más 3·d a cada lado, m
+    const semi = semiextension(area, n) + (3 * Math.max(0, dUtil)) / 1000;
+    const [t0, t1] = [t - semi, t + semi];
     let A = b ? areaBarrasForjado(b) : 0;
     for (const r of a.losa.refuerzos ?? []) {
       if (r.armadura !== k || (D.reticular ? r.en !== "abacos" : r.en !== undefined)) continue;
-      if (s >= r.s[0] - 1e-6 && s <= r.s[1] + 1e-6 && t >= r.t[0] - 1e-6 && t <= r.t[1] + 1e-6) A += areaBarrasForjado(r.barras);
+      if (!(s >= r.s[0] - 1e-6 && s <= r.s[1] + 1e-6)) continue;
+      const cubre = Math.max(0, Math.min(t1, r.t[1]) - Math.max(t0, r.t[0]));
+      A += (areaBarrasForjado(r.barras) * cubre) / (t1 - t0);
     }
     as.push(A);
-    diam.push(b?.diametro ?? 0);
+    bandas.push(2 * semi);
   });
   if (!(as[0]! > 0 && as[1]! > 0 && Number.isFinite(as[0]! + as[1]!))) return { motivo: `la losa no tiene armadura ${cara} en las dos direcciones junto al pilar` };
-  // La Y va por dentro de la X (CO3-e): dx = h − r − Øx/2, dy = h − r − Øx − Øy/2
-  const h = 1000 * D.espesor;
-  const d = h - a.recubrimiento - diam[0]! - diam[1]! / 4 + diam[0]! / 4;
-  return { as: [as[0]!, as[1]!], diametro: Math.max(diam[0]!, diam[1]!), d: d };
+  return { as: [as[0]!, as[1]!], diametro: Math.max(diam[0]!, diam[1]!), d: dUtil, bandas: [bandas[0]!, bandas[1]!] };
 }
 
 const FILAS_AGOTAMIENTO = new Set(["punz-ved-max", "punz-ved-vrdc", "punz-ved-vrdcs"]);
@@ -376,7 +398,7 @@ export function comprobarPunzonamiento(D: DemandaPunzonamiento, a: ArmadoPunzona
     if (!suyas.some((c) => signo * c.Fz + c.aFz >= V_MINIMO)) continue;
     const area = cara === "superior" ? (D.areas.inferior ?? D.areas.superior) : (D.areas.superior ?? D.areas.inferior);
     if (!area) continue;
-    const f = flexion(D, a, cara, area.c);
+    const f = flexion(D, a, cara, area);
     if ("motivo" in f) {
       pendiente(f.motivo);
       continue;
@@ -413,7 +435,7 @@ export function comprobarPunzonamiento(D: DemandaPunzonamiento, a: ArmadoPunzona
     // La malla equivalente: cuantía √(ρx·ρy) con el mayor diámetro
     const asEq = Math.sqrt(f.as[0] * f.as[1]) / 1000;
     const sEq = getBarArea(f.diametro) / asEq;
-    const otra = flexion(D, a, cara === "superior" ? "inferior" : "superior", area.c);
+    const otra = flexion(D, a, cara === "superior" ? "inferior" : "superior", area);
     const [dOtra, sOtra] = "motivo" in otra ? [f.diametro, sEq] : [otra.diametro, getBarArea(otra.diametro) / (Math.sqrt(otra.as[0] * otra.as[1]) / 1000)];
     const entrada: PunchingInputs = {
       ...punchingDefaults,

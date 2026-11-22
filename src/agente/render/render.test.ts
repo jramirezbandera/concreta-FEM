@@ -737,9 +737,10 @@ describe("A4, criterio 2: determinismo", () => {
   });
 });
 
-// Regenerados el 2026-11-07: los ejes se dibujan alargados más allá del borde de la losa (`ejesVistos`)
-const SVG_CONGELADO = "5d2518ac4def20f0508f016278c21b4f4f48ed0d17c425bc70ddd263b5371772";
-const PNG_CONGELADO = "7eeb07d4bbbc2f6ca89bc5cb0bb089ea6de26a4623a022f3f603e3ff258b6091";
+// Regenerados el 2026-11-07: los ejes se dibujan alargados más allá del borde de la losa (`ejesVistos`);
+// el 2026-11-22: la dirección de una losa maciza, en cruz (las dos direcciones de armado)
+const SVG_CONGELADO = "8282fbff1938aeeb10d584cc6d70b261f6dd9adac724478926ae9ee26acbd6cb";
+const PNG_CONGELADO = "628fbd1619a485456bade966b845d4a5ba05010d3a6481d1b90166de7b4eb791";
 
 describe("A4, criterio 3: tamaño de la imagen y del texto", () => {
   it(`el lado mayor no pasa de ${LADO_MAXIMO} px y ningún texto baja de 11 px, en todas las vistas`, () => {

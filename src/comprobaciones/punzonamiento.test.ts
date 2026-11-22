@@ -352,6 +352,14 @@ describe("CO4: la demanda que manda y las dos caras", () => {
     ]);
     const lejos = con([{ armadura: "x-sup", s: [2, 4], t: [-1, 1], barras: { diametro: 16, separacion: 150 } }]);
     const abajo = con([{ armadura: "x-inf", s: [-1, 1], t: [-1, 1], barras: { diametro: 16, separacion: 150 } }]);
+    // CO4-f: uno estrecho cuenta por la parte que cubre de la banda (el pilar más 3·d a cada lado)
+    const estrecho = con([
+      { armadura: "x-sup", s: [-1, 1], t: [-0.3, 0.3], barras: { diametro: 16, separacion: 150 } },
+      { armadura: "y-sup", s: [-1, 1], t: [-0.3, 0.3], barras: { diametro: 16, separacion: 150 } },
+    ]);
+    const banda = 0.4 + 6 * (250 - 30 - 12) / 1000;
+    cerca(estrecho.as[0], sin.as[0] + ((Math.PI * 64 * 1000) / 150) * (0.6 / banda), 1e-12, "as con un refuerzo estrecho");
+    expect(estrecho.resultado.vRdc).toBeLessThan(cubre.resultado.vRdc);
     expect(cubre.resultado.vRdc).toBeGreaterThan(sin.resultado.vRdc);
     expect(lejos.resultado.vRdc).toBe(sin.resultado.vRdc);
     expect(abajo.resultado.vRdc).toBe(sin.resultado.vRdc);

@@ -162,7 +162,7 @@ export function comprobarPunzonamientos(q: Consultas, forjados: Record<string, A
     diagnosticos.push({
       codigo: "comprobacion/punzonamiento-con-vigas",
       severidad: "info",
-      mensaje: `A ${todos.length} de los pilares comprobados les llegan vigas${conPlanas.size ? ` (a ${conPlanas.size}, vigas planas)` : ""}: el punzonamiento se comprueba sólo con lo que la losa les pasa por su huella; lo que les llega por las vigas es el cortante de la viga, que se comprueba con ella. Los pilares a los que la losa no llega (van dentro del ancho de sus vigas) no tienen comprobación de punzonamiento.`,
+      mensaje: `A ${todos.length} de los pilares comprobados les llegan vigas${conPlanas.size ? ` (a ${conPlanas.size}, vigas planas)` : ""}: el punzonamiento se comprueba sólo con lo que la losa les pasa por su huella; lo que les llega por las vigas es el cortante de la viga, que se comprueba con ella. Los pilares a los que la losa no llega (van dentro del ancho de sus vigas) no tienen comprobación de punzonamiento: junto a ellos, el cortante de la losa se comprueba con sus franjas en la cara de las vigas.`,
       ids: todos,
     });
   }

@@ -435,7 +435,7 @@ Pasan los criterios 5 a 14 en lo de las losas; falta su parte de la app (CO6), l
 
 - **CO3-a, el armado de una losa:** una base por cara y dirección en toda la losa y refuerzos en rectángulos; en un reticular, además la parrilla de los ábacos y cercos por zonas. Los rectángulos van en coordenadas de la planta: si la losa se mueve o se gira en el editor, no la siguen (se avisa si un refuerzo se queda sin estaciones).
 - **CO3-b, nervio o ábaco:** una estación es de ábaco si al menos la mitad de su ancho lo es.
-- **CO3-c, el cortante junto a los pilares** (su metro y a menos de dos cantos de ellos) no se comprueba aquí: es del punzonamiento (CO4). Hasta que CO4 esté, ese cortante no lo comprueba nadie, y se dice en un aviso.
+- **CO3-c, el cortante junto a los pilares** (su metro y a menos de dos cantos de ellos) no se comprueba aquí: es del punzonamiento (CO4). Hasta que CO4 esté, ese cortante no lo comprueba nadie, y se dice en un aviso. **Desde CO4-4** (§8.8), el de las estaciones en la cara de una viga o un apoyo sí se comprueba, también junto a un pilar.
 - **CO3-d, en los ábacos sólo cuenta su parrilla,** no las barras de los nervios que los cruzan (del lado seguro).
 - **CO3-e, la dirección Y va por dentro de la X,** en las dos caras. No se puede elegir todavía.
 - **CO3-f, las tablas** de parrillas, de barras de nervio y de cercos.
@@ -455,7 +455,7 @@ Pasan los criterios 5 a 14 en lo de las losas; falta su parte de la app (CO6), l
 
 ### 8.7 CO4, el punzonamiento (2026-11-22)
 
-Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO6) y la sombra (CO7). Las decisiones CO4-a…CO4-j son de Claude; **CO4-a y CO4-b, confirmadas por el usuario el 2026-11-22**, y las demás, por confirmar (abajo). En ecuaciones, el coste es cero: no cambia el modelo analítico.
+Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO6) y la sombra (CO7). Las decisiones CO4-a…CO4-j, de Claude, **confirmadas por el usuario el 2026-11-22**; CO4-f, con el cambio que se recomendaba (§8.8). En ecuaciones, el coste es cero: no cambia el modelo analítico.
 
 **Lo que la losa pasa al pilar** (lo único que cambia fuera de `src/comprobaciones/`):
 
@@ -514,14 +514,14 @@ Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO
 - **CO4-5, el centro de un pilar de borde cae justo en el contorno** cuando la losa se dibuja por los ejes de los pilares: sin el ancho de las vigas en el forjado, 5 de las 12 uniones de la vivienda quedaban pendientes, y los pilares de esquina del edificio objetivo, también.
 - **CO4-6, vmín:** el módulo de punzonamiento usa 0,035·k^(3/2)·√fck (el del Eurocódigo), y los de vigas y forjados, 0,051/γc = 0,034 (CO3-4). Hay que contrastar los dos con el texto del Anejo 19.
 
-**Decisiones de Claude** (CO4-a y CO4-b, **confirmadas por el usuario el 2026-11-22**; las demás, por confirmar):
+**Decisiones de Claude, confirmadas por el usuario el 2026-11-22** (CO4-f, cambiada: §8.8):
 
 - **CO4-a, sólo cuenta lo que la losa pasa al pilar** (CO-i al pie de la letra). Lo de las vigas planas se da como información y no entra: su cortante se comprueba con la viga (CO2), con sus cercos. La alternativa (contarlas, porque son hormigón del forjado) daría por no cumplido un pórtico de vigas planas armadas a cortante. Un pilar al que la losa no llega no tiene comprobación de punzonamiento.
 - **CO4-b, β general sin suelo:** no se sube a 1,15 / 1,4 / 1,5 cuando sale menor (CO4-2). La alternativa del lado seguro es tomar el mayor de los dos.
 - **CO4-c, la cara libre:** el borde a menos de c∥/2 + π·d; con un borde que no es paralelo a la cara, la menor de sus distancias. El pilar retranqueado, como enrasado con el área prolongada (también en u0).
 - **CO4-d, los huecos, por sus tangentes** desde el centro del área, con todo su contorno (sin la reducción de la figura A19.6.14 para huecos alargados: del lado seguro); y lo que el perímetro tiene fuera del forjado no cuenta, hasta la mitad.
 - **CO4-e, la excentricidad perpendicular al borde hacia fuera** (no la cubre u1/u1*) se suma como en un pilar interior. No es de la norma: es del lado seguro.
-- **CO4-f, la armadura de flexión:** √(ρx·ρy) con los refuerzos que cubren el centro del área (la norma pide la media en el ancho del pilar más 3·d a cada lado), y d la media de las dos direcciones.
+- **CO4-f, la armadura de flexión:** √(ρx·ρy), media en el ancho del pilar más 3·d a cada lado, y d la media de las dos direcciones. Al principio contaba entero todo refuerzo que cubría el centro del área, que con uno estrecho daba más ρl del que hay (§8.8).
 - **CO4-g, la armadura de punzonamiento:** cercos verticales por perímetros, con su tabla. Sin barras levantadas ni pernos.
 - **CO4-h, en un reticular,** el perímetro crítico y uout dentro del ábaco, como filas que fallan; no se propone agrandar el ábaco.
 - **CO4-i, en una losa de cimentación** no se descuenta la reacción del terreno dentro del perímetro (del lado seguro), ni se comprueban perímetros más cercanos que 2·d (§6.4.4(2)).
@@ -537,7 +537,26 @@ Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO
 - **El edificio objetivo de losas de 7 plantas con viento:** 280 uniones, todas cumplen sin armadura; el punzonamiento, 0,2 s (armar antes las losas, 19 s).
 - **Frente a la diferencia de axiles del pilar** (la alternativa de CO-i): sin vigas coinciden (lo separa el peso del pilar en su zona rígida, 1,4 kN); con vigas, la diferencia de axiles es de 1,1 a 4,3 veces lo que pasa la losa.
 
-**Pendiente de CO4:** CO4-4 (el cortante de la losa contra la cara de una viga junto a un pilar); la sombra con el punzonamiento de CYPECAD (CO7); la app (CO6); contrastar CO4-6.
+**Pendiente de CO4:** la sombra con el punzonamiento de CYPECAD (CO7); la app (CO6); contrastar CO4-6. CO4-4, cerrado en §8.8.
+
+### 8.8 CO4-f y CO4-4, tras las decisiones (2026-11-22)
+
+Decidido por el usuario el 2026-11-22: CO4-a…CO4-j como estaban, salvo CO4-f, que se cambia, y cerrar CO4-4 antes de CO5.
+
+**CO4-f, la cuantía media en una banda** (`comprobar/punzonamiento.ts`, `flexion`): la armadura de cada dirección es la media en el ancho del pilar más 3·d a cada lado, transversal a las barras (CE A19 §6.4.4(1)): la base entera y, de cada refuerzo que pasa por el pilar a lo largo de sus barras, la parte de la banda que cubre. Prueba: un refuerzo de 0,6 m de ancho centrado en un pilar de 40 con d = 208 mm cuenta 0,6/1,648 de su área. En las referencias (`out_cambiosCO4f4.txt`), la cuantía de los pilares de borde baja (ρl,min/ρl de 0,68 a 0,75 en la losa de 5 m) y vEd/vRd,c sube hasta un 4 % (losa de 7 m, de 1,42 a 1,48; en la vivienda, P11, de 0,855 a 0,883). Ninguna unión cambia de armadura ni deja de cumplir.
+
+**CO4-4, el cortante en la cara de las vigas junto a los pilares** (`demandas/losas.ts`): el cortante de una estación de **apoyo** (la cara de una viga, un muro o un apoyo lineal) se comprueba siempre, también a menos de dos cantos de un pilar: lo que pasa por ella va a la viga o al apoyo, y el punzonamiento no lo ve. Sigue sin comprobarse en el metro de un pilar (es del punzonamiento) y en las estaciones de **paso** a menos de dos cantos de un pilar, que por campos no convergen junto a la esquina de un pilar y una viga (en la vivienda, de 138 a 91 kN/m al pasar de h = 0,75 a 0,375) y que ya cubre la estación de la cara, exacta.
+
+- **Se probó primero** contar también las de paso junto a los pilares que no tienen losa en su huella; daba esos valores sin converger y se descartó. De ello queda `Consultas.losaEnHuella(pilar, planta)` (la losa que toca la huella, sin calcular nada).
+- **Lo que destapa, la vivienda deja de cumplir** (CO4-7): las dos losas fallan a cortante en la cara de una viga, dentro de un ábaco, donde no se propone armadura transversal:
+  - **L-CUB-S, junto a P4** (la esquina de la losa en la que se juntan dos vigas, con P4 dentro del ancho de las dos): 281 kN/m en la franja X13, **2,24 de VRd,c**. Converge: 281, 283 y 282 kN/m con h = 0,75, 0,375 y 0,25. Es la reacción de esquina de una losa apoyada en dos vigas que se cruzan.
+  - **L-CUB, junto a P2:** 122 kN/m en la franja Y5, **1,003**; también converge (122, 127 y 122).
+  - El armado propuesto no cambia (`armado igual` en el registro): no hay nada de la tabla que arregle el cortante de un ábaco.
+- **A un canto útil de la cara** (el §6.2.1(8) del Anejo 19 deja no comprobar más cerca con carga repartida), el de P4 baja a unos 90–100 kN/m, del orden de 0,75 de VRd,c (por las estaciones de paso de antes de este cambio, con h = 0,75). Se toma en la cara por CO3-j; cambiarlo es decisión del usuario (CO4-7).
+- **Las demás referencias** de CO3 (la losa en dos apoyos, la plana con sismo, el reticular) no cambian.
+
+**Pendiente del usuario, CO4-7:** el cortante de la vivienda en la cara de las vigas junto a P4 y P2. O se mantiene en la cara (CO3-j) y la vivienda no cumple (hay que macizar más, subir el canto o llevar la carga a otra parte), o el cortante se comprueba a un canto útil de la cara de los apoyos (§6.2.1(8)), en todas las losas.
+
 
 ## 9. Fuera de esta fase
 

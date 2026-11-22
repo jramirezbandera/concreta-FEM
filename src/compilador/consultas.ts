@@ -53,7 +53,7 @@ import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type Pil
 import { huellaPilar } from "./geometria2d.ts";
 import type { Mapeo } from "./mapeo.ts";
 import { diafragmaDe } from "./piezas.ts";
-import { IndicePunzonamiento, N_TRANSMITIDO, transmitidoPilar, type TransmitidoPilar } from "./punzonamiento.ts";
+import { IndicePunzonamiento, losaEnHuella, N_TRANSMITIDO, transmitidoPilar, type TransmitidoPilar } from "./punzonamiento.ts";
 import { EsfuerzosPiezas } from "./resultados.ts";
 import { amplificar, calcularSegundoOrden, coeficientes, diagnosticosSegundoOrden, maximos, opcionesSegundoOrden, type CoeficienteHipotesis, type MaximoHipotesis, type SegundoOrdenCalculado } from "./segundoOrden.ts";
 import { calcularSismo, sismoDelCalculo, tieneEspectro, type EspectroSismo, type SismoCalculado } from "./sismo.ts";
@@ -760,6 +760,14 @@ export class Consultas {
     if (!this.transmitidos.has(clave))
       this.transmitidos.set(clave, transmitidoPilar(this.ctx, { modelo: this.modelo, mapeo: this.mapeo }, this.cortes.fuerzas, this.casos, (this.punzC ??= new IndicePunzonamiento(this.modelo)), pilar, planta));
     return { valido: true, valor: this.transmitidos.get(clave)!, diagnosticos: [] };
+  }
+
+  /**
+   * CO4: la losa que toca la huella de un pilar en una planta (sin calcular nada), o null: el pilar va
+   * dentro del ancho de sus vigas, o no hay losa. Sólo esos pilares tienen punzonamiento.
+   */
+  losaEnHuella(pilar: string, planta: string): string | null {
+    return losaEnHuella(this.mapeo, (this.punzC ??= new IndicePunzonamiento(this.modelo)), pilar, planta);
   }
 
   /**

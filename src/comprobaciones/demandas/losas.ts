@@ -9,10 +9,16 @@
  *  - en la ELS cuasipermanente, los mismos momentos (fisuración).
  * Por metro de ancho; en los nervios de un reticular se pasan a su nervio con `ancho`.
  *
- * El cortante de una estación no cuenta (`cortante: null`) en el metro de un pilar ni donde su recta,
- * en el ancho de la franja, pasa a menos de `CANTOS_PUNZONAMIENTO` cantos de un pilar que llega a la
- * planta de la losa (también del que está en el ancho de una viga): ahí la losa no trabaja como una
- * viga ancha sino a punzonamiento, que es otra comprobación (CO4).
+ * El cortante de una estación no cuenta (`cortante: null`):
+ *  - en el metro de un pilar (lo que pasa por su huella): es del punzonamiento (CO4);
+ *  - en una estación de paso cuya recta, en el ancho de la franja, pasa a menos de
+ *    `CANTOS_PUNZONAMIENTO` cantos de un pilar que llega a la planta: ahí la losa no trabaja como una
+ *    viga ancha, y lo que la cruza llega a la huella del pilar (punzonamiento) o a la cara de una viga
+ *    o un apoyo, cuya estación sí se comprueba. Por campos, junto a la esquina de un pilar y una viga
+ *    no converge (en la vivienda, de 138 a 91 kN/m al pasar de h = 0,75 a 0,375).
+ * El de una estación de apoyo (la cara de una viga, de un muro o un apoyo lineal) se comprueba
+ * siempre, también junto a un pilar: lo que pasa por ella va a la viga o al apoyo, no a la huella del
+ * pilar, y el punzonamiento no lo ve (CO4-4). Es exacto (por fuerzas nodales).
  *
  * El contrato, como en los pilares y las vigas: sólo se lee por `Consultas`, sin ver vectores por caso
  * ni factores. Cada fila del módulo depende de un solo esfuerzo, así que bastan sus envolventes.
@@ -59,7 +65,7 @@ export interface EstacionLosa {
   superior: number;
   combInferior: string;
   combSuperior: string;
-  /** ELU: el mayor cortante medio, kN/m; null donde es del punzonamiento (junto a un pilar). */
+  /** ELU: el mayor cortante medio, kN/m; null en el metro de un pilar (punzonamiento) y en las estaciones de paso junto a un pilar. */
   cortante: number | null;
   combCortante: string;
   /** ELS cuasipermanente: momento de cada cara, kN·m/m (0 sin combinaciones de ELS). */
@@ -107,11 +113,11 @@ const error = (codigo: string, mensaje: string, ids: string[]): { valido: false;
  * Los pilares que llegan a la planta de una losa: su punto en planta y el radio que lo envuelve (media
  * diagonal de su mayor sección; con un punto fijo que no es el centro, la diagonal entera).
  */
-function pilaresDePlanta(q: Consultas, planta: string): { p: Vec2; r: number }[] {
+function pilaresDePlanta(q: Consultas, planta: string): { id: string; p: Vec2; r: number }[] {
   const orden = new Map(q.fisico.plantas.map((x, i) => [x.id, i]));
   const k = orden.get(planta);
   if (k === undefined) return [];
-  const r: { p: Vec2; r: number }[] = [];
+  const r: { id: string; p: Vec2; r: number }[] = [];
   for (const p of q.fisico.pilares ?? []) {
     // Las plantas van de arriba abajo: el pilar va de `desde` (abajo) a `hasta` (arriba)
     const [a, b] = [orden.get(p.hasta), orden.get(p.desde)];
@@ -122,7 +128,7 @@ function pilaresDePlanta(q: Consultas, planta: string): { p: Vec2; r: number }[]
       if (sc?.forma === "rectangular") diagonal = Math.max(diagonal, Math.hypot(sc.b, sc.h));
       else if (sc?.forma === "circular") diagonal = Math.max(diagonal, sc.D);
     }
-    r.push({ p: [p.x, p.y], r: p.fijo && p.fijo !== "centro" ? diagonal : diagonal / 2 });
+    r.push({ id: p.id, p: [p.x, p.y], r: p.fijo && p.fijo !== "centro" ? diagonal : diagonal / 2 });
   }
   return r;
 }
@@ -183,7 +189,7 @@ export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> 
         const x = w.valor[i]!;
         const xc = wcp?.valor[i];
         const seccion: SeccionLosa = losa.reticular ? ((e.fraccionAbaco ?? 0) >= FRACCION_ABACO ? "abaco" : "nervio") : "maciza";
-        const punzonamiento = e.ventana !== undefined || cerca.some((x) => Math.hypot(e.s - x.s, Math.max(0, f.t0 - x.t, x.t - f.t1)) < x.r - 1e-9);
+        const punzonamiento = e.ventana !== undefined || (e.tipo !== "apoyo" && cerca.some((x) => Math.hypot(e.s - x.s, Math.max(0, f.t0 - x.t, x.t - f.t1)) < x.r - 1e-9));
         estaciones.push({
           franja: f.id,
           indice: i,

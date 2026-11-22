@@ -1,0 +1,72 @@
+== CO3, las losas (CO4-4)
+losa-dos-apoyos: {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0} → {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0}
+losa-plana-sismo: {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0} → {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0}
+losa-reticular: {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0} → {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0}
+vivienda: {"losas":2,"cumplen":2,"noCumplen":0,"sinArmado":0} → {"losas":2,"cumplen":0,"noCumplen":2,"sinArmado":0}
+  L-CUB: cumple true → false; filas de cortante 34 → 34; el peor cortante 0.973 → 1.003; armado igual
+  L-CUB-S: cumple true → false; filas de cortante 39 → 39; el peor cortante 1.000 → 2.238; armado igual
+
+== CO4, el punzonamiento (CO4-f)
+losa-bordes: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}
+  P00@P1: vEd/vRd,c 0.779 → 0.779; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P01@P1: vEd/vRd,c 0.946 → 0.946; ρl,min/ρl 0.676 → 0.753; cumple true → true
+  P02@P1: vEd/vRd,c 0.779 → 0.779; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P10@P1: vEd/vRd,c 0.946 → 0.946; ρl,min/ρl 0.703 → 0.774; cumple true → true
+  P11@P1: vEd/vRd,c 1.071 → 1.071; ρl,min/ρl 0.324 → 0.324; cumple true → true
+  P12@P1: vEd/vRd,c 0.946 → 0.946; ρl,min/ρl 0.703 → 0.774; cumple true → true
+  P20@P1: vEd/vRd,c 0.779 → 0.779; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P21@P1: vEd/vRd,c 0.946 → 0.946; ρl,min/ρl 0.676 → 0.753; cumple true → true
+  P22@P1: vEd/vRd,c 0.779 → 0.779; ρl,min/ρl 0.915 → 0.915; cumple true → true
+losa-bordes-7m: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":9,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":9,"sinArmadoLosa":0,"pendientes":0}
+  P00@P1: vEd/vRd,c 1.166 → 1.166; ρl,min/ρl 0.952 → 0.952; cumple true → true
+  P01@P1: vEd/vRd,c 1.420 → 1.478; ρl,min/ρl 0.509 → 0.639; cumple true → true
+  P02@P1: vEd/vRd,c 1.166 → 1.166; ρl,min/ρl 0.952 → 0.952; cumple true → true
+  P10@P1: vEd/vRd,c 1.437 → 1.478; ρl,min/ρl 0.528 → 0.657; cumple true → true
+  P11@P1: vEd/vRd,c 1.402 → 1.402; ρl,min/ρl 0.162 → 0.162; cumple true → true
+  P12@P1: vEd/vRd,c 1.437 → 1.478; ρl,min/ρl 0.528 → 0.657; cumple true → true
+  P20@P1: vEd/vRd,c 1.166 → 1.166; ρl,min/ρl 0.952 → 0.952; cumple true → true
+  P21@P1: vEd/vRd,c 1.420 → 1.478; ρl,min/ρl 0.509 → 0.639; cumple true → true
+  P22@P1: vEd/vRd,c 1.166 → 1.166; ρl,min/ρl 0.952 → 0.952; cumple true → true
+losa-bordes-hueco: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}
+  P00@P1: vEd/vRd,c 0.780 → 0.780; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P01@P1: vEd/vRd,c 0.970 → 0.970; ρl,min/ρl 0.676 → 0.753; cumple true → true
+  P02@P1: vEd/vRd,c 0.777 → 0.777; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P10@P1: vEd/vRd,c 0.970 → 0.970; ρl,min/ρl 0.703 → 0.774; cumple true → true
+  P11@P1: vEd/vRd,c 1.198 → 1.198; ρl,min/ρl 0.246 → 0.246; cumple true → true
+  P12@P1: vEd/vRd,c 0.965 → 0.965; ρl,min/ρl 0.703 → 0.774; cumple true → true
+  P20@P1: vEd/vRd,c 0.777 → 0.777; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P21@P1: vEd/vRd,c 0.965 → 0.965; ρl,min/ρl 0.676 → 0.753; cumple true → true
+  P22@P1: vEd/vRd,c 0.775 → 0.775; ρl,min/ρl 0.915 → 0.915; cumple true → true
+losa-plana-sismo: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}
+  P1@F1: vEd/vRd,c 0.814 → 0.814; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P2@F1: vEd/vRd,c 0.983 → 0.983; ρl,min/ρl 0.703 → 0.768; cumple true → true
+  P3@F1: vEd/vRd,c 0.814 → 0.814; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P4@F1: vEd/vRd,c 0.983 → 0.983; ρl,min/ρl 0.734 → 0.791; cumple true → true
+  P5@F1: vEd/vRd,c 1.069 → 1.069; ρl,min/ρl 0.339 → 0.339; cumple true → true
+  P6@F1: vEd/vRd,c 0.983 → 0.983; ρl,min/ρl 0.734 → 0.791; cumple true → true
+  P7@F1: vEd/vRd,c 0.814 → 0.814; ρl,min/ρl 0.915 → 0.915; cumple true → true
+  P8@F1: vEd/vRd,c 0.983 → 0.983; ρl,min/ρl 0.703 → 0.768; cumple true → true
+  P9@F1: vEd/vRd,c 0.814 → 0.814; ρl,min/ρl 0.915 → 0.915; cumple true → true
+reticular-bordes: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}
+  P00@P1: vEd/vRd,c 0.744 → 0.744; ρl,min/ρl 0.952 → 0.952; cumple true → true
+  P01@P1: vEd/vRd,c 0.903 → 0.903; ρl,min/ρl 0.719 → 0.859; cumple true → true
+  P02@P1: vEd/vRd,c 0.744 → 0.744; ρl,min/ρl 0.952 → 0.952; cumple true → true
+  P10@P1: vEd/vRd,c 0.903 → 0.903; ρl,min/ρl 0.719 → 0.859; cumple true → true
+  P11@P1: vEd/vRd,c 1.021 → 1.043; ρl,min/ρl 0.340 → 0.363; cumple true → true
+  P12@P1: vEd/vRd,c 0.903 → 0.903; ρl,min/ρl 0.719 → 0.859; cumple true → true
+  P20@P1: vEd/vRd,c 0.744 → 0.744; ρl,min/ρl 0.952 → 0.952; cumple true → true
+  P21@P1: vEd/vRd,c 0.903 → 0.903; ρl,min/ρl 0.719 → 0.859; cumple true → true
+  P22@P1: vEd/vRd,c 0.744 → 0.744; ρl,min/ρl 0.952 → 0.952; cumple true → true
+vivienda: {"uniones":12,"cumplen":12,"noCumplen":0,"conArmadura":0,"sinArmadoLosa":0,"pendientes":0} → {"uniones":12,"cumplen":12,"noCumplen":0,"conArmadura":0,"sinArmadoLosa":0,"pendientes":0}
+  P2@CUB: vEd/vRd,c 0.263 → 0.263; ρl,min/ρl 0.842 → 0.869; cumple true → true
+  P3@CUB: vEd/vRd,c 0.952 → 0.952; ρl,min/ρl 0.723 → 0.850; cumple true → true
+  P4@CUB: vEd/vRd,c 0.397 → 0.397; ρl,min/ρl 0.958 → 0.958; cumple true → true
+  P5@CUB-S: vEd/vRd,c 0.648 → 0.648; ρl,min/ρl 0.842 → 0.907; cumple true → true
+  P6@CUB-S: vEd/vRd,c 0.393 → 0.393; ρl,min/ρl 0.958 → 0.958; cumple true → true
+  P8@CUB-S: vEd/vRd,c 0.467 → 0.467; ρl,min/ρl 0.739 → 0.779; cumple true → true
+  P9@CUB-S: vEd/vRd,c 0.310 → 0.310; ρl,min/ρl 0.842 → 0.894; cumple true → true
+  P11@CUB: vEd/vRd,c 0.855 → 0.883; ρl,min/ρl 0.545 → 0.651; cumple true → true
+  P12@CUB-S: vEd/vRd,c 0.127 → 0.127; ρl,min/ρl 0.958 → 0.958; cumple true → true
+  P12@CUB: vEd/vRd,c 0.354 → 0.354; ρl,min/ρl 0.958 → 0.958; cumple true → true
+  P13@CUB-S: vEd/vRd,c 0.475 → 0.475; ρl,min/ρl 0.842 → 0.907; cumple true → true
+  P16@CUB-S: vEd/vRd,c 0.118 → 0.118; ρl,min/ρl 0.842 → 0.914; cumple true → true

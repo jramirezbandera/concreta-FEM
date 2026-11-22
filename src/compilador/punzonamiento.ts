@@ -105,6 +105,22 @@ export class IndicePunzonamiento {
 }
 
 /**
+ * La losa que llega a la huella del pilar en la planta (la de más láminas en sus nudos rígidos), sin
+ * calcular nada; null si el pilar no llega a la planta o ninguna losa toca su huella (va dentro del
+ * ancho de sus vigas, o no hay losa).
+ */
+export function losaEnHuella(mapeo: Mapeo, indice: IndicePunzonamiento, pilar: string, planta: string): string | null {
+  const nudo = mapeo.nudosPilar[`${pilar}@${planta}`];
+  if (nudo === undefined) return null;
+  const cuenta = new Map<string, number>();
+  for (const l of indice.laminas(indice.rigidos(nudo))) {
+    const losa = mapeo.laminas?.[l]?.losa;
+    if (losa !== undefined) cuenta.set(losa, (cuenta.get(losa) ?? 0) + 1);
+  }
+  return [...cuenta].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] ?? null;
+}
+
+/**
  * Lo que el forjado pasa al pilar en la planta; null si el pilar no llega a ella o no se une a ninguna
  * losa (va por sus vigas, o no hay losa).
  */

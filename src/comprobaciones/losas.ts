@@ -180,7 +180,7 @@ export function comprobarLosas(q: Consultas, armado: ArmadoLosas | undefined, da
   if (resumen.losas && datos?.exposicion === undefined)
     diagnosticos.push({ codigo: "comprobacion/losas-por-defecto", severidad: "aviso", mensaje: `Las losas se comprueban con la clase de exposición ${DATOS_ARMADO.exposicion} (fisura admisible de 0,3 mm), por defecto: confírmala o escríbela en obra.armado (exposicion; con XC1, en interiores secos, la fisuración no se comprueba).` });
   if (conPilares)
-    diagnosticos.push({ codigo: "comprobacion/punzonamiento-aparte", severidad: "info", mensaje: "El cortante de las losas no se comprueba junto a los pilares (en su metro ni a menos de dos cantos de su cara): ahí es del punzonamiento, que se comprueba aparte, pilar a pilar." });
+    diagnosticos.push({ codigo: "comprobacion/punzonamiento-aparte", severidad: "info", mensaje: "El cortante de las losas no se comprueba en el metro de los pilares (es del punzonamiento, que se comprueba aparte, pilar a pilar) ni en las estaciones de paso a menos de dos cantos de ellos; sí en la cara de las vigas y los apoyos junto a ellos." });
   if (resumen.sinArmado && !op.proponer)
     diagnosticos.push({ codigo: "comprobacion/sin-armado", severidad: "aviso", mensaje: `${resumen.sinArmado} de ${resumen.losas} losas no tienen armado en el proyecto (armado.forjados) y no se dan por comprobadas; «fem armar» propone uno.` });
   return { valido: true, valor: { losas, resumen }, diagnosticos };
