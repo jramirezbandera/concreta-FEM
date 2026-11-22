@@ -677,7 +677,112 @@ De la puerta de uso de CO6 (el usuario, con la vivienda): el armado sólo se le�
 - **CO6-6:** dibujados, los refuerzos de las losas enseñan lo que el texto escondía: la propuesta deja refuerzos de 0,16 a 0,40 m de largo (una estación suelta que no cumple) y zonas que se pisan. Es de proponer (CO3-h, AB-5: agrupar e igualar las zonas), no del dibujo.
 - **CO6-7:** `dibujoArmado.ts` repite la cuenta de `direccionEje1` del compilador en vez de importarla: lo carga el hilo principal de la app, que no lleva el compilador.
 
-**Por decidir por el usuario:** CO6-e, si la planta abre con el armado (como queda) o con el aprovechamiento; CO6-f, qué más quiere a la vista (lo que no está: el armado en el 3D y en el alzado, el cuadro de pilares, mover o estirar la zona de un refuerzo con el ratón, añadir uno a mano, y los planos, A6).
+**Por decidir por el usuario:** CO6-e, si la planta abre con el armado (como queda) o con el aprovechamiento; CO6-f, qué más quiere a la vista (lo que no está: el armado en el 3D y en el alzado, el cuadro de pilares y los planos, A6; mover o estirar la zona de un refuerzo con el ratón y añadir uno a mano, hechos en §8.12).
+
+### 8.12 CO6, los refuerzos de las losas: despiece, cotas y edición con el ratón (2026-11-22)
+
+Lo primero de la lista de mejoras visuales que eligió el usuario tras §8.11: que la planta de refuerzos de las losas se pueda enseñar. Dibujada, la propuesta dejaba refuerzos de 2 a 40 cm de largo (CO6-6). El cálculo no cambia; **sí cambia lo que propone `fem armar` en las losas**, a sabiendas.
+
+**El despiece al proponer (CO6-g; `armar/losas.ts`, `despiece`).** Son reglas de obra, que sólo añaden acero; el juez sigue siendo la comprobación del armado entero.
+
+- **En los ábacos, uno por ábaco:** si alguna estación de un ábaco pide refuerzo en una armadura, el refuerzo es una parrilla en el ábaco entero (lo que cae en la losa), no en el trozo que falla. Las demandas llevan los ábacos de la losa como los usa el cálculo (`DemandasLosa.abacos`).
+- **En los nervios y en una maciza,** el rectángulo que envuelve cada zona se alarga por cada punta el decalaje (el canto de la losa) más la longitud de anclaje de su barra (`computeAnchorage` del módulo de forjados, con su posición de adherencia: con Ø12 y HA-25, 0,49 m abajo y 0,69 m arriba), sin salir de la losa y hasta 1 m (`LARGO_MINIMO`). El anclaje depende del diámetro, que sale de dimensionar: se repite con el diámetro elegido (como mucho cuatro rondas; el diámetro supuesto sólo crece).
+- **Se unen** dos rectángulos de la misma armadura que se tocan o se pisan si el que los envuelve a los dos no pasa de 1,2 veces lo que cubren (`HOLGURA_UNION`: los trozos seguidos de un nervio, los nervios vecinos de casi el mismo largo), y siempre si sus zonas se pisan de origen. Los que aun así se pisan (dos vanos seguidos) se cortan a mitad del hueco entre sus zonas: ningún refuerzo pisa a otro de su armadura y de su clase, y el solape entre los dos no se da.
+- **Las puntas, a 5 cm** (`MODULO_LARGO`), hacia fuera, salvo las que llegan al borde de la losa o a un corte.
+- **Las zonas de cercos,** igual: sin anclaje, de 0,5 m como mínimo y uniéndose hasta el doble de lo que cubren (`HOLGURA_UNION_CERCOS`: cuestan poco acero). La segunda pasada (tras los refuerzos) rehace las de su dirección con todo lo que ha pedido cercos, en lugar de añadir trozos sueltos.
+
+**Lo que cambia** (`validacion/co/out_cambiosDespiece.txt`; las referencias congeladas de CO3 y CO4, regeneradas a sabiendas):
+
+| Losa | Refuerzos | El más corto | Lo que cubren | Zonas de cercos |
+|---|---|---|---|---|
+| vivienda, L-CUB | 13 → 11 | 0,02 → 1,75 m | 138 → 214 m² | 10 → 9 |
+| vivienda, L-CUB-S | 17 → 14 | 0,15 → 1,70 m | 105 → 175 m² | 15 → 12 |
+| losa plana con sismo | 8 → 6 | 0,25 → 1,75 m | 11 → 25 m² | — |
+| losa reticular | 16 → 14 | 0,15 → 2,05 m | 244 → 399 m² | 24 → 24 |
+
+- Las bases, lo que cumple y los peores aprovechamientos no cambian (L-CUB sigue sin cumplir por el cortante junto a P2, 1,003).
+- **El acero de los refuerzos sube:** en la vivienda, de 494 a 708 kg en L-CUB y de 239 a 402 kg en L-CUB-S (estimado con el intereje, sin patillas). Una parte es el anclaje, que antes no estaba y sin el que el refuerzo no se podía poner en obra; otra, el ábaco entero y las uniones; y en L-CUB-S, un Ø25 por nervio donde antes bastaba un Ø20, porque la zona de cercos de al lado, ahora de 0,5 m, cubre la estación que manda y le baja el canto útil.
+- En el punzonamiento sólo cambia la cuantía de la losa sobre algunos pilares (ρl,mín/ρl baja y vEd/vRd,c baja hasta un 3 %): ninguna unión cambia de estado.
+
+**Las cotas en la planta** (`cotasRefuerzo` en `dibujoArmado.ts`, `referenciasRefuerzo` en `armadoPlanta.ts`). Cada refuerzo se acota a lo largo de sus barras respecto a los pilares de su ancho (su punto, con 0,30 m de holgura) y a los ejes de las vigas que lo cruzan: si alguno cae dentro, por tramos desde él (un refuerzo superior sobre un pilar: «1,00 | 1,00»); si no, de cada punta al más cercano, hasta 2 m (un refuerzo de vano: lo que le falta hasta el eje del apoyo). Con más de tres dentro no se acota por tramos (se lee su largo).
+
+**Lo que se ve.** El selector de la planta de losas es ahora «Se ve: Todo | Inferior | Superior | Cercos»: con una cara, sin los cercos; con «Cercos», sólo ellos.
+
+**Con el ratón** (`src/editor/refuerzosPlanta.ts`, puro; `app/src/dibujo/refuerzos.ts`, el adaptador de la vista):
+
+- **Estirar y mover:** con un refuerzo o una zona de cercos elegido, su zona se pinta con cinco asas: la del medio de cada lado lo estira y la del centro lo mueve entero. Un clic en un asa la coge y el clic siguiente la deja; arrastrarla, también. Lo que cambia va a 5 cm y ningún lado baja de 10 cm. Mientras, se ve la zona que quedaría con sus medidas.
+- **Añadir:** «Añadir…» en la barra (refuerzo X o Y, inferior o superior; en un reticular, de los nervios o de los ábacos; o cercos de nervios X o Y) y dos clics en la planta, o una ventana: las esquinas opuestas de la zona, en la losa que hay debajo. Entra con Ø12 (uno por nervio o cada 200 mm) o cercos Ø6/150, elegido, para cambiarle las barras en la ficha.
+- **Quitar:** Supr con uno elegido (o su × en la ficha). Tras quitar uno, lo elegido es la losa: los de detrás cambian de número.
+- Esc suelta lo que se tiene a medias y, después, la herramienta de añadir. Cada cambio es un paso de deshacer y vuelve a comprobar la losa.
+
+**Validación:** `armar/despiece.test.ts` (alargar, el mínimo, el borde de la losa, unir, cortar, y 200 casos al azar: deterministas, sin pisarse y con cada zona cubierta), `losas.test.ts` (lo propuesto en una maciza y en un reticular: ninguno corto, ninguno pisa a otro, las puntas al módulo y uno por ábaco; sigue cumpliendo, y con un puesto menos, no), `refuerzosPlanta.test.ts`, `dibujoArmado.test.ts` (las cotas), `src/visor/comprobaciones.test.ts` (lo que se ve), `app/src/test/refuerzos.test.ts` (el adaptador: coger y dejar un asa, arrastrar, añadir con dos clics y con una ventana, soltar) y `comprobacion.test.tsx` (Supr, «Añadir» y Esc). A mano, en la app, con la vivienda: estirar un refuerzo, añadir uno y quitarlo. Los bancos de Chrome no se han pasado.
+
+**Hallazgos:**
+
+- **CO6-8:** quitar un refuerzo con su × dejaba elegido el siguiente (los de detrás cambian de número). Ahora lo elegido pasa a ser la losa.
+- **CO6-9:** las filas de la ficha de una losa repetían clave (varias filas con el mismo id, una por grupo de sección) y React lo avisaba miles de veces. Corregido.
+- **CO6-10:** el refuerzo de una zona es el mismo en toda ella, el que pide su peor estación. Con zonas mayores (unidas, con anclaje) eso cuesta más acero: en L-CUB, una zona de vano de 8,1 × 11,5 m lleva un Ø25 por nervio entera. Escalonar el refuerzo dentro de una zona es lo siguiente que ahorraría acero.
+
+**Decisiones, de Claude, por confirmar por el usuario (CO6-g):** el decalaje igual al canto de la losa; el mínimo de 1 m (0,5 m en los cercos); unir hasta 1,2 veces lo que cubren (2 en los cercos); en los ábacos, el ábaco entero; cortar sin solape los que se pisan; 5 cm.
+
+**No hecho:** partir un refuerzo en dos con el ratón; enganchar las asas a los nervios, a los ábacos o a las caras de las vigas (van a 5 cm); los solapes y las patillas.
+
+### 8.13 CO6, el despiece de las vigas por pórtico (2026-11-22)
+
+Lo segundo de las mejoras visuales que eligió el usuario. El cálculo, las comprobaciones y lo que propone `fem armar` no cambian: el despiece sólo coloca el armado que ya hay.
+
+**Los pórticos (`src/comprobaciones/porticos.ts`).** Un pórtico es una alineación de vigas de una planta.
+
+- Dos vigas se siguen si acaban en el mismo punto (a 5 cm) o en el mismo pilar (hasta 0,6 m desplazadas, enrasadas a caras distintas) y su dirección cambia menos de 10°. Si hay varias candidatas, la más alineada.
+- Cada viga está en un pórtico y sólo en uno; las que cruzan no se encadenan.
+- Va de izquierda a derecha en planta (de abajo arriba, si es según Y). Una viga dibujada en el otro sentido va `invertida`: lo de su inicio queda a la derecha.
+- Sus apoyos y sus vanos son los de `Consultas.viga` (las caras de los apoyos), en una sola coordenada a lo largo. Una viga en polilínea con un quiebro se dibuja estirada, con una marca en el quiebro.
+- La misma alineación dibujada en una viga o en tres, una al revés, da el mismo pórtico (a 1e-9).
+
+**El despiece (`despieceVigas.ts`, `despiecePortico`; reglas CO6-h).** Del armado de cada vano (una armadura por cara y por zona) salen las barras una a una. Las reglas sólo alargan las barras más allá de donde la comprobación cuenta con ellas:
+
+- **Inferior** (y la de piel): de cara a cara de los apoyos del vano, más su anclaje en cada uno.
+- **Superior corrida:** pasa de un vano al siguiente si es la misma (n y Ø) y la barra no pasa de 12 m; si no, se ancla más allá de la cara. Donde la zona de un apoyo lleva otro diámetro, es sólo el montaje del centro y empieza un anclaje antes del fin de esa zona.
+- **Superior de un apoyo:** lo que la zona (el cuarto de la luz) tiene de más sobre la corrida, o toda si es de otro diámetro. Cubre la zona y sigue el decalaje (z·cot θ/2, con z = 0,9·d y cot θ = 2, el del cortante) más su anclaje. Con vano a los dos lados, lo común pasa de uno a otro y lo que un lado tiene de más se ancla más allá de su cara. Dos iguales de zonas distintas que se pisan (un vano corto) son una.
+- **El anclaje:** el básico a fyd (`lb,rqd`, CE A19 §8.4.3, con `computeAnchorage` del módulo de forjados), al alza a 5 cm. La cara superior de un canto de más de 25 cm, en adherencia deficiente (÷ 0,7).
+- **En un apoyo extremo:** recta si cabe hasta el recubrimiento de su cara de fuera; si no, hasta ahí y una patilla, la mayor de 0,7·lb menos lo recto y 10 Ø. Si la patilla no cabe en el canto, se avisa.
+- **Los cercos,** donde los pone `alzadoVano` (el primero a 5 cm de la cara), contados por tramos del mismo cerco, con su desarrollo estimado (el cerco, otro por cada par de ramas de más, una horquilla por la impar y dos ganchos de 10 Ø).
+- **La medición:** una fila por barra y por tramo de cercos (n, Ø, largo, total y kg, a 7 850 kg/m³) y el acero por diámetro. El largo es lo recto más las patillas, sin descontar los doblados.
+
+**En la app** (`app/src/editor/DespiecePortico.tsx`; pedido `portico` del worker, que no depende del armado).
+
+- Con una viga elegida en Resultados · Comprobación, la pestaña «Pórtico» de abajo (o «Ver el pórtico» en la ficha) dibuja su alineación entera: los apoyos y los vanos a escala a lo largo, con el nombre y el aprovechamiento de cada vano.
+- Cada barra, en su sitio (fina) y sacada a su fila con su marca, sus patillas y «nØ L=»; las superiores, arriba (en rojo) y las inferiores, abajo (en azul). Las de apoyo llevan debajo lo que sale a cada lado del eje de su apoyo.
+- Los cercos, en su sitio y contados por tramos («25cØ6/150 (3R)»); las luces entre caras y el ancho de cada apoyo, acotados.
+- Las secciones del vano elegido (junto a cada apoyo y en el centro, en el sentido del pórtico) y la tabla de despiece con el acero.
+- Sigue a lo que se escribe en la ficha del vano elegido, sin aplicarlo; el campo con el foco resalta sus barras, y lo de los demás vanos va atenuado. Un clic en otro vano lo elige.
+
+**Medido** (`validacion/co/medirPorticos.ts`, `out_medirPorticos.txt`, con el armado propuesto):
+
+| | Vigas | Pórticos | Barras | De más de 12 m | Acero en vigas |
+|---|---|---|---|---|---|
+| Vivienda | 18 | 17 | 52 | 0 | 708,7 kg |
+| Pórtico de las pruebas de las vigas | 10 | 10 | 50 | 0 | 652,8 kg |
+
+En la vivienda sólo se encadenan VPG-2 y Z-CUB-S-2 (14,10 m, cuatro vanos); encadenar todas las vigas tarda 7 ms.
+
+**Validación.**
+
+- `porticos.test.ts`: cada viga en un pórtico, los apoyos y los vanos de `Consultas.viga`, la alineación partida en tres con una al revés y girada 90°, y los anclajes contra la fórmula.
+- `despieceVigas.test.ts`: cada regla con sus números a mano sobre un pórtico de dos vanos y un voladizo, y 300 armados al azar en los que cada zona tiene al menos el acero de su armado, la inferior cubre el vano entero, nada sale del pórtico y ninguna barra pasa de 12 m.
+- `src/visor/comprobaciones.test.ts`: el pedido `portico` es `porticoDe` y `datosDespiece`.
+- `app/src/test/despiecePortico.test.tsx` y `comprobacion.test.tsx`: lo dibujado es lo de `despiecePortico`, sigue al borrador y un clic cambia de vano.
+- A mano en la app con la vivienda. Los bancos de Chrome no se han pasado.
+
+**Hallazgos.**
+
+- **CO6-11:** con las zonas fijas de un cuarto de la luz (CO2-a), las superiores de los apoyos salen largas. Un 4Ø16 sobre un pilar en un vano de 3 m (HA-30, canto 30) llega a 1,95 m del eje: el cuarto de la luz (75 cm), 23 cm de decalaje y 82 cm de anclaje. Cortarlas por la envolvente de momentos las acortaría.
+- **CO6-12:** en una viga plana de 30, la patilla de un Ø16 en un apoyo de 30 pide 35 cm y caben 24: se avisa (en la vivienda, una vez).
+- **CO6-13:** cuando una viga apoya en otra, su apoyo se llama como esa viga, y la barra se ancla en su ancho como en un pilar.
+
+**Decisiones, de Claude, por confirmar por el usuario (CO6-h):** el anclaje básico entero (sin reducirlo por el acero que sobra) y a 5 cm; el decalaje con cot θ = 2; la inferior anclada entera también en los apoyos interiores (la norma pide allí 10 Ø, pero con el sismo esa cara puede traccionar); la patilla; la corrida pasante hasta 12 m; lo común que pasa sobre el apoyo; y, para encadenar, 10°, 5 cm y 0,6 m.
+
+**No hecho:** cortar las barras por la envolvente de momentos (CO6-11); los solapes de una barra de más de 12 m (se avisa); dos capas; mover una barra con el ratón; el despiece en `fem` (hoy sólo está en la app); y los planos.
 
 ## 9. Fuera de esta fase
 

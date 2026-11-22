@@ -10,13 +10,22 @@
  *   módulo de comprobación.
  * - «Proponer» pone el armado de las tablas (el primero que cumple): en lo que falta, en todo el
  *   tipo, en la pieza de la ficha o en toda la obra. Es un paso de deshacer.
+ * - En la planta de las losas (§8.12, `dibujo/refuerzos.ts`): el refuerzo o la zona de cercos elegido
+ *   se estira por las asas de sus lados y se mueve por la del centro; «Añadir» pone uno nuevo con dos
+ *   clics, y Supr quita el elegido. Cada cambio, un paso de deshacer.
+ *
+ * - Con una viga elegida (§8.13), la pestaña «Pórtico» de abajo dibuja el despiece de su alineación
+ *   entera: cada barra con su marca, sus patillas y su largo, los cercos contados y la tabla de
+ *   despiece. Sigue a lo que se escribe en la ficha del vano elegido, y un clic en otro vano lo elige.
  *
  * Todo número sale de los pedidos `comprobaciones`, `comprobacion` y `armar` de la sesión, que
  * llaman a lo que da la orden de comprobar del agente. El armado va en cada pedido.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ArmadoProyecto } from "../../../src/agente/armaduraBase.ts";
+import type { ArmadoForjado, ArmadoVanoViga, CercosForjado, RefuerzoForjado } from "../../../src/comprobaciones/armado.ts";
 import { armadoDeBorrador, armadoParcial, borradorArmado, DIAMETROS_BARRA, elementoDeId, gruposArmado, idElemento, ponerArmado, sinElemento, type GrupoArmado } from "../../../src/editor/armadoBarras.ts";
+import { conElemento, conZona } from "../../../src/editor/refuerzosPlanta.ts";
 import type { CaraDibujada } from "../../../src/visor/armadoPlanta.ts";
 import type { DatosArmar, FichaComprobacion, FilaModulo, ParteComprobada, TipoComprobacion } from "../../../src/visor/comprobaciones.ts";
 import { Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
@@ -29,9 +38,11 @@ import { useVisor } from "../contexto.ts";
 import { fmt, plural, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { CroquisLosa, CroquisPilar, CroquisPunzonamiento, CroquisViga } from "../editor/CroquisArmado.tsx";
+import { DespiecePortico, type EstadoVano } from "../editor/DespiecePortico.tsx";
 import { Dialogo } from "../editor/Dialogos.tsx";
+import { EditorRefuerzos, type NuevoElemento } from "../dibujo/refuerzos.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { FuenteEscena, ZonaVistas } from "../vistas/Zona.tsx";
+import { FuenteEscena, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
 
 const TIPOS: { id: TipoComprobacion; nombre: string; title: string }[] = [
   {
@@ -98,10 +109,25 @@ const DIBUJOS: { id: Dibujo; nombre: string; title: string }[] = [
   { id: "aprovechamiento", nombre: "Aprovechamiento", title: "La planta con cada pieza del color de su aprovechamiento, sin el armado" },
 ];
 const CARAS: { id: CaraDibujada; nombre: string; title: string }[] = [
-  { id: "todas", nombre: "Las dos", title: "Los refuerzos de las dos caras: los inferiores en azul y los superiores en rojo" },
+  { id: "todas", nombre: "Todo", title: "Los refuerzos de las dos caras (los inferiores en azul y los superiores en rojo) y los cercos de los nervios" },
   { id: "inferior", nombre: "Inferior", title: "Sólo los refuerzos de la cara inferior" },
   { id: "superior", nombre: "Superior", title: "Sólo los refuerzos de la cara superior" },
+  { id: "cercos", nombre: "Cercos", title: "Sólo las zonas de cercos de los nervios" },
 ];
+
+/** Lo que se puede añadir a una losa en la planta (§8.12): su clave en el desplegable. */
+const ANADIR: { id: string; nombre: string; nuevo: NuevoElemento }[] = [
+  { id: "x-inf", nombre: "Refuerzo X inferior", nuevo: { lista: "refuerzos", armadura: "x-inf" } },
+  { id: "x-sup", nombre: "Refuerzo X superior", nuevo: { lista: "refuerzos", armadura: "x-sup" } },
+  { id: "y-inf", nombre: "Refuerzo Y inferior", nuevo: { lista: "refuerzos", armadura: "y-inf" } },
+  { id: "y-sup", nombre: "Refuerzo Y superior", nuevo: { lista: "refuerzos", armadura: "y-sup" } },
+  { id: "cercos-x", nombre: "Cercos de nervios X", nuevo: { lista: "cercos", direccion: "x" } },
+  { id: "cercos-y", nombre: "Cercos de nervios Y", nuevo: { lista: "cercos", direccion: "y" } },
+];
+const enFoco = () => {
+  const a = document.activeElement;
+  return a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement || a instanceof HTMLSelectElement || (a instanceof HTMLElement && a.isContentEditable);
+};
 
 const aprov = (x: number | null) => (x === null ? "—" : fmt(x, 2));
 
@@ -229,7 +255,32 @@ function FormArmado({
 }
 
 /** La ficha de una parte: su armado (se edita), sus datos y las filas del módulo. */
-function Ficha({ tipo, ficha, cargando, proponer, ocupado, elegido, onElemento }: { tipo: TipoComprobacion; ficha: FichaComprobacion; cargando: boolean; proponer: () => void; ocupado: boolean; elegido: Elemento | null; onElemento: (e: Elemento) => void }) {
+function Ficha({
+  tipo,
+  ficha,
+  cargando,
+  proponer,
+  ocupado,
+  elegido,
+  onElemento,
+  alQuitar,
+  alDibujar,
+  alActivar,
+  verPortico,
+}: {
+  tipo: TipoComprobacion;
+  ficha: FichaComprobacion;
+  cargando: boolean;
+  proponer: () => void;
+  ocupado: boolean;
+  elegido: Elemento | null;
+  onElemento: (e: Elemento) => void;
+  alQuitar: () => void;
+  /** Lo que se está escribiendo (el armado a medias) y el campo con el foco: los sigue el despiece del pórtico. */
+  alDibujar?: (clave: string, armado: Record<string, unknown> | undefined) => void;
+  alActivar?: (ruta: string | null) => void;
+  verPortico?: () => void;
+}) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion;
   // Por su contenido: otra respuesta con el mismo armado (el mismo pedido otra vez) no tira lo escrito
@@ -238,7 +289,11 @@ function Ficha({ tipo, ficha, cargando, proponer, ocupado, elegido, onElemento }
   const delProyecto = useMemo(() => borradorArmado((JSON.parse(claveArmado) as typeof ficha.armado).armado, grupos), [claveArmado, grupos]); // eslint-disable-line react-hooks/exhaustive-deps -- por su contenido
   const [borrador, setBorrador] = useState(delProyecto);
   const [error, setError] = useState<string | null>(null);
-  const [activo, setActivo] = useState<string | null>(null);
+  const [activo, ponerActivo] = useState<string | null>(null);
+  const setActivo = (r: string | null) => {
+    ponerActivo(r);
+    alActivar?.(r);
+  };
   const [ampliado, setAmpliado] = useState(false);
   // Lo que se dibuja: lo escrito, aunque esté a medias (sin nada escrito ni en el proyecto, nada)
   const dibujado = useMemo(() => (Object.values(borrador).some((v) => v.trim() !== "") || ficha.armado.armado ? armadoParcial(ficha.armado.armado, grupos, borrador) : undefined), [borrador, grupos, claveArmado]); // eslint-disable-line react-hooks/exhaustive-deps -- el armado, por su contenido
@@ -247,6 +302,10 @@ function Ficha({ tipo, ficha, cargando, proponer, ocupado, elegido, onElemento }
     setBorrador(delProyecto);
     setError(null);
   }, [delProyecto]);
+  useEffect(() => {
+    alDibujar?.(ficha.clave, dibujado);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al cambiar lo dibujado
+  }, [dibujado, ficha.clave]);
   const cambiado = Object.keys(delProyecto).some((k) => (borrador[k] ?? "") !== delProyecto[k]);
   const escribir = (valor: object | null, etiqueta: string) => {
     if (!ed) return setError("El proyecto no se puede editar.");
@@ -267,6 +326,8 @@ function Ficha({ tipo, ficha, cargando, proponer, ocupado, elegido, onElemento }
   const quitarElemento = (x: Elemento) => {
     if (ficha.armado.tipo !== "losas" || !ficha.armado.armado) return;
     escribir(sinElemento(ficha.armado.armado, x), `Quitar ${x.lista === "refuerzos" ? "el refuerzo" : "los cercos"} ${x.indice + 1} de ${ficha.clave}`);
+    // Los de detrás cambian de número: lo elegido deja de ser uno de ellos
+    alQuitar();
   };
   const cambiar = (ruta: string, v: string) => setBorrador((b) => ({ ...b, [ruta]: v }));
   const botones = (
@@ -305,14 +366,19 @@ function Ficha({ tipo, ficha, cargando, proponer, ocupado, elegido, onElemento }
           <>
             <Croquis ficha={ficha} armado={dibujado} activo={activo} />
             {(tipo === "pilares" || tipo === "vigas") && (
-              <div className="-mt-1 px-3.5 text-right">
+              <div className="-mt-1 flex justify-end gap-3 px-3.5">
+                {tipo === "vigas" && verPortico && (
+                  <button type="button" className="enlace-armado" onClick={verPortico} title="El despiece de la alineación entera, abajo: cada barra con su largo y sus patillas, los cercos contados y el acero">
+                    Ver el pórtico
+                  </button>
+                )}
                 <button type="button" className="enlace-armado" onClick={() => setAmpliado(true)} title="El armado en grande, con su formulario al lado">
                   Ampliar el dibujo
                 </button>
               </div>
             )}
             <FormArmado grupos={grupos} borrador={borrador} onCambio={cambiar} onActivo={setActivo} elegido={elegido} onElemento={onElemento} onQuitar={quitarElemento} />
-            {tipo === "losas" && ficha.armado.tipo === "losas" && (ficha.armado.armado?.refuerzos?.length || ficha.armado.armado?.cercos?.length) ? <p className="nota">Cada refuerzo y cada zona de cercos se elige también en la planta. Su zona es la que se propuso: aquí se cambian sus barras o se quita.</p> : null}
+            {tipo === "losas" && ficha.armado.tipo === "losas" && (ficha.armado.armado?.refuerzos?.length || ficha.armado.armado?.cercos?.length) ? <p className="nota">Cada refuerzo y cada zona de cercos se elige también en la planta. Elegido, se estira por las asas de sus lados y se mueve por la del centro (a 5 cm), y Supr lo quita; «Añadir», en la barra, pone uno nuevo con dos clics. Aquí se cambian sus barras.</p> : null}
             {error && <p className="nota text-state-fail">{error}</p>}
             {botones}
           </>
@@ -376,8 +442,8 @@ function Ficha({ tipo, ficha, cargando, proponer, ocupado, elegido, onElemento }
             </tr>
           </thead>
           <tbody>
-            {filas.map((f) => (
-              <tr key={f.id}>
+            {filas.map((f, i) => (
+              <tr key={`${f.id}#${i}`}>
                 <td className="txt et">
                   {textoApp(f.descripcion)}
                   <small>{[f.articulo, lugarDe(f)].filter(Boolean).join(" · ")}</small>
@@ -404,6 +470,11 @@ export function ModoComprobacion() {
   const [peores, setPeores] = useState(false);
   const [dibujo, setDibujo] = useState<Dibujo>("armado");
   const [cara, setCara] = useState<CaraDibujada>("todas");
+  const [anadir, setAnadir] = useState<string>("");
+  const [anadirEn, setAnadirEn] = useState<"nervios" | "abacos">("nervios");
+  const [avisoPlanta, setAvisoPlanta] = useState<string | null>(null);
+  const editor = useRef<EditorRefuerzos | null>(null);
+  editor.current ??= new EditorRefuerzos();
   const [ocupado, setOcupado] = useState(false);
   const [propuesta, setPropuesta] = useState<{
     datos: DatosArmar | null;
@@ -431,6 +502,18 @@ export function ModoComprobacion() {
   );
   const ficha = f.datos && elegida && f.datos.clave === elegida.clave ? f.datos : null;
 
+  // §8.13: el pórtico de la viga elegida, para su despiece. No depende del armado: se pide una vez por viga
+  const pp = usePedido(proyecto.cliente, activo && tipo === "vigas" && elegida ? { tipo: "portico", viga: elegida.pieza } : null);
+  const portico = tipo === "vigas" && elegida && pp.datos?.portico.vigas.some((v) => v.id === elegida.pieza) ? pp.datos : null;
+  const [escrito, setEscrito] = useState<{ clave: string; armado: Record<string, unknown> | undefined } | null>(null);
+  const [activoFicha, setActivoFicha] = useState<string | null>(null);
+  const vigasArmadas = entero?.vigas;
+  const armadosPortico = useMemo(() => {
+    const r: Record<string, Partial<ArmadoVanoViga> | null | undefined> = {};
+    for (const v of portico?.portico.vanos ?? []) r[v.clave] = escrito && escrito.clave === v.clave && v.clave === clave ? (escrito.armado as Partial<ArmadoVanoViga> | undefined) : vigasArmadas?.[v.viga]?.[v.vano];
+    return r;
+  }, [portico, vigasArmadas, escrito, clave]);
+
   // Lo elegido en las vistas: la primera parte de esa pieza que no cumple (o la primera). Un refuerzo
   // o una zona de cercos de una losa («L1/R3»), su losa
   const elegidoVista = elegidos[elegidos.length - 1];
@@ -442,6 +525,71 @@ export function ModoComprobacion() {
     if (suyas.length) setClave((suyas.find((p) => !p.cumple) ?? suyas[0]!).clave);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al cambiar lo elegido o la tabla
   }, [ultimo, d]);
+
+  // §8.12: los refuerzos y los cercos de las losas, con el ratón en la planta
+  const losasModelo = ed?.proyecto.modelo.losas;
+  const hayReticular = !!losasModelo?.some((l) => l.reticular);
+  const editable = tipo === "losas" && dibujo === "armado" && !!ed && activo;
+  const er = editor.current;
+  const escribirLosa = (losa: string, a: ArmadoForjado, etiqueta: string): boolean => {
+    if (!ed) return false;
+    const x = ed.editar({ op: "armado", armado: { ...entero, forjados: { ...entero?.forjados, [losa]: a } } }, etiqueta);
+    setAvisoPlanta(x.ok ? null : x.errores.map((y) => textoApp(y.mensaje)).join(" "));
+    return x.ok;
+  };
+  er.losas = useMemo(() => (losasModelo ?? []).map((l) => ({ id: l.id, planta: l.planta, eje1: l.eje1, contorno: l.contorno, armado: entero?.forjados?.[l.id] })), [losasModelo, entero?.forjados]);
+  er.elegido = editable && elemento ? { losa: elemento.losa, elemento: { lista: elemento.lista, indice: elemento.indice } } : null;
+  er.nuevo = editable ? (ANADIR.find((x) => x.id === anadir)?.nuevo ?? null) : null;
+  er.alAvisar = setAvisoPlanta;
+  er.alMover = (losa, e, zona) => {
+    const a = entero?.forjados?.[losa];
+    if (a) escribirLosa(losa, conZona(a, e, zona), `Zona de ${idElemento(losa, e)}`);
+  };
+  er.alAnadir = (losa, n, zona) => {
+    const a = entero?.forjados?.[losa];
+    const reticular = !!losasModelo?.find((l) => l.id === losa)?.reticular;
+    if (!a) return;
+    if (n.lista === "cercos" && !reticular) return setAvisoPlanta(`La losa ${losa} es maciza: los cercos son de los nervios de un reticular.`);
+    const en = reticular ? anadirEn : undefined;
+    const nuevo: RefuerzoForjado | CercosForjado = n.lista === "cercos" ? { direccion: n.direccion, ...zona, cercos: { diametro: 6, separacion: 150 } } : { armadura: n.armadura, ...zona, barras: en === "nervios" ? { diametro: 12, n: 1 } : { diametro: 12, separacion: 200 }, ...(en ? { en } : {}) };
+    const r = conElemento(a, nuevo);
+    if (!escribirLosa(losa, r.armado, `Añadir ${idElemento(losa, r.elemento)}`)) return;
+    setAnadir("");
+    setElegidos([idElemento(losa, r.elemento)]);
+  };
+  const quitarElegido = () => {
+    const a = elemento && entero?.forjados?.[elemento.losa];
+    if (!elemento || !a || !a[elemento.lista]?.[elemento.indice]) return;
+    if (escribirLosa(elemento.losa, sinElemento(a, elemento), `Quitar ${idElemento(elemento.losa, elemento)}`)) setElegidos([elemento.losa]);
+  };
+  const quitar = useRef(quitarElegido);
+  quitar.current = quitarElegido;
+  useEffect(() => {
+    if (!editable) return;
+    const tecla = (ev: KeyboardEvent) => {
+      if (enFoco() || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (ev.key === "Escape") {
+        // Primero lo que está a medias; después, la herramienta de añadir
+        if (er.cancelar()) repintarVistas();
+        else if (er.nuevo) setAnadir("");
+        else return;
+        setAvisoPlanta(null);
+        ev.stopPropagation();
+        ev.preventDefault();
+      } else if ((ev.key === "Delete" || ev.key === "Backspace") && er.elegido && !er.ocupado) {
+        quitar.current();
+        ev.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", tecla, true);
+    return () => window.removeEventListener("keydown", tecla, true);
+  }, [editable, er]);
+  // Al cambiar de herramienta o al dejar de poder editar, nada a medias
+  useEffect(() => {
+    er.cancelar();
+    setAvisoPlanta(null);
+    repintarVistas();
+  }, [anadir, editable, er]);
 
   const elegir = (p: ParteComprobada) => {
     setClave(p.clave);
@@ -521,7 +669,25 @@ export function ModoComprobacion() {
       />
       <Separador />
       <Segmentado etiqueta="En planta" opciones={DIBUJOS} valor={dibujo} onCambio={setDibujo} />
-      {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Refuerzos" opciones={CARAS} valor={cara} onCambio={setCara} />}
+      {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Se ve" opciones={CARAS} valor={cara} onCambio={setCara} />}
+      {editable && (
+        <div role="group" aria-label="Añadir a una losa" className="flex items-center gap-1.5">
+          <select className="sel" style={{ height: 28 }} value={anadir} onChange={(x) => setAnadir(x.target.value)} aria-label="Añadir a una losa" title="Un refuerzo o una zona de cercos nuevos: elija cuál y dé en la planta dos esquinas opuestas de su zona">
+            <option value="">Añadir…</option>
+            {ANADIR.filter((x) => hayReticular || x.nuevo.lista === "refuerzos").map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.nombre}
+              </option>
+            ))}
+          </select>
+          {hayReticular && anadir !== "" && er.nuevo?.lista === "refuerzos" && (
+            <select className="sel" style={{ height: 28 }} value={anadirEn} onChange={(x) => setAnadirEn(x.target.value as "nervios" | "abacos")} aria-label="En un reticular, el refuerzo es de" title="En un reticular: el refuerzo es de los nervios (barras por nervio) o de los ábacos (una parrilla)">
+              <option value="nervios">en los nervios</option>
+              <option value="abacos">en los ábacos</option>
+            </select>
+          )}
+        </div>
+      )}
       <Separador />
       <div role="group" aria-label="Proponer armado" className="flex items-center gap-1.5">
         <span className="text-[11.5px] text-text-secondary">Proponer armado</span>
@@ -650,11 +816,50 @@ export function ModoComprobacion() {
     </Seccion>
   );
 
+  const estadosPortico = useMemo(() => {
+    const r: Record<string, EstadoVano> = {};
+    if (tipo === "vigas") for (const x of d?.partes ?? []) r[x.clave] = { ...estadoDe(x), aprovechamiento: x.aprovechamiento };
+    return r;
+  }, [d, tipo]);
+  const panelPortico = !activo ? (
+    <div className="p-3">
+      <AvisoDesactualizado que="este despiece" />
+    </div>
+  ) : !elegida ? (
+    <p className="nota">Elija una viga en la planta o en la tabla: aquí se dibuja el despiece de su pórtico, la alineación entera de la que forma parte.</p>
+  ) : pp.diagnosticos ? (
+    <p className="nota text-state-fail">{pp.diagnosticos.map((x) => textoApp(x.mensaje)).join(" ")}</p>
+  ) : !portico ? (
+    <p className="nota">Preparando el pórtico…</p>
+  ) : (
+    <DespiecePortico
+      datos={portico}
+      armados={armadosPortico}
+      estados={estadosPortico}
+      elegida={clave}
+      activo={activoFicha}
+      onVano={(c) => {
+        const x = d?.partes.find((y) => y.clave === c);
+        if (x) elegir(x);
+      }}
+    />
+  );
+
   const avisos = d && d.diagnosticos.length > 0 ? <ListaDiagnosticos ds={d.diagnosticos} onObjeto={(id) => setElegidos([id])} /> : <p className="nota">Sin avisos.</p>;
 
   const propiedades =
     elegida && ficha ? (
-      <Ficha key={`${tipo}/${ficha.clave}`} tipo={tipo} ficha={ficha} cargando={f.cargando} ocupado={ocupado} elegido={elemento && elemento.losa === ficha.pieza ? elemento : null} onElemento={(x) => setElegidos([idElemento(ficha.pieza, x)])} proponer={() => void proponer(tipo === "punzonamiento" ? ["punzonamiento"] : [tipo], { ids: [ficha.pieza] }, `Armado propuesto: ${ficha.pieza}`)} />
+      <Ficha
+        key={`${tipo}/${ficha.clave}`}
+        tipo={tipo}
+        ficha={ficha}
+        cargando={f.cargando}
+        ocupado={ocupado}
+        elegido={elemento && elemento.losa === ficha.pieza ? elemento : null}
+        onElemento={(x) => setElegidos([idElemento(ficha.pieza, x)])}
+        alQuitar={() => setElegidos([ficha.pieza])}
+        {...(tipo === "vigas" ? { alDibujar: (c: string, a: Record<string, unknown> | undefined) => setEscrito({ clave: c, armado: a }), alActivar: setActivoFicha, verPortico: () => pan.abrirPestana("portico") } : {})}
+        proponer={() => void proponer(tipo === "punzonamiento" ? ["punzonamiento"] : [tipo], { ids: [ficha.pieza] }, `Armado propuesto: ${ficha.pieza}`)} />
     ) : (
       <>
         <Cabecera icono={IcComprobacion} tipo="Comprobación" titulo={TIPOS.find((t) => t.id === tipo)!.nombre} detalle={TIPOS.find((t) => t.id === tipo)!.title} />
@@ -723,11 +928,20 @@ export function ModoComprobacion() {
           <ZonaVistas
             fuentes={{
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
-              planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}) } : {}) } }} /> : null),
+              planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
               cabeceraPlanta: () => (
-                <Chip acento>
-                  {dibujo === "armado" ? "Armado" : "Aprovechamiento"} · {TIPOS.find((t) => t.id === tipo)!.nombre.toLowerCase()}
-                </Chip>
+                <>
+                  <Chip acento>
+                    {dibujo === "armado" ? "Armado" : "Aprovechamiento"} · {TIPOS.find((t) => t.id === tipo)!.nombre.toLowerCase()}
+                  </Chip>
+                  {editable && (avisoPlanta || anadir !== "") && (
+                    <Chip>
+                      <span data-aviso-planta className={avisoPlanta ? "text-state-fail" : undefined}>
+                        {avisoPlanta ?? `${ANADIR.find((x) => x.id === anadir)!.nombre}: dos clics, las esquinas opuestas de su zona · Esc`}
+                      </span>
+                    </Chip>
+                  )}
+                </>
               ),
             }}
           />
@@ -741,6 +955,7 @@ export function ModoComprobacion() {
             insignia: d ? (d.resumen.noCumplen ? `${d.resumen.noCumplen} ✕` : "✓") : undefined,
             contenido: tabla,
           },
+          ...(tipo === "vigas" ? [{ id: "portico", titulo: "Pórtico", contenido: panelPortico }] : []),
           {
             id: "avisos",
             titulo: "Avisos",

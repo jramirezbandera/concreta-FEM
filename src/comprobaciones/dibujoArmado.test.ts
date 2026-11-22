@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { ejesArmado } from "../compilador/franjas.ts";
 import { barrasDe, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga } from "./armado.ts";
-import { alzadoVano, armadoDeZona, cercosDibujados, ejesArmadura, PRIMER_CERCO, refuerzosDibujados, seccionPilarArmada, seccionVigaArmada } from "./dibujoArmado.ts";
+import { alzadoVano, armadoDeZona, cercosDibujados, cotasRefuerzo, ejesArmadura, PRIMER_CERCO, refuerzosDibujados, seccionPilarArmada, seccionVigaArmada } from "./dibujoArmado.ts";
 
 const REC = 30;
 
@@ -135,5 +135,23 @@ describe("CO6: el armado dibujado", () => {
     expect(Math.hypot(g.reparto[1][0] - g.reparto[0][0], g.reparto[1][1] - g.reparto[0][1])).toBeCloseTo(1, 12);
     expect(g.giro).toBeCloseTo(30, 9);
     expect(refuerzosDibujados(0, undefined)).toEqual([]);
+    // Cada uno lleva sus ejes y su rectángulo en ellos (para acotarlo y para editarlo)
+    expect(r[1]).toMatchObject({ d: [0, 1], n: [1, 0], s: [1, 3], t: [4, 6] });
+  });
+
+  it("las cotas de un refuerzo (§8.12): por tramos desde el eje que tiene dentro o, si no, de cada punta al más cercano", () => {
+    // Un refuerzo superior sobre un pilar: lo que sale a cada lado de su eje
+    expect(cotasRefuerzo([4, 6.2], [5, 11, -3])).toEqual({ dentro: [5], fuera: [null, null] });
+    // Dos ejes a menos de 5 cm (un pilar y el eje de su viga) son el mismo; los de las puntas no parten nada
+    expect(cotasRefuerzo([4, 6.2], [5, 5.03, 4.02, 6.2])).toEqual({ dentro: [5], fuera: [null, null] });
+    // Con más de tres dentro (un vano entero con sus apoyos), sin tramos: se lee su largo
+    expect(cotasRefuerzo([0, 20], [2, 6, 10, 14])).toEqual({ dentro: [], fuera: [null, null] });
+    expect(cotasRefuerzo([0, 20], [2, 6, 10]).dentro).toEqual([2, 6, 10]);
+    // Un refuerzo de vano: lo que le falta a cada punta hasta el eje del apoyo, si está a menos de 2 m
+    expect(cotasRefuerzo([1.2, 4.6], [0.75, 5, 9])).toEqual({ dentro: [], fuera: [0.75, 5] });
+    expect(cotasRefuerzo([1.2, 4.6], [-1.5, 5])).toEqual({ dentro: [], fuera: [null, 5] });
+    // La punta en el eje no se acota (0 m)
+    expect(cotasRefuerzo([1.2, 4.6], [1.2, 4.601])).toEqual({ dentro: [], fuera: [null, null] });
+    expect(cotasRefuerzo([1.2, 4.6], [])).toEqual({ dentro: [], fuera: [null, null] });
   });
 });

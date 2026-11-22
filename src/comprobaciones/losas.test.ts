@@ -20,8 +20,8 @@ import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts"
 import { calcular } from "../motor/calcular.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { ARMADURAS_FORJADO, areaBarra, areaBarrasForjado, erroresArmadoForjado, type ArmadoForjado, type BarrasForjado } from "./armado.ts";
-import { proponerLosa, tablaCercosNervio, tablaNervios, tablaParrillas } from "./armar/losas.ts";
-import { armadoLosa, comprobarLosa, entradasLosa, estacionesQueFallan, type ComprobacionLosa } from "./comprobar/losas.ts";
+import { LARGO_MINIMO, LARGO_MINIMO_CERCOS, MODULO_LARGO, proponerLosa, tablaCercosNervio, tablaNervios, tablaParrillas } from "./armar/losas.ts";
+import { armadoLosa, comprobarLosa, cubre, entradasLosa, estacionesQueFallan, type ComprobacionLosa } from "./comprobar/losas.ts";
 import { forjadosDefaults } from "./concreta/data/defaults.ts";
 import { calcForjados } from "./concreta/lib/calculations/rcSlabs.ts";
 import { demandasLosa, direccionArmadura, type DemandasLosa } from "./demandas/losas.ts";
@@ -465,6 +465,52 @@ describe("CO3: proponer el armado de una losa", () => {
     const { cercos: _c, ...sinCercos } = a;
     expect(comprobarLosa(d, armadoLosa(sinCercos)).filas.some((f) => f.id.endsWith("/shear") && f.seccion === "nervio" && f.estado === "fail")).toBe(true);
     expect(JSON.stringify(proponerLosa(d).armado)).toBe(JSON.stringify(a));
+  });
+
+  it("el despiece (CO6-g): ningún refuerzo corto, ninguno pisa a otro de su armadura, las puntas a 5 cm y, en los ábacos, uno por ábaco", () => {
+    for (const v of [{}, { reticular: true }] as VarianteLosaPlana[]) {
+      const { d } = plana(v);
+      const a = proponerLosa(d).armado!;
+      const rs = a.refuerzos!;
+      const enModulo = (x: number) => Math.abs(x / MODULO_LARGO - Math.round(x / MODULO_LARGO)) < 1e-6;
+      for (const [i, r] of rs.entries()) {
+        const dir = d.direcciones[direccionArmadura(r.armadura) - 1]!;
+        const [l0, l1] = [Math.min(...dir.franjas.map((f) => f.s0)), Math.max(...dir.franjas.map((f) => f.s1))];
+        // Dentro de la losa y de al menos el largo mínimo
+        expect(r.s[0]).toBeGreaterThanOrEqual(l0 - 1e-6);
+        expect(r.s[1]).toBeLessThanOrEqual(l1 + 1e-6);
+        expect(r.s[1] - r.s[0], `refuerzo ${i + 1}`).toBeGreaterThanOrEqual(LARGO_MINIMO - 1e-6);
+        // En los nervios y en la maciza, las puntas al módulo (o en el borde de la losa o en el corte con un vecino)
+        if (r.en !== "abacos")
+          for (const x of r.s) expect(enModulo(x) || Math.abs(x - l0) < 1e-6 || Math.abs(x - l1) < 1e-6 || rs.some((o) => o !== r && o.armadura === r.armadura && (Math.abs(o.s[0] - x) < 1e-6 || Math.abs(o.s[1] - x) < 1e-6)), `refuerzo ${i + 1}: ${x}`).toBe(true);
+        for (const o of rs.slice(i + 1)) {
+          if (o.armadura !== r.armadura || o.en !== r.en) continue;
+          expect(Math.min(r.s[1], o.s[1]) - Math.max(r.s[0], o.s[0]) > 1e-6 && Math.min(r.t[1], o.t[1]) - Math.max(r.t[0], o.t[0]) > 1e-6, `${i + 1} pisa a otro`).toBe(false);
+        }
+      }
+      // En los ábacos: cada refuerzo cubre su ábaco entero (lo que cae en la losa) y hay uno por ábaco y armadura
+      const deAbaco = rs.filter((r) => r.en === "abacos");
+      if (v.reticular) expect(deAbaco.length).toBeGreaterThan(0);
+      for (const r of deAbaco) {
+        const dir = d.direcciones[direccionArmadura(r.armadura) - 1]!;
+        const cajas = d.abacos.map((p) => {
+          const [ss, ts] = [p.map((q) => q[0] * dir.d[0] + q[1] * dir.d[1]), p.map((q) => q[0] * dir.n[0] + q[1] * dir.n[1])];
+          return { s: [Math.min(...ss), Math.max(...ss)], t: [Math.min(...ts), Math.max(...ts)] };
+        });
+        const suyo = cajas.filter((c) => c.s[0] < r.s[1] - 1e-6 && c.s[1] > r.s[0] + 1e-6 && c.t[0] < r.t[1] - 1e-6 && c.t[1] > r.t[0] + 1e-6);
+        expect(suyo).toHaveLength(1);
+        // Sus estaciones de ábaco, todas cubiertas
+        const enEl = dir.estaciones.filter((e) => e.seccion === "abaco" && e.s > suyo[0]!.s[0] + 1e-6 && e.s < suyo[0]!.s[1] - 1e-6 && (e.t0 + e.t1) / 2 > suyo[0]!.t[0] + 1e-6 && (e.t0 + e.t1) / 2 < suyo[0]!.t[1] - 1e-6);
+        expect(enEl.length).toBeGreaterThan(0);
+        expect(enEl.every((e) => cubre(r, e))).toBe(true);
+        expect(deAbaco.filter((o) => o.armadura === r.armadura && o.s[0] < r.s[1] - 1e-6 && o.s[1] > r.s[0] + 1e-6 && o.t[0] < r.t[1] - 1e-6 && o.t[1] > r.t[0] + 1e-6)).toHaveLength(1);
+      }
+      // Las zonas de cercos, igual: de su largo mínimo y sin pisarse en su dirección
+      for (const [i, c] of (a.cercos ?? []).entries()) {
+        expect(c.s[1] - c.s[0]).toBeGreaterThanOrEqual(LARGO_MINIMO_CERCOS - 1e-6);
+        for (const o of a.cercos!.slice(i + 1)) if (o.direccion === c.direccion) expect(Math.min(c.s[1], o.s[1]) - Math.max(c.s[0], o.s[0]) > 1e-6 && Math.min(c.t[1], o.t[1]) - Math.max(c.t[0], o.t[0]) > 1e-6).toBe(false);
+      }
+    }
   });
 });
 

@@ -4,7 +4,7 @@
  *
  * Puro: el núcleo WASM ya iniciado por quien lo crea.
  */
-import { datosArmar, datosComprobacion, datosComprobaciones } from "./comprobaciones.ts";
+import { datosArmar, datosComprobacion, datosComprobaciones, datosPortico } from "./comprobaciones.ts";
 import type { OpcionesCompilacion, ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
@@ -184,6 +184,8 @@ export class Atendedor {
         return de(datosComprobaciones(s, p.de, p.armado));
       case "comprobacion":
         return de(datosComprobacion(s, p.de, p.clave, p.armado));
+      case "portico":
+        return de(datosPortico(s, p.viga));
       case "armar":
         return de(datosArmar(s, p));
     }

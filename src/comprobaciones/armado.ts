@@ -97,7 +97,7 @@ export function textoArmado(t: ArmadoTramoPilar): string {
   return `${partes.join(" + ")} · cØ${t.cercos.diametro}/${t.cercos.separacion}`;
 }
 
-const DIAMETROS = [6, 8, 10, 12, 16, 20, 25, 32];
+export const DIAMETROS = [6, 8, 10, 12, 16, 20, 25, 32];
 
 /** Lo que no vale de un armado de tramo, en palabras; vacío si es un dato admisible. */
 export function erroresArmado(t: ArmadoTramoPilar): string[] {

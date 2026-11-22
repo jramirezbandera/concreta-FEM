@@ -101,8 +101,8 @@ export function seccionPilarArmada(g: { b: number; h: number } | { D: number }, 
 export type ZonaVano = "inicio" | "centro" | "fin";
 export const ZONAS_VANO: readonly ZonaVano[] = ["inicio", "centro", "fin"];
 
-const barrasValidas = (c: Partial<BarrasCara> | undefined): c is BarrasCara => !!c && entero(c.n) && c.n > 0 && positivo(c.diametro);
-const cercosValidos = (c: Partial<CercosViga> | undefined): c is CercosViga => !!c && positivo(c.diametro) && positivo(c.separacion);
+export const barrasValidas = (c: Partial<BarrasCara> | undefined): c is BarrasCara => !!c && entero(c.n) && c.n > 0 && positivo(c.diametro);
+export const cercosValidos = (c: Partial<CercosViga> | undefined): c is CercosViga => !!c && positivo(c.diametro) && positivo(c.separacion);
 
 /** La armadura superior y los cercos que trabajan en una zona del vano (los de la zona, o los corridos). */
 export function armadoDeZona(a: Partial<ArmadoVanoViga> | undefined, zona: ZonaVano): { superior: BarrasCara | undefined; cercos: CercosViga | undefined; superiorPropia: boolean; cercosPropios: boolean } {
@@ -229,6 +229,40 @@ export interface RefuerzoDibujado {
   largo: number;
   ancho: number;
   en?: "abacos" | "nervios";
+  /** Los ejes de su armadura (a lo largo de las barras y en transversal) y su rectángulo en ellos, m. */
+  d: Vec2;
+  n: Vec2;
+  s: [number, number];
+  t: [number, number];
+}
+
+/** Hasta dónde se busca una referencia por fuera de la punta de un refuerzo para acotarla, m. */
+export const ALCANCE_COTAS = 2;
+/** Con más referencias dentro que éstas, un refuerzo no se acota por tramos (un vano entero: se lee su largo). */
+export const MAXIMO_COTAS = 3;
+
+/** Las cotas de un refuerzo a lo largo de sus barras, respecto a unas referencias (ejes de pilares y de vigas, en su s). */
+export interface CotasRefuerzo {
+  /** Las referencias que caen dentro: lo parten en tramos (de la punta a la referencia y entre referencias). */
+  dentro: number[];
+  /** Sin ninguna dentro: la referencia más cercana por fuera de cada punta, si la hay dentro del alcance. */
+  fuera: [number | null, number | null];
+}
+
+/**
+ * Cómo se acota un refuerzo de `s[0]` a `s[1]`: si alguna referencia cae dentro (a más de 5 cm de las
+ * puntas), por tramos desde ella (un refuerzo superior sobre un pilar: lo que sale a cada lado de su
+ * eje); si no, cada punta a la referencia más cercana por fuera (un refuerzo de vano: lo que le falta
+ * hasta el eje del apoyo). Las referencias a menos de 5 cm entre sí son la misma.
+ */
+export function cotasRefuerzo(s: readonly [number, number], referencias: readonly number[], alcance = ALCANCE_COTAS): CotasRefuerzo {
+  const refs: number[] = [];
+  for (const x of [...referencias].filter(Number.isFinite).sort((a, b) => a - b)) if (!refs.length || x - refs[refs.length - 1]! > 0.05) refs.push(x);
+  const dentro = refs.filter((x) => x > s[0] + 0.05 && x < s[1] - 0.05);
+  if (dentro.length) return { dentro: dentro.length <= MAXIMO_COTAS ? dentro : [], fuera: [null, null] };
+  const antes = refs.filter((x) => x <= s[0] + 0.05 && x >= s[0] - alcance).pop() ?? null;
+  const despues = refs.find((x) => x >= s[1] - 0.05 && x <= s[1] + alcance) ?? null;
+  return { dentro: [], fuera: [antes !== null && s[0] - antes > 0.005 ? antes : null, despues !== null && despues - s[1] > 0.005 ? despues : null] };
 }
 
 export interface CercosDibujados {
@@ -270,6 +304,10 @@ export function refuerzosDibujados(eje1: number | undefined, a: Pick<ArmadoForja
       largo: x.s[1] - x.s[0],
       ancho: x.t[1] - x.t[0],
       ...(x.en ? { en: x.en } : {}),
+      d,
+      n,
+      s: [x.s[0], x.s[1]],
+      t: [x.t[0], x.t[1]],
     });
   });
   return r;

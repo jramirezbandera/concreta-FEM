@@ -29,6 +29,7 @@
  * ni factores. Cada fila del módulo depende de un solo esfuerzo, así que bastan sus envolventes.
  */
 import { conjuntoCombinaciones } from "../../agente/combinaciones.ts";
+import { abacosDe } from "../../compilador/abacos.ts";
 import type { Consultas, Respuesta } from "../../compilador/consultas.ts";
 import type { Material, Vec2 } from "../../compilador/fisico.ts";
 import { PASO_ESTACIONES, type Franja } from "../../compilador/franjas.ts";
@@ -102,6 +103,8 @@ export interface DemandasLosa {
   material: Material;
   /** Reticular: intereje, ancho del nervio y capa de compresión, m. */
   reticular: { intereje: number; nervio: number; capa: number } | null;
+  /** Los ábacos de un reticular, como los usa el cálculo (polígonos en planta); sin ellos, ninguno. */
+  abacos: Vec2[][];
   cimentacion: boolean;
   direcciones: [DemandasDireccion, DemandasDireccion];
   /** Combinaciones de ELU. */
@@ -242,6 +245,7 @@ export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> 
       espesor: losa.espesor,
       material,
       reticular: losa.reticular ? { intereje: losa.reticular.intereje, nervio: losa.reticular.nervio, capa: losa.reticular.capa } : null,
+      abacos: losa.reticular ? abacosDe(q.fisico, losa).map((p) => p.map((v): Vec2 => [v[0], v[1]])) : [],
       cimentacion: losa.cimentacion !== undefined,
       direcciones: [direcciones[0]!, direcciones[1]!],
       combinaciones: elu.valor.factores.length,

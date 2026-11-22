@@ -23,7 +23,9 @@ import { aplicar } from "../editor/operaciones.ts";
 import { calcular } from "../motor/calcular.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { Atendedor } from "./atender.ts";
-import type { DatosArmar, DatosComprobaciones, FichaComprobacion, TipoComprobacion } from "./comprobaciones.ts";
+import type { DatosArmar, DatosComprobaciones, DatosPortico, FichaComprobacion, TipoComprobacion } from "./comprobaciones.ts";
+import { despiecePortico } from "../comprobaciones/despieceVigas.ts";
+import { datosDespiece, porticoDe, porticosDe } from "../comprobaciones/porticos.ts";
 import { claseAprovechamiento, COLOR_APROVECHAMIENTO, TIPOS_COMPROBACION } from "./comprobaciones.ts";
 import { dentro, type Escena } from "../agente/render/escena.ts";
 import { barrasDe } from "../comprobaciones/armado.ts";
@@ -66,6 +68,41 @@ beforeAll(async () => {
 }, 600_000);
 
 describe("CO6: las comprobaciones en el worker", () => {
+  it("§8.13: el pedido `portico` da el pórtico de la viga y lo que su despiece necesita; con el armado propuesto, cada vano armado tiene sus barras y sus cercos", async () => {
+    const vigas = modelo.vigas!.map((v) => v.id);
+    for (const viga of [vigas[0]!, vigas[vigas.length - 1]!]) {
+      const r = await pedir<DatosPortico>({ tipo: "portico", viga });
+      const p = porticoDe(q, viga)!;
+      expect(r.portico).toEqual(p);
+      expect(r.despiece).toEqual(datosDespiece(p));
+      expect(r.portico.vigas.some((v) => v.id === viga)).toBe(true);
+    }
+    const no = await at.atender({ tipo: "portico", viga: "no-existe" });
+    expect(no.ok).toBe(false);
+    // Todas las vigas, en algún pórtico; y el despiece de cada uno con lo propuesto
+    const ps = porticosDe(q);
+    expect(ps.flatMap((p) => p.vigas.map((v) => v.id)).sort()).toEqual([...vigas].sort());
+    let barras = 0;
+    for (const p of ps) {
+      const armados = Object.fromEntries(p.vanos.map((v) => [v.clave, propuesto.armado.vigas?.[v.viga]?.[v.vano]]));
+      const d = despiecePortico(p, armados, datosDespiece(p));
+      barras += d.barras.length;
+      for (const v of p.vanos) {
+        const a = armados[v.clave];
+        if (!a) continue;
+        // La inferior de cada vano armado, entera: de cara a cara y más allá
+        const inf = d.barras.filter((b) => b.cara === "inferior" && b.origen.some((o) => o.clave === v.clave));
+        expect(inf, v.clave).toHaveLength(1);
+        expect(inf[0]!.n).toBe(a.inferior.n);
+        expect(inf[0]!.x[0]).toBeLessThanOrEqual(v.desde + 1e-9);
+        expect(inf[0]!.x[1]).toBeGreaterThanOrEqual(v.hasta - 1e-9);
+        expect(d.cercos.some((c) => c.origen.some((o) => o.clave === v.clave))).toBe(true);
+      }
+      expect(d.acero.total).toBeCloseTo(d.medicion.reduce((t, f) => t + f.kg, 0), 9);
+    }
+    expect(barras).toBeGreaterThan(0);
+  });
+
   it("sin armado, nada cumple y todo está sin armado (el punzonamiento, sin el de su losa)", async () => {
     for (const de of TIPOS_COMPROBACION) {
       const t = await tabla(de);
@@ -256,6 +293,11 @@ describe("CO6: las comprobaciones en el worker", () => {
       const el = escena(planta, "losas");
       const inf = escena(planta, "losas", { cara: "inferior" });
       expect(inf.primitivas.some((x) => "estilo" in x && x.estilo.startsWith("armado-superior"))).toBe(false);
+      // §8.12: con una cara, sin los cercos; con «cercos», sólo ellos
+      expect(inf.primitivas.some((x) => "estilo" in x && x.estilo === "armado-cercos")).toBe(false);
+      const soloCercos = escena(planta, "losas", { cara: "cercos" });
+      expect(soloCercos.primitivas.some((x) => "estilo" in x && /^armado-(inferior|superior)/.test(x.estilo))).toBe(false);
+      expect(soloCercos.primitivas.some((x) => "estilo" in x && x.estilo === "armado-cercos")).toBe(el.primitivas.some((x) => "estilo" in x && x.estilo === "armado-cercos"));
       for (const l of (modelo.losas ?? []).filter((x) => x.planta === planta)) {
         const suyo = a.forjados?.[l.id];
         (suyo?.refuerzos ?? []).forEach((r, i) => {

@@ -17,10 +17,26 @@
  *     capa baja el canto útil del nervio y, con él, su cortante sin cercos.
  *  3. **Los refuerzos:** las estaciones en las que la flexión o la fisuración de una armadura no
  *     cumplen con la base se agrupan en zonas, como las de AB (`zonasRefuerzo`: conexas a lo largo de
- *     una franja y entre franjas vecinas). Cada zona recibe un refuerzo en el rectángulo que la
- *     envuelve (en un reticular, uno para sus ábacos y otro para sus nervios): el primero de la tabla
- *     con el que no falla ninguna fila de esa armadura en las estaciones que cubre. Las zonas van en
- *     orden, y cada una cuenta con los refuerzos ya puestos que la pisan.
+ *     una franja y entre franjas vecinas). De las zonas sale el despiece (abajo), y cada refuerzo es
+ *     el primero de la tabla con el que no falla ninguna fila de esa armadura en las estaciones que
+ *     cubre.
+ *
+ * **El despiece** (CO6-g, `comprobaciones.md` §8.12): reglas de obra, que sólo añaden acero; el juez
+ * sigue siendo la comprobación del armado entero.
+ *  - **En los ábacos, uno por ábaco:** si alguna estación de un ábaco pide refuerzo en una armadura,
+ *    el refuerzo es una parrilla en el ábaco entero (como se arma en obra), no en el trozo que falla.
+ *  - **En los nervios y en una maciza,** el rectángulo que envuelve cada zona se alarga por cada punta
+ *    el decalaje (el canto de la losa) más la longitud de anclaje de su barra (`computeAnchorage` del
+ *    módulo de forjados, con su posición de adherencia), sin salir de la losa, y hasta `LARGO_MINIMO`.
+ *    El anclaje depende del diámetro, que sale de dimensionar: se repite con el diámetro elegido.
+ *  - **Se unen** dos rectángulos de la misma armadura que se tocan o se pisan si el que los envuelve a
+ *    los dos no pasa de `HOLGURA_UNION` veces lo que cubren (trozos seguidos de un mismo nervio, nervios
+ *    vecinos con casi la misma longitud); también si sus zonas se pisan de origen. Los que aun así se
+ *    pisan (dos vanos seguidos) se cortan a mitad del hueco entre sus zonas: ningún refuerzo pisa a
+ *    otro de su armadura y de su clase, y el solape entre los dos no se dibuja.
+ *  - **Las puntas, a `MODULO_LARGO`** (5 cm), hacia fuera, salvo las que llegan al borde de la losa o
+ *    a un corte.
+ *  - **Los cercos,** igual, sin anclaje, con `LARGO_MINIMO_CERCOS` y uniéndose hasta `HOLGURA_UNION_CERCOS`.
  *
  * Las tablas:
  *  - parrillas (maciza y ábacos): Ø8 a Ø25 a 300, 250, 200, 150, 125 o 100 mm, de menos a más acero;
@@ -33,7 +49,9 @@
  */
 import type { Vec2 } from "../../compilador/fisico.ts";
 import { zonasRefuerzo, type FranjaTramos } from "../../agente/refuerzos.ts";
-import { ARMADURAS_FORJADO, areaBarra, areaBarrasForjado, type ArmadoForjado, type ArmaduraForjado, type BarrasForjado, type CercosForjado, type CercosViga, type DatosArmado, type RefuerzoForjado } from "../armado.ts";
+import { ARMADURAS_FORJADO, areaBarra, areaBarrasForjado, DATOS_ARMADO, type ArmadoForjado, type ArmaduraForjado, type BarrasForjado, type CercosForjado, type CercosViga, type DatosArmado, type RefuerzoForjado } from "../armado.ts";
+import { getFyd } from "../concreta/data/materials.ts";
+import { computeAnchorage, fctmAdherencia } from "../concreta/lib/calculations/rcSlabs.ts";
 import { armadoLosa, comprobarLosa, cubre, cubreCercos, estacionesQueFallan, estacionesSinCortante, type ComprobacionLosa } from "../comprobar/losas.ts";
 import { direccionArmadura, type DemandasLosa, type EstacionLosa, type SeccionLosa } from "../demandas/losas.ts";
 
@@ -88,6 +106,92 @@ export interface OpcionesProponerLosa {
 
 const DEMANDA = /\/(bending|cracking)$/;
 const EPS = 1e-9;
+
+/** El despiece (cabecera): las puntas de un refuerzo o de una zona de cercos van a este módulo, m. */
+export const MODULO_LARGO = 0.05;
+/** Largo mínimo de un refuerzo, m. */
+export const LARGO_MINIMO = 1;
+/** Largo mínimo de una zona de cercos, m. */
+export const LARGO_MINIMO_CERCOS = 0.5;
+/** Dos rectángulos se unen si el que los envuelve no pasa de esto por lo que cubren entre los dos. */
+export const HOLGURA_UNION = 1.2;
+/** Lo mismo para las zonas de cercos, que cuestan poco acero: hasta el doble. */
+export const HOLGURA_UNION_CERCOS = 2;
+
+/** Un rectángulo en los ejes de una armadura: a lo largo (s) y en transversal (t), m. */
+export interface Rectangulo {
+  s: [number, number];
+  t: [number, number];
+}
+
+/** Una zona que pide refuerzo o cercos: el rectángulo de sus estaciones y hasta dónde llega la losa a lo largo. */
+export interface PiezaDespiece<E = unknown> {
+  nucleo: Rectangulo;
+  limite: [number, number];
+  estaciones: E[];
+}
+
+const solape = (x: readonly [number, number], y: readonly [number, number]) => Math.min(x[1], y[1]) - Math.max(x[0], y[0]);
+const areaDe = (r: Rectangulo) => (r.s[1] - r.s[0]) * (r.t[1] - r.t[0]);
+const envuelve = (x: Rectangulo, y: Rectangulo): Rectangulo => ({ s: [Math.min(x.s[0], y.s[0]), Math.max(x.s[1], y.s[1])], t: [Math.min(x.t[0], y.t[0]), Math.max(x.t[1], y.t[1])] });
+const limpio = (v: number) => Math.round(v * 1e6) / 1e6;
+/** Al módulo, hacia abajo o hacia arriba (lo que ya está en él, a 1e-6 del módulo, se queda). */
+const alModulo = (v: number, arriba: boolean) => limpio((arriba ? Math.ceil(v / MODULO_LARGO - 1e-6) : Math.floor(v / MODULO_LARGO + 1e-6)) * MODULO_LARGO);
+
+/**
+ * El despiece de unas zonas de una armadura (cabecera): alargadas, unidas, cortadas donde se pisan y
+ * con las puntas al módulo. `alarga` da lo que se alarga cada punta de una pieza (m), `minimo`, su
+ * largo mínimo, y `holgura`, hasta cuánto se unen. Determinista: las piezas, en su orden.
+ */
+export function despiece<E>(piezas: readonly PiezaDespiece<E>[], alarga: (p: PiezaDespiece<E>) => number, minimo: number, holgura = HOLGURA_UNION): { caja: Rectangulo; pieza: PiezaDespiece<E> }[] {
+  const extendida = (p: PiezaDespiece<E>): Rectangulo => {
+    const la = alarga(p);
+    const [l0, l1] = p.limite;
+    let [a, b] = [p.nucleo.s[0] - la, p.nucleo.s[1] + la];
+    if (b - a < minimo) [a, b] = [(a + b - minimo) / 2, (a + b + minimo) / 2];
+    // Dentro de la losa; lo que se recorta por un lado se da por el otro hasta el mínimo
+    if (a < l0) [a, b] = [l0, Math.max(b, Math.min(l0 + minimo, b + (l0 - a)))];
+    if (b > l1) [a, b] = [Math.min(a, Math.max(l1 - minimo, a - (b - l1))), l1];
+    // Las puntas, al módulo hacia fuera (antes de unir y de cortar: el redondeo no hace que dos se pisen después)
+    return { s: [Math.max(l0, alModulo(Math.max(a, l0), false)), Math.min(l1, alModulo(b, true))], t: [limpio(p.nucleo.t[0]), limpio(p.nucleo.t[1])] };
+  };
+  let ps = piezas.slice();
+  for (;;) {
+    const cs = ps.map(extendida);
+    let par: [number, number] | null = null;
+    busca: for (let i = 0; i < ps.length; i++)
+      for (let j = i + 1; j < ps.length; j++) {
+        const [os, ot] = [solape(cs[i]!.s, cs[j]!.s), solape(cs[i]!.t, cs[j]!.t)];
+        // A lo largo se pisan; en transversal, se pisan o se tocan
+        if (os <= EPS || ot < -EPS) continue;
+        const cubren = areaDe(cs[i]!) + areaDe(cs[j]!) - (ot > EPS ? os * ot : 0);
+        const deOrigen = ot > EPS && solape(ps[i]!.nucleo.s, ps[j]!.nucleo.s) > EPS;
+        if (deOrigen || areaDe(envuelve(cs[i]!, cs[j]!)) <= holgura * cubren) {
+          par = [i, j];
+          break busca;
+        }
+      }
+    if (!par) break;
+    const [pi, pj] = par;
+    const [x, y] = [ps[pi]!, ps[pj]!];
+    const unida: PiezaDespiece<E> = { nucleo: envuelve(x.nucleo, y.nucleo), limite: [Math.min(x.limite[0], y.limite[0]), Math.max(x.limite[1], y.limite[1])], estaciones: [...x.estaciones, ...y.estaciones] };
+    ps = ps.flatMap((q, i) => (i === pi ? [unida] : i === pj ? [] : [q]));
+  }
+  const cs = ps.map(extendida);
+  for (let i = 0; i < ps.length; i++)
+    for (let j = i + 1; j < ps.length; j++) {
+      if (solape(cs[i]!.s, cs[j]!.s) <= EPS || solape(cs[i]!.t, cs[j]!.t) <= EPS) continue;
+      // Sus zonas no se pisan a lo largo (se habrían unido): el corte, a mitad del hueco entre ellas
+      const [lo, hi] = ps[i]!.nucleo.s[0] <= ps[j]!.nucleo.s[0] ? [i, j] : [j, i];
+      const [g0, g1] = [ps[lo]!.nucleo.s[1], ps[hi]!.nucleo.s[0]];
+      let corte = alModulo((g0 + g1) / 2, false);
+      if (corte < g0 - EPS || corte > g1 + EPS) corte = (g0 + g1) / 2;
+      corte = limpio(corte);
+      if (corte < cs[lo]!.s[1]) cs[lo]!.s[1] = corte;
+      if (corte > cs[hi]!.s[0]) cs[hi]!.s[0] = corte;
+    }
+  return ps.map((pieza, i) => ({ caja: cs[i]!, pieza }));
+}
 
 export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesProponerLosa = {}): PropuestaLosa {
   if (d.material.tipo !== "hormigon") return { armado: null, comprobacion: null, probados: 0, sinRefuerzo: [], motivo: `el material ${d.material.id} no es hormigón` };
@@ -152,9 +256,16 @@ export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesP
     return zonas;
   };
   /** El rectángulo que envuelve los tramos de unas estaciones. */
-  const caja = (es: readonly EstacionLosa[]): { s: [number, number]; t: [number, number] } => {
+  const caja = (es: readonly EstacionLosa[]): Rectangulo => {
     const s: [number, number] = [Math.min(...es.map((e) => Math.min(e.a, e.s))), Math.max(...es.map((e) => Math.max(e.b, e.s)))];
     return { s: s[1] > s[0] + EPS ? s : [s[0] - 0.05, s[1] + 0.05], t: [Math.min(...es.map((e) => e.t0)), Math.max(...es.map((e) => e.t1))] };
+  };
+  /** La pieza del despiece de unas estaciones de una dirección: su caja y hasta dónde llegan sus franjas. */
+  const piezaDe = (k: 1 | 2, es: EstacionLosa[]): PiezaDespiece<EstacionLosa> => {
+    const suyas = new Set(es.map((e) => e.franja));
+    const fs = d.direcciones[k - 1]!.franjas.filter((f) => suyas.has(f.id));
+    const nucleo = caja(es);
+    return { nucleo, limite: [Math.min(nucleo.s[0], ...fs.map((f) => f.s0)), Math.max(nucleo.s[1], ...fs.map((f) => f.s1))], estaciones: es };
   };
 
   // ─── 2. Los cercos de los nervios, zona a zona ────────────────────────────────────────────────
@@ -165,13 +276,19 @@ export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesP
    * Cercos en las zonas de nervios sin cortante. `conFlexion`: tras los refuerzos, los cercos tampoco
    * pueden hacer fallar la flexión (cambian el canto útil y el hueco de las barras).
    */
+  /** Las estaciones que han pedido cercos en cada dirección, en todas las pasadas. */
+  const pidenCercos: [Set<EstacionLosa>, Set<EstacionLosa>] = [new Set(), new Set()];
   const pasoCercos = (conFlexion: boolean) => {
     for (const k of [1, 2] as const) {
       const eje = k === 1 ? ("x" as const) : ("y" as const);
-      const fallan = new Set(estacionesSinCortante(d, armadoLosa(a, datos), k));
-      if (!fallan.size) continue;
-      for (const z of zonasDe(k, `${eje}-inf`, fallan)) {
-        const c: CercosForjado = { direccion: eje, ...caja(z.estaciones), cercos: tabla[0]! };
+      const fallan = estacionesSinCortante(d, armadoLosa(a, datos), k);
+      if (!fallan.length) continue;
+      // Las zonas de la dirección se rehacen con todo lo que ha pedido cercos, para unirlas con las de antes
+      for (const e of fallan) pidenCercos[k - 1].add(e);
+      for (let i = cercos.length - 1; i >= 0; i--) if (cercos[i]!.direccion === eje) cercos.splice(i, 1);
+      const piezas = zonasDe(k, `${eje}-inf`, pidenCercos[k - 1]).map((z) => piezaDe(k, z.estaciones));
+      for (const { caja: rect } of despiece(piezas, () => 0, LARGO_MINIMO_CERCOS, HOLGURA_UNION_CERCOS)) {
+        const c: CercosForjado = { direccion: eje, ...rect, cercos: tabla[0]! };
         const cubiertas = d.direcciones[k - 1]!.estaciones.filter((e) => cubreCercos(c, e));
         cercos.push(c);
         let vale = false;
@@ -190,47 +307,102 @@ export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesP
         }
         if (!vale) {
           cercos.pop();
-          sinRefuerzo.push({ zona: z.id.replace(`:${eje}-inf:R`, `:${eje}:C${conFlexion ? "b" : ""}`), motivo: `ningunos cercos de la tabla cumplen ${motivo}: la sección no basta` });
+          sinRefuerzo.push({ zona: `${d.losa}:${eje}:C${conFlexion ? "b" : ""}@${rect.s[0].toFixed(2)},${rect.t[0].toFixed(2)}`, motivo: `ningunos cercos de la tabla cumplen ${motivo}: la sección no basta` });
         }
       }
     }
   };
   if (reticular) pasoCercos(false);
 
-  // ─── 3. Los refuerzos, zona a zona ────────────────────────────────────────────────────────────
+  // ─── 3. Los refuerzos ─────────────────────────────────────────────────────────────────────────
   const refuerzos: RefuerzoForjado[] = (a.refuerzos = []);
+  const fyd = getFyd(datos?.fyk ?? DATOS_ARMADO.fyk);
+  const fctm = fctmAdherencia(d.material.fck);
+  /** Lo que se alarga cada punta de un refuerzo: el decalaje (el canto) más el anclaje de su barra, m. */
+  const alarga = (diametro: number, arm: ArmaduraForjado) => d.espesor + computeAnchorage(diametro, fctm, fyd, arm.endsWith("inf") ? "inf" : "sup", 1000 * d.espesor).lb_rqd / 1000;
+  /** El primer refuerzo de la tabla que cumple en su rectángulo; si ninguno, queda dicho. */
+  const dimensionar = (arm: ArmaduraForjado, rect: Rectangulo, en: "abacos" | "nervios" | undefined, zona: string): RefuerzoForjado | null => {
+    const k = direccionArmadura(arm);
+    const r: RefuerzoForjado = { armadura: arm, s: rect.s, t: rect.t, barras: parrillas[0]!, ...(en ? { en } : {}) };
+    const cubiertas = d.direcciones[k - 1]!.estaciones.filter((e) => cubre(r, e));
+    refuerzos.push(r);
+    let motivo = "";
+    for (const b of en === "nervios" ? nervios : parrillas) {
+      r.barras = b;
+      const c = probar({ direccion: k, estaciones: cubiertas });
+      const f = c.filas.find((x) => x.armadura === arm && x.estado === "fail" && x.grupo !== "seccion");
+      const p = c.pendientes[0];
+      if (!f && !p) return r;
+      motivo = p?.motivo ?? `«${f!.descripcion}»`;
+    }
+    refuerzos.pop();
+    sinRefuerzo.push({ armadura: arm, zona, ...(en ? { en } : {}), motivo: `ningún refuerzo de la tabla cumple ${motivo}: la sección no basta` });
+    return null;
+  };
   for (const arm of ARMADURAS_FORJADO) {
     const k = direccionArmadura(arm);
     const dir = d.direcciones[k - 1]!;
     const fallan = new Set(estacionesQueFallan(d, armadoLosa(a, datos), arm));
     if (!fallan.size) continue;
-    for (const z of zonasDe(k, arm, fallan)) {
-      const clases: SeccionLosa[] = reticular ? ["abaco", "nervio"] : ["maciza"];
-      for (const clase of clases) {
-        const suyas = z.estaciones.filter((e) => e.seccion === clase);
-        if (!suyas.length) continue;
-        const en = clase === "abaco" ? ("abacos" as const) : clase === "nervio" ? ("nervios" as const) : undefined;
-        const r: RefuerzoForjado = { armadura: arm, ...caja(suyas), barras: parrillas[0]!, ...(en ? { en } : {}) };
-        const cubiertas = dir.estaciones.filter((e) => cubre(r, e));
-        refuerzos.push(r);
-        let vale = false;
-        let motivo = "";
-        for (const b of clase === "nervio" ? nervios : parrillas) {
-          r.barras = b;
-          const c = probar({ direccion: k, estaciones: cubiertas });
-          const f = c.filas.find((x) => x.armadura === arm && x.estado === "fail" && x.grupo !== "seccion");
-          const p = c.pendientes[0];
-          if (!f && !p) {
-            vale = true;
-            break;
-          }
-          motivo = p?.motivo ?? `«${f!.descripcion}»`;
-        }
-        if (!vale) {
-          refuerzos.pop();
-          sinRefuerzo.push({ armadura: arm, zona: z.id, ...(en ? { en } : {}), motivo: `ningún refuerzo de la tabla cumple ${motivo}: la sección no basta` });
-        }
+    const zonas = zonasDe(k, arm, fallan);
+    // En los ábacos, uno por ábaco: la parrilla del ábaco entero
+    if (reticular) {
+      const cajas = d.abacos.map((p): Rectangulo => {
+        const [ss, ts] = [p.map((v) => v[0] * dir.d[0] + v[1] * dir.d[1]), p.map((v) => v[0] * dir.n[0] + v[1] * dir.n[1])];
+        return { s: [Math.min(...ss), Math.max(...ss)], t: [Math.min(...ts), Math.max(...ts)] };
+      });
+      const fuera = (c: Rectangulo, e: EstacionLosa) => Math.hypot(Math.max(0, c.s[0] - e.s, e.s - c.s[1]), Math.max(0, c.t[0] - (e.t0 + e.t1) / 2, (e.t0 + e.t1) / 2 - c.t[1]));
+      const porAbaco = new Map<number, EstacionLosa[]>();
+      for (const e of dir.estaciones) {
+        if (!fallan.has(e) || e.seccion !== "abaco") continue;
+        let cual = -1;
+        cajas.forEach((c, i) => {
+          if (cual < 0 || fuera(c, e) < fuera(cajas[cual]!, e) - EPS) cual = i;
+        });
+        (porAbaco.get(cual) ?? porAbaco.set(cual, []).get(cual)!).push(e);
       }
+      for (const [i, es] of [...porAbaco].sort((x, y) => x[0] - y[0])) {
+        // El ábaco y, por si alguna cae fuera de él, sus estaciones
+        const puntos: Rectangulo = { s: [Math.min(...es.map((e) => e.s)), Math.max(...es.map((e) => e.s))], t: [Math.min(...es.map((e) => (e.t0 + e.t1) / 2)), Math.max(...es.map((e) => (e.t0 + e.t1) / 2))] };
+        let rect = i >= 0 ? envuelve(cajas[i]!, puntos) : caja(es);
+        if (i >= 0) {
+          // Un ábaco de borde sale de la losa: hasta donde llegan las franjas que lo cruzan
+          const cruzan = dir.franjas.filter((f) => f.t1 > rect.t[0] + EPS && f.t0 < rect.t[1] - EPS && f.s1 > rect.s[0] + EPS && f.s0 < rect.s[1] - EPS);
+          if (cruzan.length)
+            rect = {
+              s: [Math.max(rect.s[0], Math.min(...cruzan.map((f) => f.s0))), Math.min(rect.s[1], Math.max(...cruzan.map((f) => f.s1)))],
+              t: [Math.max(rect.t[0], Math.min(...cruzan.map((f) => f.t0))), Math.min(rect.t[1], Math.max(...cruzan.map((f) => f.t1)))],
+            };
+          rect = envuelve(rect, puntos);
+        }
+        dimensionar(arm, { s: [limpio(rect.s[0]), limpio(rect.s[1])], t: [limpio(rect.t[0]), limpio(rect.t[1])] }, "abacos", `${d.losa}:${arm}:ábaco ${i + 1}`);
+      }
+    }
+    // En los nervios y en una maciza: las zonas, con su despiece
+    const clase: SeccionLosa = reticular ? "nervio" : "maciza";
+    const en = reticular ? ("nervios" as const) : undefined;
+    const piezas = zonas.flatMap((z) => {
+      const suyas = z.estaciones.filter((e) => e.seccion === clase);
+      return suyas.length ? [piezaDe(k, suyas)] : [];
+    });
+    if (!piezas.length) continue;
+    // El anclaje depende del diámetro, que sale de dimensionar: se repite mientras alguno crezca
+    const supuesto = new Map<EstacionLosa, number>();
+    const [desde, sinDesde] = [refuerzos.length, sinRefuerzo.length];
+    for (let ronda = 0; ronda < 4; ronda++) {
+      refuerzos.length = desde;
+      sinRefuerzo.length = sinDesde;
+      let crece = false;
+      for (const { caja: rect, pieza } of despiece(piezas, (p) => alarga(Math.max(DIAMETROS_LOSA[0], ...p.estaciones.map((e) => supuesto.get(e) ?? 0)), arm), LARGO_MINIMO)) {
+        const r = dimensionar(arm, rect, en, `${d.losa}:${arm}@${rect.s[0].toFixed(2)},${rect.t[0].toFixed(2)}`);
+        if (!r) continue;
+        for (const e of pieza.estaciones)
+          if ((supuesto.get(e) ?? DIAMETROS_LOSA[0]) < r.barras.diametro) {
+            supuesto.set(e, r.barras.diametro);
+            crece = true;
+          }
+      }
+      if (!crece) break;
     }
   }
   // Un refuerzo en segunda capa baja el canto útil del nervio, y con él su cortante sin cercos: otra pasada

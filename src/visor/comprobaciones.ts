@@ -20,6 +20,8 @@ import { armadoPropuestoLosas, comprobarLosas } from "../comprobaciones/losas.ts
 import { armadoPropuesto, comprobarPilares } from "../comprobaciones/pilares.ts";
 import { armadoPropuestoPunzonamiento, comprobarPunzonamientos } from "../comprobaciones/punzonamiento.ts";
 import { armadoPropuestoVigas, comprobarVigas } from "../comprobaciones/vigas.ts";
+import type { DatosDespiece } from "../comprobaciones/despieceVigas.ts";
+import { datosDespiece, porticoDe, type Portico } from "../comprobaciones/porticos.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import { bandaPolilinea, numeroFijo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva } from "../agente/render/escena.ts";
@@ -373,6 +375,20 @@ export function alDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto 
     }
   }
   return { valido: true, valor: { fichas: ids.flatMap((id) => cache.piezas.get(id)?.fichas ?? []), diagnosticos: cache.diagnosticos, comprobadas } };
+}
+
+/** El pórtico de una viga (pedido `portico`): sus apoyos y sus vanos a lo largo de él, y lo que su despiece necesita además del armado. */
+export interface DatosPortico {
+  portico: Portico;
+  despiece: DatosDespiece;
+}
+
+export function datosPortico(s: Sesion, viga: string): Resultado<DatosPortico> {
+  const q = s.q;
+  if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
+  const portico = porticoDe(q, viga);
+  if (!portico) return no("visor/comprobacion", `No hay ninguna viga «${viga}» con vanos.`);
+  return { valido: true, valor: { portico, despiece: datosDespiece(portico, s.proyecto.obra?.armado) } };
 }
 
 export const sinFilas = ({ filas: _f, armado: _a, datos: _d, geometria: _g, recubrimiento: _r, ...p }: FichaComprobacion): ParteComprobada => p;

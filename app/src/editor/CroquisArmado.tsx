@@ -34,6 +34,7 @@ const RUTAS_CERCOS = ["cercos", "cercosInicio", "cercosFin"];
 const es = (activo: string | null, rutas: readonly string[]) => (activo !== null && rutas.includes(activo)) || undefined;
 
 /** Una sección con su armado, a escala, en una caja de w × h px con sus cotas. */
+export { Seccion as SeccionDibujada };
 function Seccion({ s, w, h, x0 = 0, y0 = 0, activo, titulo, cotaY = true }: { s: SeccionArmada; w: number; h: number; x0?: number; y0?: number; activo: string | null; titulo?: string; cotaY?: boolean }) {
   const [mx, my] = [26, titulo ? 24 : 18];
   const k = Math.min((w - 2 * mx) / s.ancho, (h - 2 * my) / s.alto);

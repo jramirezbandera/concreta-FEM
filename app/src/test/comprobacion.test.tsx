@@ -17,7 +17,8 @@ import { sha256 } from "../../../src/compilador/huella.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
 import { Atendedor } from "../../../src/visor/atender.ts";
-import type { DatosComprobaciones, FichaComprobacion } from "../../../src/visor/comprobaciones.ts";
+import type { DatosComprobaciones, DatosPortico, FichaComprobacion } from "../../../src/visor/comprobaciones.ts";
+import { despiecePortico } from "../../../src/comprobaciones/despieceVigas.ts";
 import type { Pedido } from "../../../src/visor/protocolo.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { ContextoPaneles, useAlmacenPaneles } from "../armazon/paneles.ts";
@@ -309,5 +310,71 @@ describe("CO6 · DOM: Resultados · Comprobación", () => {
     fireEvent.click(within(document.querySelector('[data-lista-armado="refuerzos"] .elemento-armado') as HTMLElement).getByRole("button", { name: /^Quitar: R1 / }));
     expect(reg.ediciones.length).toBe(antes + 1);
     expect(reg.proyecto.armado!.forjados![losa]!.refuerzos?.length ?? 0).toBe(suyo.refuerzos!.length - 1);
+    // Los de detrás cambian de número: tras quitar uno, lo elegido es la losa
+    expect(reg.elegidos.at(-1)).toEqual([losa]);
+    // §8.12: con uno elegido, Supr lo quita (un paso de deshacer)
+    const quedan = reg.proyecto.armado!.forjados![losa]!.refuerzos?.length ?? 0;
+    if (quedan) {
+      await waitFor(() => expect(document.querySelectorAll('[data-lista-armado="refuerzos"] .elemento-armado').length).toBe(quedan), { timeout: 60_000 });
+      fireEvent.click(within(document.querySelector('[data-lista-armado="refuerzos"] .elemento-armado') as HTMLElement).getAllByRole("button")[0]!);
+      expect(reg.elegidos.at(-1)).toEqual([`${losa}/R1`]);
+      const n = reg.ediciones.length;
+      fireEvent.keyDown(window, { key: "Delete" });
+      expect(reg.ediciones.length).toBe(n + 1);
+      expect(reg.proyecto.armado!.forjados![losa]!.refuerzos?.length ?? 0).toBe(quedan - 1);
+      expect(reg.elegidos.at(-1)).toEqual([losa]);
+    }
+    // «Añadir» pone la herramienta (lo dice sobre la planta) y Esc la suelta
+    const anadir = screen.getByRole("combobox", { name: "Añadir a una losa" }) as HTMLSelectElement;
+    fireEvent.change(anadir, { target: { value: "x-sup" } });
+    await waitFor(() => expect(anadir.value).toBe("x-sup"));
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(anadir.value).toBe(""));
+    // Lo que se ve: todo, una cara o los cercos
+    fireEvent.click(within(screen.getByRole("group", { name: "Se ve" })).getByRole("button", { name: "Cercos" }));
+    await waitFor(() => expect(reg.pedidos.some((p) => p.tipo === "escena" && p.vista.vista === "comprobacion" && p.vista.cara === "cercos")).toBe(true));
+  }, 240_000);
+
+  it("§8.13: con una viga elegida, «Ver el pórtico» abre su despiece: el de `despiecePortico` con el armado del proyecto; sigue a lo que se escribe y un clic en otro vano lo elige", async () => {
+    const reg = montar();
+    await waitFor(() => expect(filasTabla().length).toBeGreaterThan(0));
+    fireEvent.click(within(screen.getByRole("group", { name: "Qué se comprueba" })).getByRole("button", { name: "Vigas" }));
+    await waitFor(() => expect(document.querySelector("[data-tabla-comprobacion] th")!.textContent).toBe("Viga"));
+    fireEvent.click(screen.getByRole("button", { name: "Todo" }));
+    await waitFor(() => expect(reg.ediciones.length).toBe(1), { timeout: 120_000 });
+    const vigas = reg.proyecto.armado!.vigas!;
+    // Una viga de más de un vano, para cambiar de uno a otro
+    const t = await pedir<DatosComprobaciones>({ tipo: "comprobaciones", de: "vigas", armado: { vigas } });
+    const parte = t.partes.find((p) => t.partes.filter((x) => x.pieza === p.pieza).length > 1) ?? t.partes[0]!;
+    await waitFor(() => expect(filasTabla().length).toBe(t.partes.length));
+    fireEvent.click(filasTabla()[t.partes.indexOf(parte)]!);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ver el pórtico" })).toBeTruthy(), { timeout: 60_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Ver el pórtico" }));
+    await waitFor(() => expect(document.querySelector("[data-despiece-portico]")).toBeTruthy(), { timeout: 60_000 });
+    expect(reg.pedidos.some((p) => p.tipo === "portico" && p.viga === parte.pieza)).toBe(true);
+    const dp = await pedir<DatosPortico>({ tipo: "portico", viga: parte.pieza });
+    const armados = Object.fromEntries(dp.portico.vanos.map((v) => [v.clave, vigas[v.viga]?.[v.vano]]));
+    const d = despiecePortico(dp.portico, armados, dp.despiece);
+    const raiz = document.querySelector("[data-despiece-portico]")!;
+    expect(raiz.getAttribute("data-despiece-portico")).toBe(dp.portico.id);
+    expect([...raiz.querySelectorAll("[data-barra] .dp-rotulo")].map((x) => x.textContent)).toEqual(d.barras.map((b) => `${b.n}Ø${b.diametro} L=${fmt(b.largo, 2)}`));
+    expect(raiz.querySelector("[data-tabla-despiece]")!.querySelectorAll("tbody tr")).toHaveLength(d.medicion.length);
+    expect(raiz.querySelector(`[data-vano="${parte.clave}"]`)!.hasAttribute("data-on")).toBe(true);
+    // Lo que se escribe en la ficha, sin aplicarlo: el despiece lo sigue (otra inferior), y el proyecto no cambia
+    const inferior = within(document.querySelector("[data-form-armado]") as HTMLElement).getAllByRole("combobox")[0] as HTMLSelectElement;
+    const suya = d.barras.find((b) => b.cara === "inferior" && b.origen.some((o) => o.clave === parte.clave))!;
+    const otro = suya.diametro === 25 ? 20 : 25;
+    fireEvent.change(inferior, { target: { value: String(otro) } });
+    await waitFor(() => expect(raiz.querySelector(`[data-barra="${suya.marca}"] .dp-rotulo`)!.textContent).toMatch(new RegExp(`^${suya.n}Ø${otro} L=`)));
+    expect(reg.ediciones.length).toBe(1);
+    // Un clic en otro vano del pórtico lo elige: su ficha y su banda
+    const otra = dp.portico.vanos.find((v) => v.clave !== parte.clave && t.partes.some((p) => p.clave === v.clave));
+    if (otra) {
+      fireEvent.click(raiz.querySelector(`[data-vano="${otra.clave}"]`)!);
+      await waitFor(() => expect(document.querySelector("[data-despiece-portico]")!.querySelector(`[data-vano="${otra.clave}"]`)!.hasAttribute("data-on")).toBe(true), { timeout: 60_000 });
+      expect(reg.elegidos.at(-1)).toEqual([otra.viga]);
+      // El borrador era del otro vano: aquí vuelve a dibujarse lo del proyecto
+      await waitFor(() => expect([...document.querySelectorAll("[data-despiece-portico] [data-barra] .dp-rotulo")].map((x) => x.textContent)).toEqual(d.barras.map((b) => `${b.n}Ø${b.diametro} L=${fmt(b.largo, 2)}`)), { timeout: 60_000 });
+    }
   }, 240_000);
 });

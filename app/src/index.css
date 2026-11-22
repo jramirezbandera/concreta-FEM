@@ -1221,8 +1221,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .cq-guia { fill: none; stroke: var(--color-text-tertiary); stroke-width: .7; }
 
 /* El armado dibujado (CO6): barras por su grupo, cercos, y la leyenda con el punto de cada grupo */
-.croquis { --ca-inferior: #2563eb; --ca-superior: #dc2626; --ca-caraB: #2563eb; --ca-caraH: #0d9488; --ca-piel: #8b5cf6; }
-:root[data-theme="dark"] .croquis, .dark .croquis { --ca-inferior: #60a5fa; --ca-superior: #f87171; --ca-caraB: #60a5fa; --ca-caraH: #2dd4bf; --ca-piel: #a78bfa; }
+.croquis, .despiece { --ca-inferior: #2563eb; --ca-superior: #dc2626; --ca-caraB: #2563eb; --ca-caraH: #0d9488; --ca-piel: #8b5cf6; }
+:root[data-theme="dark"] .croquis, .dark .croquis, :root[data-theme="dark"] .despiece, .dark .despiece { --ca-inferior: #60a5fa; --ca-superior: #f87171; --ca-caraB: #60a5fa; --ca-caraH: #2dd4bf; --ca-piel: #a78bfa; }
 .ca-barra { fill: var(--color-text-primary); stroke: var(--color-bg-surface); stroke-width: .6; }
 .ca-barra[data-grupo="caraB"] { fill: var(--ca-caraB); }
 .ca-barra[data-grupo="caraH"] { fill: var(--ca-caraH); }
@@ -1255,6 +1255,57 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .ca-entrada i[data-grupo="piel"] { background: var(--ca-piel); }
 .ca-entrada i[data-grupo="cercos"] { width: 9px; height: 9px; border-radius: 2px; background: none; border: 1.5px solid var(--color-text-secondary); }
 .ca-dato { display: block; margin-top: 2px; color: var(--color-text-secondary); }
+/* El despiece de un pórtico (CO6, §8.13): el alzado con las barras sacadas a su fila, los cercos contados, las secciones y la tabla */
+.despiece { padding: 6px 12px 10px; }
+.despiece-titulo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; padding: 0 2px 4px; font-size: 12px; color: var(--color-text-secondary); }
+.despiece-titulo b { color: var(--color-text-primary); font-weight: 600; }
+.despiece-alzado { overflow-x: auto; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); }
+.despiece svg { display: block; }
+.despiece text { font: 11px var(--font-mono); fill: var(--color-text-secondary); paint-order: stroke; stroke: var(--color-bg-surface); stroke-width: 3px; stroke-linejoin: round; }
+.dp-vano rect { fill: transparent; }
+.dp-vano[data-on] rect { fill: color-mix(in srgb, var(--color-accent) 9%, transparent); }
+.dp-vano:hover rect { fill: color-mix(in srgb, var(--color-accent) 5%, transparent); }
+.dp-vano[data-on]:hover rect { fill: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.dp-vano { cursor: pointer; }
+.despiece text.dp-nombre-vano { fill: var(--color-text-tertiary); }
+.despiece .dp-vano[data-on] text.dp-nombre-vano { fill: var(--color-text-primary); font-weight: 600; }
+.despiece text.dp-nombre-vano[data-tono="fail"] { fill: var(--color-state-fail); }
+.despiece text.dp-nombre-vano[data-tono="warn"] { fill: var(--color-state-warn); }
+.despiece text.dp-nombre-apoyo { fill: var(--color-text-primary); font-weight: 600; }
+.dp-apoyo, .dp-viga, .dp-cercos, .dp-cotas, .despiece text.ca-falta { pointer-events: none; }
+.dp-apoyo[data-tipo="viga"] rect { fill: color-mix(in srgb, var(--color-text-tertiary) 55%, transparent); }
+.dp-cercos[data-otro], .dp-barra[data-otro], .dp-tramo-cercos[data-otro] { opacity: .6; }
+.dp-cota-barra line { stroke: var(--color-text-tertiary); stroke-width: 1; }
+.despiece .dp-cota-barra text { font-size: 10px; fill: var(--color-text-secondary); }
+.dp-barra .dp-linea { fill: none; stroke: var(--color-text-primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dp-barra .dp-en-sitio { stroke: var(--color-text-primary); stroke-width: 1.3; }
+.dp-barra[data-grupo="inferior"] .dp-linea, .dp-barra[data-grupo="inferior"] .dp-en-sitio { stroke: var(--ca-inferior); }
+.dp-barra[data-grupo="superior"] .dp-linea, .dp-barra[data-grupo="superior"] .dp-en-sitio { stroke: var(--ca-superior); }
+.dp-barra[data-grupo="piel"] .dp-linea, .dp-barra[data-grupo="piel"] .dp-en-sitio { stroke: var(--ca-piel); }
+.dp-barra[data-papel="corrida"] .dp-linea { stroke-width: 1.5; }
+.dp-barra[data-activo] .dp-linea { stroke-width: 3.6; }
+.dp-barra[data-activo] .dp-en-sitio { stroke-width: 3; }
+.dp-barra .dp-marca { fill: var(--color-bg-surface); stroke: var(--color-text-secondary); stroke-width: 1; }
+.dp-barra[data-grupo="inferior"] .dp-marca { stroke: var(--ca-inferior); }
+.dp-barra[data-grupo="superior"] .dp-marca { stroke: var(--ca-superior); }
+.dp-barra[data-grupo="piel"] .dp-marca { stroke: var(--ca-piel); }
+.despiece text.dp-marca-numero { font-size: 9.5px; fill: var(--color-text-primary); stroke: none; }
+.despiece .dp-barra[data-grupo="inferior"] text.dp-rotulo { fill: var(--ca-inferior); }
+.despiece .dp-barra[data-grupo="superior"] text.dp-rotulo { fill: var(--ca-superior); }
+.despiece .dp-barra[data-grupo="piel"] text.dp-rotulo { fill: var(--ca-piel); }
+.despiece .dp-barra[data-activo] text.dp-rotulo, .despiece .dp-tramo-cercos[data-activo] text { font-weight: 700; }
+.dp-tramo-cercos path { fill: none; stroke: var(--color-text-tertiary); stroke-width: 1; }
+.dp-tramo-cercos[data-activo] path { stroke: var(--color-accent); stroke-width: 1.8; }
+.despiece text.dp-cota-apoyo { fill: var(--color-text-tertiary); font-size: 9.5px; }
+.despiece-pie { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 18px; padding-top: 8px; }
+.despiece-secciones { margin: 0; padding: 0 6px 0 16px; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); }
+.despiece-secciones svg { overflow: visible; }
+.despiece-secciones figcaption { padding: 0 10px 6px; font-size: 11px; color: var(--color-text-secondary); text-align: center; }
+.despiece text.ca-titulo { fill: var(--color-text-primary); font-family: var(--font-sans, inherit); }
+.despiece text.ca-falta { fill: var(--color-text-tertiary); font-style: italic; }
+.despiece-tabla { width: auto; min-width: 420px; flex: 1 1 420px; max-width: 640px; }
+.despiece-tabla tr[data-on] td { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.despiece-tabla tfoot td { font-weight: 600; border-top: 1px solid var(--color-border-strong); }
 /* El editor ampliado del armado (el dibujo grande y el formulario al lado) y las filas de refuerzos de una losa */
 .dialogo.dialogo-armado { width: min(1180px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
 .editor-armado { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 8px; align-items: start; }
