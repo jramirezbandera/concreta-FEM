@@ -124,6 +124,40 @@ describe("CO3: las demandas de una losa", () => {
     expect(d.direcciones.some((x) => x.estaciones.some((e) => e.cortante === null))).toBe(true);
   });
 
+  it("en una astilla de losa (menos de un canto en el ancho de la franja), el cortante no cuenta y se avisa (CO4-7)", () => {
+    const [L, h] = [5, 0.2];
+    const una = losaEnDosApoyos({ L, h, cm: 2, q: 3 });
+    // Una losa en L: para x > 2,5, la franja de arriba (t de 2 a 3) sólo tiene 10 cm de losa
+    const f: ModeloFisico = {
+      ...una,
+      losas: una.losas!.map((l) => ({ ...l, contorno: [[0, 0], [L, 0], [L, 2.1], [2.5, 2.1], [2.5, 3], [0, 3]] as [number, number][] })),
+      apoyosLineales: [una.apoyosLineales![0]!, { ...una.apoyosLineales![1]!, puntos: [[L, 0], [L, 2.1]] }],
+    };
+    const r = demandasLosa(consultas(f, { tamanoMalla: 0.25 }), "L");
+    if (!r.valido) throw new Error("demandas");
+    const x = r.valor.direcciones[0];
+    let astillas = 0;
+    for (const e of x.estaciones) {
+      const g = x.franjas.find((y) => y.id === e.franja)!;
+      // La franja de arriba, más allá del escalón, es la astilla; las demás estaciones llevan su cortante
+      const enAstilla = g.t0 > 1.9 && e.s > 2.5 + 1e-6;
+      if (enAstilla) {
+        astillas++;
+        expect(e.sinCortante).toBe("astilla");
+        expect(e.cortante).toBeNull();
+      } else if (e.s < 2.5 - 1e-6 || g.t0 < 1.9) {
+        expect(e.sinCortante).toBeNull();
+        expect(e.cortante).not.toBeNull();
+      }
+    }
+    expect(astillas).toBeGreaterThan(5);
+    expect(r.diagnosticos.some((d) => d.codigo === "comprobacion/cortante-astilla")).toBe(true);
+    // Sin astillas, ni el aviso
+    const sin = demandasLosa(consultas(una, { tamanoMalla: 0.25 }), "L");
+    if (!sin.valido) throw new Error("demandas");
+    expect(sin.diagnosticos.some((d) => d.codigo === "comprobacion/cortante-astilla")).toBe(false);
+  });
+
   it("con el sismo del programa, ninguna demanda baja (criterio 9)", () => {
     const [a, b] = [plana().d, plana({ sismo: true }).d];
     expect(b.combinaciones).toBeGreaterThan(a.combinaciones);

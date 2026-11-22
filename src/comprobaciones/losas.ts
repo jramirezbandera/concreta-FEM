@@ -126,7 +126,7 @@ export function comprobarLosas(q: Consultas, armado: ArmadoLosas | undefined, da
     }
     const dem = d.valor;
     const estaciones = dem.direcciones[0].estaciones.length + dem.direcciones[1].estaciones.length;
-    conPilares ||= dem.direcciones.some((x) => x.estaciones.some((e) => e.cortante === null));
+    conPilares ||= dem.direcciones.some((x) => x.estaciones.some((e) => e.sinCortante === "pilar"));
     const base = { losa: id, planta: dem.planta, tipo: dem.reticular ? ("reticular" as const) : ("maciza" as const), combinaciones: dem.combinaciones, estaciones };
     const suyo = armado?.[id];
     let a: ArmadoForjado | undefined = suyo;

@@ -15,7 +15,12 @@
  *    `CANTOS_PUNZONAMIENTO` cantos de un pilar que llega a la planta: ahí la losa no trabaja como una
  *    viga ancha, y lo que la cruza llega a la huella del pilar (punzonamiento) o a la cara de una viga
  *    o un apoyo, cuya estación sí se comprueba. Por campos, junto a la esquina de un pilar y una viga
- *    no converge (en la vivienda, de 138 a 91 kN/m al pasar de h = 0,75 a 0,375).
+ *    no converge (en la vivienda, de 138 a 91 kN/m al pasar de h = 0,75 a 0,375);
+ *  - CO4-7 (decisión del usuario, 2026-11-22): en una estación con menos de un canto de losa en el
+ *    ancho de la franja (`anchoEnLosa` < espesor), una astilla de losa junto a una viga que corre a lo
+ *    largo de la franja, o junto al borde. No trabaja como una losa ancha sino con la viga; en la
+ *    vivienda, 8 cm de losa en la esquina de dos vigas que se cruzan en P4 daban 22,5 kN repartidos en
+ *    ellos, 281 kN/m. Se avisa (`comprobacion/cortante-astilla`).
  * El de una estación de apoyo (la cara de una viga, de un muro o un apoyo lineal) se comprueba
  * siempre, también junto a un pilar: lo que pasa por ella va a la viga o al apoyo, no a la huella del
  * pilar, y el punzonamiento no lo ve (CO4-4). Es exacto (por fuerzas nodales).
@@ -68,6 +73,8 @@ export interface EstacionLosa {
   /** ELU: el mayor cortante medio, kN/m; null en el metro de un pilar (punzonamiento) y en las estaciones de paso junto a un pilar. */
   cortante: number | null;
   combCortante: string;
+  /** Por qué no tiene cortante: el punzonamiento («pilar») o menos de un canto de losa en la franja («astilla», CO4-7). */
+  sinCortante: "pilar" | "astilla" | null;
   /** ELS cuasipermanente: momento de cada cara, kN·m/m (0 sin combinaciones de ELS). */
   cpInferior: number;
   cpSuperior: number;
@@ -158,6 +165,7 @@ export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> 
   const direcciones: DemandasDireccion[] = [];
   const pilaresPlanta = pilaresDePlanta(q, losa.planta);
   const radio = CANTOS_PUNZONAMIENTO * losa.espesor;
+  const astillas: string[] = [];
   for (const k of [1, 2] as const) {
     const franjas = fs.valor.filter((f) => f.direccion === k);
     const estaciones: EstacionLosa[] = [];
@@ -190,6 +198,9 @@ export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> 
         const xc = wcp?.valor[i];
         const seccion: SeccionLosa = losa.reticular ? ((e.fraccionAbaco ?? 0) >= FRACCION_ABACO ? "abaco" : "nervio") : "maciza";
         const punzonamiento = e.ventana !== undefined || (e.tipo !== "apoyo" && cerca.some((x) => Math.hypot(e.s - x.s, Math.max(0, f.t0 - x.t, x.t - f.t1)) < x.r - 1e-9));
+        const astilla = !punzonamiento && e.anchoEnLosa < losa.espesor - 1e-9;
+        if (astilla) astillas.push(`${f.id} s = ${e.s.toFixed(2)} (${Math.round(100 * e.anchoEnLosa)} cm)`);
+        const sinCortante = punzonamiento ? "pilar" : astilla ? "astilla" : null;
         estaciones.push({
           franja: f.id,
           indice: i,
@@ -205,8 +216,9 @@ export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> 
           superior: x.superior,
           combInferior: x.combInferior >= 0 ? elu.valor.nombres[x.combInferior]! : "",
           combSuperior: x.combSuperior >= 0 ? elu.valor.nombres[x.combSuperior]! : "",
-          cortante: punzonamiento ? null : v.valor[i]!.v,
+          cortante: sinCortante ? null : v.valor[i]!.v,
           combCortante: v.valor[i]!.comb >= 0 ? elu.valor.nombres[v.valor[i]!.comb]! : "",
+          sinCortante,
           cpInferior: xc?.inferior ?? 0,
           cpSuperior: xc?.superior ?? 0,
           luz,
@@ -215,6 +227,10 @@ export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> 
     }
     const ejes = franjas[0];
     direcciones.push({ direccion: k, d: ejes?.d ?? [1, 0], n: ejes?.n ?? [0, 1], franjas, estaciones, sinValor });
+  }
+  if (astillas.length) {
+    const lista = astillas.length > 6 ? `${astillas.slice(0, 6).join("; ")} y ${astillas.length - 6} más` : astillas.join("; ");
+    diagnosticos.push({ codigo: "comprobacion/cortante-astilla", severidad: "aviso", mensaje: `${astillas.length} estaciones de las franjas de la losa ${id} tienen menos de un canto de losa en su ancho (${lista}): es una astilla junto a una viga o un borde, que trabaja con la viga, y su cortante no se comprueba como el de una losa.`, ids: [id] });
   }
   const sinValor = direcciones[0]!.sinValor + direcciones[1]!.sinValor;
   if (sinValor) diagnosticos.push({ codigo: "comprobacion/estaciones-sin-valor", severidad: "aviso", mensaje: `${sinValor} estaciones de las franjas de la losa ${id} no tienen valor (su corte no sigue la malla) y no se comprueban: revise ahí el armado.`, ids: [id] });

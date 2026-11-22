@@ -552,10 +552,28 @@ Decidido por el usuario el 2026-11-22: CO4-a…CO4-j como estaban, salvo CO4-f, 
   - **L-CUB-S, junto a P4** (la esquina de la losa en la que se juntan dos vigas, con P4 dentro del ancho de las dos): 281 kN/m en la franja X13, **2,24 de VRd,c**. Converge: 281, 283 y 282 kN/m con h = 0,75, 0,375 y 0,25. Es la reacción de esquina de una losa apoyada en dos vigas que se cruzan.
   - **L-CUB, junto a P2:** 122 kN/m en la franja Y5, **1,003**; también converge (122, 127 y 122).
   - El armado propuesto no cambia (`armado igual` en el registro): no hay nada de la tabla que arregle el cortante de un ábaco.
-- **A un canto útil de la cara** (el §6.2.1(8) del Anejo 19 deja no comprobar más cerca con carga repartida), el de P4 baja a unos 90–100 kN/m, del orden de 0,75 de VRd,c (por las estaciones de paso de antes de este cambio, con h = 0,75). Se toma en la cara por CO3-j; cambiarlo es decisión del usuario (CO4-7).
+- **A un canto útil de la cara** (el §6.2.1(8) del Anejo 19 deja no comprobar más cerca con carga repartida), el de P4 parecía bajar a unos 90–100 kN/m, del orden de 0,75 de VRd,c. La estimación salía de las estaciones de paso por campos, que junto a un apoyo no valen (§8.9).
 - **Las demás referencias** de CO3 (la losa en dos apoyos, la plana con sismo, el reticular) no cambian.
 
-**Pendiente del usuario, CO4-7:** el cortante de la vivienda en la cara de las vigas junto a P4 y P2. O se mantiene en la cara (CO3-j) y la vivienda no cumple (hay que macizar más, subir el canto o llevar la carga a otra parte), o el cortante se comprueba a un canto útil de la cara de los apoyos (§6.2.1(8)), en todas las losas.
+**CO4-7,** decidida por el usuario el mismo día: §8.9.
+
+### 8.9 CO4-7, las astillas de losa (2026-11-22)
+
+El usuario eligió primero tomar el cortante a un canto útil de la cara de los apoyos (§6.2.1(8)). Al hacerlo salieron dos cosas, y con ellas decidió otra cosa: **no comprobar a cortante las astillas de losa y dejar el cortante en la cara de los apoyos** (CO3-j).
+
+**El cortante a un canto útil no sale bien de la malla.** La estación de la cara es exacta (fuerzas nodales), pero lo que hay entre la cara y d sólo lo dan las estaciones de paso, por campos, y junto a un apoyo salen bajas, del lado inseguro:
+- en una losa continua de dos vanos, a 0,25 m del apoyo interior, 27 kN/m frente a los 40 de la viga con h = 0,25 (−32 %; con h = 0,1, exacto): el SPR mezcla los dos lados del salto del cortante en el apoyo;
+- en la vivienda, con h = 0,75, el valor a d interpolado sale un 14 % bajo frente a la malla fina (87 frente a 101 kN/m).
+
+Las dos maneras seguras (restar p·d al de la cara, que baja 3–4 kN/m, o cortar por fuerzas nodales por una línea de la malla paralela a la cara a menos de d, que no siempre hay) no compensaban. El intento por interpolación se descartó sin subirlo.
+
+**El 2,24 de P4 era una astilla.** La franja X13 de L-CUB-S tiene 0,72 m de ancho, pero en la cara de la viga sólo 8 cm de losa (`anchoEnLosa` = 0,08): el resto cae en el ancho de una viga que corre a lo largo de la franja. Los 281 kN/m eran 22,5 kN en esos 8 cm, en la esquina de dos vigas que se cruzan. Ese trozo trabaja con la viga, no como una losa ancha.
+
+**La regla** (`demandas/losas.ts`): una estación con menos de un canto de losa en el ancho de su franja (`anchoEnLosa` < espesor), de apoyo o de paso, no lleva cortante (`sinCortante: "astilla"`), y la losa lleva el aviso `comprobacion/cortante-astilla` con las estaciones. Los momentos no cambian. `sinCortante` dice también las del punzonamiento («pilar»), y el aviso `comprobacion/punzonamiento-aparte` sólo sale por ellas.
+
+- **Prueba** (`losas.test.ts`): una losa en L en la que la franja de arriba, más allá del escalón, tiene 10 cm de losa con 20 de canto; sin el escalón, ni astillas ni aviso.
+- **Referencias** (`validacion/co/out_cambiosAstillas.txt`): sólo cambia la vivienda. L-CUB-S cumple (de 2,238 a 1,000 en el peor cortante, 0,9999 con sus cercos, y el mismo armado); L-CUB pierde una zona de cercos que sólo pedía una astilla y sigue sin cumplir por poco: 1,003 de VRd,c en un ábaco junto a P2, con losa en todo el ancho de la franja (0,72 m). El punzonamiento no cambia.
+- **La vivienda sigue sin cumplir** por esa estación de L-CUB (un 0,3 % por encima).
 
 
 ## 9. Fuera de esta fase
@@ -568,7 +586,7 @@ Decidido por el usuario el 2026-11-22: CO4-a…CO4-j como estaban, salvo CO4-f, 
 - Los planos de armado y su DXF (A6), y los PDF de cada pieza que hace Concreta.
 - La resistencia al fuego.
 - Del punzonamiento (CO4): las barras levantadas y los pernos; la disposición de los cercos (la primera fila, la separación tangencial, el anclaje); descontar la reacción del terreno en una losa de cimentación; los pilares de sección que no es rectangular ni circular, los circulares de borde y los que tienen borde libre en dos caras opuestas; el cortante de la losa contra la cara de una viga junto a un pilar (CO4-4).
-- De las losas (CO3): la flecha de la losa fisurada (CO-k); los anclajes, los solapes y las longitudes de los refuerzos; la armadura de reparto, la de borde y la de las esquinas entrantes; la armadura transversal de una maciza; las viguetas de un unidireccional (CO-b); la membrana de la losa (con diafragma rígido no tiene valor); elegir qué dirección va por fuera (CO3-e); que los refuerzos sigan a la losa al moverla o girarla en el editor; partir o igualar las zonas de refuerzo (CO3-h).
+- De las losas (CO3): el cortante a un canto útil de la cara de los apoyos (se toma en la cara, §8.9) y el de las astillas de losa junto a una viga (CO4-7); la flecha de la losa fisurada (CO-k); los anclajes, los solapes y las longitudes de los refuerzos; la armadura de reparto, la de borde y la de las esquinas entrantes; la armadura transversal de una maciza; las viguetas de un unidireccional (CO-b); la membrana de la losa (con diafragma rígido no tiene valor); elegir qué dirección va por fuera (CO3-e); que los refuerzos sigan a la losa al moverla o girarla en el editor; partir o igualar las zonas de refuerzo (CO3-h).
 - De las vigas (CO2): mezclar diámetros en una cara (CO2-b), las longitudes, los solapes y los anclajes de los refuerzos y el decalaje de la ley de momentos (el refuerzo de un apoyo se entiende que cubre su cuarto de vano), el momento mínimo de empotramiento en los apoyos del §9.2.1.2(1) (el modelo ya da el del pórtico), el cortante a un canto útil de la cara (se toma el de la cara), la armadura de piel que no sea por torsión, igualar el armado entre vanos y vigas, y las vigas en T o con la losa como cabeza.
 
 ## 10. Riesgos
