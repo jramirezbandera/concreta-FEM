@@ -16,6 +16,8 @@
 import type { AbacosPilares, AccionCaso, ApoyoFisico, ExceptoBorde, ApoyoLineal, Barra, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Procedencia, Relleno, Seccion, Vec2, Viga } from "../compilador/fisico.ts";
 import { gammaMaterial } from "../agente/sensatez.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { losaCimentacionMuro, losaCimentacionPilar } from "../compilador/cimentacion.ts";
+import { resolverOpciones } from "../compilador/fisico.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
 import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, pesoReticular, pesoUnidireccional, viguetaPesable, type Bovedilla, type Caseton, type DesglosePeso } from "../compilador/pesoForjado.ts";
 import { describirCaso } from "./casos.ts";
@@ -45,7 +47,7 @@ export interface Columna {
    * desplegable; la celda se sigue pudiendo escribir y pegar. En una columna opcional, la primera
    * es «» (sin dar: el valor por defecto).
    */
-  opciones?: (ctx: Contexto) => readonly Opcion[];
+  opciones?: (ctx: Contexto, f?: Fila) => readonly Opcion[];
   /**
    * GE: la lista de la que elige la columna (`opciones` son sus ids), para que la interfaz ofrezca
    * «Nueva…» y «Editar…» junto a ellas. Sólo las que tienen gestor (GE1: secciones y materiales;
@@ -189,6 +191,22 @@ const casos_ = (defecto?: string) =>
   ];
 const materiales_ = (defecto?: string) =>
   (ctx: Contexto): Opcion[] => [...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]), ...ctx.modelo.materiales.map((x) => ({ valor: x.id, texto: `${x.id} · ${describirMaterial(x)}` }))];
+
+/**
+ * LC-c: la losa de cimentación en la que arranca el pilar o el muro de la fila, o undefined (también
+ * si la fila no se lee). Con la base vacía, el compilador lo apoya en ella, no en el terreno.
+ */
+function losaBajo(ctx: Contexto, f: Fila, tabla: "pilares" | "muros"): string | undefined {
+  if (!(ctx.modelo.losas ?? []).some((l) => l.cimentacion !== undefined)) return undefined;
+  const r = (tabla === "pilares" ? pilares : muros).objeto({ ...f, base: "" }, ctx);
+  if (!r.ok) return undefined;
+  const eps = resolverOpciones().epsSnap;
+  const l = tabla === "pilares" ? losaCimentacionPilar(ctx.modelo, r.objeto as unknown as Pilar, eps) : losaCimentacionMuro(ctx.modelo, r.objeto as unknown as Muro, eps);
+  return l?.id;
+}
+
+/** Lo que vale la base vacía: apoyada en su losa de cimentación o empotrada. */
+const baseDefecto = (losa: string | undefined) => (losa ? `sobre la losa ${losa}` : "empotrado");
 
 const id: Columna = { clave: "id", titulo: "id", ayuda: "único en todo el modelo; vacío en una fila nueva: se pone solo" };
 const nombre: Columna = { clave: "nombre", titulo: "nombre" };
@@ -433,7 +451,12 @@ const pilares: DefTabla = {
       ayuda: "el punto de la sección que está en (x, y) en todas las plantas: centro (por defecto), mitad-… o esquina-… («derecha» según el canto h; con giro 0, +X, y «superior», +Y)",
       opciones: fijas(PUNTOS_FIJOS, "centro"),
     },
-    { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga, una losa, un muro u otro pilar)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
+    {
+      clave: "base",
+      titulo: "base",
+      ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga, una losa, un muro u otro pilar). Vacía en una losa de cimentación, se apoya en ella",
+      opciones: (ctx, f) => fijas(["empotrado", "articulado", "ninguno"], baseDefecto(f && losaBajo(ctx, f, "pilares")))(),
+    },
     { clave: "libBase", titulo: "lib. base", ayuda: GDL },
     { clave: "libCabeza", titulo: "lib. cabeza", ayuda: GDL },
   ],
@@ -1072,7 +1095,12 @@ const muros: DefTabla = {
     { clave: "hasta", titulo: "hasta", ayuda: "planta de la cabeza", opciones: opcionesPlantas, referencia: "plantas" },
     { clave: "espesor", titulo: "espesor", unidad: "m" },
     { clave: "material", titulo: "material", opciones: materiales_(), referencia: "materiales" },
-    { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (nace sobre una viga, una losa u otro muro)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
+    {
+      clave: "base",
+      titulo: "base",
+      ayuda: "empotrado (por defecto), articulado o ninguno (nace sobre una viga, una losa u otro muro). Vacía en una losa de cimentación, se apoya en ella",
+      opciones: (ctx, f) => fijas(["empotrado", "articulado", "ninguno"], baseDefecto(f && losaBajo(ctx, f, "muros")))(),
+    },
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "rectángulos en alzado, «desde hasta z0 z1 | …»: estaciones a lo largo del eje y alturas sobre la base" },
   ],
   fila(o) {

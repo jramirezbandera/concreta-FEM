@@ -375,7 +375,7 @@ export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: N
               if (EN_CROQUIS[tabla]?.has(c.clave)) return null;
               const valor = borrador[c.clave] ?? fila[c.clave] ?? "";
               const err = errores[c.clave];
-              const opciones = c.opciones && !c.calculada ? c.opciones(ctx) : null;
+              const opciones = c.opciones && !c.calculada ? c.opciones(ctx, actual) : null;
               const estado = estados[c.clave];
               const falta = !!estado?.obligatorio && !valor.trim();
               return (

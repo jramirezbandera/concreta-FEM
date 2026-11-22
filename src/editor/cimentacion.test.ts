@@ -10,6 +10,8 @@
 import { describe, expect, it } from "vitest";
 import type { Proyecto } from "../agente/proyecto.ts";
 import { compilar } from "../compilador/compilar.ts";
+import { resolverCimentacion } from "../compilador/cimentacion.ts";
+import { resolverOpciones } from "../compilador/fisico.ts";
 import type { Losa, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { escribirFila } from "./edicion.ts";
 import { aplicar } from "./operaciones.ts";
@@ -135,5 +137,41 @@ describe("LC2: la herramienta Forjado de tipo cimentación", () => {
   it("sin balasto, dice qué falta", () => {
     const r = dibujar(base(), { pilar: {}, viga: {}, forjado: { modo: "poligono", tipo: "cimentacion", espesor: 0.6, material: "HA-30" } });
     expect(r.error).toBe("Escriba en Propiedades el balasto del terreno (kN/m³).");
+  });
+});
+
+describe("LC-c en el editor: la base vacía de lo que arranca en una losa de cimentación", () => {
+  const sec = { id: "P30x30", tipo: "rectangular", b: 0.3, h: 0.3, material: "HA-30" } as never;
+  const m: ModeloFisico = {
+    ...modelo([{ id: "LC1", planta: "Cim", contorno: rect(10, 6), espesor: 0.6, material: "HA-30", cimentacion: { balasto: 40000 } }]),
+    materiales: [{ id: "HA-30", tipo: "hormigon", fck: 30 }] as never,
+    secciones: [sec],
+    pilares: [
+      { id: "P1", x: 5, y: 3, desde: "Cim", hasta: "N1", seccion: "P30x30" },
+      { id: "P2", x: 15, y: 3, desde: "Cim", hasta: "N1", seccion: "P30x30" },
+    ],
+    muros: [{ id: "M1", puntos: [[1, 1], [4, 1]], desde: "Cim", hasta: "N1", espesor: 0.25, material: "HA-30" }],
+  };
+  const ctx = contexto(m);
+  const vacia = (tabla: "pilares" | "muros", o: object) => {
+    const d = DEF_TABLAS[tabla];
+    const col = d.columnas.find((c) => c.clave === "base")!;
+    return col.opciones!(ctx, d.fila(o as never, ctx))[0];
+  };
+  it("dentro de la losa, «(sobre la losa LC1)»; fuera, «(empotrado)»", () => {
+    expect(vacia("pilares", m.pilares![0]!)).toEqual({ valor: "", texto: "(sobre la losa LC1)" });
+    expect(vacia("pilares", m.pilares![1]!)).toEqual({ valor: "", texto: "(empotrado)" });
+    expect(vacia("muros", m.muros![0]!)).toEqual({ valor: "", texto: "(sobre la losa LC1)" });
+  });
+  it("es lo que hace el compilador: P1 y M1 se apoyan en la losa (base «ninguno») y P2 queda empotrado", () => {
+    const r = resolverCimentacion(m, resolverOpciones().epsSnap);
+    expect(r.pilares!.map((p) => p.base)).toEqual(["ninguno", undefined]);
+    expect(r.muros![0]!.base).toBe("ninguno");
+  });
+  it("sin losas de cimentación, o sin la fila, «(empotrado)»", () => {
+    const sin = contexto({ ...m, losas: [] });
+    const col = DEF_TABLAS.pilares.columnas.find((c) => c.clave === "base")!;
+    expect(col.opciones!(sin, DEF_TABLAS.pilares.fila(m.pilares![0] as never, sin))[0]!.texto).toBe("(empotrado)");
+    expect(col.opciones!(ctx)[0]!.texto).toBe("(empotrado)");
   });
 });

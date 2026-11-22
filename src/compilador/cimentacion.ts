@@ -77,24 +77,33 @@ function muroEn(puntos: readonly Vec2[], l: Losa, eps: number): boolean {
   return false;
 }
 
+/** La losa de cimentación (válida) en la que arranca el pilar, sea cual sea su `base` escrita, o undefined. */
+export function losaCimentacionPilar(f: ModeloFisico, p: NonNullable<ModeloFisico["pilares"]>[number], eps: number): Losa | undefined {
+  if (typeof p.desde !== "string") return undefined;
+  const q = ejeBase(f, p);
+  return deCimentacion(f, p.desde).find((l) => cimentacionNoValida(l) === null && enLosa(q, l, eps));
+}
+
+/** La losa de cimentación (válida) en la que arranca el muro, sea cual sea su `base` escrita, o undefined. */
+export function losaCimentacionMuro(f: ModeloFisico, m: NonNullable<ModeloFisico["muros"]>[number], eps: number): Losa | undefined {
+  if (!Array.isArray(m.puntos)) return undefined;
+  return deCimentacion(f, m.desde).find((l) => cimentacionNoValida(l) === null && muroEn(m.puntos, l, eps));
+}
+
 /**
  * LC-c: los pilares y muros sin `base` escrita que arrancan en una losa de cimentación, con base
  * "ninguno". Sin losas de cimentación, el mismo objeto.
  */
 export function resolverCimentacion(f: ModeloFisico, eps: number): ModeloFisico {
   if (!(f.losas ?? []).some((l) => l.cimentacion !== undefined)) return f;
-  const valida = (l: Losa) => cimentacionNoValida(l) === null;
   let cambia = false;
   const pilares = (f.pilares ?? []).map((p) => {
-    if (p.base !== undefined || typeof p.desde !== "string") return p;
-    const q = ejeBase(f, p);
-    if (!deCimentacion(f, p.desde).some((l) => valida(l) && enLosa(q, l, eps))) return p;
+    if (p.base !== undefined || !losaCimentacionPilar(f, p, eps)) return p;
     cambia = true;
     return { ...p, base: "ninguno" as const };
   });
   const muros = (f.muros ?? []).map((m) => {
-    if (m.base !== undefined || !Array.isArray(m.puntos)) return m;
-    if (!deCimentacion(f, m.desde).some((l) => valida(l) && muroEn(m.puntos, l, eps))) return m;
+    if (m.base !== undefined || !losaCimentacionMuro(f, m, eps)) return m;
     cambia = true;
     return { ...m, base: "ninguno" as const };
   });

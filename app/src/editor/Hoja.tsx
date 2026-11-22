@@ -541,7 +541,10 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     );
   };
 
-  const opcionesActiva = useMemo(() => (desplegado ? (cols[c0]?.opciones?.(contexto(m)) ?? null) : null), [desplegado, cols, c0, m]);
+  const opcionesActiva = useMemo(
+    () => (desplegado ? (cols[c0]?.opciones?.(contexto(m), f0 < nBorrador ? filas[f0]?.fila : borrador) ?? null) : null),
+    [desplegado, cols, c0, m, f0, nBorrador, filas, borrador],
+  );
   const desplegable: DesplegableCelda | null = opcionesActiva ? { opciones: opcionesActiva, onElegir: elegir, onCerrar: cerrar, ...(cols[c0]?.referencia ? { referencia: cols[c0]!.referencia } : {}) } : null;
 
   const confirmar = (df: number, dc: number) => {
