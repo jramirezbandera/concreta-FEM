@@ -455,7 +455,7 @@ Pasan los criterios 5 a 14 en lo de las losas; falta su parte de la app (CO6), l
 
 ### 8.7 CO4, el punzonamiento (2026-11-22)
 
-Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO6) y la sombra (CO7). Las decisiones CO4-a…CO4-j, de Claude, **por confirmar por el usuario** (abajo). En ecuaciones, el coste es cero: no cambia el modelo analítico.
+Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO6) y la sombra (CO7). Las decisiones CO4-a…CO4-j son de Claude; **CO4-a y CO4-b, confirmadas por el usuario el 2026-11-22**, y las demás, por confirmar (abajo). En ecuaciones, el coste es cero: no cambia el modelo analítico.
 
 **Lo que la losa pasa al pilar** (lo único que cambia fuera de `src/comprobaciones/`):
 
@@ -514,7 +514,7 @@ Pasan los criterios 5 a 14 en lo del punzonamiento; falta su parte de la app (CO
 - **CO4-5, el centro de un pilar de borde cae justo en el contorno** cuando la losa se dibuja por los ejes de los pilares: sin el ancho de las vigas en el forjado, 5 de las 12 uniones de la vivienda quedaban pendientes, y los pilares de esquina del edificio objetivo, también.
 - **CO4-6, vmín:** el módulo de punzonamiento usa 0,035·k^(3/2)·√fck (el del Eurocódigo), y los de vigas y forjados, 0,051/γc = 0,034 (CO3-4). Hay que contrastar los dos con el texto del Anejo 19.
 
-**Decisiones de Claude, por confirmar por el usuario:**
+**Decisiones de Claude** (CO4-a y CO4-b, **confirmadas por el usuario el 2026-11-22**; las demás, por confirmar):
 
 - **CO4-a, sólo cuenta lo que la losa pasa al pilar** (CO-i al pie de la letra). Lo de las vigas planas se da como información y no entra: su cortante se comprueba con la viga (CO2), con sus cercos. La alternativa (contarlas, porque son hormigón del forjado) daría por no cumplido un pórtico de vigas planas armadas a cortante. Un pilar al que la losa no llega no tiene comprobación de punzonamiento.
 - **CO4-b, β general sin suelo:** no se sube a 1,15 / 1,4 / 1,5 cuando sale menor (CO4-2). La alternativa del lado seguro es tomar el mayor de los dos.
