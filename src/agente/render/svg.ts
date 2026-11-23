@@ -114,6 +114,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "despegue-rayado": { stroke: "#111827", sw: 0.7 },
   "armado-inferior": { stroke: "#1d4ed8", sw: 2.4 },
   "armado-inferior-fino": { stroke: "#1d4ed8", sw: 1 },
+  "armado-inferior-nervio": { stroke: "#1d4ed8", sw: 1.7 },
+  "armado-superior-nervio": { stroke: "#dc2626", sw: 1.7 },
   "armado-inferior-zona": { stroke: "#1d4ed8", sw: 0.8, dash: "5 4" },
   "armado-superior": { stroke: "#dc2626", sw: 2.4 },
   "armado-superior-fino": { stroke: "#dc2626", sw: 1 },
@@ -125,6 +127,7 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "armado-critico": { stroke: "#6b7280", sw: 1, dash: "6 4" },
   "armado-critico-sin": { stroke: "#a3aab5", sw: 0.9, dash: "2 3" },
   "armado-nervio": { stroke: "#8fa27a", sw: 0.9 },
+  "armado-caseton": { fill: "#e8ecf1", stroke: "#b9c3d0", sw: 0.6 },
 };
 
 /** Número en px con un decimal, sin «-0» ni «.0». */

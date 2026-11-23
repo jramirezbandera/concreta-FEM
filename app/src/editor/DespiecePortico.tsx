@@ -64,7 +64,58 @@ function repartir(xs: readonly (readonly [number, number])[]): number[] {
 }
 
 /** Alto de la banda de un esfuerzo bajo el despiece, px. */
-const ALTO_ESFUERZO = 92;
+const ALTO_ESFUERZO = 108;
+const valorEsfuerzo = (v: number) => fmt(v, Math.abs(v) < 9.95 ? 1 : 0);
+
+/** Un pico rotulado de una envolvente: dónde, su valor y si el rótulo va debajo. */
+interface Pico {
+  x: number;
+  y: number;
+  texto: string;
+  signo: "pos" | "neg";
+  abajo: boolean;
+  peso: number;
+}
+
+/**
+ * La banda de un esfuerzo: sus tramos unidos en una curva continua (entre las caras de un apoyo, recta),
+ * la escala según lo que hay a cada lado del cero y los picos de cada tramo, sin los que pisarían a
+ * otro mayor.
+ */
+function bandaEsfuerzo(ts: readonly (readonly PuntoEsfuerzo[])[], X: (x: number) => number, yArriba: number, alto: number, abajo: boolean) {
+  const todo = ts.flat();
+  const pos = Math.max(0, ...todo.map((q) => q.max));
+  const neg = Math.max(0, ...todo.map((q) => -q.min));
+  const k = alto / Math.max(pos + neg, 1e-9);
+  const sg = abajo ? 1 : -1;
+  const y0 = yArriba + (abajo ? neg : pos) * k;
+  const Y = (v: number) => y0 + sg * v * k;
+  const area = (de: (q: PuntoEsfuerzo) => number) => (todo.length ? `M ${X(todo[0]!.x)} ${y0} ${todo.map((q) => `L ${X(q.x)} ${Y(de(q))}`).join(" ")} L ${X(todo[todo.length - 1]!.x)} ${y0} Z` : "");
+  const linea = (c: "max" | "min") => (todo.length ? `M ${todo.map((q) => `${X(q.x)} ${Y(q[c])}`).join(" L ")}` : "");
+  const tope = Math.max(pos, neg, 1e-9);
+  const candidatos: Pico[] = [];
+  for (const t of ts) {
+    if (!t.length) continue;
+    const mas = t.reduce((a, q) => (q.max > a.max ? q : a), t[0]!);
+    const menos = t.reduce((a, q) => (q.min < a.min ? q : a), t[0]!);
+    if (mas.max > 0.03 * tope) candidatos.push({ x: X(mas.x), y: Y(mas.max), texto: valorEsfuerzo(mas.max), signo: "pos", abajo: sg > 0, peso: mas.max });
+    if (menos.min < -0.03 * tope) candidatos.push({ x: X(menos.x), y: Y(menos.min), texto: valorEsfuerzo(menos.min), signo: "neg", abajo: sg < 0, peso: -menos.min });
+  }
+  // De mayor a menor: un pico no se rotula si pisa el rótulo de otro mayor (los dos lados de un apoyo)
+  const picos: Pico[] = [];
+  for (const c of candidatos.sort((a, b) => b.peso - a.peso)) if (!picos.some((o) => Math.abs(o.x - c.x) < (o.texto.length + c.texto.length) * 3.4 + 6 && Math.abs(o.y + (o.abajo ? 13 : -6) - (c.y + (c.abajo ? 13 : -6))) < 12)) picos.push(c);
+  /** El máximo y el mínimo en una x (interpolados en su tramo); null fuera de la curva. */
+  const en = (x: number): { max: number; min: number } | null => {
+    for (let i = 0; i + 1 < todo.length; i++) {
+      const [a, b] = [todo[i]!, todo[i + 1]!];
+      if (x < a.x || x > b.x || b.x - a.x < 1e-9) continue;
+      const f = (x - a.x) / (b.x - a.x);
+      return { max: a.max + f * (b.max - a.max), min: a.min + f * (b.min - a.min) };
+    }
+    return null;
+  };
+  return { y0, Y, area, linea, picos, en };
+}
 const ESFUERZOS_PORTICO = [
   { id: "My", nombre: "M", titulo: "M (kN·m): envolvente de ELU, lo positivo (tracción abajo) hacia abajo", abajo: true },
   { id: "Vz", nombre: "V", titulo: "V (kN): envolvente de ELU", abajo: false },
@@ -78,6 +129,8 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
   const [ancho, setAncho] = useState(0);
   const [verEsfuerzo, setVerEsfuerzo] = useState<Record<"My" | "Vz" | "T" | "N", boolean>>({ My: true, Vz: false, T: false, N: false });
   const [sobre, setSobre] = useState<string | null>(null);
+  /** La x del pórtico bajo el cursor (m): la sección que se lee en las envolventes. */
+  const [cursor, setCursor] = useState<number | null>(null);
   useLayoutEffect(() => {
     const el = caja.current;
     if (!el) return;
@@ -123,8 +176,16 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
   const yCer = (f: number) => yInf(nInf + nPiel) + 4 + f * 22;
   const yCota = yCer(nCer) + 8;
   const curvas = ESFUERZOS_PORTICO.filter((e) => verEsfuerzo[e.id] && esfuerzos?.esfuerzos[e.id]?.length);
-  const yEsfuerzo = (i: number) => yCota + 26 + i * ALTO_ESFUERZO;
-  const H = yCota + 20 + (curvas.length ? 6 + curvas.length * ALTO_ESFUERZO : 0);
+  const yEsfuerzo = (i: number) => yCota + 30 + i * ALTO_ESFUERZO;
+  const H = yCota + 20 + (curvas.length ? 10 + curvas.length * ALTO_ESFUERZO : 0);
+  const bandas = curvas.map((e, i) => bandaEsfuerzo(esfuerzos!.esfuerzos[e.id]!, X, yEsfuerzo(i) + 30, ALTO_ESFUERZO - 62, e.abajo));
+  /** El cursor sobre el dibujo: su x en el pórtico, si cae dentro. */
+  const alMover = (ev: { clientX: number; currentTarget: SVGSVGElement }) => {
+    const caja = ev.currentTarget.getBoundingClientRect();
+    if (!(caja.width > 0)) return;
+    const x = p.x[0] + ((ev.clientX - caja.left) * (W / caja.width) - M) / kx;
+    setCursor(x >= p.x[0] && x <= p.x[1] ? x : null);
+  };
 
   /** Lo que resalta: el campo con el foco del vano elegido, o lo que está bajo el ratón. */
   const resalta = (o: readonly OrigenBarra[], id: string) => sobre === id || (activo !== null && elegida !== null && o.some((x) => x.clave === elegida && x.ruta === activo)) || undefined;
@@ -172,7 +233,7 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
         )}
       </div>
       <div ref={caja} className="despiece-alzado">
-        <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Despiece del pórtico ${p.nombre}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Despiece del pórtico ${p.nombre}`} onMouseMove={curvas.length ? alMover : undefined} onMouseLeave={() => setCursor(null)}>
           {/* Los vanos: la banda del elegido, y dónde se hace clic */}
           {p.vanos.map((v) => {
             const e = estados?.[v.clave];
@@ -193,6 +254,10 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
               </g>
             );
           })}
+          {/* El eje de cada apoyo, de arriba abajo: une el alzado, las barras, las cotas y las envolventes */}
+          {p.apoyos.map((a, i) => (
+            <line key={i} x1={X(a.eje)} x2={X(a.eje)} y1={yTop - 14} y2={H - 6} className="dp-eje-apoyo" />
+          ))}
           {/* Los apoyos, por debajo de la viga */}
           {p.apoyos.map((a, i) => {
             const [x0, x1] = [X(a.caras[0]), X(a.caras[1])];
@@ -285,47 +350,54 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
           {/* Las cotas: la luz de cada vano entre las caras de sus apoyos, y el ancho de cada apoyo */}
           {/* §8.14: las envolventes de ELU, bajo el despiece y a su misma escala a lo largo */}
           {curvas.map((e, i) => {
-            const ts = esfuerzos!.esfuerzos[e.id]!;
-            const tope = Math.max(1e-9, ...ts.flatMap((t) => t.flatMap((q) => [Math.abs(q.max), Math.abs(q.min)])));
-            const medio = (ALTO_ESFUERZO - 40) / 2;
-            const y0 = yEsfuerzo(i) + 20 + medio;
-            const sg = e.abajo ? 1 : -1;
-            const Yv = (v: number) => y0 + sg * (v / tope) * medio;
-            const area = (t: readonly PuntoEsfuerzo[], de: (q: PuntoEsfuerzo) => number) => `M ${X(t[0]!.x)} ${y0} ${t.map((q) => `L ${X(q.x)} ${Yv(de(q))}`).join(" ")} L ${X(t[t.length - 1]!.x)} ${y0} Z`;
-            const linea = (t: readonly PuntoEsfuerzo[], k: "max" | "min") => `M ${t.map((q) => `${X(q.x)} ${Yv(q[k])}`).join(" L ")}`;
-            const valor = (v: number) => fmt(v, Math.abs(v) < 9.95 ? 1 : 0);
+            const g = bandas[i]!;
+            const signo = (s: "pos" | "neg") => (e.id === "My" ? s : "v");
             return (
               <g key={e.id} className="dp-esfuerzo" data-esfuerzo={e.id}>
-                <text x={M} y={yEsfuerzo(i) + 9} className="dp-esf-titulo">
-                  {ROTULO_ESFUERZO[e.id]} · {esfuerzos!.combinaciones}
+                <rect x={M - 8} y={yEsfuerzo(i) - 4} width={W - 2 * M + 16} height={ALTO_ESFUERZO - 6} rx={6} className="dp-esf-fondo" />
+                <text x={M} y={yEsfuerzo(i) + 10} className="dp-esf-titulo">
+                  {ROTULO_ESFUERZO[e.id]}
+                  <tspan className="dp-esf-combinaciones"> · envolvente de {esfuerzos!.combinaciones}</tspan>
                 </text>
-                <line x1={X(p.x[0])} x2={X(p.x[1])} y1={y0} y2={y0} className="dp-esf-eje" />
-                {ts.map((t, k) => {
-                  // Los picos del tramo: el mayor positivo y el menor negativo, con su valor
-                  const mas = t.reduce((a, q) => (q.max > a.max ? q : a), t[0]!);
-                  const menos = t.reduce((a, q) => (q.min < a.min ? q : a), t[0]!);
-                  return (
-                    <g key={k}>
-                      <path d={area(t, (q) => Math.max(q.max, 0))} className="dp-esf-area" data-signo={e.id === "My" ? "pos" : "v"} />
-                      <path d={area(t, (q) => Math.min(q.min, 0))} className="dp-esf-area" data-signo={e.id === "My" ? "neg" : "v"} />
-                      <path d={linea(t, "max")} className="dp-esf-linea" data-signo={e.id === "My" ? "pos" : "v"} />
-                      <path d={linea(t, "min")} className="dp-esf-linea" data-signo={e.id === "My" ? "neg" : "v"} />
-                      {mas.max > 0.02 * tope && (
-                        <text x={centrado(X(mas.x), 6)} y={Yv(mas.max) + (sg > 0 ? 11 : -3)} textAnchor="middle" className="dp-esf-valor" data-signo={e.id === "My" ? "pos" : "v"}>
-                          {valor(mas.max)}
-                        </text>
-                      )}
-                      {menos.min < -0.02 * tope && (
-                        <text x={centrado(X(menos.x), 6)} y={Yv(menos.min) + (sg > 0 ? -3 : 11)} textAnchor="middle" className="dp-esf-valor" data-signo={e.id === "My" ? "neg" : "v"}>
-                          {valor(menos.min)}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
+                <line x1={X(p.x[0])} x2={X(p.x[1])} y1={g.y0} y2={g.y0} className="dp-esf-eje" />
+                <path d={g.area((q) => Math.max(q.max, 0))} className="dp-esf-area" data-signo={signo("pos")} />
+                <path d={g.area((q) => Math.min(q.min, 0))} className="dp-esf-area" data-signo={signo("neg")} />
+                <path d={g.linea("max")} className="dp-esf-linea" data-signo={signo("pos")} />
+                <path d={g.linea("min")} className="dp-esf-linea" data-signo={signo("neg")} />
+                {g.picos.map((c, k) => (
+                  <g key={k}>
+                    <circle cx={c.x} cy={c.y} r={2.2} className="dp-esf-pico" data-signo={signo(c.signo)} />
+                    <text x={centrado(c.x, c.texto.length)} y={c.y + (c.abajo ? 13 : -6)} textAnchor="middle" className="dp-esf-valor" data-signo={signo(c.signo)}>
+                      {c.texto}
+                    </text>
+                  </g>
+                ))}
               </g>
             );
           })}
+          {/* Bajo el cursor: la sección del pórtico y lo que valen en ella las envolventes */}
+          {cursor !== null && curvas.length > 0 && (
+            <g className="dp-cursor" data-cursor-portico>
+              <line x1={X(cursor)} x2={X(cursor)} y1={yTop - 8} y2={H - 6} />
+              <text x={X(cursor) + (X(cursor) > W - 120 ? -6 : 6)} y={yCota - 8} textAnchor={X(cursor) > W - 120 ? "end" : "start"} className="dp-cursor-valor">
+                x = {fmt(cursor - p.x[0], 2)} m
+              </text>
+              {curvas.map((e, i) => {
+                const v = bandas[i]!.en(cursor);
+                if (!v) return null;
+                const izq = X(cursor) > W - 120;
+                return (
+                  <g key={e.id}>
+                    <circle cx={X(cursor)} cy={bandas[i]!.Y(v.max)} r={2.6} />
+                    <circle cx={X(cursor)} cy={bandas[i]!.Y(v.min)} r={2.6} />
+                    <text x={X(cursor) + (izq ? -6 : 6)} y={yEsfuerzo(i) + 10} textAnchor={izq ? "end" : "start"} className="dp-cursor-valor">
+                      {Math.abs(v.max - v.min) < 0.05 ? valorEsfuerzo(v.max) : `${valorEsfuerzo(v.min)} … ${valorEsfuerzo(v.max)}`}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
           <g className="cq-cota dp-cotas">
             <line x1={X(p.x[0])} x2={X(p.x[1])} y1={yCota} y2={yCota} />
             {[...new Set([...p.apoyos.flatMap((a) => a.caras), ...p.vanos.flatMap((v) => [v.desde, v.hasta])].map((x) => Math.round(x * 1000) / 1000))].map((x) => (

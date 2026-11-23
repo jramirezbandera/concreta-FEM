@@ -26,7 +26,7 @@
 import type { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { AbacosPilares, Losa, ModeloFisico, Seccion, Vec2 } from "./fisico.ts";
 import { TAMANO_MALLA } from "./fisico.ts";
-import { areaConSigno, areaInterseccionRegiones, distanciaABorde, distanciaEntreSegmentos, puntoEnPoligono, puntoEnRegion, trozosSegmento, type Region } from "./poligonos.ts";
+import { areaConSigno, areaInterseccionRegiones, distanciaABorde, distanciaEntreSegmentos, puntoEnPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "./poligonos.ts";
 import { ejeSeccion } from "./puntoFijo.ts";
 
 /** Tolerancia de unión por defecto (MA-d): la mitad del tamaño de malla por defecto. */
@@ -184,6 +184,88 @@ export function nerviosLosa(l: Losa): [Vec2, Vec2][] {
   const r: [Vec2, Vec2][] = [];
   for (const x of ejesNervios(X0, X1, s, c, P && S(P))) r.push(...trozosSegmento(g(x, Y0), g(x, Y1), anillos, aligerada));
   for (const y of ejesNervios(Y0, Y1, s, c, P && T(P))) r.push(...trozosSegmento(g(X0, y), g(X1, y), anillos, aligerada));
+  return r;
+}
+
+/** La retícula de un reticular en sus ejes: d (el eje 1), n (su perpendicular) y los ejes de sus nervios. */
+export interface ReticulaLosa {
+  d: Vec2;
+  n: Vec2;
+  /** Los nervios que corren según n: la coordenada según d de cada eje. */
+  x: number[];
+  /** Los nervios que corren según d: la coordenada según n de cada eje. */
+  y: number[];
+}
+
+/** Los ejes de los nervios de una losa reticular en sus coordenadas (los de `nerviosLosa`, sin recortar); null si no es un reticular bien formado. */
+export function reticulaLosa(l: Losa): ReticulaLosa | null {
+  const ret = l.reticular;
+  if (!ret || !(ret.intereje > 0 && ret.nervio > 0 && ret.nervio < ret.intereje) || l.contorno.length < 3) return null;
+  const d = direccionGrados(l.eje1 ?? 0);
+  const n: Vec2 = [-d[1], d[0]];
+  const S = (q: readonly number[]) => q[0]! * d[0] + q[1]! * d[1];
+  const T = (q: readonly number[]) => q[0]! * n[0] + q[1]! * n[1];
+  const [ls, lt] = [l.contorno.map(S), l.contorno.map(T)];
+  const c = ret.intereje - ret.nervio;
+  const P = ret.paso;
+  return { d, n, x: ejesNervios(Math.min(...ls), Math.max(...ls), ret.intereje, c, P && S(P)), y: ejesNervios(Math.min(...lt), Math.max(...lt), ret.intereje, c, P && T(P)) };
+}
+
+/**
+ * Los casetones de un reticular en planta (la retícula del sólido): cada celda de `reticulaCasetones`
+ * recortada con la losa (contorno menos huecos), sin las que tocan un ábaco o un `macizo` (la huella
+ * de una viga, de un pilar): ahí no hay casetón entero. Cada uno, en sus anillos (uno, o el contorno
+ * recortado y el de un hueco que entra en él: relleno par-impar). Para dibujar la retícula de fondo.
+ */
+export function casetonesLosa(l: Losa, macizos: readonly (readonly Vec2[])[] = []): Vec2[][][] {
+  const ret = l.reticular;
+  if (!ret || !(ret.intereje > 0 && ret.nervio > 0 && ret.nervio < ret.intereje) || l.contorno.length < 3) return [];
+  const s = ret.intereje;
+  const c = s - ret.nervio;
+  const d = direccionGrados(l.eje1 ?? 0);
+  const n: Vec2 = [-d[1], d[0]];
+  const S = (q: readonly number[]) => q[0]! * d[0] + q[1]! * d[1];
+  const T = (q: readonly number[]) => q[0]! * n[0] + q[1]! * n[1];
+  const g = (x: number, y: number): Vec2 => [x * d[0] + y * n[0], x * d[1] + y * n[1]];
+  const huecos = (l.huecos ?? []) as Vec2[][];
+  const R: Region = { contorno: l.contorno as Vec2[], huecos };
+  const [ls, lt] = [l.contorno.map(S), l.contorno.map(T)];
+  const [X0, X1, Y0, Y1] = [Math.min(...ls), Math.max(...ls), Math.min(...lt), Math.max(...lt)];
+  const P = ret.paso;
+  const [ax, i0, i1] = reticulaCasetones(X0, X1, s, c, P && S(P));
+  const [ay, j0, j1] = reticulaCasetones(Y0, Y1, s, c, P && T(P));
+  // Lo macizo y los anillos de la losa, en los ejes de la retícula, con su caja
+  const local = (p: readonly (readonly number[])[]) => {
+    const q = p.map((v): Vec2 => [S(v), T(v)]);
+    const [xs, ys] = [q.map((v) => v[0]), q.map((v) => v[1])];
+    return { q, caja: [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)] as const };
+  };
+  const ms = [...((ret.abacos ?? []) as Vec2[][]), ...macizos].filter((m) => m.length >= 3).map(local);
+  const bordes = [l.contorno as Vec2[], ...huecos].map(local);
+  /** ¿Toca el polígono q (en los ejes de la retícula) a la celda [x, x + c] × [y, y + c]? */
+  const toca = (m: { q: Vec2[]; caja: readonly [number, number, number, number] }, x: number, y: number, soloBorde: boolean): boolean => {
+    if (m.caja[0] >= x + c || m.caja[1] <= x || m.caja[2] >= y + c || m.caja[3] <= y) return false;
+    const esquinas: Vec2[] = [[x, y], [x + c, y], [x + c, y + c], [x, y + c]];
+    if (m.q.some((v) => v[0] > x && v[0] < x + c && v[1] > y && v[1] < y + c)) return true;
+    if (!soloBorde && (esquinas.some((e) => puntoEnPoligono(e, m.q)) || puntoEnPoligono([x + c / 2, y + c / 2], m.q))) return true;
+    for (let i = 0, j = m.q.length - 1; i < m.q.length; j = i++) for (let k = 0; k < 4; k++) if (distanciaEntreSegmentos(m.q[j]!, m.q[i]!, esquinas[k]!, esquinas[(k + 1) % 4]!) === 0) return true;
+    return false;
+  };
+  const r: Vec2[][][] = [];
+  for (let j = j0; j <= j1; j++)
+    for (let i = i0; i <= i1; i++) {
+      const [x, y] = [ax + i * s, ay + j * s];
+      if (ms.some((m) => toca(m, x, y, false))) continue;
+      const celda = [g(x, y), g(x + c, y), g(x + c, y + c), g(x, y + c)];
+      // Entera dentro de la losa, tal cual; cortada por un borde, lo que queda dentro
+      if (!bordes.some((b) => toca(b, x, y, true))) {
+        if (puntoEnRegion(g(x + c / 2, y + c / 2), R)) r.push([celda]);
+      } else {
+        // Los anillos de lo recortado (el contorno y, si entra un hueco, el suyo: relleno par-impar)
+        const as = (recorteRegionConvexo(R, celda) ?? []).filter((a) => Math.abs(areaConSigno(a)) > 1e-4);
+        if (as.length) r.push(as);
+      }
+    }
   return r;
 }
 

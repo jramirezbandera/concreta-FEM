@@ -919,6 +919,32 @@ De la tercera prueba de uso de Comprobación con la vivienda. El cálculo, las c
 
 **Validación:** `src/visor/comprobaciones.test.ts` (las ternas son de la envolvente del tramo y su N mínimo y máximo, los de ella; T y N en el pórtico y los extremos de cada vano con sus seis esfuerzos; las marcas de las barras, sin objeto) y `app/src/test/comprobacion.test.tsx` (las columnas de la tabla ancha, las ocho ternas, la tabla de la base, los esfuerzos del vano y las cuatro casillas); a mano en la app con la vivienda. Los bancos de Chrome no se han pasado.
 
+### 8.18 CO6: los refuerzos sobre sus nervios, los casetones de fondo y los dibujos del pórtico y del pilar (2026-11-23)
+
+De la cuarta prueba de uso de Comprobación con la vivienda: en la planta de las losas, los refuerzos «no coinciden con los nervios» (una barra por el medio de su zona, que con un número par de nervios cae en un casetón, y un rectángulo con los bordes a mitad de casetón), y los dibujos del pórtico y del pilar «no se ven profesionales». El cálculo, las comprobaciones y lo que se propone no cambian: sólo cómo se dibuja.
+
+**La planta de las losas** (`src/visor/armadoPlanta.ts`):
+
+- **los casetones, de fondo** (`casetonesLosa` en `src/compilador/abacos.ts`: la retícula del sólido, recortada con la losa y sin los que tocan un ábaco, una viga o un pilar), en lugar de los ejes de los nervios: los nervios son lo que queda entre ellos. Se apagan con «Casetones: Sí | No» en la barra (`reticula: false` en la vista);
+- **un refuerzo por nervio, con una barra sobre el eje de cada nervio que arma** (`nerviosDeRefuerzo`: los ejes de `reticulaLosa` que caen en su ancho), unidas por la línea de reparto con un punto en cada nervio; sin el rectángulo de su zona, que era lo que no casaba con la retícula. El rótulo dice cuántos nervios: «3 nervios · 2Ø12 por nervio · 5,11 m», y va, con las cotas, sobre el nervio más cercano al medio;
+- los refuerzos a una separación (una maciza, la parrilla de un ábaco) y uno por nervio que no cubre ninguno (dibujado a mano en un casetón) siguen como antes: la zona, una barra y la línea de reparto.
+
+**El despiece del pórtico** (`app/src/editor/DespiecePortico.tsx`):
+
+- el eje de cada apoyo, de arriba abajo, une el alzado, las barras, las cotas y las envolventes;
+- **las envolventes, continuas:** los tramos se unen en una curva (antes, cada tramo cerraba en la cara de su apoyo y quedaba un hueco del ancho del pilar), con la escala según lo que hay a cada lado del cero (un esfuerzo de un solo signo ya no gasta media banda), cada banda en su recuadro y su título con las combinaciones aparte;
+- **los picos, sin pisarse:** de mayor a menor, uno no se rotula si pisa a otro mayor (los dos lados de un apoyo daban «−23 29» encimados); cada uno, con su punto;
+- **bajo el cursor,** la sección del pórtico: una línea de arriba abajo, su x y, en cada banda, el mínimo y el máximo de la envolvente en ella (interpolados).
+
+**El croquis del pilar** (`app/src/editor/CroquisArmado.tsx`; la sección, también la de las vigas):
+
+- las cotas de la sección, con su línea y sus topes («h = 30», «b = 30»);
+- los esfuerzos del tramo: la escala va de lo menor a lo mayor con el cero dentro (antes, simétrica: el axil, siempre de compresión, ocupaba media banda), con la línea del cero, los niveles de la cabeza y del pie, la banda entre el mínimo y el máximo, lo que hay hasta el cero más suave y un punto en cada extremo.
+
+**Validación:** `src/compilador/nervios.test.ts` (los casetones caen en la losa, fuera de los ábacos y de lo macizo, y ningún eje de nervio los atraviesa), `src/comprobaciones/dibujoArmado.test.ts` (los nervios de un refuerzo) y, a mano en la app con la vivienda, la planta de las losas con y sin casetones, el pórtico de Z-CUB-S-2 con sus cuatro envolventes y el cursor, y el tramo de P8. `validacion/co6/planta.ts` saca la planta con el armado a PNG desde Node. Los bancos de Chrome no se han pasado.
+
+**No hecho:** al estirar o añadir un refuerzo con el ratón, sus lados no se enganchan a la retícula (siguen a 5 cm); el 3D de las losas sigue como estaba.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

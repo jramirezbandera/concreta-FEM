@@ -73,6 +73,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "despegue-rayado": { stroke: "#fafafa", sw: 0.7 },
   "armado-inferior": { stroke: "#60a5fa", sw: 2.4 },
   "armado-inferior-fino": { stroke: "#60a5fa", sw: 1 },
+  "armado-inferior-nervio": { stroke: "#60a5fa", sw: 1.7 },
+  "armado-superior-nervio": { stroke: "#f87171", sw: 1.7 },
   "armado-inferior-zona": { stroke: "#60a5fa", sw: 0.8, dash: "5 4" },
   "armado-superior": { stroke: "#f87171", sw: 2.4 },
   "armado-superior-fino": { stroke: "#f87171", sw: 1 },
@@ -84,6 +86,7 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "armado-critico": { stroke: "#9ca3af", sw: 1, dash: "6 4" },
   "armado-critico-sin": { stroke: "#6b7280", sw: 0.9, dash: "2 3" },
   "armado-nervio": { stroke: "#6e8a5f", sw: 0.9 },
+  "armado-caseton": { fill: "#232a34", stroke: "#414b5a", sw: 0.6 },
 };
 
 export function pintura(estilo: Estilo, tema: Theme): Pintura {

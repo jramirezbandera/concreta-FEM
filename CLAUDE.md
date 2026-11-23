@@ -1123,6 +1123,11 @@
     - el torsor y el axil de las vigas: sus curvas bajo el despiece y los extremos del vano con su combinación (`esfuerzos-portico`);
     - el armado de una losa, en tablas: la base por dirección y cara, y los refuerzos y los cercos en dos pestañas;
     - el panel de abajo deja unos 300 px a las vistas, y el pilar elegido ya no resalta cada barra en la planta.
+  - **De la cuarta prueba de uso, el mismo día** (`comprobaciones.md` §8.18; sólo cambia el dibujo):
+    - en la planta de las losas, los casetones del reticular de fondo (`casetonesLosa`; se apagan con «Casetones: Sí | No») y cada refuerzo por nervio con una barra sobre el eje de cada nervio que arma (`nerviosDeRefuerzo`), con «n nervios» en su rótulo; antes, una barra por el medio de su zona, que podía caer en un casetón;
+    - el despiece del pórtico: ejes de apoyo de arriba abajo, envolventes continuas con la escala según cada lado del cero, picos que no se pisan y la lectura de la sección bajo el cursor;
+    - el croquis del pilar: cotas de la sección con su línea, y los esfuerzos del tramo con el cero en su sitio y los niveles de cabeza y pie;
+    - `validacion/co6/planta.ts` saca la planta con el armado a PNG desde Node. Los bancos de Chrome no se han pasado.
 - **2026-11-15: fase IG hecha** (la imperfección geométrica global del CE Anejo 19 §5.2: la condición de SO-g y el tramo CO0 del plan de CO; compilador **IG1**, `docs/fem3d/imperfeccion.md`). Pasan sus doce criterios en vitest; los bancos de Chrome no se han pasado.
   - **Motor:** casos **derivados** (`CasoDerivado`, `src/motor/derivados.ts`): un caso sin cargas propias cuya carga es, en cada nudo, `factor`·P en X o en Y, con P = −Fz de las fuerzas nodales equivalentes de su caso de origen. Un lado derecho más; las ecuaciones y los demás casos, con los mismos bits. `FuerzasNodales` y `EsfuerzosPiezas` rehacen sus cargas nodales con las mismas cuentas.
   - **Compilador** (`src/compilador/imperfeccion.ts`): θ = θ₀·α_h·α_m; `resolverImperfeccion` añade detrás de los casos del viento `IMP-X(<caso>)` e `IMP-Y(<caso>)` por cada caso con acción G, Q o S (nocionales con su `inclinacion`, sin signo), en `fisicoResuelto`, `compilar` y `Consultas`, como el viento. Una nocional escrita con su `inclinacion` no se duplica; con sus cargas a mano, el aviso `imperfeccion/nocional-a-mano`.

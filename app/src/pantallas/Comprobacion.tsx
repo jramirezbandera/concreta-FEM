@@ -116,6 +116,10 @@ const DIBUJOS: { id: Dibujo; nombre: string; title: string }[] = [
   { id: "armado", nombre: "Armado", title: "La planta con el armado dibujado: los refuerzos y los cercos de las losas, las barras de los pilares, el armado de cada vano y los perímetros de punzonamiento" },
   { id: "aprovechamiento", nombre: "Aprovechamiento", title: "La planta con cada pieza del color de su aprovechamiento, sin el armado" },
 ];
+const RETICULA: { id: "si" | "no"; nombre: string; title: string }[] = [
+  { id: "si", nombre: "Sí", title: "En un reticular, sus casetones de fondo: los nervios van entre ellos" },
+  { id: "no", nombre: "No", title: "Sin los casetones: sólo el armado" },
+];
 const CARAS: { id: CaraDibujada; nombre: string; title: string }[] = [
   { id: "todas", nombre: "Todo", title: "Los refuerzos de las dos caras (los inferiores en azul y los superiores en rojo) y los cercos de los nervios" },
   { id: "inferior", nombre: "Inferior", title: "Sólo los refuerzos de la cara inferior" },
@@ -833,6 +837,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   const [peores, setPeores] = useState(false);
   const [dibujo, setDibujo] = useState<Dibujo>("armado");
   const [cara, setCara] = useState<CaraDibujada>("todas");
+  /** Los casetones de los reticulares, de fondo del armado de las losas. */
+  const [reticula, setReticula] = useState(true);
   const [anadir, setAnadir] = useState<string>("");
   const [anadirEn, setAnadirEn] = useState<"nervios" | "abacos">("nervios");
   const [avisoPlanta, setAvisoPlanta] = useState<string | null>(null);
@@ -1114,6 +1120,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       <Separador />
       <Segmentado etiqueta="En planta" opciones={DIBUJOS} valor={dibujo} onCambio={setDibujo} />
       {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Se ve" opciones={CARAS} valor={cara} onCambio={setCara} />}
+      {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Casetones" opciones={RETICULA} valor={reticula ? "si" : "no"} onCambio={(v) => setReticula(v === "si")} />}
       {editable && (
         <div role="group" aria-label="Añadir a una losa" className="flex items-center gap-1.5">
           <select className="sel" style={{ height: 28 }} value={anadir} onChange={(x) => setAnadir(x.target.value)} aria-label="Añadir a una losa" title="Un refuerzo o una zona de cercos nuevos: elija cuál y dé en la planta dos esquinas opuestas de su zona">
@@ -1400,7 +1407,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
             fuentes={{
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
               ...(tipo === "losas" && dibujo === "armado" ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} /> } : {}),
-              planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
+              planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
               cabeceraPlanta: () => (
                 <>
                   <Chip acento>

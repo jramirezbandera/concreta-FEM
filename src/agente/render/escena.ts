@@ -103,6 +103,9 @@ export type Estilo =
   /** CO6: el armado en barras, dibujado. Un refuerzo de losa de cada cara: su barra, su línea de reparto y su zona. */
   | "armado-inferior"
   | "armado-inferior-fino"
+  /** La barra de un refuerzo sobre cada nervio que arma (más fina que la de un refuerzo a una separación). */
+  | "armado-inferior-nervio"
+  | "armado-superior-nervio"
   | "armado-inferior-zona"
   | "armado-superior"
   | "armado-superior-fino"
@@ -119,7 +122,9 @@ export type Estilo =
   /** El perímetro crítico de un pilar que no se comprueba (dentro del ancho de sus vigas), como referencia. */
   | "armado-critico-sin"
   /** Los ejes de los nervios de un reticular, bajo el armado dibujado de la losa. */
-  | "armado-nervio";
+  | "armado-nervio"
+  /** Un casetón de un reticular, de fondo del armado en barras. */
+  | "armado-caseton";
 
 export type Primitiva =
   /** Polígono con huecos: el primer anillo es el contorno (relleno par-impar). `relleno` sustituye al del estilo. */

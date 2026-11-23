@@ -93,7 +93,7 @@ export type VistaResultadosPlanta = (
   | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number }
   /** CO6-d: las partes de un tipo de comprobación, del color de su aprovechamiento; el armado va en el pedido, como el de AB. */
   /** `dibujo: "armado"` (§8.11): con el armado en barras dibujado; `cara`, los refuerzos de las losas que se ven. */
-  | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto; dibujo?: "armado"; cara?: CaraDibujada; /** Los datos de armado de la obra, si han cambiado desde que se abrió (`Sesion.datosArmado`). */ datos?: DatosArmadoObra }
+  | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto; dibujo?: "armado"; cara?: CaraDibujada; /** En un reticular, sus casetones de fondo (por defecto, sí). */ reticula?: boolean; /** Los datos de armado de la obra, si han cambiado desde que se abrió (`Sesion.datosArmado`). */ datos?: DatosArmadoObra }
 ) & { malla?: boolean };
 
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
@@ -689,7 +689,7 @@ export class Sesion {
           e = { ...r.valor, primitivas: [...r.valor.primitivas.filter((p) => p.tipo !== "texto"), ...m.primitivas, ...textos], leyenda: [...r.valor.leyenda, ...m.leyenda], notas: [...r.valor.notas, ...m.notas] };
         } else if (v.vista === "malla") e = vistaMalla(rr, planta, d);
         else if (v.vista === "comprobacion") {
-          const c = v.dibujo === "armado" ? vistaArmadoBarras(this, planta, v.de, v.armado, d, v.cara) : vistaComprobacion(this, planta, v.de, v.armado, d);
+          const c = v.dibujo === "armado" ? vistaArmadoBarras(this, planta, v.de, v.armado, d, v.cara, v.reticula !== false) : vistaComprobacion(this, planta, v.de, v.armado, d);
           if (!c.valido) return c;
           e = c.valor;
         }

@@ -25,11 +25,11 @@ import { recorteTramos, regionesLosas, trozosEnLosa } from "../agente/render/arm
 import { bandaPolilinea, numeroFijo, type EntradaLeyenda, type Escena, type Estilo, type ExtremoRotulado, type Primitiva } from "../agente/render/escena.ts";
 import { anchoViga, fondoModelo, giroTexto, huellaSeccion, PlantaFisica, type DatosVista } from "../agente/render/modelo.ts";
 import { cabecera, caja, circuloPilar } from "../agente/render/resultados.ts";
-import { nerviosLosa } from "../compilador/abacos.ts";
+import { casetonesLosa, nerviosLosa, reticulaLosa } from "../compilador/abacos.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import { puntoEnRegion, type Region } from "../compilador/poligonos.ts";
 import { ARMADURAS_FORJADO, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type BarrasCara, type CercosViga } from "../comprobaciones/armado.ts";
-import { alzadoVano, cercosDibujados, cotasRefuerzo, puntosCercos, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
+import { alzadoVano, cercosDibujados, cotasRefuerzo, nerviosDeRefuerzo, puntosCercos, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { abacosDePilares, alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, trozo, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
 import type { Sesion } from "./sesion.ts";
@@ -114,8 +114,12 @@ export function referenciasRefuerzo(x: Pick<RefuerzoDibujado, "d" | "n" | "t">, 
 const NOMBRE_VISTA: Record<TipoComprobacion, string> = { pilares: "los tramos de pilar que llegan a la planta", vigas: "los vanos de las vigas de la planta", losas: "las losas de la planta", punzonamiento: "el punzonamiento de las losas de la planta" };
 const NOMBRE_ARMADURA = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf": "Y inferior", "y-sup": "Y superior" } as const;
 
-/** La planta con el armado en barras dibujado: la escena de la vista `comprobacion` con `dibujo: "armado"`. */
-export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined, d: DatosVista, cara: CaraDibujada = "todas"): Resultado<Escena> {
+/**
+ * La planta con el armado en barras dibujado: la escena de la vista `comprobacion` con `dibujo: "armado"`.
+ * `reticula`: en un reticular, sus casetones de fondo (por defecto, sí): los nervios son lo que queda
+ * entre ellos. Con ella o sin ella, cada refuerzo por nervio se dibuja con una barra sobre cada nervio que arma.
+ */
+export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined, d: DatosVista, cara: CaraDibujada = "todas", reticula = true): Resultado<Escena> {
   const r = alDia(s, tipo, armado);
   if (!r.valido) return r;
   const pl = new PlantaFisica(s.proyecto.modelo, planta);
@@ -263,8 +267,20 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     let hayCercos = false;
     let hayCotas = false;
     let hayNervios = false;
+    let porNervios = false;
+    let porZona = false;
     const puntosPilares = pl.pilares().map((x): Vec2 => [x.p.x, x.p.y]);
     const ejesVigas = pl.enPlanta(pl.f.vigas).map((v) => v.puntos);
+    // Lo macizo de la planta además de los ábacos: las huellas de las vigas y de los pilares (ahí no hay casetón)
+    const macizos: Vec2[][] = reticula
+      ? [
+          ...pl.enPlanta(pl.f.vigas).flatMap((v) => bandaPolilinea(v.puntos, Math.max(anchoViga(pl.f.secciones?.find((x) => x.id === v.seccion)), 0.1))),
+          ...pl.pilares().flatMap((x) => {
+            const h = huellaSeccion(x.p, x.seccion);
+            return h ? ["anillo" in h ? h.anillo : circuloPilar(h.centro, h.radio)] : [];
+          }),
+        ]
+      : [];
     for (const p of fichas) {
       const l = losas.get(p.pieza);
       if (!l) continue;
@@ -275,11 +291,12 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
       anotar(p, c);
       // El contorno de la losa, del color de su aprovechamiento
       P.push({ tipo: "linea", puntos: [...l.contorno.map((q) => [q[0], q[1]] as Vec2), [l.contorno[0]![0], l.contorno[0]![1]]], estilo: "contorno", objeto: p.pieza });
-      // En un reticular, los ejes de sus nervios: con ellos se ve qué nervios lleva cada refuerzo
-      if (l.reticular) {
-        const ns = nerviosLosa(l);
-        if (ns.length) hayNervios = true;
-        for (const t of ns) P.push({ tipo: "linea", puntos: t, estilo: "armado-nervio" });
+      // En un reticular, sus casetones de fondo: los nervios son lo que queda entre ellos, y se ve qué nervios lleva cada refuerzo
+      const ret = l.reticular ? reticulaLosa(l) : null;
+      if (ret && reticula) {
+        const cs = casetonesLosa(l, macizos);
+        if (cs.length) hayNervios = true;
+        for (const anillos of cs) P.push({ tipo: "poligono", anillos, estilo: "armado-caseton" });
       }
       // Los cercos de los nervios: el contorno de su zona, a trazos, y un punto por cerco sobre el eje de cada nervio
       const zonasCercos = cara === "todas" || cara === "cercos" ? cercosDibujados(l.eje1, a) : [];
@@ -297,16 +314,34 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
         if (cara !== "todas" && x.cara !== cara) continue;
         caras.add(x.cara);
         const [grueso, fino, zona]: [Estilo, Estilo, Estilo] = x.cara === "inferior" ? ["armado-inferior", "armado-inferior-fino", "armado-inferior-zona"] : ["armado-superior", "armado-superior-fino", "armado-superior-zona"];
-        for (let i = 0; i < 4; i++) for (const t of trozosEnLosa(region, x.zona[i]!, x.zona[(i + 1) % 4]!)) P.push({ tipo: "linea", puntos: t, estilo: zona, objeto: `${p.pieza}/R${x.indice + 1}` });
-        for (const t of trozosEnLosa(region, x.barra[0], x.barra[1])) P.push({ tipo: "linea", puntos: t, estilo: grueso, objeto: `${p.pieza}/R${x.indice + 1}` });
-        for (const t of trozosEnLosa(region, x.reparto[0], x.reparto[1])) P.push({ tipo: "linea", puntos: t, estilo: fino, objeto: `${p.pieza}/R${x.indice + 1}` });
-        // Los topes de la línea de reparto: una raya corta según la barra en cada punta
+        const objeto = `${p.pieza}/R${x.indice + 1}`;
         const dir: Vec2 = [(x.barra[1][0] - x.barra[0][0]) / x.largo, (x.barra[1][1] - x.barra[0][1]) / x.largo];
-        for (const q of x.reparto) if (!region || puntoEnRegion(q, region)) P.push({ tipo: "linea", puntos: [[q[0] - dir[0] * 0.08, q[1] - dir[1] * 0.08], [q[0] + dir[0] * 0.08, q[1] + dir[1] * 0.08]], estilo: fino, objeto: `${p.pieza}/R${x.indice + 1}` });
-        P.push({ tipo: "marca", p: x.centro, forma: "circulo", radio: 2.4, estilo: grueso, objeto: `${p.pieza}/R${x.indice + 1}` });
-        textos.push({ tipo: "texto", p: x.centro, texto: `${x.texto} · ${metros(x.largo)} m`, tamano: 11, ancla: "medio", dy: -5, giro: giroTexto(dir), color: COLOR_CARA[x.cara], fondo: true, prioridad: 40 + Math.min(9, x.largo), objeto: `${p.pieza}/R${x.indice + 1}` });
+        const sm = (x.s[0] + x.s[1]) / 2;
+        const punto = (s: number, t: number): Vec2 => [s * x.d[0] + t * x.n[0], s * x.d[1] + t * x.n[1]];
+        // Por nervio: una barra sobre el eje de cada nervio que arma (los de su ancho), unidas por la línea de reparto
+        const ns = ret ? nerviosDeRefuerzo(x, x.armadura[0] === "x" ? ret.y : ret.x) : [];
+        /** La t por la que van el rótulo y las cotas: el nervio más cercano al medio o, sin nervios, el medio de la zona. */
+        let tm = (x.t[0] + x.t[1]) / 2;
+        if (ns.length) {
+          porNervios = true;
+          const medio = tm;
+          tm = ns.reduce((a, t) => (Math.abs(t - medio) < Math.abs(a - medio) - 1e-9 ? t : a), ns[0]!);
+          for (const t of ns) for (const tr of trozosEnLosa(region, punto(x.s[0], t), punto(x.s[1], t))) P.push({ tipo: "linea", puntos: tr, estilo: x.cara === "inferior" ? "armado-inferior-nervio" : "armado-superior-nervio", objeto });
+          if (ns.length > 1) for (const tr of trozosEnLosa(region, punto(sm, ns[0]!), punto(sm, ns[ns.length - 1]!))) P.push({ tipo: "linea", puntos: tr, estilo: fino, objeto });
+          for (const t of ns) if (!region || puntoEnRegion(punto(sm, t), region)) P.push({ tipo: "marca", p: punto(sm, t), forma: "circulo", radio: t === tm ? 2.6 : 1.9, estilo: grueso, objeto });
+        } else {
+          // A una separación (una maciza, un ábaco) o fuera de los nervios: la zona, una barra y su línea de reparto
+          porZona = true;
+          for (let i = 0; i < 4; i++) for (const t of trozosEnLosa(region, x.zona[i]!, x.zona[(i + 1) % 4]!)) P.push({ tipo: "linea", puntos: t, estilo: zona, objeto });
+          for (const t of trozosEnLosa(region, x.barra[0], x.barra[1])) P.push({ tipo: "linea", puntos: t, estilo: grueso, objeto });
+          for (const t of trozosEnLosa(region, x.reparto[0], x.reparto[1])) P.push({ tipo: "linea", puntos: t, estilo: fino, objeto });
+          // Los topes de la línea de reparto: una raya corta según la barra en cada punta
+          for (const q of x.reparto) if (!region || puntoEnRegion(q, region)) P.push({ tipo: "linea", puntos: [[q[0] - dir[0] * 0.08, q[1] - dir[1] * 0.08], [q[0] + dir[0] * 0.08, q[1] + dir[1] * 0.08]], estilo: fino, objeto });
+          P.push({ tipo: "marca", p: x.centro, forma: "circulo", radio: 2.4, estilo: grueso, objeto });
+        }
+        const rotulo = ns.length > 1 ? `${ns.length} nervios · ${x.texto} · ${metros(x.largo)} m` : `${x.texto} · ${metros(x.largo)} m`;
+        textos.push({ tipo: "texto", p: punto(sm, tm), texto: rotulo, tamano: 11, ancla: "medio", dy: -5, giro: giroTexto(dir), color: COLOR_CARA[x.cara], fondo: true, prioridad: 40 + Math.min(9, x.largo), objeto });
         // Las cotas a lo largo de la barra: desde el eje que tiene dentro, o de cada punta al más cercano
-        const tm = (x.t[0] + x.t[1]) / 2;
         const en = (s: number, dt = 0): Vec2 => [s * x.d[0] + (tm + dt) * x.n[0], s * x.d[1] + (tm + dt) * x.n[1]];
         const raya = (s: number) => (!region || puntoEnRegion(en(s), region)) && P.push({ tipo: "linea", puntos: [en(s, -0.12), en(s, 0.12)], estilo: fino, objeto: `${p.pieza}/R${x.indice + 1}` });
         const cota = (a: number, b: number) => textos.push({ tipo: "texto", p: en((a + b) / 2), texto: metros(b - a), tamano: 10, ancla: "medio", dy: 11, giro: giroTexto(dir), color: COLOR_CARA[x.cara], fondo: true, prioridad: 34, objeto: `${p.pieza}/R${x.indice + 1}` });
@@ -337,8 +372,9 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     if (caras.has("inferior")) leyenda.push({ estilo: "armado-inferior", texto: "Refuerzo inferior: la barra y lo que cubre" });
     if (caras.has("superior")) leyenda.push({ estilo: "armado-superior", texto: "Refuerzo superior: la barra y lo que cubre" });
     if (hayCercos) leyenda.push({ estilo: "armado-cercos-punto", texto: "Cercos de los nervios: un punto por cerco, con sus ramas (R)" });
-    if (hayNervios) leyenda.push({ estilo: "armado-nervio", texto: "Ejes de los nervios del reticular" });
-    notas.push("Cada refuerzo: su barra, de punta a punta, y la línea de reparto, que cruza lo que cubre; se suma a la armadura base. Rótulo: las barras y su largo.");
+    if (hayNervios) leyenda.push({ estilo: "armado-caseton", texto: "Casetones del reticular: los nervios van entre ellos" });
+    if (porNervios) notas.push("En los nervios, cada refuerzo se dibuja con una barra sobre el eje de cada nervio que arma, unidas por su línea de reparto. Rótulo: cuántos nervios, las barras de cada uno y su largo. Se suma a la armadura base.");
+    if (porZona) notas.push(`${porNervios ? "Los demás refuerzos (a una separación)" : "Cada refuerzo"}: su zona, una barra de punta a punta y la línea de reparto, que cruza lo que cubre; se suma a la armadura base. Rótulo: las barras y su largo.`);
     if (hayCotas) notas.push("Bajo cada barra, sus cotas en metros: lo que sale a cada lado del eje del pilar o de la viga que cruza o, si no cruza ninguno, lo que falta de cada punta hasta el más cercano.");
   }
   if (tipo !== "losas") for (const x of ["no-cumple", "alto", "cumple", "sin-armado"] as const) if (usadas.has(x)) leyenda.push({ relleno: COLOR_APROVECHAMIENTO[x], texto: TEXTO_CLASE[x] });

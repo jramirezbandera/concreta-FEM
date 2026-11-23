@@ -220,3 +220,25 @@ describe("CO1-f: las zonas de cercos de un tramo de pilar y su alzado", () => {
     expect(alzadoPilar({ b: 300, h: 300 }, 0.85, a, SOLAPES).zonas.map((z) => z.zona)).toEqual(["pie", "cabeza"]);
   });
 });
+
+describe("los refuerzos por nervio, sobre sus nervios", () => {
+  it("un refuerzo por nervio arma los nervios de su ancho; uno a una separación, o de ábaco, ninguno", async () => {
+    const { nerviosDeRefuerzo, refuerzosDibujados } = await import("./dibujoArmado.ts");
+    const ejes = [0.4, 1.2, 2.0, 2.8, 3.6];
+    const [porNervio, parrilla, abaco, enCaseton] = refuerzosDibujados(0, {
+      refuerzos: [
+        { armadura: "x-inf", s: [0, 4], t: [0.8, 3.2], barras: { diametro: 12, n: 2 }, en: "nervios" },
+        { armadura: "x-sup", s: [0, 4], t: [0.8, 3.2], barras: { diametro: 12, separacion: 200 } },
+        { armadura: "y-sup", s: [0, 2], t: [0, 2], barras: { diametro: 8, n: 1 }, en: "abacos" },
+        { armadura: "x-inf", s: [0, 4], t: [1.4, 1.9], barras: { diametro: 12, n: 2 }, en: "nervios" },
+      ],
+    });
+    expect(porNervio!.porNervio).toBe(true);
+    expect(nerviosDeRefuerzo(porNervio!, ejes)).toEqual([1.2, 2.0, 2.8]);
+    expect(parrilla!.porNervio).toBe(false);
+    expect(nerviosDeRefuerzo(parrilla!, ejes)).toEqual([]);
+    expect(nerviosDeRefuerzo(abaco!, ejes)).toEqual([]);
+    // Dibujado entre dos nervios (en un casetón): ninguno, y se dibuja por su zona
+    expect(nerviosDeRefuerzo(enCaseton!, ejes)).toEqual([]);
+  });
+});

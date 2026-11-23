@@ -36,7 +36,7 @@ const es = (activo: string | null, rutas: readonly string[]) => (activo !== null
 /** Una sección con su armado, a escala, en una caja de w × h px con sus cotas. */
 export { Seccion as SeccionDibujada };
 function Seccion({ s, w, h, x0 = 0, y0 = 0, activo, titulo, cotaY = true }: { s: SeccionArmada; w: number; h: number; x0?: number; y0?: number; activo: string | null; titulo?: string; cotaY?: boolean }) {
-  const [mx, my] = [26, titulo ? 24 : 18];
+  const [mx, my] = [34, titulo ? 30 : 26];
   const k = Math.min((w - 2 * mx) / s.ancho, (h - 2 * my) / s.alto);
   const X = (x: number) => x0 + w / 2 + x * k;
   const Y = (y: number) => y0 + h / 2 - y * k + (titulo ? 5 : 0);
@@ -60,14 +60,21 @@ function Seccion({ s, w, h, x0 = 0, y0 = 0, activo, titulo, cotaY = true }: { s:
       {s.barras.map((q, i) => (
         <circle key={i} cx={X(q.x)} cy={Y(q.y)} r={Math.max((q.diametro * k) / 2, 2.2)} className="ca-barra" data-grupo={q.grupo} data-activo={es(activo, RUTA_GRUPO[q.grupo])} />
       ))}
-      <text x={X(0)} y={Y(-s.alto / 2) + 13} textAnchor="middle">
-        {s.cotas.x} {cm(s.ancho)}
-      </text>
-      {cotaY && (
-        <text x={X(-s.ancho / 2) - 5} y={Y(0) + 4} textAnchor="end">
-          {s.cotas.y} {cm(s.alto)}
+      {/* Las cotas: su línea, sus topes y el valor (cm) */}
+      <g className="cq-cota ca-cota-seccion">
+        <path d={`M${X(-s.ancho / 2)} ${Y(-s.alto / 2) + 5}v8M${X(s.ancho / 2)} ${Y(-s.alto / 2) + 5}v8M${X(-s.ancho / 2)} ${Y(-s.alto / 2) + 9}H${X(s.ancho / 2)}`} />
+        <text x={X(0)} y={Y(-s.alto / 2) + 22} textAnchor="middle">
+          {s.cotas.x} = {cm(s.ancho)}
         </text>
-      )}
+        {cotaY && (
+          <>
+            <path d={`M${X(-s.ancho / 2) - 5} ${Y(s.alto / 2)}h-8M${X(-s.ancho / 2) - 5} ${Y(-s.alto / 2)}h-8M${X(-s.ancho / 2) - 9} ${Y(s.alto / 2)}V${Y(-s.alto / 2)}`} />
+            <text x={X(-s.ancho / 2) - 14} y={Y(0)} textAnchor="middle" transform={`rotate(-90 ${X(-s.ancho / 2) - 14} ${Y(0)})`}>
+              {s.cotas.y} = {cm(s.alto)}
+            </text>
+          </>
+        )}
+      </g>
     </g>
   );
 }
@@ -152,43 +159,56 @@ const ESFUERZOS_PILAR = [
   { id: "Mz", titulo: "Mz", unidad: "kN·m" },
 ] as const;
 
-/** La envolvente de ELU de un esfuerzo a lo largo del tramo, junto a su alzado y a su misma altura: el máximo y el mínimo, con sus valores en el pie y en la cabeza. */
+/**
+ * La envolvente de ELU de un esfuerzo a lo largo del tramo, junto a su alzado y a su misma altura: la
+ * banda entre el mínimo y el máximo, con el cero en su sitio (la escala va de lo menor a lo mayor, con
+ * el cero dentro) y sus valores en el pie y en la cabeza.
+ */
 function EsfuerzoTramo({ titulo, unidad, tramos, libre, x0, w, h }: { titulo: string; unidad: string; tramos: PuntoEsfuerzo[][]; libre: number; x0: number; w: number; h: number }) {
   const [yt, yb] = [34, h - 28];
   const k = (yb - yt) / Math.max(libre, 1e-9);
   const Y = (s: number) => yb - s * k;
   const todos = tramos.flat();
-  const tope = Math.max(1e-9, ...todos.flatMap((p) => [Math.abs(p.max), Math.abs(p.min)]));
-  const xc = x0 + w / 2;
-  const medio = w / 2 - 12;
-  const X = (v: number) => xc + (v / tope) * medio;
+  const lo = Math.min(0, ...todos.map((p) => p.min));
+  const hi = Math.max(0, ...todos.map((p) => p.max));
+  const [xl, xr] = [x0 + 12, x0 + w - 12];
+  const X = (v: number) => xl + ((v - lo) / Math.max(hi - lo, 1e-9)) * (xr - xl);
+  const xc = (xl + xr) / 2;
   const valor = (v: number) => fmt(v, Math.abs(v) < 9.95 ? 1 : 0);
+  const rango = (p: PuntoEsfuerzo) => (Math.abs(p.max - p.min) < 0.05 ? valor(p.max) : `${valor(p.min)} … ${valor(p.max)}`);
   const [pie, cabeza] = [todos[0], todos[todos.length - 1]];
   return (
     <g data-esfuerzo-pilar={titulo}>
       <text x={xc} y={11} textAnchor="middle" className="ca-titulo">
         {titulo} <tspan className="ca-unidad">{unidad}</tspan>
       </text>
-      <line x1={xc} x2={xc} y1={yt} y2={yb} className="cq-eje" />
+      {/* Los niveles de la cabeza y del pie (las caras de los nudos), y el cero */}
+      <path d={`M${x0 + 2} ${yt}H${x0 + w - 2}M${x0 + 2} ${yb}H${x0 + w - 2}`} className="ca-esf-nivel" />
+      <line x1={X(0)} x2={X(0)} y1={yt - 3} y2={yb + 3} className="ca-esf-eje" />
       {tramos.map((t, i) => {
+        if (!t.length) return null;
         const banda = `M ${X(t[0]!.min)} ${Y(t[0]!.x)} ${t.map((p) => `L ${X(p.min)} ${Y(p.x)}`).join(" ")} ${[...t].reverse().map((p) => `L ${X(p.max)} ${Y(p.x)}`).join(" ")} Z`;
+        // Hasta el cero: lo que el esfuerzo llega a valer, relleno más suave
+        const alCero = `M ${X(0)} ${Y(t[0]!.x)} ${t.map((p) => `L ${X(p.min > 0 ? p.min : p.max < 0 ? p.max : 0)} ${Y(p.x)}`).join(" ")} L ${X(0)} ${Y(t[t.length - 1]!.x)} Z`;
         return (
           <g key={i}>
+            <path d={alCero} className="ca-esf-fondo" />
             <path d={banda} className="ca-esf-banda" />
             <path d={`M ${t.map((p) => `${X(p.max)} ${Y(p.x)}`).join(" L ")}`} className="ca-esf-linea" />
             <path d={`M ${t.map((p) => `${X(p.min)} ${Y(p.x)}`).join(" L ")}`} className="ca-esf-linea" />
           </g>
         );
       })}
-      {cabeza && (
-        <text x={xc} y={yt - 5} textAnchor="middle" className="ca-esf-valor">
-          {valor(cabeza.min)} … {valor(cabeza.max)}
-        </text>
-      )}
-      {pie && (
-        <text x={xc} y={yb + 13} textAnchor="middle" className="ca-esf-valor">
-          {valor(pie.min)} … {valor(pie.max)}
-        </text>
+      {[pie, cabeza].map((p, i) =>
+        p ? (
+          <g key={i}>
+            <circle cx={X(p.min)} cy={Y(p.x)} r={2.2} className="ca-esf-punto" />
+            <circle cx={X(p.max)} cy={Y(p.x)} r={2.2} className="ca-esf-punto" />
+            <text x={xc} y={i === 0 ? yb + 14 : yt - 7} textAnchor="middle" className="ca-esf-valor">
+              {rango(p)}
+            </text>
+          </g>
+        ) : null,
       )}
     </g>
   );
@@ -221,7 +241,7 @@ export function CroquisPilar({
   const [WS, H] = grande ? [340, 310] : [300, 210];
   const al = seccion && libre !== undefined && libre > 0 ? alzadoPilar(seccion, libre, armado, solapes) : null;
   const curvas = al && esfuerzos ? ESFUERZOS_PILAR.flatMap((e) => (esfuerzos.esfuerzos[e.id]?.length ? [{ ...e, tramos: esfuerzos.esfuerzos[e.id]! }] : [])) : [];
-  const [WA, WE] = [al ? 236 : 0, 104];
+  const [WA, WE] = [al ? 236 : 0, 116];
   const W = WS + WA + curvas.length * WE;
   const [svg, letra] = useLetra(W);
   if (!seccion) return SIN_SECCION;
@@ -253,7 +273,7 @@ export function CroquisPilar({
             {al ? ` · ${al.cercos} en el tramo` : ""}
           </Entrada>
         ) : null}
-        {curvas.length > 0 && <span className="ca-dato">Esfuerzos: el mínimo y el máximo de {esfuerzos!.combinaciones}, a la altura del tramo; arriba, los de la cabeza y abajo, los del pie.</span>}
+        {curvas.length > 0 && <span className="ca-dato">Esfuerzos: la banda entre el mínimo y el máximo de {esfuerzos!.combinaciones}, a la altura del tramo, con la línea del cero; arriba, los de la cabeza y abajo, los del pie.</span>}
         {completo && (
           <span className="ca-dato" data-as>
             {barrasDe(armado as ArmadoTramoPilar)} barras · As = {fmt(As / 100, 2)} cm² · ρ = {fmt((100 * As) / Ac, 2)} %

@@ -321,6 +321,8 @@ export interface RefuerzoDibujado {
   largo: number;
   ancho: number;
   en?: "abacos" | "nervios";
+  /** Sus barras van por nervio (n barras en cada nervio que cubre), no a una separación. */
+  porNervio: boolean;
   /** Los ejes de su armadura (a lo largo de las barras y en transversal) y su rectángulo en ellos, m. */
   d: Vec2;
   n: Vec2;
@@ -403,6 +405,7 @@ export function refuerzosDibujados(eje1: number | undefined, a: Pick<ArmadoForja
       largo: x.s[1] - x.s[0],
       ancho: x.t[1] - x.t[0],
       ...(x.en ? { en: x.en } : {}),
+      porNervio: x.barras.n !== undefined,
       d,
       n,
       s: [x.s[0], x.s[1]],
@@ -410,6 +413,16 @@ export function refuerzosDibujados(eje1: number | undefined, a: Pick<ArmadoForja
     });
   });
   return r;
+}
+
+/**
+ * Los nervios que arma un refuerzo por nervio: de los ejes de los nervios paralelos a sus barras (su
+ * coordenada transversal, t), los que caen en su ancho. Vacío si no va por nervio o no cubre ninguno
+ * (dibujado en un casetón): entonces se dibuja por su zona.
+ */
+export function nerviosDeRefuerzo(x: Pick<RefuerzoDibujado, "porNervio" | "en" | "t">, ejes: readonly number[]): number[] {
+  if (!x.porNervio || x.en === "abacos") return [];
+  return ejes.filter((t) => t >= x.t[0] - 1e-6 && t <= x.t[1] + 1e-6).sort((a, b) => a - b);
 }
 
 /** Las zonas de cercos de los nervios de un reticular, en planta. */

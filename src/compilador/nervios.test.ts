@@ -11,7 +11,8 @@
  *   cambia.
  */
 import { describe, expect, it } from "vitest";
-import { ejesNervios, nerviosLosa, puntoPasoNervios, reticulaCasetones } from "./abacos.ts";
+import { casetonesLosa, ejesNervios, nerviosLosa, puntoPasoNervios, reticulaCasetones, reticulaLosa } from "./abacos.ts";
+import { areaConSigno, puntoEnPoligono } from "./poligonos.ts";
 import { compilar } from "./compilar.ts";
 import type { Losa, ModeloFisico, Vec2 } from "./fisico.ts";
 import { asas, moverAsa, transformar } from "../editor/transformar.ts";
@@ -169,5 +170,44 @@ describe("en el editor", () => {
     const l = r.operacion.objeto as unknown as Losa;
     expect(l.reticular!.paso).toEqual([2.5, 2.5]);
     expect(l.contorno).toEqual(m.losas![0]!.contorno);
+  });
+});
+
+describe("los casetones en planta (el fondo del armado dibujado)", () => {
+  for (const eje1 of [0, 30]) {
+    it(`eje 1 a ${eje1}°: dentro de la losa, fuera de los ábacos y de lo macizo, entre los ejes de los nervios`, () => {
+      const l = modelo({}, eje1).losas![0]!;
+      const ret = reticulaLosa(l)!;
+      const cs = casetonesLosa(l);
+      expect(cs.length).toBeGreaterThan(10);
+      const S1 = (q: Vec2) => q[0] * ret.d[0] + q[1] * ret.d[1];
+      const T1 = (q: Vec2) => q[0] * ret.n[0] + q[1] * ret.n[1];
+      let area = 0;
+      for (const anillos of cs) {
+        for (const a of anillos) area += Math.abs(areaConSigno(a));
+        const a = anillos[0]!;
+        const c: Vec2 = [a.reduce((x, q) => x + q[0], 0) / a.length, a.reduce((x, q) => x + q[1], 0) / a.length];
+        // Dentro de la losa y fuera de los ábacos
+        expect(puntoEnPoligono(c, l.contorno as Vec2[])).toBe(true);
+        for (const ab of l.reticular!.abacos as Vec2[][]) expect(puntoEnPoligono(c, ab)).toBe(false);
+        // Ningún eje de nervio lo atraviesa: los nervios van entre los casetones
+        const [ss, ts] = [a.map(S1), a.map(T1)];
+        for (const x of ret.x) expect(x <= Math.min(...ss) + 1e-9 || x >= Math.max(...ss) - 1e-9).toBe(true);
+        for (const y of ret.y) expect(y <= Math.min(...ts) + 1e-9 || y >= Math.max(...ts) - 1e-9).toBe(true);
+      }
+      // Como mucho, la parte de casetón de la zona aligerada: (c/s)² de la losa sin sus ábacos
+      expect(area).toBeLessThan((C / S) ** 2 * (30 - 4 * 0.7 * 0.7) + 1e-6);
+      if (eje1 === 0) expect(cs.filter((x) => x.length === 1 && Math.abs(Math.abs(areaConSigno(x[0]!)) - C * C) < 1e-9).length).toBeGreaterThan(10);
+    });
+  }
+
+  it("lo macizo que se le pasa (una viga, un pilar) quita los casetones que toca", () => {
+    const l = modelo().losas![0]!;
+    const todos = casetonesLosa(l);
+    const viga: Vec2[] = rect(2.9, 0, 3.1, 5);
+    const sin = casetonesLosa(l, [viga]);
+    expect(sin.length).toBeLessThan(todos.length);
+    for (const anillos of sin) for (const q of anillos[0]!) expect(q[0] <= 2.9 + 1e-9 || q[0] >= 3.1 - 1e-9).toBe(true);
+    expect(casetonesLosa({ ...l, reticular: undefined } as Losa)).toEqual([]);
   });
 });
