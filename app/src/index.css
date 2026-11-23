@@ -1347,6 +1347,14 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 }
 .minima-reducida { margin: 8px 14px 4px; padding: 7px 10px; border: 1px solid var(--color-border-sub); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--color-text-primary); }
 .minima-reducida p { margin-top: 4px; font-size: 11.5px; color: var(--color-text-secondary); }
+/* §8.16: lo que ha hecho «Proponer», y las comprobaciones y las hipótesis de la pieza, bajo el armado */
+.aviso-proponer { margin: 2px 14px 4px; padding: 6px 10px; border-radius: 8px; background: var(--color-bg-sub, rgba(127, 127, 127, 0.08)); color: var(--color-text-primary); }
+.banco-comprobaciones { margin-top: 4px; border-top: 1px solid var(--color-border-sub); }
+.banco-comprobaciones h4 { margin: 8px 14px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+.banco-comprobaciones h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.hipotesis { margin: 2px 14px 8px; padding-left: 16px; list-style: disc; font-size: 11.5px; line-height: 1.45; color: var(--color-text-secondary); }
+.hipotesis li + li { margin-top: 3px; }
+.barra-proponer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 14px 2px; }
 .enlace-armado { font-size: 11.5px; color: var(--color-accent-text, var(--color-accent)); }
 .enlace-armado:hover { text-decoration: underline; }
 .elemento-armado { margin-top: 5px; padding: 4px 6px 5px 8px; border-left: 3px solid var(--color-border-strong); border-radius: 0 6px 6px 0; }

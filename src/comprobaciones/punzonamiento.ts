@@ -9,10 +9,10 @@
  */
 import type { Consultas, Respuesta } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import { textoPunzonamiento, type ArmadoForjado, type ArmaduraPunzonamiento, type DatosArmado } from "./armado.ts";
+import { DATOS_ARMADO, textoPunzonamiento, type ArmadoForjado, type ArmaduraPunzonamiento, type DatosArmado } from "./armado.ts";
 import { proponerPunzonamiento } from "./armar/punzonamiento.ts";
-import { armadoPunzonamiento, comprobarPunzonamiento, type CaraPunzonamiento, type ComprobacionPunzonamiento, type FilaPunzonamiento } from "./comprobar/punzonamiento.ts";
-import { demandasPunzonamiento } from "./demandas/punzonamiento.ts";
+import { armadoPunzonamiento, comprobarPunzonamiento, flexion, type CasoPunzonamiento, type CaraPunzonamiento, type ComprobacionPunzonamiento, type FilaPunzonamiento } from "./comprobar/punzonamiento.ts";
+import { demandasPunzonamiento, type DemandaPunzonamiento } from "./demandas/punzonamiento.ts";
 
 /** La armadura de punzonamiento del proyecto: por pilar y por la planta de la losa. */
 export type ArmadoPunzonamientos = Record<string, Record<string, ArmaduraPunzonamiento>>;
@@ -63,12 +63,27 @@ export interface PunzonamientoComprobado {
   vigasPlanas: string[];
   vigas: string[];
   filas?: FilaResumenPunzonamiento[];
+  /** Con las filas: las hipótesis de partida de la comprobación, en palabras. */
+  hipotesis?: string[];
   /** Con una propuesta: las armaduras probadas. */
   probados?: number;
 }
 
+/** Un pilar que atraviesa una losa sin unión por su huella: no se comprueba (`SinUnionPunzonamiento`). */
+export interface PunzonamientoSinUnion {
+  pilar: string;
+  planta: string;
+  losa: string;
+  vigas: string[];
+  motivo: string;
+  /** El canto útil con el que se dibuja su perímetro crítico, como referencia: el del armado de la losa o, sin él, el canto menos el recubrimiento y un Ø12. mm. */
+  d: number;
+}
+
 export interface ComprobacionPunzonamientos {
   pilares: PunzonamientoComprobado[];
+  /** Los pilares que atraviesan una losa sin unión por su huella: no se comprueban. */
+  sinUnion: PunzonamientoSinUnion[];
   resumen: { uniones: number; cumplen: number; noCumplen: number; conArmadura: number; sinArmadoLosa: number; pendientes: number; llamadas: number };
 }
 
@@ -131,6 +146,7 @@ export function comprobarPunzonamientos(q: Consultas, forjados: Record<string, A
     if (!c.casos.length && !c.pendientes.length) continue;
     const m = manda(c);
     const caso = c.casos.find((x) => x.cara === m?.cara) ?? c.casos[0];
+    if (op.filas) extra = { ...extra, hipotesis: hipotesis(D, caso, armadura, datos) };
     pilares.push({
       ...base,
       origen,
@@ -168,7 +184,44 @@ export function comprobarPunzonamientos(q: Consultas, forjados: Record<string, A
   }
   if (cimentacion.size)
     diagnosticos.push({ codigo: "comprobacion/punzonamiento-cimentacion", severidad: "info", mensaje: `En las losas de cimentación (${[...cimentacion].sort().join(", ")}) no se descuenta la reacción del terreno dentro del perímetro crítico: del lado de la seguridad.`, ids: [...cimentacion].sort() });
-  return { valido: true, valor: { pilares, resumen }, diagnosticos };
+  const rec = datos?.recubrimiento ?? DATOS_ARMADO.recubrimiento;
+  const sinUnion: PunzonamientoSinUnion[] = d.valor.sinUnion.map((s) => {
+    const losa = forjados?.[s.losa];
+    const f = losa ? flexion(s, armadoPunzonamiento(losa, undefined, datos), "superior", s.area) : null;
+    const dUtil = f && !("motivo" in f) && f.d > 0 ? f.d : Math.max(1000 * s.espesor - rec - 12, 0.5 * 1000 * s.espesor);
+    return { pilar: s.pilar, planta: s.planta, losa: s.losa, vigas: s.vigas, motivo: s.motivo, d: dUtil };
+  });
+  return { valido: true, valor: { pilares, sinUnion, resumen }, diagnosticos };
+}
+
+const mm = (x: number) => Math.round(x).toLocaleString("es-ES");
+const dos = (x: number) => x.toFixed(2).replace(".", ",");
+
+/**
+ * Las hipótesis de partida de la comprobación de una unión, en palabras: qué demanda se toma, la
+ * posición y por qué, el canto útil, el perímetro crítico, β, la armadura de flexión que cuenta y lo
+ * que no se comprueba aquí. Los números son los de la comprobación (la cara que manda).
+ */
+function hipotesis(D: DemandaPunzonamiento, caso: CasoPunzonamiento | undefined, cercos: ArmaduraPunzonamiento | undefined, datos: DatosArmado | undefined): string[] {
+  const r: string[] = [];
+  const vigas = [...new Set([...D.vigas, ...D.vigasPlanas])].sort();
+  r.push(`Demanda: lo que la losa ${D.losa} pasa al pilar por su huella (la fuerza vertical y los dos momentos), en cada combinación de ELU; manda la de mayor β·VEd${caso ? ` (${caso.comb}: VEd = ${dos(caso.VEd)} kN)` : ""}.${vigas.length ? ` Lo que le llega por ${vigas.length === 1 ? "la viga" : "las vigas"} ${vigas.join(", ")} no cuenta: es su cortante, que se comprueba con ${vigas.length === 1 ? "ella" : "ellas"}.` : ""}`);
+  if (!caso) return r;
+  const area = caso.tramo === "inferior" ? (D.areas.inferior ?? D.areas.superior) : (D.areas.superior ?? D.areas.inferior);
+  r.push(caso.cara === "superior" ? `La losa cuelga del pilar: tracciona la cara superior y el área cargada es la sección del tramo de debajo${area ? ` (${area.seccion})` : ""}.` : `El pilar carga sobre la losa (apeado o en una losa de cimentación): tracciona la cara inferior y el área cargada es la sección del tramo de encima${area ? ` (${area.seccion})` : ""}.`);
+  const nombre = { interior: "interior", borde: "de borde", esquina: "de esquina" }[caso.posicion];
+  const caras = area?.caras.map((c) => (Number.isFinite(c.distancia) ? `${mm(1000 * c.distancia)} mm` : "—")).join(", ");
+  r.push(`Posición: pilar ${nombre}. Una cara tiene el borde libre si el borde del forjado queda a menos de c∥/2 + π·d de ella (el perímetro que muere en el borde es más corto que el cerrado; CE A19 §6.4.2(4)).${caras ? ` Distancia de cada cara al borde: ${caras}.` : ""}${caso.posicion !== "interior" ? " El área se prolonga hasta el borde, como si el pilar estuviera enrasado." : ""}`);
+  r.push(`Canto útil d = ${mm(caso.d)} mm: el canto de la losa (${mm(1000 * D.espesor)} mm) menos el recubrimiento (${mm(datos?.recubrimiento ?? DATOS_ARMADO.recubrimiento)} mm) y las barras de la cara ${caso.cara}, media de las dos direcciones (la Y por dentro de la X).`);
+  r.push(`Perímetro crítico a 2·d = ${mm(2 * caso.d)} mm de la cara del pilar: u1 = ${mm(caso.u1)} mm${Math.abs(caso.u1Eficaz - caso.u1) > 1 ? `; sin lo que tapan los huecos a menos de 6·d o cae fuera del forjado, ${mm(caso.u1Eficaz)} mm (entra por β)` : ""}.`);
+  r.push(`β = ${dos(caso.beta)}, de la fórmula general (CE A19 §6.4.3) con los momentos que la losa pasa al pilar respecto al centro del área${caso.posicion === "interior" ? "" : `; en ${nombre === "de borde" ? "un pilar de borde" : "un pilar de esquina"}, u1/u1* más la excentricidad que no cubre`}.`);
+  r.push(`Armadura de flexión que cuenta: la de la cara ${caso.cara}, media en el ancho del pilar más 3·d a cada lado (CE A19 §6.4.4(1)): ${mm(caso.as[0])} mm²/m según X y ${mm(caso.as[1])} mm²/m según Y${D.reticular ? " (la parrilla de los ábacos y los refuerzos de ábaco que pasan por el pilar)" : " (la base y los refuerzos que pasan por el pilar)"}, como una malla de cuantía √(ρx·ρy).`);
+  if (D.reticular) r.push("En un reticular el perímetro crítico tiene que caber en el ábaco (y uout, si hace falta armadura). Los nervios a la salida del ábaco se comprueban en Losas.");
+  if (D.cimentacion) r.push("En una losa de cimentación no se descuenta la reacción del terreno dentro del perímetro: del lado de la seguridad.");
+  const vRdc = caso.resultado.vRdc;
+  const vEd = caso.resultado.vEd;
+  r.push(cercos ? `Con cercos: ${textoPunzonamiento(cercos)}; mandan vRd,cs (≤ 1,5·vRd,c) y vRd,max en la cara del pilar.` : vEd <= vRdc ? `Sin armadura de punzonamiento: vEd = ${dos(vEd)} MPa ≤ vRd,c = ${dos(vRdc)} MPa, así que no hace falta.` : `Sin armadura de punzonamiento no basta: vEd = ${dos(vEd)} MPa > vRd,c = ${dos(vRdc)} MPa.`);
+  return r;
 }
 
 /** El bloque `armado.punzonamiento` con lo propuesto: donde se propone, lo de antes se sustituye (o se quita, si ya no hace falta). */

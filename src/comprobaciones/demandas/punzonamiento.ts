@@ -100,8 +100,33 @@ export interface DemandaPunzonamiento {
   combos: ComboPunzonamiento[];
 }
 
+/**
+ * Un pilar que atraviesa una losa de la planta (su centro cae en ella o en el ancho de sus vigas) sin
+ * que la losa le pase nada por su huella: va dentro del ancho de sus vigas (un zuncho de borde por su
+ * eje, una viga plana que lo cubre). No tiene punzonamiento que comprobar: lo que le llega es el
+ * cortante de esas vigas, y el de la losa junto a él se comprueba con sus franjas en la cara de las
+ * vigas (CO4-3, CO4-4). Se da para decirlo y para dibujar su perímetro crítico como referencia.
+ */
+export interface SinUnionPunzonamiento {
+  pilar: string;
+  planta: string;
+  /** La losa en la que cae (o la más cercana). */
+  losa: string;
+  espesor: number;
+  reticular: boolean;
+  ejes: ReturnType<typeof ejesArmado>;
+  /** El área del tramo de debajo (o del de encima, si el pilar arranca en la planta). */
+  area: AreaCargada;
+  /** Las vigas en cuyo ancho cae la huella del pilar. */
+  vigas: string[];
+  /** Por qué no se comprueba, en palabras. */
+  motivo: string;
+}
+
 export interface DemandasPunzonamiento {
   demandas: DemandaPunzonamiento[];
+  /** Los pilares que atraviesan una losa sin unión por su huella: no se comprueban (y se dice por qué). */
+  sinUnion: SinUnionPunzonamiento[];
   /** Combinaciones de ELU. */
   combinaciones: number;
 }
@@ -202,6 +227,7 @@ export function demandasPunzonamiento(q: Consultas, ids?: readonly string[]): Re
   for (const id of ids ?? []) if (!pilares.some((p) => p.id === id)) return { valido: false, diagnosticos: [{ codigo: "consulta/no-existe", severidad: "error", mensaje: `El pilar «${id}» no existe en el modelo.`, ids: [id] }] };
   const losas = q.fisico.losas ?? [];
   const demandas: DemandaPunzonamiento[] = [];
+  const sinUnion: SinUnionPunzonamiento[] = [];
   for (const p of pilares) {
     if (ids?.length && !ids.includes(p.id)) continue;
     // Las plantas van de arriba abajo: el pilar va de `desde` (abajo) a `hasta` (arriba)
@@ -211,7 +237,11 @@ export function demandasPunzonamiento(q: Consultas, ids?: readonly string[]): Re
       const planta = plantas[k]!.id;
       const t = q.transmitidoPilar(p.id, planta);
       if (!t.valido) return t;
-      if (!t.valor) continue;
+      if (!t.valor) {
+        const s = sinUnionEn(q, p, planta, k < abajo ? seccionEn(p, planta) : seccionEn(p, plantas[k - 1]?.id ?? planta), k < abajo ? "inferior" : "superior");
+        if (s) sinUnion.push(s);
+        continue;
+      }
       const losa = losas.find((l) => l.id === t.valor!.losa);
       if (!losa) continue;
       const material = q.fisico.materiales.find((m) => m.id === losa.material);
@@ -252,5 +282,43 @@ export function demandasPunzonamiento(q: Consultas, ids?: readonly string[]): Re
       });
     }
   }
-  return { valido: true, valor: { demandas, combinaciones: elu.valor.factores.length }, diagnosticos };
+  return { valido: true, valor: { demandas, sinUnion, combinaciones: elu.valor.factores.length }, diagnosticos };
+}
+
+/** Distancia de un punto a un polígono (0 si está dentro), m. */
+function distanciaPoligono(c: Vec2, p: readonly Vec2[]): number {
+  if (puntoEnPoligono(c, p)) return 0;
+  let m = Infinity;
+  for (let i = 0; i < p.length; i++) {
+    const [a, b] = [p[i]!, p[(i + 1) % p.length]!];
+    const [ex, ey] = [b[0] - a[0], b[1] - a[1]];
+    const L2 = ex * ex + ey * ey;
+    const t = L2 > 0 ? Math.min(1, Math.max(0, ((c[0] - a[0]) * ex + (c[1] - a[1]) * ey) / L2)) : 0;
+    m = Math.min(m, Math.hypot(c[0] - a[0] - t * ex, c[1] - a[1] - t * ey));
+  }
+  return m;
+}
+
+/**
+ * Un pilar de la planta sin unión con la losa por su huella (`transmitidoPilar` da null): si su centro
+ * cae en una losa maciza o reticular de la planta o en el ancho de una de sus vigas, lo que no se
+ * comprueba y por qué; si no (no hay losa ahí), null.
+ */
+function sinUnionEn(q: Consultas, p: Pilar, planta: string, seccion: string, tramo: "inferior" | "superior"): SinUnionPunzonamiento | null {
+  const dePlanta = (q.fisico.losas ?? []).filter((l) => l.planta === planta);
+  if (!dePlanta.length) return null;
+  const anchos = (q.mapeo.anchos ?? []).filter((x) => x.planta === planta);
+  const contornos: (readonly Vec2[])[] = [...dePlanta.map((l) => l.contorno), ...anchos.map((x) => x.poligono)];
+  const a = area(q, p, seccion, tramo, contornos, null);
+  if (!a.dentro) return null;
+  // Las vigas en cuyo ancho cae la huella: su centro o alguna esquina (las de la sección que envuelve un círculo)
+  const [h, b] = a.forma ? (a.forma.tipo === "circulo" ? [a.forma.D, a.forma.D] : [a.forma.h, a.forma.b]) : [0, 0];
+  const puntos: Vec2[] = [a.c];
+  for (const [u, v] of [[1, 1], [-1, 1], [-1, -1], [1, -1]] as const) puntos.push([a.c[0] + ((u * h) / 2) * 0.98 * a.ez[0] + ((v * b) / 2) * 0.98 * a.ey[0], a.c[1] + ((u * h) / 2) * 0.98 * a.ez[1] + ((v * b) / 2) * 0.98 * a.ey[1]]);
+  const vigas = [...new Set(anchos.filter((x) => puntos.some((pt) => puntoEnPoligono(pt, x.poligono))).map((x) => x.viga))].sort();
+  const losa = [...dePlanta].sort((x, y) => distanciaPoligono(a.c, x.contorno) - distanciaPoligono(a.c, y.contorno))[0]!;
+  const motivo = vigas.length
+    ? `${p.id} queda dentro del ancho de ${vigas.length === 1 ? "la viga" : "las vigas"} ${vigas.join(", ")}: la losa ${losa.id} no le pasa nada por su huella, así que no hay punzonamiento que comprobar. Lo que le llega es el cortante de ${vigas.length === 1 ? "esa viga" : "esas vigas"}, que se comprueba con ${vigas.length === 1 ? "ella" : "ellas"} (Vigas), y el de la losa junto a él, con sus franjas en la cara de las vigas (Losas)`
+    : `la losa ${losa.id} no le pasa nada a ${p.id} por su huella, así que no hay punzonamiento que comprobar`;
+  return { pilar: p.id, planta, losa: losa.id, espesor: losa.espesor, reticular: losa.reticular !== undefined, ejes: ejesArmado(losa), area: a, vigas, motivo };
 }

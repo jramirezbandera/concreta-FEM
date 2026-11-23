@@ -328,7 +328,7 @@ describe("CO6 · DOM: Comprobación", () => {
         expect(filasTabla().length).toBe(t.partes.length);
         expect(celdas(filasTabla()[0]!)[0]).toBe(t.partes[0]!.pieza);
       });
-      filasTabla().forEach((tr, i) => expect(celdas(tr).at(-1), `${de} ${t.partes[i]!.clave}`).toBe(t.partes[i]!.cumple ? "Cumple" : t.partes[i]!.origen === "sin-armado" ? "Sin armado" : !t.partes[i]!.fallan && t.partes[i]!.pendientes.length ? "Sin comprobar" : "No cumple"));
+      filasTabla().forEach((tr, i) => expect(celdas(tr).at(-1), `${de} ${t.partes[i]!.clave}`).toBe(t.partes[i]!.origen === "no-aplica" ? "No se comprueba" : t.partes[i]!.cumple ? "Cumple" : t.partes[i]!.origen === "sin-armado" ? "Sin armado" : !t.partes[i]!.fallan && t.partes[i]!.pendientes.length ? "Sin comprobar" : "No cumple"));
     }
     // §8.11: la planta pide el armado dibujado (por defecto), y con «Aprovechamiento», sólo los colores
     expect(reg.pedidos.some((p) => p.tipo === "escena" && p.vista.vista === "comprobacion" && p.vista.dibujo === "armado")).toBe(true);

@@ -30,6 +30,7 @@ import type { Vec2 } from "../compilador/fisico.ts";
 import { bandaPolilinea, numeroFijo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva } from "../agente/render/escena.ts";
 import { anchoViga, fondoModelo, giroTexto, huellaSeccion, PlantaFisica, type DatosVista } from "../agente/render/modelo.ts";
 import { cabecera, caja, circuloPilar } from "../agente/render/resultados.ts";
+import { puntoEnPoligono } from "../compilador/poligonos.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { Sesion } from "./sesion.ts";
 
@@ -69,8 +70,12 @@ export interface ParteComprobada {
   parte: string;
   planta?: string;
   seccion?: string;
-  /** De dónde sale el armado: del proyecto, o no hay (`sin-armadura`: el punzonamiento, que puede no llevar). */
-  origen: "proyecto" | "propuesto" | "sin-armado" | "sin-armadura";
+  /**
+   * De dónde sale el armado: del proyecto, o no hay (`sin-armadura`: el punzonamiento, que puede no
+   * llevar). `no-aplica`: un pilar que atraviesa la losa sin unión por su huella (dentro del ancho de
+   * sus vigas): no tiene punzonamiento que comprobar, y `pendientes` dice por qué.
+   */
+  origen: "proyecto" | "propuesto" | "sin-armado" | "sin-armadura" | "no-aplica";
   /** «4Ø16 + 4Ø12 (caras b) · cØ6/140». */
   texto?: string;
   cumple: boolean;
@@ -123,6 +128,8 @@ export interface FichaComprobacion extends ParteComprobada {
   geometria: GeometriaParte;
   /** El recubrimiento hasta el cerco con el que se ha comprobado, mm. */
   recubrimiento: number;
+  /** Las hipótesis de partida de la comprobación, en palabras (el punzonamiento). */
+  hipotesis?: string[];
 }
 
 export interface ResumenComprobaciones {
@@ -131,6 +138,8 @@ export interface ResumenComprobaciones {
   cumplen: number;
   noCumplen: number;
   sinArmado: number;
+  /** Las que no se comprueban (`no-aplica`): no cuentan en las demás. */
+  noAplica: number;
 }
 
 export interface DatosComprobaciones {
@@ -360,8 +369,31 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
       armado: { tipo, ...(p.armadura ? { armado: p.armadura } : {}) },
       datos: d,
       geometria: { tipo, ...(seccionEnPlanta(q, p.pilar, p.planta) ? { seccion: seccionEnPlanta(q, p.pilar, p.planta)! } : {}), ...(p.d !== undefined ? { d: p.d } : {}), ...(p.perimetros !== undefined ? { perimetros: p.perimetros } : {}), ...(p.alcance !== undefined ? { alcance: p.alcance } : {}), ...(p.posicion ? { posicion: p.posicion } : {}) },
+      ...(p.hipotesis ? { hipotesis: p.hipotesis } : {}),
     });
   }
+  // Los que atraviesan la losa sin unión por su huella: no se comprueban, y se dice por qué
+  for (const s of r.valor.sinUnion)
+    a_(s.pilar, {
+      clave: `${s.pilar}/${s.planta}`,
+      pieza: s.pilar,
+      parte: `${s.planta} · ${s.losa}`,
+      planta: s.planta,
+      origen: "no-aplica",
+      texto: "no se comprueba",
+      cumple: true,
+      aprovechamiento: null,
+      fallan: 0,
+      pendientes: [s.motivo],
+      filas: [],
+      armado: { tipo },
+      datos: [...(s.vigas.length ? [{ nombre: "Dentro del ancho de", valor: s.vigas.join(", ") }] : []), { nombre: "d (para dibujar el perímetro)", valor: s.d, unidad: "mm" }],
+      geometria: { tipo, ...(seccionEnPlanta(q, s.pilar, s.planta) ? { seccion: seccionEnPlanta(q, s.pilar, s.planta)! } : {}), d: s.d, posicion: "no se comprueba" },
+      hipotesis: [`El perímetro crítico se dibuja a puntos, a 2·d de la cara del pilar, sólo como referencia: d ≈ ${Math.round(s.d)} mm, el canto útil de la armadura superior de la losa junto al pilar (sin armado, el canto menos el recubrimiento y un Ø12).`],
+    });
+  // Cada pilar, de arriba abajo (el orden de las plantas)
+  const orden = new Map(q.fisico.plantas.map((x, i) => [x.id, i]));
+  for (const fs of fichas.values()) fs.sort((x, y) => (orden.get(x.planta ?? "") ?? 0) - (orden.get(y.planta ?? "") ?? 0));
   return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
 }
 
@@ -492,7 +524,7 @@ export function esfuerzosTramoPilar(s: Sesion, pilar: string, planta: string): R
   return { valido: true, valor: { esfuerzos, combinaciones } };
 }
 
-export const sinFilas = ({ filas: _f, armado: _a, datos: _d, geometria: _g, recubrimiento: _r, ...p }: FichaComprobacion): ParteComprobada => p;
+export const sinFilas = ({ filas: _f, armado: _a, datos: _d, geometria: _g, recubrimiento: _r, hipotesis: _h, ...p }: FichaComprobacion): ParteComprobada => p;
 
 /** La tabla de un tipo de pieza (pedido `comprobaciones`). */
 export function datosComprobaciones(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): Resultado<DatosComprobaciones> {
@@ -501,12 +533,13 @@ export function datosComprobaciones(s: Sesion, tipo: TipoComprobacion, armado: A
   const partes = r.valor.fichas.map(sinFilas);
   const sinArmado = partes.filter((p) => p.origen === "sin-armado").length;
   const diagnosticos = [...r.valor.diagnosticos.filter((d) => d.codigo !== "comprobacion/sin-armado")];
+  const comprobadas = partes.filter((p) => p.origen !== "no-aplica");
   return {
     valido: true,
     valor: {
       tipo,
       partes,
-      resumen: { piezas: new Set(partes.map((p) => p.pieza)).size, partes: partes.length, cumplen: partes.filter((p) => p.cumple).length, noCumplen: partes.filter((p) => !p.cumple).length, sinArmado },
+      resumen: { piezas: new Set(comprobadas.map((p) => p.pieza)).size, partes: comprobadas.length, cumplen: comprobadas.filter((p) => p.cumple).length, noCumplen: comprobadas.filter((p) => !p.cumple).length, sinArmado, noAplica: partes.length - comprobadas.length },
       datos: { ...DATOS_ARMADO, ...s.datosArmado },
       diagnosticos,
       comprobadas: r.valor.comprobadas,
@@ -632,13 +665,13 @@ export function datosArmar(s: Sesion, p: PedidoArmar): Resultado<DatosArmar> {
 // ─── En planta, por colores (CO6-d) ─────────────────────────────────────────────────────────────
 
 /** Lo que dice el color de una parte. */
-export type ClaseAprovechamiento = "cumple" | "alto" | "no-cumple" | "sin-armado";
+export type ClaseAprovechamiento = "cumple" | "alto" | "no-cumple" | "sin-armado" | "no-aplica";
 
 /** Por encima de este aprovechamiento, una parte que cumple va en ámbar. */
 export const APROVECHAMIENTO_ALTO = 0.9;
 
 /** Los colores de cada clase (los de la leyenda; en el tema oscuro, la app los aclara). */
-export const COLOR_APROVECHAMIENTO: Record<ClaseAprovechamiento, string> = { cumple: "#7cc48f", alto: "#f0b443", "no-cumple": "#e2574c", "sin-armado": "#cfd4db" };
+export const COLOR_APROVECHAMIENTO: Record<ClaseAprovechamiento, string> = { cumple: "#7cc48f", alto: "#f0b443", "no-cumple": "#e2574c", "sin-armado": "#cfd4db", "no-aplica": "#a3aab5" };
 
 /**
  * La clase de una parte: sin armado, gris; no cumple (alguna fila falla), rojo; cumple con el
@@ -646,6 +679,7 @@ export const COLOR_APROVECHAMIENTO: Record<ClaseAprovechamiento, string> = { cum
  * pendiente, sin que nada falle), ámbar; el resto, verde.
  */
 export function claseAprovechamiento(p: ParteComprobada): ClaseAprovechamiento {
+  if (p.origen === "no-aplica") return "no-aplica";
   if (p.origen === "sin-armado") return "sin-armado";
   if (!p.cumple) return !p.fallan && p.pendientes.length ? "alto" : "no-cumple";
   return (p.aprovechamiento ?? 0) > APROVECHAMIENTO_ALTO ? "alto" : "cumple";
@@ -657,6 +691,7 @@ export const TEXTO_CLASE: Record<ClaseAprovechamiento, string> = {
   alto: `Cumple con más de ${numeroFijo(APROVECHAMIENTO_ALTO, 2)} o sin comprobar del todo`,
   "no-cumple": "No cumple",
   "sin-armado": "Sin armado",
+  "no-aplica": "No se comprueba: dentro del ancho de sus vigas",
 };
 
 /** El trozo de una polilínea entre dos estaciones a lo largo de ella (m). */
@@ -675,6 +710,39 @@ export function trozo(p: readonly Vec2[], s0: number, s1: number): Vec2[] {
     s += l;
   }
   return r;
+}
+
+/**
+ * En el punzonamiento, un clic en un ábaco es un clic en su pilar: lo que el fondo dibuja de cada
+ * ábaco (`<losa>/A<n>`) que contiene el centro de uno de `pilares` pasa a llevar su id.
+ */
+export function abacosDePilares(P: Primitiva[], pilares: readonly { id: string; c: Vec2 }[]): void {
+  const de = new Map<string, string>();
+  // (el centro de un pilar de borde o de esquina cae justo en el contorno de su ábaco: a 1 cm vale)
+  const aBorde = (c: Vec2, a: readonly Vec2[]) => {
+    let m = Infinity;
+    for (let i = 0; i < a.length; i++) {
+      const [p, q] = [a[i]!, a[(i + 1) % a.length]!];
+      const [ex, ey] = [q[0] - p[0], q[1] - p[1]];
+      const L2 = ex * ex + ey * ey;
+      const t = L2 > 0 ? Math.min(1, Math.max(0, ((c[0] - p[0]) * ex + (c[1] - p[1]) * ey) / L2)) : 0;
+      m = Math.min(m, Math.hypot(c[0] - p[0] - t * ex, c[1] - p[1] - t * ey));
+    }
+    return m;
+  };
+  for (const x of P) {
+    if (x.tipo !== "poligono" || !x.objeto || !/\/A[1-9]\d*$/.test(x.objeto) || de.has(x.objeto)) continue;
+    const anillo = x.anillos[0];
+    if (!anillo) continue;
+    const p = pilares.find((y) => puntoEnPoligono(y.c, anillo)) ?? pilares.find((y) => aBorde(y.c, anillo) <= 0.01);
+    if (p) de.set(x.objeto, p.id);
+  }
+  if (!de.size) return;
+  for (let i = 0; i < P.length; i++) {
+    const x = P[i]!;
+    const id = "objeto" in x && x.objeto ? de.get(x.objeto) : undefined;
+    if (id) P[i] = { ...x, objeto: id } as Primitiva;
+  }
 }
 
 const NOMBRE_VISTA: Record<TipoComprobacion, string> = { pilares: "los tramos de pilar que llegan a la planta", vigas: "los vanos de las vigas de la planta", losas: "las losas de la planta", punzonamiento: "el punzonamiento de las losas de la planta junto a cada pilar" };
@@ -700,6 +768,7 @@ export function vistaComprobacion(s: Sesion, planta: string, tipo: TipoComprobac
   if (tipo === "pilares" || tipo === "punzonamiento") {
     // El tramo con la cabeza en la planta, o la unión con la losa de la planta: en la huella del pilar
     const pilares = new Map(pl.pilares().map((x) => [x.p.id, x]));
+    const centros: { id: string; c: Vec2 }[] = [];
     for (const p of partes) {
       if (p.planta !== planta) continue;
       const x = pilares.get(p.pieza);
@@ -708,8 +777,10 @@ export function vistaComprobacion(s: Sesion, planta: string, tipo: TipoComprobac
       const anillo = "anillo" in h ? h.anillo : circuloPilar(h.centro, h.radio);
       const c: Vec2 = "anillo" in h ? [h.anillo.reduce((a, q) => a + q[0], 0) / h.anillo.length, h.anillo.reduce((a, q) => a + q[1], 0) / h.anillo.length] : h.centro;
       const lado = Math.max(...anillo.map((q) => Math.hypot(q[0] - c[0], q[1] - c[1])));
-      anotar(p, [anillo], [c[0], c[1] + lado], `${p.pieza} ${valor(p)}`);
+      anotar(p, [anillo], [c[0], c[1] + lado], p.origen === "no-aplica" ? `${p.pieza} · no se comprueba` : `${p.pieza} ${valor(p)}`);
+      centros.push({ id: p.pieza, c });
     }
+    if (tipo === "punzonamiento") abacosDePilares(P, centros);
   } else if (tipo === "vigas") {
     const vigas = new Map(pl.enPlanta(pl.f.vigas).map((v) => [v.id, v]));
     for (const p of partes) {
@@ -754,7 +825,7 @@ export function vistaComprobacion(s: Sesion, planta: string, tipo: TipoComprobac
     }
     for (const [id, x] of coloreadas) if (!puestas.has(id)) P.push(x);
   }
-  const leyenda: EntradaLeyenda[] = (["no-cumple", "alto", "cumple", "sin-armado"] as const).filter((x) => usadas.has(x)).map((x) => ({ relleno: COLOR_APROVECHAMIENTO[x], texto: TEXTO_CLASE[x] }));
+  const leyenda: EntradaLeyenda[] = (["no-cumple", "alto", "cumple", "sin-armado", "no-aplica"] as const).filter((x) => usadas.has(x)).map((x) => ({ relleno: COLOR_APROVECHAMIENTO[x], texto: TEXTO_CLASE[x] }));
   const ninguna = !usadas.size;
   return {
     valido: true,

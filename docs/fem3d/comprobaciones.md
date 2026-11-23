@@ -872,6 +872,30 @@ En la de 60 cm muy cargada no cumple el cortante con ninguna de las dos (la secc
 
 **Por confirmar por el usuario (CO3-k):** el suelo (0,9 ‰; con B400, 1,0 ‰) y que la opción sea de toda la obra y sólo de las losas de cimentación (no de las zapatas ni de las demás losas).
 
+### 8.16 CO6: lo que pasa al proponer, las hipótesis, el punzonamiento de los pilares de borde, los nervios y las losas en 3D (2026-11-23)
+
+De la segunda prueba de uso de Comprobación con la vivienda. El cálculo, las comprobaciones y lo que se propone no cambian.
+
+**El parpadeo de la vista al proponer.** «Proponiendo…» aparecía en la barra de herramientas mientras se proponía: con la barra llena, el grupo cambiaba de ancho, la barra se recolocaba y la zona de vistas cambiaba de tamaño. «Proponer armado» sale de la barra (el armado viene propuesto solo, §8.14) y va encima de la tabla de Comprobaciones, con el «Proponiendo…» reservado en su sitio. Medido en Chrome: al proponer, los lienzos no cambian de tamaño; sólo la leyenda y Propiedades.
+
+**«Proponer» en una pieza dice lo que ha hecho.** Si lo propuesto es lo que ya tenía, no se escribe nada (ni un paso de deshacer) y el banco dice por qué: en el punzonamiento, «No hace falta armadura de punzonamiento: P11 cumple sin ella (vEd/vRd,c = 0,86 ≤ 1)»; si no hay propuesta, el motivo. Si cambia, «Armado propuesto en …».
+
+**Las comprobaciones, en el banco.** Bajo el armado de la pieza, sus filas (las que no cumplen primero), lo que no se comprueba y, en el punzonamiento, las **hipótesis de partida** (`FichaComprobacion.hipotesis`, de `comprobaciones/punzonamiento.ts`, con los números de la cara que manda): la demanda (lo que la losa pasa por su huella, la combinación y VEd; lo de las vigas no cuenta), la cara que tracciona y el área cargada, la posición y por qué (las distancias de cada cara al borde frente a c∥/2 + π·d), d y de dónde sale, u1 a 2·d (y el eficaz), β de la fórmula general, la armadura de flexión que cuenta (en el ancho del pilar más 3·d), el ábaco en un reticular, el terreno en una de cimentación y si hace falta armadura (vEd frente a vRd,c). También en Propiedades.
+
+**Los pilares de borde y de esquina en el punzonamiento.** Con zunchos de borde por su eje (lo corriente, como en la vivienda), la losa no les pasa nada por su huella (CO4-3) y no salían en ninguna parte: un clic en su ábaco no daba nada. Ahora:
+
+- `demandasPunzonamiento` da también `sinUnion`: cada pilar cuyo centro cae en una losa maciza o reticular de la planta (o en el ancho de una de sus vigas) sin unión por su huella, con las vigas en cuyo ancho cae y el motivo. `comprobarPunzonamientos` lo pasa con el canto útil del armado de la losa junto al pilar (o, sin armado, el canto menos el recubrimiento y un Ø12), y `fem comprobar` lo da en `punzonamientoSinComprobar`.
+- En la app son partes «No se comprueba» (`origen: "no-aplica"`, gris): no cuentan en el resumen, la ficha y el banco dicen por qué (lo que les llega es el cortante de esas vigas, que se comprueba en Vigas, y el de la losa junto a ellos, con sus franjas en la cara de las vigas, en Losas) y la planta dibuja su perímetro crítico a puntos, a 2·d, sólo como referencia (estilo `armado-critico-sin`).
+- **Un clic en un ábaco es un clic en su pilar** (`abacosDePilares`), también si el centro del pilar cae justo en el contorno del ábaco (los de borde y de esquina: a 1 cm).
+
+En la vivienda: 12 uniones comprobadas y 15 que no se comprueban (P1, P7, P10, P14, P18, P22 y P23 en CUB; P4, P17, P20 y P21 en CUB-S; P15 y P19 en las dos), todas por los zunchos o las vigas en cuyo ancho caen.
+
+**Los nervios del reticular, en la planta de Losas.** Los ejes de los nervios en la zona aligerada (`nerviosLosa`, por su punto de paso; estilo `armado-nervio`), bajo los refuerzos y los cercos: se ve qué nervios lleva cada refuerzo por nervio.
+
+**El armado de las losas en el 3D** (`src/visor/armadoLosas3d.ts`, pedido `armado-losas-3d`): con Losas y «Armado», la vista 3D dibuja cada refuerzo barra a barra en la cota de su cara (a un recubrimiento de la cara de arriba o de la de abajo; los superiores en rojo y los inferiores en azul) y el contorno de lo que cubre, recortado con la losa. Una armadura por separación, una barra cada separación; una por nervio, una barra en el eje de cada nervio paralelo a ella. La cara de arriba es la cota de la planta más el desnivel, como el sólido. Va con la estructura de los diagramas del 3D, sobre el modelo en alámbrico; la base no se dibuja.
+
+**Validación:** `src/visor/comprobaciones.test.ts` (los pilares sin unión son los de `transmitidoPilar` nulo, con su motivo, su d y sus hipótesis; las uniones comprobadas traen las suyas; en la planta del punzonamiento ningún ábaco se queda sin su pilar; el 3D, con los superiores por encima de los inferiores y una sola cara si se pide) y los tests de DOM de la app; a mano en la app con la vivienda (Chrome: el clic en un ábaco de borde, «Proponer» en P11, el 3D de las losas, los nervios). Los bancos de Chrome no se han pasado.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

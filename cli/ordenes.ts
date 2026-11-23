@@ -765,6 +765,8 @@ async function comprobarOrden(a: Argumentos, mal: (m: string) => Salida, armar: 
     ...(rl?.valido ? { losas: rl.valor.losas } : {}),
     // El punzonamiento, todas las uniones de pilar y losa (son pocas): cada una, con la fila que manda
     ...(rz?.valido ? { punzonamiento: rz.valor.pilares } : {}),
+    // Los pilares que atraviesan una losa sin unión por su huella (dentro del ancho de sus vigas): no se comprueban, y por qué
+    ...(rz?.valido && rz.valor.sinUnion.length ? { punzonamientoSinComprobar: rz.valor.sinUnion.map(({ pilar, planta, losa, vigas, motivo }) => ({ pilar, planta, losa, vigas, motivo })) } : {}),
     // Las zapatas, todas (una por pilar con base): cada una, con la fila que manda
     ...(rf?.valido ? { zapatas: rf.valor.zapatas } : {}),
     ...listaDiagnosticos([...(rp?.diagnosticos ?? []), ...(rv?.diagnosticos ?? []), ...(rl?.diagnosticos ?? []), ...(rz?.diagnosticos ?? []), ...(rf?.diagnosticos ?? [])]),

@@ -43,7 +43,7 @@ import { DespiecePortico, type EstadoVano } from "../editor/DespiecePortico.tsx"
 import { Dialogo } from "../editor/Dialogos.tsx";
 import { EditorRefuerzos, type NuevoElemento } from "../dibujo/refuerzos.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { FuenteEscena, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente3DModelo, FuenteEscena, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
 
 const TIPOS: { id: TipoComprobacion; nombre: string; title: string; icono: Icono }[] = [
   {
@@ -136,10 +136,21 @@ const enFoco = () => {
 
 const aprov = (x: number | null) => (x === null ? "—" : fmt(x, 2));
 
+/**
+ * §8.16: el 3D de Comprobación con las losas a la vista: los refuerzos de las losas barra a barra, en la
+ * cota de su cara (los superiores en rojo y los inferiores en azul), sobre el modelo en alámbrico.
+ */
+function Armado3DLosas({ armado, cara, datos }: { armado: ArmadoProyecto | undefined; cara: CaraDibujada; datos: DatosArmado }) {
+  const { proyecto } = useVisor();
+  const r = usePedido(proyecto.cliente, { tipo: "armado-losas-3d", planta: null, ...(armado ? { armado } : {}), ...(cara !== "todas" ? { cara } : {}), datos });
+  return <Fuente3DModelo resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Armado de las losas", notas: r.datos.notas } : null, cargando: r.cargando }} />;
+}
+
 function estadoDe(p: ParteComprobada): {
   texto: string;
   tono: "ok" | "fail" | "neu" | "warn";
 } {
+  if (p.origen === "no-aplica") return { texto: "No se comprueba", tono: "neu" };
   if (p.origen === "sin-armado") return { texto: "Sin armado", tono: "neu" };
   if (p.cumple) return { texto: "Cumple", tono: "ok" };
   if (!p.fallan && p.pendientes.length) return { texto: "Sin comprobar", tono: "warn" };
@@ -263,6 +274,47 @@ function FormArmado({
   );
 }
 
+/** Las filas del módulo de una parte, las que no cumplen primero: la tabla de la ficha y del banco. */
+function TablaFilas({ ficha }: { ficha: FichaComprobacion }) {
+  // Las que no cumplen, primero; después, por aprovechamiento; al final, los datos
+  const peso = (x: FilaModulo) => (x.informativa ? -1 : x.estado === "fail" ? 1e9 : 0) + (x.aprovechamiento ?? 0);
+  const filas = [...ficha.filas].sort((a, b) => peso(b) - peso(a));
+  if (!filas.length) return null;
+  return (
+    <table className="tb" data-filas-modulo>
+      <thead>
+        <tr>
+          <th>Comprobación</th>
+          <th>Aprov.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {filas.map((f, i) => (
+          <tr key={`${f.id}#${i}`}>
+            <td className="txt et">
+              {textoApp(f.descripcion)}
+              <small>{[f.articulo, lugarDe(f)].filter(Boolean).join(" · ")}</small>
+            </td>
+            <td className={f.estado === "fail" ? "f" : f.estado === "warn" ? "w" : undefined}>{f.informativa ? "dato" : f.aprovechamiento === null ? (f.estado === "fail" ? "no" : "sí") : aprov(f.aprovechamiento)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Lo que no se ha comprobado de una parte, y las hipótesis de partida de su comprobación (el punzonamiento). */
+function Hipotesis({ ficha }: { ficha: FichaComprobacion }) {
+  if (!ficha.hipotesis?.length) return null;
+  return (
+    <ul className="hipotesis" data-hipotesis>
+      {ficha.hipotesis.map((x) => (
+        <li key={x}>{textoApp(x)}</li>
+      ))}
+    </ul>
+  );
+}
+
 /**
  * El banco de armado de una parte, en el panel de abajo: a un lado, su dibujo a escala (el despiece del
  * pórtico de una viga; el croquis de las demás), que sigue a lo que se escribe; al otro, el armado como
@@ -280,9 +332,12 @@ function BancoArmado({
   alActivar,
   portico,
   esfuerzos,
+  aviso,
 }: {
   tipo: TipoComprobacion;
   ficha: FichaComprobacion;
+  /** Lo que ha hecho «Proponer» en esta pieza, en palabras (también cuando no cambia nada, y por qué). */
+  aviso?: string | null;
   /** §8.14: las envolventes de ELU de la pieza, para dibujarlas con su armado. */
   esfuerzos?: DatosEsfuerzosArmado | null;
   proponer: () => void;
@@ -346,6 +401,7 @@ function BancoArmado({
   const cambiar = (ruta: string, v: string) => setBorrador((b) => ({ ...b, [ruta]: v }));
   const e = estadoDe(ficha);
   const sinLosa = tipo === "punzonamiento" && ficha.origen === "sin-armado";
+  const noAplica = ficha.origen === "no-aplica";
   // CO3-k: en una losa de cimentación, la armadura mínima reducida de la obra (un dato de la obra, no de la losa)
   const deCimentacion = ficha.geometria.tipo === "losas" && !!ficha.geometria.cimentacion;
   const reducida = !!ed?.proyecto.obra?.armado?.minimaReducidaCimentacion;
@@ -371,10 +427,18 @@ function BancoArmado({
           </span>
           {ficha.seccion && <small className="text-text-tertiary">Sección {ficha.seccion}</small>}
         </div>
-        <p className="nota mono" style={{ color: "var(--color-text-primary)" }}>
-          {ficha.texto ?? (ficha.origen === "sin-armadura" ? "Sin armadura de punzonamiento" : "Sin armado")}
-        </p>
-        {sinLosa ? (
+        {!noAplica && (
+          <p className="nota mono" style={{ color: "var(--color-text-primary)" }}>
+            {ficha.texto ?? (ficha.origen === "sin-armadura" ? "Sin armadura de punzonamiento" : "Sin armado")}
+          </p>
+        )}
+        {noAplica ? (
+          <>
+            <p className="nota" data-no-aplica style={{ color: "var(--color-text-primary)" }}>
+              {textoApp(ficha.pendientes[0] ?? "No se comprueba.")}.
+            </p>
+          </>
+        ) : sinLosa ? (
           <p className="nota">La losa no tiene armado: el punzonamiento depende de su armadura de flexión. Ármela en Losas.</p>
         ) : (
           <>
@@ -404,12 +468,43 @@ function BancoArmado({
                 Quitar
               </button>
             </div>
+            {aviso && (
+              <p className="nota aviso-proponer" data-aviso-proponer>
+                {aviso}
+              </p>
+            )}
             <p className="nota">
-              El dibujo sigue a lo que se escribe; «Aplicar» lo guarda en el proyecto y vuelve a comprobar la pieza.{ficha.manda ? ` Manda: ${textoApp(ficha.manda.descripcion)}.` : ""}
+              El dibujo sigue a lo que se escribe; «Aplicar» lo guarda en el proyecto y vuelve a comprobar la pieza.
               {tipo === "losas" && ficha.armado.tipo === "losas" && (ficha.armado.armado?.refuerzos?.length || ficha.armado.armado?.cercos?.length) ? " Cada refuerzo y cada zona de cercos se elige también en la planta: elegido, se estira por las asas de sus lados y se mueve por la del centro (a 5 cm), y Supr lo quita; «Añadir», en la barra, pone uno nuevo con dos clics." : ""}
             </p>
           </>
         )}
+        <div className="banco-comprobaciones" data-banco-comprobaciones>
+          {ficha.pendientes.length > 0 && !noAplica && (
+            <>
+              <h4>Sin comprobar</h4>
+              {ficha.pendientes.map((x) => (
+                <p key={x} className="nota text-state-warn">
+                  {textoApp(x)}
+                </p>
+              ))}
+            </>
+          )}
+          {ficha.filas.length > 0 && (
+            <>
+              <h4>
+                Comprobaciones{ficha.manda ? <small> · manda: {textoApp(ficha.manda.descripcion)}</small> : null}
+              </h4>
+              <TablaFilas ficha={ficha} />
+            </>
+          )}
+          {ficha.hipotesis?.length ? (
+            <>
+              <h4>Hipótesis de partida</h4>
+              <Hipotesis ficha={ficha} />
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -418,9 +513,29 @@ function BancoArmado({
 /** La ficha de una parte, en Propiedades: su estado, su armado en una línea, sus datos y todas las filas del módulo. El armado se edita abajo, en el banco. */
 function Ficha({ tipo, ficha, cargando, editar }: { tipo: TipoComprobacion; ficha: FichaComprobacion; cargando: boolean; editar: () => void }) {
   const e = estadoDe(ficha);
-  // Las que no cumplen, primero; después, por aprovechamiento; al final, los datos
-  const peso = (x: FilaModulo) => (x.informativa ? -1 : x.estado === "fail" ? 1e9 : 0) + (x.aprovechamiento ?? 0);
-  const filas = [...ficha.filas].sort((a, b) => peso(b) - peso(a));
+  if (ficha.origen === "no-aplica")
+    return (
+      <>
+        <Cabecera icono={IcComprobacion} tipo={NOMBRE_TIPO[tipo]} titulo={`${ficha.pieza} · ${ficha.parte}`} mono>
+          <span className="pill neu" data-estado-ficha>
+            {e.texto}
+          </span>
+        </Cabecera>
+        <Seccion titulo="Por qué no se comprueba">
+          <p className="nota" style={{ color: "var(--color-text-primary)" }}>
+            {textoApp(ficha.pendientes[0] ?? "")}.
+          </p>
+          <Hipotesis ficha={ficha} />
+        </Seccion>
+        {ficha.datos.length > 0 && (
+          <Seccion titulo="Datos">
+            {ficha.datos.map((d) => (
+              <Fila key={d.nombre} k={d.nombre} v={typeof d.valor === "number" ? `${fmt(d.valor, Number.isInteger(d.valor) ? 0 : 0)}${d.unidad ? ` ${d.unidad}` : ""}` : d.valor} />
+            ))}
+          </Seccion>
+        )}
+      </>
+    );
   return (
     <>
       <Cabecera icono={IcComprobacion} tipo={NOMBRE_TIPO[tipo]} titulo={`${ficha.pieza} · ${ficha.parte}`} mono detalle={ficha.seccion ? `Sección ${ficha.seccion}` : undefined}>
@@ -450,26 +565,13 @@ function Ficha({ tipo, ficha, cargando, editar }: { tipo: TipoComprobacion; fich
         </Seccion>
       )}
       <Seccion titulo="Comprobaciones" valor={cargando ? "…" : ficha.fallan ? `${ficha.fallan} no cumplen` : `${ficha.filas.length}`}>
-        <table className="tb" data-filas-modulo>
-          <thead>
-            <tr>
-              <th>Comprobación</th>
-              <th>Aprov.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filas.map((f, i) => (
-              <tr key={`${f.id}#${i}`}>
-                <td className="txt et">
-                  {textoApp(f.descripcion)}
-                  <small>{[f.articulo, lugarDe(f)].filter(Boolean).join(" · ")}</small>
-                </td>
-                <td className={f.estado === "fail" ? "f" : f.estado === "warn" ? "w" : undefined}>{f.informativa ? "dato" : f.aprovechamiento === null ? (f.estado === "fail" ? "no" : "sí") : aprov(f.aprovechamiento)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TablaFilas ficha={ficha} />
       </Seccion>
+      {ficha.hipotesis?.length ? (
+        <Seccion titulo="Hipótesis de partida">
+          <Hipotesis ficha={ficha} />
+        </Seccion>
+      ) : null}
       {ficha.datos.length > 0 && (
         <Seccion titulo="Datos">
           {ficha.datos.map((d) => (
@@ -512,6 +614,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   } | null>(null);
   /** CO6-b: «Todo» con partes que ya tienen armado espera a que se confirme. */
   const [sustituir, setSustituir] = useState<number | null>(null);
+  /** Lo que ha hecho «Proponer» en la pieza del banco (§8.16): también si no cambia nada, y por qué. */
+  const [avisoPieza, setAvisoPieza] = useState<{ clave: string; texto: string } | null>(null);
   const ed = proyecto.edicion;
   const entero = ed?.proyecto.armado;
   const armado = useMemo(() => armadoDe(tipo, entero), [tipo, entero?.pilares, entero?.vigas, entero?.forjados, entero?.punzonamiento]); // eslint-disable-line react-hooks/exhaustive-deps -- sólo los bloques del tipo
@@ -687,6 +791,41 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     }
   };
 
+  /**
+   * «Proponer» en el banco: el armado de las tablas para la pieza de la ficha, y en palabras lo que ha
+   * pasado. Si lo propuesto es lo que ya tenía, no se escribe nada (ni un paso de deshacer) y se dice
+   * por qué: en el punzonamiento, que la unión cumple sin armadura.
+   */
+  const proponerPieza = async (fc: FichaComprobacion) => {
+    if (!proyecto.cliente || !ed || ocupado) return;
+    setOcupado(true);
+    setAvisoPieza(null);
+    const decir = (texto: string) => setAvisoPieza({ clave: fc.clave, texto });
+    try {
+      const x = await proyecto.cliente.pedir({ tipo: "armar", tipos: [tipo], ...(entero ? { armado: entero } : {}), datos: datosObra, ids: [fc.pieza] });
+      if (!x.ok) return decir(x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" "));
+      const datos = x.valor as DatosArmar;
+      const sin = datos.sinPropuesta.find((y) => y.clave === fc.clave) ?? datos.sinPropuesta.find((y) => y.clave.startsWith(`${fc.pieza}/`) || y.clave === fc.pieza);
+      const antes = JSON.stringify(entero ?? {});
+      const despues = JSON.stringify(datos.armado ?? {});
+      if (antes === despues) {
+        if (sin) return decir(`Sin propuesta: ${textoApp(sin.motivo)}. Hay que cambiar la sección, el canto o el material.`);
+        if (tipo === "punzonamiento") {
+          const v = fc.datos.find((y) => y.nombre.startsWith("vEd / vRd,c"))?.valor;
+          return decir(`No hace falta armadura de punzonamiento: ${fc.pieza} cumple sin ella${typeof v === "number" ? ` (vEd/vRd,c = ${fmt(v, 2)} ≤ 1)` : ""}. No se ha cambiado nada.`);
+        }
+        return decir("Lo propuesto es lo que ya tiene: el primer armado de las tablas con el que todo cumple. No se ha cambiado nada.");
+      }
+      const ap = ed.editar({ op: "armado", armado: datos.armado }, `Armado propuesto: ${fc.pieza}`);
+      if (!ap.ok) return decir(`El armado propuesto no se pudo escribir en el proyecto. ${ap.errores.slice(0, 2).map((y) => textoApp(y.mensaje)).join(" ")}`);
+      decir(sin ? `Propuesto lo que se ha podido; sin propuesta: ${textoApp(sin.motivo)}. Se deshace con Ctrl+Z.` : `Armado propuesto en ${fc.pieza}: el primero de las tablas con el que todo cumple. Se deshace con Ctrl+Z.`);
+    } catch {
+      decir("El proyecto cambió mientras se proponía el armado: vuelva a pedirlo.");
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   // §8.14: el armado viene propuesto. Con la tabla del tipo a la vista y partes sin armado, lo que
   // falta en toda la obra, una vez por cálculo (deshecho, no vuelve solo: están los botones)
   const huella = proyecto.estado?.huella ?? "";
@@ -761,31 +900,34 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
         </div>
       )}
       <Separador />
-      <div role="group" aria-label="Proponer armado" className="flex items-center gap-1.5">
-        <span className="text-[11.5px] text-text-secondary">Proponer armado</span>
-        <span className="flex items-center gap-1.5">
-          <button type="button" className="btn" style={{ height: 28 }} disabled={!ed || ocupado || !activo} onClick={proponerFalta} title={tipo === "punzonamiento" ? "La armadura de punzonamiento que haga falta en las uniones que no tienen una escrita" : `El armado de las tablas en los ${varios} que no tienen`}>
-            Lo que falta
-          </button>
-          <button type="button" className="btn" style={{ height: 28 }} disabled={!ed || ocupado || !activo} onClick={pedirTodo} title={`El armado de las tablas en todos los ${varios}: sustituye al que tengan (lo pregunta antes)`}>
-            Todo
-          </button>
-          <button
-            type="button"
-            className="btn"
-            style={{ height: 28 }}
-            disabled={!ed || ocupado || !activo}
-            onClick={() => void proponer(["pilares", "vigas", "losas", "punzonamiento"], { soloSinArmado: true }, "Armado propuesto: lo que falta en la obra")}
-            title="Pilares, vigas, losas y punzonamiento: el armado de las tablas en lo que no lo tiene; lo que ya tiene armado, también la armadura de punzonamiento escrita, se queda"
-          >
-            Toda la obra
-          </button>
-          {ocupado && <span className="text-[12px] text-text-secondary">Proponiendo…</span>}
-        </span>
-      </div>
-      <Separador />
       <BarraVistas />
     </>
+  );
+
+  // §8.16: el armado viene propuesto solo, así que volver a pedirlo no va en la barra: va encima de la tabla
+  const barraProponer = (
+    <div role="group" aria-label="Proponer armado" className="barra-proponer" data-barra-proponer>
+      <span className="text-[11.5px] text-text-secondary">Volver a proponer el armado:</span>
+      <button type="button" className="btn" style={{ height: 24 }} disabled={!ed || ocupado || !activo} onClick={proponerFalta} title={tipo === "punzonamiento" ? "La armadura de punzonamiento que haga falta en las uniones que no tienen una escrita" : `El armado de las tablas en los ${varios} que no tienen`}>
+        Lo que falta
+      </button>
+      <button type="button" className="btn" style={{ height: 24 }} disabled={!ed || ocupado || !activo} onClick={pedirTodo} title={`El armado de las tablas en todos los ${varios}: sustituye al que tengan (lo pregunta antes)`}>
+        Todo
+      </button>
+      <button
+        type="button"
+        className="btn"
+        style={{ height: 24 }}
+        disabled={!ed || ocupado || !activo}
+        onClick={() => void proponer(["pilares", "vigas", "losas", "punzonamiento"], { soloSinArmado: true }, "Armado propuesto: lo que falta en la obra")}
+        title="Pilares, vigas, losas y punzonamiento: el armado de las tablas en lo que no lo tiene; lo que ya tiene armado, también la armadura de punzonamiento escrita, se queda"
+      >
+        Toda la obra
+      </button>
+      <span className="text-[12px] text-text-secondary" style={{ visibility: ocupado ? "visible" : "hidden" }}>
+        Proponiendo…
+      </span>
+    </div>
   );
 
   const resumenPropuesta = propuesta && (
@@ -837,10 +979,12 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
         <span data-resumen-comprobacion>
           {d.resumen.cumplen} de {plural(d.resumen.partes, uno, varios)} cumplen
           {d.resumen.sinArmado ? ` · ${d.resumen.sinArmado} sin armado` : ""}
+          {d.resumen.noAplica ? ` · ${d.resumen.noAplica} no se comprueban` : ""}
           {r.cargando ? " · comprobando…" : ""}
         </span>
       }
     >
+      {barraProponer}
       {resumenPropuesta}
       {d.partes.length === 0 ? (
         <p className="nota">{tipo === "punzonamiento" ? "Ninguna losa pasa carga a un pilar por su huella (los pilares van dentro del ancho de sus vigas, o no hay losas)." : `No hay ${varios} que comprobar.`}</p>
@@ -946,7 +1090,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       alQuitar={() => setElegidos([ficha.pieza])}
       {...(tipo === "pilares" && esfuerzos ? { esfuerzos } : {})}
       {...(tipo === "vigas" ? { alDibujar: (c: string, a: Record<string, unknown> | undefined) => setEscrito({ clave: c, armado: a }), alActivar: setActivoFicha, portico: panelPortico } : {})}
-      proponer={() => void proponer(tipo === "punzonamiento" ? ["punzonamiento"] : [tipo], { ids: [ficha.pieza] }, `Armado propuesto: ${ficha.pieza}`)}
+      aviso={avisoPieza?.clave === ficha.clave ? avisoPieza.texto : null}
+      proponer={() => void proponerPieza(ficha)}
     />
   );
 
@@ -1021,6 +1166,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           <ZonaVistas
             fuentes={{
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
+              ...(tipo === "losas" && dibujo === "armado" ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} /> } : {}),
               planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
               cabeceraPlanta: () => (
                 <>

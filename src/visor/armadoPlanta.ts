@@ -31,7 +31,7 @@ import { puntoEnRegion, type Region } from "../compilador/poligonos.ts";
 import { ARMADURAS_FORJADO, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type BarrasCara, type CercosViga } from "../comprobaciones/armado.ts";
 import { alzadoVano, cercosDibujados, cotasRefuerzo, puntosCercos, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import { alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, trozo, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
+import { abacosDePilares, alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, trozo, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
 import type { Sesion } from "./sesion.ts";
 
 type Resultado<T> = { valido: true; valor: T } | { valido: false; diagnosticos: Diagnostico[] };
@@ -138,6 +138,8 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     const pilares = new Map(pl.pilares().map((x) => [x.p.id, x]));
     const regiones = [...regionesLosas(pl.enPlanta(pl.f.losas)).values()];
     let conCercos = false;
+    let sinComprobar = false;
+    const centros: { id: string; c: Vec2 }[] = [];
     for (const p of fichas) {
       if (p.planta !== planta) continue;
       const x = pilares.get(p.pieza);
@@ -146,6 +148,7 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
       dibujadas++;
       const anillo = "anillo" in h ? h.anillo : circuloPilar(h.centro, h.radio);
       const c = "anillo" in h ? medio(h.anillo) : h.centro;
+      centros.push({ id: p.pieza, c });
       const lado = Math.max(...anillo.map((q) => Math.hypot(q[0] - c[0], q[1] - c[1])));
       // Los ejes de la sección en planta: el canto h según ez (el giro del pilar) y el ancho b según ey
       const g = ((x.p.giro ?? 0) * Math.PI) / 180;
@@ -178,7 +181,10 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
           const [a, b] = "D" in sc ? [0, 0] : [sc.h / 2000, sc.b / 2000];
           const r0 = "D" in sc ? sc.D / 2000 : 0;
           const a2d = (2 * gm.d) / 1000;
-          for (const t of dentroDe(contornoA(c, ez, ey, a, b, r0 + a2d), regiones)) P.push({ tipo: "linea", puntos: t, estilo: "armado-critico", objeto: p.pieza });
+          // El de un pilar que no se comprueba (dentro del ancho de sus vigas), como referencia
+          const noAplica = p.origen === "no-aplica";
+          if (noAplica) sinComprobar = true;
+          for (const t of dentroDe(contornoA(c, ez, ey, a, b, r0 + a2d), regiones)) P.push({ tipo: "linea", puntos: t, estilo: noAplica ? "armado-critico-sin" : "armado-critico", objeto: p.pieza });
           const arm = p.armado.tipo === "punzonamiento" ? p.armado.armado : undefined;
           const n = gm.perimetros ?? 0;
           if (arm && n && gm.alcance) {
@@ -189,16 +195,20 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
             }
           }
         }
-        textos.push({ tipo: "texto", p: [c[0], c[1] + lado], texto: `${p.pieza} · ${p.texto ?? "sin armadura"} · ${valor(p)}`, tamano: 11, ancla: "medio", dy: -4, fondo: true, prioridad: claseAprovechamiento(p) === "no-cumple" ? 60 : 50, objeto: p.pieza });
+        textos.push({ tipo: "texto", p: [c[0], c[1] + lado], texto: p.origen === "no-aplica" ? `${p.pieza} · no se comprueba` : `${p.pieza} · ${p.texto ?? "sin armadura"} · ${valor(p)}`, tamano: 11, ancla: "medio", dy: -4, fondo: true, prioridad: claseAprovechamiento(p) === "no-cumple" ? 60 : p.origen === "no-aplica" ? 35 : 50, objeto: p.pieza });
       }
     }
+    // Un clic en un ábaco, a su pilar
+    if (tipo === "punzonamiento") abacosDePilares(P, centros);
     if (tipo === "pilares") {
       leyenda.push({ estilo: "armado-barra", texto: "Barras del tramo que llega a la planta, a escala en su huella" }, { estilo: "armado-cerco", texto: "Cerco" });
       notas.push("Rótulo: el pilar y el armado de su tramo; debajo, el aprovechamiento de la comprobación que manda. Las barras se ven al acercarse.");
     } else {
       leyenda.push({ estilo: "armado-critico", texto: "Perímetro crítico, a 2·d de la cara del pilar" });
       if (conCercos) leyenda.push({ estilo: "armado-cerco", texto: "Perímetros de cercos" });
+      if (sinComprobar) leyenda.push({ estilo: "armado-critico-sin", texto: "Perímetro crítico de referencia de un pilar que no se comprueba" });
       notas.push("Rótulo: el pilar, su armadura de punzonamiento y el aprovechamiento de la comprobación que manda. Los perímetros se cortan en el borde de las losas.");
+      if (sinComprobar) notas.push("«No se comprueba»: el pilar queda dentro del ancho de sus vigas y la losa no le pasa nada por su huella; lo que le llega es el cortante de las vigas. Su perímetro crítico, a puntos, sólo como referencia.");
     }
   } else if (tipo === "vigas") {
     const vigas = new Map(pl.enPlanta(pl.f.vigas).map((v) => [v.id, v]));
@@ -251,6 +261,7 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     const caras = new Set<"inferior" | "superior">();
     let hayCercos = false;
     let hayCotas = false;
+    let hayNervios = false;
     const puntosPilares = pl.pilares().map((x): Vec2 => [x.p.x, x.p.y]);
     const ejesVigas = pl.enPlanta(pl.f.vigas).map((v) => v.puntos);
     for (const p of fichas) {
@@ -263,6 +274,12 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
       anotar(p, c);
       // El contorno de la losa, del color de su aprovechamiento
       P.push({ tipo: "linea", puntos: [...l.contorno.map((q) => [q[0], q[1]] as Vec2), [l.contorno[0]![0], l.contorno[0]![1]]], estilo: "contorno", objeto: p.pieza });
+      // En un reticular, los ejes de sus nervios: con ellos se ve qué nervios lleva cada refuerzo
+      if (l.reticular) {
+        const ns = nerviosLosa(l);
+        if (ns.length) hayNervios = true;
+        for (const t of ns) P.push({ tipo: "linea", puntos: t, estilo: "armado-nervio" });
+      }
       // Los cercos de los nervios: el contorno de su zona, a trazos, y un punto por cerco sobre el eje de cada nervio
       const zonasCercos = cara === "todas" || cara === "cercos" ? cercosDibujados(l.eje1, a) : [];
       const nervios = zonasCercos.length ? nerviosLosa(l) : [];
@@ -319,6 +336,7 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     if (caras.has("inferior")) leyenda.push({ estilo: "armado-inferior", texto: "Refuerzo inferior: la barra y lo que cubre" });
     if (caras.has("superior")) leyenda.push({ estilo: "armado-superior", texto: "Refuerzo superior: la barra y lo que cubre" });
     if (hayCercos) leyenda.push({ estilo: "armado-cercos-punto", texto: "Cercos de los nervios: un punto por cerco, con sus ramas (R)" });
+    if (hayNervios) leyenda.push({ estilo: "armado-nervio", texto: "Ejes de los nervios del reticular" });
     notas.push("Cada refuerzo: su barra, de punta a punta, y la línea de reparto, que cruza lo que cubre; se suma a la armadura base. Rótulo: las barras y su largo.");
     if (hayCotas) notas.push("Bajo cada barra, sus cotas en metros: lo que sale a cada lado del eje del pilar o de la viga que cruza o, si no cruza ninguno, lo que falta de cada punta hasta el más cercano.");
   }

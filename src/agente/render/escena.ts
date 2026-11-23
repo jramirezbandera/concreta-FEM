@@ -115,7 +115,11 @@ export type Estilo =
   | "armado-cerco"
   | "armado-barra"
   /** El perímetro crítico de punzonamiento. */
-  | "armado-critico";
+  | "armado-critico"
+  /** El perímetro crítico de un pilar que no se comprueba (dentro del ancho de sus vigas), como referencia. */
+  | "armado-critico-sin"
+  /** Los ejes de los nervios de un reticular, bajo el armado dibujado de la losa. */
+  | "armado-nervio";
 
 export type Primitiva =
   /** Polígono con huecos: el primer anillo es el contorno (relleno par-impar). `relleno` sustituye al del estilo. */

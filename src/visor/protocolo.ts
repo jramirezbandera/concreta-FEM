@@ -23,6 +23,7 @@ import type { DatosArmado, DatosFranja } from "./franjas.ts";
 import type { DatosArmado as DatosArmadoObra } from "../comprobaciones/armado.ts";
 import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
+import type { CaraDibujada } from "./armadoPlanta.ts";
 import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, PedidoArmar, TipoComprobacion } from "./comprobaciones.ts";
 import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
@@ -76,6 +77,8 @@ export type Pedido =
   /** AB: el armado en el 3D y el valor de un punto de su mapa. */
   | ({ tipo: "armado3d" } & PedidoArmado3D)
   | ({ tipo: "valor-armado" } & PedidoValorArmado)
+  /** CO6 (§8.16): los refuerzos de las losas, barra a barra, en el 3D (null: todas las plantas). */
+  | { tipo: "armado-losas-3d"; planta: string | null; armado?: ArmadoProyecto; cara?: CaraDibujada; datos?: DatosArmadoObra }
   /** `provisional`: sin el peso propio calculado, para enseñarla antes (luego se pide sin él). */
   | { tipo: "revision"; provisional?: boolean }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
@@ -133,6 +136,7 @@ export interface Respuestas {
   "reacciones-casos": ReaccionesCasos;
   "valor-lamina": ValorLamina | null;
   armado3d: Armado3D;
+  "armado-losas-3d": Diagramas3D;
   "valor-armado": ValorArmado | null;
   revision: DatosRevision;
   precalentar: null;

@@ -111,7 +111,7 @@ export interface Armado3D {
 }
 
 /** Los triángulos de lo que cae en la losa de un rectángulo de tramos (`recorteTramos`). */
-function triangulosRecorte(region: Region | undefined, rect: readonly Vec2[]): Vec2[] {
+export function triangulosRecorte(region: Region | undefined, rect: readonly Vec2[]): Vec2[] {
   const anillos = recorteTramos(region, rect);
   const r: Vec2[] = [];
   const convexo = (p: Vec2[]) => p.every((a, i) => {
