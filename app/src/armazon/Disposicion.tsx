@@ -327,7 +327,7 @@ export interface Pestana {
   contenido: ReactNode;
 }
 
-/** Lo más bajo del panel inferior abierto, px; lo más alto deja 260 px a la vista. */
+/** Lo más bajo del panel inferior abierto, px; lo más alto deja a las vistas unos 300 px (lo de encima de ellas, las barras, son ~120). */
 const ALTO_DOCK_MIN = 120;
 /** C-20: lo que sube o baja el panel con cada flecha, px. */
 const PASO_DOCK = 20;
@@ -338,7 +338,7 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
   const seccion = useRef<HTMLElement>(null);
   const idCuerpo = useId();
   const abierto = p.dock;
-  const maximo = () => Math.max(ALTO_DOCK_MIN, window.innerHeight - 260);
+  const maximo = () => Math.max(ALTO_DOCK_MIN, window.innerHeight - 420);
   const limitar = (a: number) => Math.round(Math.max(ALTO_DOCK_MIN, Math.min(maximo(), a)));
   /** C-38: al soltar, la altura se guarda una vez (durante el arrastre sólo cambia el estilo). */
   const soltar = () => {

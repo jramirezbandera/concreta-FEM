@@ -20,7 +20,8 @@ import { armadoPropuestoLosas, comprobarLosas } from "../comprobaciones/losas.ts
 import { armadoPropuesto, comprobarPilares } from "../comprobaciones/pilares.ts";
 import { solapesPilar } from "../comprobaciones/armar/pilares.ts";
 import { SITUACIONES_ELU } from "../comprobaciones/demandas/pilares.ts";
-import { datosViga, type Esfuerzo } from "./datos.ts";
+import { datosViga, filasPilarQ, type Esfuerzo } from "./datos.ts";
+import type { Extremo, TramoEnvolvente } from "../agente/consultas.ts";
 import { armadoPropuestoPunzonamiento, comprobarPunzonamientos } from "../comprobaciones/punzonamiento.ts";
 import { armadoPropuestoVigas, comprobarVigas } from "../comprobaciones/vigas.ts";
 import type { DatosDespiece } from "../comprobaciones/despieceVigas.ts";
@@ -458,6 +459,12 @@ export interface DatosEsfuerzosArmado {
   esfuerzos: Partial<Record<Esfuerzo, PuntoEsfuerzo[][]>>;
   /** Qué combinaciones envuelven («ELU: 12 combinaciones»). */
   combinaciones: string;
+  /** En un tramo de pilar: los pésimos de su pie y de su cabeza, cada uno con su combinación y sus [N, Vy, Vz, T, My, Mz] concomitantes. */
+  ternas?: TramoEnvolvente;
+  /** En un pórtico: los extremos de cada vano (por su clave, «V3/0») con su combinación y sus esfuerzos concomitantes. */
+  vanos?: Record<string, Record<string, Extremo>>;
+  /** En un pórtico: las vigas cuyo axil no tiene valor (van en un diafragma rígido, que se lo lleva). */
+  axilSinValor?: string[];
 }
 
 const ELU = { tipo: "situaciones" as const, situaciones: [...SITUACIONES_ELU] };
@@ -488,21 +495,26 @@ export function esfuerzosPortico(s: Sesion, viga: string): Resultado<DatosEsfuer
   if (!p) return no("visor/comprobacion", `No hay ninguna viga «${viga}» con vanos.`);
   const esfuerzos: DatosEsfuerzosArmado["esfuerzos"] = {};
   let combinaciones = "";
-  for (const e of ["My", "Vz"] as const) {
+  const vanos: Record<string, Record<string, Extremo>> = {};
+  const axilSinValor = new Set<string>();
+  for (const e of ["My", "Vz", "T", "N"] as const) {
     const tramos: PuntoEsfuerzo[][] = [];
     for (const v of p.vigas) {
       const d = datosViga(s, v.id, e, ELU);
       if (!d.valido) return d;
       combinaciones = d.valor.combinaciones.descripcion;
+      if (d.valor.axilSinValor) axilSinValor.add(v.id);
+      d.valor.vanos.forEach((x, i) => (vanos[`${v.id}/${i}`] = x.extremos));
       for (const t of tramosEnvolvente(d.valor, -Infinity, Infinity)) {
-        // Una viga dibujada al revés: su s va de derecha a izquierda, y su cortante cambia de signo
-        const ps = t.map((x): PuntoEsfuerzo => (v.invertida ? { x: v.x[1] - x.s, max: e === "Vz" ? -x.min : x.max, min: e === "Vz" ? -x.max : x.min } : { x: v.x[0] + x.s, max: x.max, min: x.min }));
+        // Una viga dibujada al revés: su s va de derecha a izquierda, y su cortante y su torsor cambian de signo
+        const cambia = e === "Vz" || e === "T";
+        const ps = t.map((x): PuntoEsfuerzo => (v.invertida ? { x: v.x[1] - x.s, max: cambia ? -x.min : x.max, min: cambia ? -x.max : x.min } : { x: v.x[0] + x.s, max: x.max, min: x.min }));
         tramos.push(v.invertida ? ps.reverse() : ps);
       }
     }
     esfuerzos[e] = tramos.sort((a, b) => a[0]!.x - b[0]!.x);
   }
-  return { valido: true, valor: { esfuerzos, combinaciones } };
+  return { valido: true, valor: { esfuerzos, combinaciones, vanos, ...(axilSinValor.size ? { axilSinValor: [...axilSinValor] } : {}) } };
 }
 
 /** Las envolventes de N, My, Mz, Vy y Vz de un tramo de pilar (el de la cabeza en `planta`), desde la cara de su nudo de abajo (pedido `esfuerzos-pilar`). */
@@ -521,7 +533,11 @@ export function esfuerzosTramoPilar(s: Sesion, pilar: string, planta: string): R
     combinaciones = d.valor.combinaciones.descripcion;
     esfuerzos[e] = tramosEnvolvente(d.valor, t.base.s, t.cabeza.s).map((ps) => ps.map((x) => ({ x: x.s - t.base.s, max: x.max, min: x.min })));
   }
-  return { valido: true, valor: { esfuerzos, combinaciones } };
+  // De qué combinación sale cada pésimo: las ternas del tramo (las de `fem consultar pieza`)
+  const conj = s.conjunto(ELU, "esfuerzos");
+  const filas = conj.valido ? filasPilarQ(q, conj.valor, pilar) : null;
+  const ternas = filas?.valido ? filas.valor.find((x) => x.planta === planta)?.tramo : undefined;
+  return { valido: true, valor: { esfuerzos, combinaciones, ...(ternas ? { ternas } : {}) } };
 }
 
 export const sinFilas = ({ filas: _f, armado: _a, datos: _d, geometria: _g, recubrimiento: _r, hipotesis: _h, ...p }: FichaComprobacion): ParteComprobada => p;

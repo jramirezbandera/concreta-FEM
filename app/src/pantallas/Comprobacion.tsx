@@ -25,6 +25,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ArmadoProyecto } from "../../../src/agente/armaduraBase.ts";
+import type { TramoEnvolvente } from "../../../src/agente/consultas.ts";
 import type { ArmadoForjado, ArmadoVanoViga, CercosForjado, DatosArmado, RefuerzoForjado } from "../../../src/comprobaciones/armado.ts";
 import { armadoDeBorrador, armadoParcial, borradorArmado, DIAMETROS_BARRA, elementoDeId, gruposArmado, idElemento, ponerArmado, sinElemento, type GrupoArmado } from "../../../src/editor/armadoBarras.ts";
 import { conElemento, conZona } from "../../../src/editor/refuerzosPlanta.ts";
@@ -40,6 +41,8 @@ import { fmt, plural, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { CroquisLosa, CroquisPilar, CroquisPunzonamiento, CroquisViga } from "../editor/CroquisArmado.tsx";
 import { DespiecePortico, type EstadoVano } from "../editor/DespiecePortico.tsx";
+import { COLUMNAS_VANO, FILAS_VANO, TablaExtremos } from "./Extremos.tsx";
+import { EXTREMOS_TRAMO, TERNAS, TITULO_PESIMOS } from "./Ternas.tsx";
 import { Dialogo } from "../editor/Dialogos.tsx";
 import { EditorRefuerzos, type NuevoElemento } from "../dibujo/refuerzos.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
@@ -202,9 +205,41 @@ function CamposGrupo({ g, borrador, onCambio }: { g: GrupoArmado; borrador: Read
   );
 }
 
+/** La fila de un elemento de una losa (un refuerzo o una zona de cercos), en su tabla. */
+function FilaElemento({ g, on, borrador, onCambio, onElemento, onQuitar, refFila }: { g: GrupoArmado; on: boolean; borrador: Readonly<Record<string, string>>; onCambio: (ruta: string, v: string) => void; onElemento?: ((e: Elemento) => void) | undefined; onQuitar?: ((e: Elemento) => void) | undefined; refFila?: React.Ref<HTMLTableRowElement> | undefined }) {
+  const e = g.elemento!;
+  // «R3 · X superior · ábacos», «C1 · nervios X»: su número y lo que es
+  const [id, ...que] = g.titulo.split(" · ");
+  const cara = e.lista === "cercos" ? "cercos" : /inferior/.test(g.titulo) ? "inferior" : "superior";
+  return (
+    <tr ref={refFila} className="elemento-armado" data-on={on || undefined} data-cara={cara}>
+      <td className="et">
+        <button type="button" className="mono" title={`${g.titulo}: elegirlo en la planta`} onClick={() => onElemento?.(e)}>
+          <i aria-hidden />
+          {id}
+        </button>
+      </td>
+      <td className="txt">{que.join(" · ")}</td>
+      <td title="Largo de las barras × ancho que cubren">{g.nota}</td>
+      <td className="txt">
+        <CamposGrupo g={g} borrador={borrador} onCambio={onCambio} />
+      </td>
+      <td>
+        <button type="button" className="px-1 text-text-tertiary hover:text-state-fail" aria-label={`Quitar: ${g.titulo}`} title="Quitarlo del armado" onClick={() => onQuitar?.(e)}>
+          ×
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+/** El orden de una armadura en las tablas: por cara y, dentro, por dirección. */
+const ordenArmadura = (g: GrupoArmado) => (/inferior/.test(g.titulo) ? 0 : 2) + (/ Y /.test(`${g.titulo} `) ? 1 : 0);
+
 /**
- * El formulario del armado de una parte: el borrador, por grupos. Los refuerzos y las zonas de cercos
- * de una losa van aparte, uno por fila: un clic en su nombre lo elige en la planta, y la «×» lo quita.
+ * El formulario del armado de una parte: el borrador, por grupos. En una losa, la armadura base va en
+ * una tabla (una fila por dirección; inferior y superior, en columnas) y los refuerzos y las zonas de
+ * cercos, en otras dos, una fila cada uno: un clic en su número lo elige en la planta, y la «×» lo quita.
  */
 function FormArmado({
   grupos,
@@ -224,78 +259,169 @@ function FormArmado({
   onQuitar?: (e: Elemento) => void;
 }) {
   const fijos = grupos.filter((g) => !g.elemento);
-  const listas = (["refuerzos", "cercos"] as const).map((lista) => ({ lista, grupos: grupos.filter((g) => g.elemento?.lista === lista) })).filter((x) => x.grupos.length);
-  const elegidoRef = useRef<HTMLDivElement>(null);
-  // El elegido en la planta, a la vista
+  const [verCara, setVerCara] = useState<"todas" | "inferior" | "superior">("todas");
+  const refuerzos = grupos.filter((g) => g.elemento?.lista === "refuerzos");
+  const cercos = grupos.filter((g) => g.elemento?.lista === "cercos");
+  const elegidoRef = useRef<HTMLTableRowElement>(null);
+  // Los refuerzos y los cercos, en dos pestañas: una lista a la vez
+  const [listaVista, setListaVista] = useState<"refuerzos" | "cercos">("refuerzos");
+  const lista = (listaVista === "refuerzos" ? refuerzos.length : cercos.length) ? listaVista : refuerzos.length ? "refuerzos" : "cercos";
+  // El elegido en la planta, a la vista (en su pestaña)
+  useEffect(() => {
+    if (elegido) setListaVista(elegido.lista);
+  }, [elegido?.lista, elegido?.indice]); // eslint-disable-line react-hooks/exhaustive-deps -- al cambiar lo elegido
   useEffect(() => {
     elegidoRef.current?.scrollIntoView?.({ block: "nearest" });
-  }, [elegido?.lista, elegido?.indice]);
-  return (
-    <div className="px-3.5 pb-1" data-form-armado onMouseLeave={() => onActivo(null)} onBlur={() => onActivo(null)}>
-      <div className="grupos-armado">
-      {fijos.map((g) => (
-        <div key={g.titulo} className="mt-1.5" onMouseEnter={() => onActivo(rutaGrupo(g))} onFocus={() => onActivo(rutaGrupo(g))}>
-          <div className="text-[11.5px] text-text-secondary">
-            {g.titulo}
-            {g.opcional && <small className="ml-1 text-text-tertiary">(opcional)</small>}
-          </div>
-          <CamposGrupo g={g} borrador={borrador} onCambio={onCambio} />
-        </div>
-      ))}
-      </div>
-      {listas.map(({ lista, grupos: gs }) => (
-        <div key={lista} className="mt-3" data-lista-armado={lista}>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-            {lista === "refuerzos" ? "Refuerzos" : "Cercos de los nervios"} · {gs.length}
-          </div>
-          <div className="lista-armado">
-          {gs.map((g) => {
-            const e = g.elemento!;
-            const on = elegido?.lista === e.lista && elegido.indice === e.indice;
-            return (
-              <div key={g.ruta} ref={on ? elegidoRef : undefined} className="elemento-armado" data-on={on || undefined} data-cara={lista === "refuerzos" ? (/inferior/.test(g.titulo) ? "inferior" : "superior") : "cercos"}>
-                <div className="flex items-baseline gap-1.5">
-                  <button type="button" className="min-w-0 flex-1 truncate text-left text-[11.5px] text-text-primary" title={`${g.titulo}: elegirlo en la planta`} onClick={() => onElemento?.(e)}>
-                    {g.titulo}
-                  </button>
-                  <small className="shrink-0 text-text-tertiary" title="Largo de las barras × ancho que cubren">{g.nota}</small>
-                  <button type="button" className="shrink-0 px-1 text-text-tertiary hover:text-state-fail" aria-label={`Quitar: ${g.titulo}`} title="Quitarlo del armado" onClick={() => onQuitar?.(e)}>
-                    ×
-                  </button>
-                </div>
-                <CamposGrupo g={g} borrador={borrador} onCambio={onCambio} />
-              </div>
-            );
+  }, [elegido?.lista, elegido?.indice, lista]);
+  // Una losa: sus grupos fijos son «base.x-inf», «abacos.y-sup»…: en una tabla, por dirección y cara
+  const deLosa = fijos.length > 0 && fijos.every((g) => /^(base|abacos)\.[xy]-(inf|sup)$/.test(g.ruta));
+  const esOn = (g: GrupoArmado) => elegido?.lista === g.elemento!.lista && elegido.indice === g.elemento!.indice;
+  const tablaElementos = (lista: "refuerzos" | "cercos", gs: readonly GrupoArmado[]) => (
+    <div data-lista-armado={lista} className="min-w-0">
+      <div className="titulo-lista">
+        <span role="tablist" aria-label="Refuerzos y cercos de la losa" className="pestanas-lista">
+          {(["refuerzos", "cercos"] as const).map((l) => {
+            const n = (l === "refuerzos" ? refuerzos : cercos).length;
+            return n ? (
+              <button key={l} type="button" role="tab" aria-selected={l === lista} data-on={l === lista || undefined} onClick={() => setListaVista(l)}>
+                {l === "refuerzos" ? "Refuerzos" : "Cercos de los nervios"} · {n}
+              </button>
+            ) : null;
           })}
-          </div>
+        </span>
+        {lista === "refuerzos" && (
+          <span role="group" aria-label="Refuerzos que se ven en la lista" className="filtro-lista">
+            {(["todas", "inferior", "superior"] as const).map((c) => (
+              <button key={c} type="button" data-on={verCara === c || undefined} onClick={() => setVerCara(c)}>
+                {c === "todas" ? "Todos" : c === "inferior" ? "Inferiores" : "Superiores"}
+              </button>
+            ))}
+          </span>
+        )}
+      </div>
+      <table className="tb tabla-armado">
+        <thead>
+          <tr>
+            <th>N.º</th>
+            <th>{lista === "refuerzos" ? "Armadura" : "De"}</th>
+            <th title="Largo de las barras × ancho que cubren">Zona</th>
+            <th>{lista === "refuerzos" ? "Barras" : "Cercos"}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {(lista === "refuerzos" ? [...gs].sort((a, b) => ordenArmadura(a) - ordenArmadura(b)).filter((g) => verCara === "todas" || (verCara === "inferior") === /inferior/.test(g.titulo)) : gs).map((g) => (
+            <FilaElemento key={g.ruta} g={g} on={esOn(g)} borrador={borrador} onCambio={onCambio} onElemento={onElemento} onQuitar={onQuitar} refFila={esOn(g) ? elegidoRef : undefined} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+  return (
+    <div className={`px-3.5 pb-1${deLosa ? " form-losa" : ""}`} data-form-armado onMouseLeave={() => onActivo(null)} onBlur={() => onActivo(null)}>
+      {deLosa ? (
+        <table className="tb tabla-armado tabla-base" data-base-losa>
+          <thead>
+            <tr>
+              <th>Armadura base</th>
+              <th>
+                <i data-cara="inferior" aria-hidden /> Inferior
+              </th>
+              <th>
+                <i data-cara="superior" aria-hidden /> Superior
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...new Set(fijos.map((g) => g.ruta.split(".")[0]!))].flatMap((raiz) =>
+              (["x", "y"] as const).map((dir) => {
+                const de = (cara: "inf" | "sup") => fijos.find((g) => g.ruta === `${raiz}.${dir}-${cara}`);
+                const primero = de("inf") ?? de("sup");
+                if (!primero) return null;
+                // «Nervios, X inferior» → «Nervios X»; «Base X inferior» → «Base X»
+                const nombre = `${primero.titulo.split(/[ ,]/)[0]} ${dir.toUpperCase()}`;
+                return (
+                  <tr key={`${raiz}.${dir}`}>
+                    <td className="et">
+                      {nombre}
+                      {primero.opcional && <small>opcional</small>}
+                    </td>
+                    {(["inf", "sup"] as const).map((cara) => {
+                      const g = de(cara);
+                      return (
+                        <td key={cara} className="txt" onMouseEnter={() => g && onActivo(rutaGrupo(g))} onFocus={() => g && onActivo(rutaGrupo(g))}>
+                          {g ? <CamposGrupo g={g} borrador={borrador} onCambio={onCambio} /> : "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              }),
+            )}
+          </tbody>
+        </table>
+      ) : (
+        <div className="grupos-armado">
+          {fijos.map((g) => (
+            <div key={g.titulo} className="mt-1.5" onMouseEnter={() => onActivo(rutaGrupo(g))} onFocus={() => onActivo(rutaGrupo(g))}>
+              <div className="text-[11.5px] text-text-secondary">
+                {g.titulo}
+                {g.opcional && <small className="ml-1 text-text-tertiary">(opcional)</small>}
+              </div>
+              <CamposGrupo g={g} borrador={borrador} onCambio={onCambio} />
+            </div>
+          ))}
         </div>
-      ))}
+      )}
+      {(refuerzos.length > 0 || cercos.length > 0) && (
+        <div className="listas-armado">{tablaElementos(lista, lista === "refuerzos" ? refuerzos : cercos)}</div>
+      )}
     </div>
   );
 }
 
-/** Las filas del módulo de una parte, las que no cumplen primero: la tabla de la ficha y del banco. */
-function TablaFilas({ ficha }: { ficha: FichaComprobacion }) {
+/**
+ * Las filas del módulo de una parte, las que no cumplen primero: la tabla de la ficha y del banco. En
+ * el banco (`ancha`), con dónde y con qué combinación en sus columnas y el aprovechamiento dibujado.
+ */
+function TablaFilas({ ficha, ancha }: { ficha: FichaComprobacion; ancha?: boolean }) {
   // Las que no cumplen, primero; después, por aprovechamiento; al final, los datos
   const peso = (x: FilaModulo) => (x.informativa ? -1 : x.estado === "fail" ? 1e9 : 0) + (x.aprovechamiento ?? 0);
   const filas = [...ficha.filas].sort((a, b) => peso(b) - peso(a));
   if (!filas.length) return null;
+  const valor = (f: FilaModulo) => (f.informativa ? "dato" : f.aprovechamiento === null ? (f.estado === "fail" ? "no" : "sí") : aprov(f.aprovechamiento));
   return (
-    <table className="tb" data-filas-modulo>
+    <table className="tb" data-filas-modulo data-ancha={ancha || undefined}>
       <thead>
         <tr>
           <th>Comprobación</th>
+          {ancha && <th>Dónde</th>}
+          {ancha && <th>Combinación</th>}
           <th>Aprov.</th>
         </tr>
       </thead>
       <tbody>
         {filas.map((f, i) => (
-          <tr key={`${f.id}#${i}`}>
+          <tr key={`${f.id}#${i}`} data-manda={ficha.manda?.id === f.id || undefined}>
             <td className="txt et">
               {textoApp(f.descripcion)}
-              <small>{[f.articulo, lugarDe(f)].filter(Boolean).join(" · ")}</small>
+              <small>{ancha ? f.articulo : [f.articulo, lugarDe(f)].filter(Boolean).join(" · ")}</small>
             </td>
-            <td className={f.estado === "fail" ? "f" : f.estado === "warn" ? "w" : undefined}>{f.informativa ? "dato" : f.aprovechamiento === null ? (f.estado === "fail" ? "no" : "sí") : aprov(f.aprovechamiento)}</td>
+            {ancha && <td className="txt">{[f.lugar, f.s !== undefined ? `s = ${fmt(f.s, 2)} m` : undefined].filter(Boolean).join(" · ") || "—"}</td>}
+            {ancha && (
+              <td className="txt mono">
+                {f.comb ?? "—"}
+                {f.pesimos ? " ±" : ""}
+              </td>
+            )}
+            <td className={f.estado === "fail" ? "f" : f.estado === "warn" ? "w" : undefined}>
+              {ancha && !f.informativa && f.aprovechamiento !== null && (
+                <span className="barra-aprov" data-estado={f.estado} aria-hidden>
+                  <i style={{ width: `${Math.min(1, Math.max(0, f.aprovechamiento)) * 100}%` }} />
+                </span>
+              )}
+              {valor(f)}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -315,10 +441,102 @@ function Hipotesis({ ficha }: { ficha: FichaComprobacion }) {
   );
 }
 
+/** Los esfuerzos de la terna, [N, Vy, Vz, T, My, Mz], en el orden de la tabla del tramo, y el de cada pésimo. */
+const COLUMNAS_TERNA = [
+  { c: 0, nombre: "N kN" },
+  { c: 1, nombre: "Vy kN" },
+  { c: 2, nombre: "Vz kN" },
+  { c: 4, nombre: "My kN·m" },
+  { c: 5, nombre: "Mz kN·m" },
+] as const;
+const DE_TERNA: Record<string, number> = { "N-": 0, "N+": 0, My: 4, Mz: 5 };
+
 /**
- * El banco de armado de una parte, en el panel de abajo: a un lado, su dibujo a escala (el despiece del
- * pórtico de una viga; el croquis de las demás), que sigue a lo que se escribe; al otro, el armado como
- * formulario, con «Aplicar», «Proponer» y «Quitar».
+ * De qué combinación salen los esfuerzos de un tramo de pilar: en la cabeza y en el pie, la que da cada
+ * pésimo (en negrita), con los demás esfuerzos de esa misma combinación.
+ */
+function TernasTramo({ t, combinaciones }: { t: TramoEnvolvente; combinaciones: string }) {
+  return (
+    <div className="banco-esfuerzos" data-ternas-tramo>
+      <h4>
+        Esfuerzos del tramo<small> · {combinaciones}: la combinación que da cada pésimo, con sus concomitantes</small>
+      </h4>
+      <table className="tb">
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left" }}>Dónde</th>
+            <th style={{ textAlign: "left" }}>Pésimo</th>
+            <th style={{ textAlign: "left" }}>Combinación</th>
+            {COLUMNAS_TERNA.map((c) => (
+              <th key={c.c}>{c.nombre}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {EXTREMOS_TRAMO.map((ex) =>
+            TERNAS.map((p, j) => {
+              const x = t[ex.k][p.k];
+              return (
+                <tr key={`${ex.k}${p.k}`} data-terna={`${ex.k} ${p.k}`}>
+                  {j === 0 && (
+                    <td className="et" rowSpan={TERNAS.length}>
+                      {ex.nombre}
+                    </td>
+                  )}
+                  <td className="et" title={p.title}>
+                    {p.nombre}
+                  </td>
+                  <td className="txt mono">
+                    {x?.comb ?? "—"}
+                    {x?.pesimos && (
+                      <span title={TITULO_PESIMOS} aria-label={`, ${TITULO_PESIMOS.toLowerCase()}`}>
+                        {" "}±
+                      </span>
+                    )}
+                  </td>
+                  {COLUMNAS_TERNA.map((c) => (
+                    <td key={c.c}>{!x ? "—" : c.c === DE_TERNA[p.k] ? <b>{fmt(x.esfuerzos[c.c]!, 1)}</b> : fmt(x.esfuerzos[c.c]!, 1)}</td>
+                  ))}
+                </tr>
+              );
+            }),
+          )}
+        </tbody>
+      </table>
+      <p className="nota">N &lt; 0, compresión; My y Mz, en los ejes de la sección. Con «±» (el sismo del programa), cada esfuerzo va con su signo pésimo: no es un estado simultáneo.</p>
+    </div>
+  );
+}
+
+const COLUMNAS_VANO_BANCO = [{ c: 0, nombre: "N kN" }, ...COLUMNAS_VANO];
+
+/** Los extremos del vano elegido con su combinación: flexión, cortante, torsor y axil, cada uno con los demás de su combinación. */
+function EsfuerzosVano({ ficha, esfuerzos }: { ficha: FichaComprobacion; esfuerzos: DatosEsfuerzosArmado }) {
+  const ex = esfuerzos.vanos?.[ficha.clave];
+  if (!ex) return null;
+  const T = ex.T?.v ?? 0;
+  const ns = Object.values(ex).flatMap((x) => (x.esfuerzos ? [x.esfuerzos[0]!] : []));
+  const sinAxil = esfuerzos.axilSinValor?.includes(ficha.pieza);
+  return (
+    <div className="banco-esfuerzos" data-esfuerzos-vano>
+      <h4>
+        Esfuerzos del vano<small> · {esfuerzos.combinaciones}</small>
+      </h4>
+      <p className="nota" style={{ color: "var(--color-text-primary)" }}>
+        Torsor: {Math.abs(T) < 0.05 ? "sin torsor apreciable" : `|T| máx. = ${fmt(Math.abs(T), 1)} kN·m (${ex.T?.comb ?? ""})`}. Axil:{" "}
+        {sinAxil ? "sin valor (la viga va en un forjado con diafragma rígido, que se lo lleva)" : ns.length ? `de ${fmt(Math.min(...ns), 1)} a ${fmt(Math.max(...ns), 1)} kN en sus extremos (negativo, compresión)` : "—"}.
+      </p>
+      <TablaExtremos grupos={[{ extremos: ex }]} filas={FILAS_VANO} columnas={COLUMNAS_VANO_BANCO} />
+      <p className="nota">Cada fila, un extremo del vano (en negrita) con los demás esfuerzos de su combinación en ese punto. Las curvas de T y de N se ven bajo el despiece, marcándolas en «Esfuerzos».</p>
+    </div>
+  );
+}
+
+/**
+ * El banco de armado de una parte, en el panel de abajo. Arriba, la pieza, su estado y los botones.
+ * Debajo, a lo ancho: su dibujo a escala (el despiece del pórtico de una viga; el croquis de las
+ * demás), que sigue a lo que se escribe, con los esfuerzos y su combinación; el armado como
+ * formulario; y sus comprobaciones, con dónde y con qué combinación.
  */
 function BancoArmado({
   tipo,
@@ -338,7 +556,7 @@ function BancoArmado({
   ficha: FichaComprobacion;
   /** Lo que ha hecho «Proponer» en esta pieza, en palabras (también cuando no cambia nada, y por qué). */
   aviso?: string | null;
-  /** §8.14: las envolventes de ELU de la pieza, para dibujarlas con su armado. */
+  /** §8.14: las envolventes de ELU de la pieza, para dibujarlas con su armado, y sus pésimos con su combinación. */
   esfuerzos?: DatosEsfuerzosArmado | null;
   proponer: () => void;
   ocupado: boolean;
@@ -402,6 +620,7 @@ function BancoArmado({
   const e = estadoDe(ficha);
   const sinLosa = tipo === "punzonamiento" && ficha.origen === "sin-armado";
   const noAplica = ficha.origen === "no-aplica";
+  const editable = !noAplica && !sinLosa;
   // CO3-k: en una losa de cimentación, la armadura mínima reducida de la obra (un dato de la obra, no de la losa)
   const deCimentacion = ficha.geometria.tipo === "losas" && !!ficha.geometria.cimentacion;
   const reducida = !!ed?.proyecto.obra?.armado?.minimaReducidaCimentacion;
@@ -413,35 +632,58 @@ function BancoArmado({
     const r = ed.editar({ op: "obra", obra: { ...obra, ...(Object.keys(nuevo).length ? { armado: nuevo } : {}) } }, v ? "Armadura mínima reducida en las losas de cimentación" : "Armadura mínima del Código en las losas de cimentación");
     setError(r.ok ? null : r.errores.map((x) => textoApp(x.mensaje)).join(" "));
   };
+  const deLosaConElementos = tipo === "losas" && ficha.armado.tipo === "losas" && !!(ficha.armado.armado?.refuerzos?.length || ficha.armado.armado?.cercos?.length);
   return (
     <div className="banco-armado" data-banco-armado data-tipo={tipo}>
-      <div className="banco-dibujo">{portico ?? (sinLosa ? null : <Croquis ficha={ficha} armado={dibujado} activo={activo} grande {...(esfuerzos ? { esfuerzos } : {})} />)}</div>
-      <div className="banco-form">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3.5 pt-2">
-          <strong className="mono text-[12.5px] text-text-primary">
-            {ficha.pieza} · {ficha.parte}
-          </strong>
-          <span className={`pill ${e.tono}`}>
-            {e.texto}
-            {ficha.aprovechamiento !== null ? ` · ${aprov(ficha.aprovechamiento)}` : ""}
+      <header className="banco-cabecera">
+        <strong className="mono text-[13px] text-text-primary">
+          {ficha.pieza} · {ficha.parte}
+        </strong>
+        <span className={`pill ${e.tono}`}>
+          {e.texto}
+          {ficha.aprovechamiento !== null ? ` · ${aprov(ficha.aprovechamiento)}` : ""}
+        </span>
+        {ficha.seccion && <small className="text-text-tertiary">Sección {ficha.seccion}</small>}
+        {!noAplica && <span className="banco-texto mono">{ficha.texto ?? (ficha.origen === "sin-armadura" ? "Sin armadura de punzonamiento" : "Sin armado")}</span>}
+        {editable && (
+          <span className="banco-botones">
+            {cambiado && <small className="text-state-warn">Cambios sin aplicar</small>}
+            <button type="button" className="btn btn-p" style={{ height: 26 }} disabled={!cambiado || !ed} onClick={aplicar} title="Guarda en el proyecto lo escrito y vuelve a comprobar la pieza">
+              Aplicar
+            </button>
+            <button type="button" className="btn" style={{ height: 26 }} disabled={ocupado || !ed} onClick={proponer} title="El primer armado de las tablas con el que todo cumple">
+              Proponer
+            </button>
+            <button type="button" className="btn" style={{ height: 26 }} disabled={!ficha.armado.armado || !ed} onClick={() => escribir(null, `Quitar el armado de ${ficha.clave}`)}>
+              Quitar
+            </button>
           </span>
-          {ficha.seccion && <small className="text-text-tertiary">Sección {ficha.seccion}</small>}
-        </div>
-        {!noAplica && (
-          <p className="nota mono" style={{ color: "var(--color-text-primary)" }}>
-            {ficha.texto ?? (ficha.origen === "sin-armadura" ? "Sin armadura de punzonamiento" : "Sin armado")}
-          </p>
         )}
-        {noAplica ? (
-          <>
-            <p className="nota" data-no-aplica style={{ color: "var(--color-text-primary)" }}>
-              {textoApp(ficha.pendientes[0] ?? "No se comprueba.")}.
+      </header>
+      {(error || aviso) && (
+        <div className="banco-avisos">
+          {error && <p className="nota text-state-fail">{error}</p>}
+          {aviso && (
+            <p className="nota aviso-proponer" data-aviso-proponer>
+              {aviso}
             </p>
-          </>
+          )}
+        </div>
+      )}
+      <div className="banco-dibujo">
+        {portico ?? (sinLosa ? null : <Croquis ficha={ficha} armado={dibujado} activo={activo} grande {...(esfuerzos && tipo === "pilares" ? { esfuerzos } : {})} />)}
+        {tipo === "pilares" && esfuerzos?.ternas && <TernasTramo t={esfuerzos.ternas} combinaciones={esfuerzos.combinaciones} />}
+      </div>
+      <div className="banco-form">
+        {noAplica ? (
+          <p className="nota" data-no-aplica style={{ color: "var(--color-text-primary)" }}>
+            {textoApp(ficha.pendientes[0] ?? "No se comprueba.")}.
+          </p>
         ) : sinLosa ? (
           <p className="nota">La losa no tiene armado: el punzonamiento depende de su armadura de flexión. Ármela en Losas.</p>
         ) : (
           <>
+            <h4>Armado</h4>
             {deCimentacion && (
               <div className="minima-reducida" data-minima-reducida>
                 <label className="flex items-start gap-2">
@@ -456,55 +698,46 @@ function BancoArmado({
               </div>
             )}
             <FormArmado grupos={grupos} borrador={borrador} onCambio={cambiar} onActivo={setActivo} elegido={elegido} onElemento={onElemento} onQuitar={quitarElemento} />
-            {error && <p className="nota text-state-fail">{error}</p>}
-            <div className="flex flex-wrap gap-1.5 px-3.5 pb-2 pt-2">
-              <button type="button" className="btn btn-p" style={{ height: 26 }} disabled={!cambiado || !ed} onClick={aplicar}>
-                Aplicar
-              </button>
-              <button type="button" className="btn" style={{ height: 26 }} disabled={ocupado || !ed} onClick={proponer} title="El primer armado de las tablas con el que todo cumple">
-                Proponer
-              </button>
-              <button type="button" className="btn" style={{ height: 26 }} disabled={!ficha.armado.armado || !ed} onClick={() => escribir(null, `Quitar el armado de ${ficha.clave}`)}>
-                Quitar
-              </button>
-            </div>
-            {aviso && (
-              <p className="nota aviso-proponer" data-aviso-proponer>
-                {aviso}
-              </p>
-            )}
             <p className="nota">
-              El dibujo sigue a lo que se escribe; «Aplicar» lo guarda en el proyecto y vuelve a comprobar la pieza.
-              {tipo === "losas" && ficha.armado.tipo === "losas" && (ficha.armado.armado?.refuerzos?.length || ficha.armado.armado?.cercos?.length) ? " Cada refuerzo y cada zona de cercos se elige también en la planta: elegido, se estira por las asas de sus lados y se mueve por la del centro (a 5 cm), y Supr lo quita; «Añadir», en la barra, pone uno nuevo con dos clics." : ""}
+              El dibujo sigue a lo que se escribe; «Aplicar» lo guarda y vuelve a comprobar.
+              {deLosaConElementos ? " Un clic en el número de un refuerzo o de unos cercos lo elige en la planta: allí se estira por las asas de sus lados, se mueve por la del centro y Supr lo quita; «Añadir», en la barra, pone uno nuevo con dos clics." : ""}
             </p>
           </>
         )}
-        <div className="banco-comprobaciones" data-banco-comprobaciones>
-          {ficha.pendientes.length > 0 && !noAplica && (
-            <>
-              <h4>Sin comprobar</h4>
-              {ficha.pendientes.map((x) => (
+      </div>
+      <div className="banco-comprobaciones" data-banco-comprobaciones>
+        {ficha.filas.length > 0 && (
+          <div>
+            <h4>
+              Comprobaciones{ficha.manda ? <small> · manda: {textoApp(ficha.manda.descripcion)}</small> : null}
+            </h4>
+            {ficha.pendientes.length > 0 &&
+              !noAplica &&
+              ficha.pendientes.map((x) => (
                 <p key={x} className="nota text-state-warn">
-                  {textoApp(x)}
+                  Sin comprobar: {textoApp(x)}
                 </p>
               ))}
-            </>
-          )}
-          {ficha.filas.length > 0 && (
-            <>
-              <h4>
-                Comprobaciones{ficha.manda ? <small> · manda: {textoApp(ficha.manda.descripcion)}</small> : null}
-              </h4>
-              <TablaFilas ficha={ficha} />
-            </>
-          )}
-          {ficha.hipotesis?.length ? (
-            <>
-              <h4>Hipótesis de partida</h4>
-              <Hipotesis ficha={ficha} />
-            </>
-          ) : null}
-        </div>
+            <TablaFilas ficha={ficha} ancha />
+          </div>
+        )}
+        {!ficha.filas.length && ficha.pendientes.length > 0 && !noAplica && (
+          <div>
+            <h4>Sin comprobar</h4>
+            {ficha.pendientes.map((x) => (
+              <p key={x} className="nota text-state-warn">
+                {textoApp(x)}
+              </p>
+            ))}
+          </div>
+        )}
+        {tipo === "vigas" && esfuerzos && <EsfuerzosVano ficha={ficha} esfuerzos={esfuerzos} />}
+        {ficha.hipotesis?.length ? (
+          <div>
+            <h4>Hipótesis de partida</h4>
+            <Hipotesis ficha={ficha} />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -593,7 +826,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     props: true,
     dock: true,
     pestana: "tabla",
-    alto: 380,
+    alto: 440,
   });
   const [tipo, setTipo] = useState<TipoComprobacion>("pilares");
   const [clave, setClave] = useState<string | null>(null);
@@ -1088,7 +1321,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       elegido={elemento && elemento.losa === ficha.pieza ? elemento : null}
       onElemento={(x) => setElegidos([idElemento(ficha.pieza, x)])}
       alQuitar={() => setElegidos([ficha.pieza])}
-      {...(tipo === "pilares" && esfuerzos ? { esfuerzos } : {})}
+      {...(esfuerzos ? { esfuerzos } : {})}
       {...(tipo === "vigas" ? { alDibujar: (c: string, a: Record<string, unknown> | undefined) => setEscrito({ clave: c, armado: a }), alActivar: setActivoFicha, portico: panelPortico } : {})}
       aviso={avisoPieza?.clave === ficha.clave ? avisoPieza.texto : null}
       proponer={() => void proponerPieza(ficha)}

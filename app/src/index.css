@@ -851,6 +851,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .ib-chip.ib-texto { width: auto; padding: 0 6px; }
 
 .dock { position: relative; display: flex; flex-direction: column; flex-shrink: 0; border-top: 1px solid var(--color-border-main); background: var(--color-bg-primary); }
+/* Un alto guardado con la ventana más grande no deja las vistas sin sitio: unos 300 px para ellas */
+.dock[data-abierto="true"] { max-height: max(120px, calc(100vh - 420px)); }
 .dock-asa { position: absolute; top: -3px; left: 0; right: 0; z-index: 5; height: 6px; cursor: ns-resize; }
 /* C-20: el asa con el foco (↑ y ↓ cambian la altura) */
 .dock-asa:focus-visible { outline: none; background: var(--color-accent); }
@@ -1333,35 +1335,83 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .croquis tspan.ca-unidad { fill: var(--color-text-tertiary); font-weight: 400; }
 .cq-guia { stroke: var(--color-text-tertiary); stroke-width: 1; }
 
-/* El banco de armado (Comprobación, panel de abajo): el dibujo de la pieza y, al lado, su formulario */
-.banco-armado { display: grid; grid-template-columns: minmax(0, 1fr) 390px; align-items: start; min-height: 100%; }
-.banco-armado[data-tipo="losas"] { grid-template-columns: 372px minmax(0, 1fr); }
-.banco-dibujo { min-width: 0; padding: 4px 0 8px; }
-.banco-dibujo > .croquis { margin: 4px auto 8px; max-width: 760px; }
+/* El banco de armado (Comprobación, panel de abajo): arriba, la pieza y los botones; debajo, a lo ancho, su dibujo, su armado y sus comprobaciones */
+.banco-armado { display: grid; grid-template-columns: minmax(0, 1.5fr) 300px minmax(0, 1fr); grid-template-areas: "cab cab cab" "avisos avisos avisos" "dibujo form comp"; grid-template-rows: auto auto 1fr; align-items: start; min-height: 100%; }
+.banco-armado[data-tipo="punzonamiento"] { grid-template-columns: 340px 300px minmax(0, 1fr); }
+.banco-armado[data-tipo="losas"] { grid-template-columns: 300px minmax(0, 1fr) minmax(0, 380px); }
+.banco-armado[data-tipo="vigas"] { grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "cab cab" "avisos avisos" "dibujo form" "comp form"; grid-template-rows: auto auto auto 1fr; }
+.banco-cabecera { grid-area: cab; position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 14px; border-bottom: 1px solid var(--color-border-sub); background: var(--color-bg-primary); }
+.banco-texto { font-size: 12px; color: var(--color-text-primary); }
+.banco-botones { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.banco-avisos { grid-area: avisos; }
+.banco-dibujo { grid-area: dibujo; min-width: 0; padding: 4px 0 8px; }
+.banco-dibujo > .croquis { margin: 6px auto 8px; max-width: 760px; }
 .banco-dibujo > .croquis[data-croquis-armado="pilar"] { max-width: 980px; }
-.banco-form { align-self: stretch; padding-bottom: 6px; border-left: 1px solid var(--color-border-main); }
-.banco-armado[data-tipo="losas"] .grupos-armado, .banco-armado[data-tipo="losas"] .lista-armado { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 0 16px; align-items: start; }
-@media (max-width: 1000px) {
-  .banco-armado, .banco-armado[data-tipo="losas"] { grid-template-columns: 1fr; }
-  .banco-form { border-left: 0; border-top: 1px solid var(--color-border-main); }
+.banco-form { grid-area: form; min-width: 0; align-self: stretch; padding-bottom: 6px; border-left: 1px solid var(--color-border-sub); }
+.banco-comprobaciones { grid-area: comp; min-width: 0; align-self: stretch; padding-bottom: 8px; border-left: 1px solid var(--color-border-sub); }
+.banco-armado[data-tipo="vigas"] .banco-comprobaciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); align-items: start; border-left: 0; border-top: 1px solid var(--color-border-sub); }
+.banco-armado h4 { margin: 8px 14px 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+.banco-armado h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.banco-esfuerzos { margin: 2px auto 0; max-width: 980px; }
+.banco-esfuerzos .tb b { color: var(--color-text-primary); font-weight: 700; }
+/* Con sitio para las tres columnas, cada una se desplaza por su cuenta: el dibujo sigue a la vista al bajar por las comprobaciones */
+@media (min-width: 1501px) {
+  .banco-armado:not([data-tipo="vigas"]) { height: 100%; min-height: 0; grid-template-rows: auto auto minmax(0, 1fr); }
+  .banco-armado:not([data-tipo="vigas"]) > .banco-dibujo, .banco-armado:not([data-tipo="vigas"]) > .banco-form, .banco-armado:not([data-tipo="vigas"]) > .banco-comprobaciones { max-height: 100%; overflow-y: auto; }
 }
+@media (max-width: 1500px) {
+  .banco-armado, .banco-armado[data-tipo="punzonamiento"] { grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "cab cab" "avisos avisos" "dibujo form" "comp comp"; grid-template-rows: auto; }
+  .banco-armado[data-tipo="losas"] { grid-template-columns: 300px minmax(0, 1fr); grid-template-areas: "cab cab" "avisos avisos" "dibujo form" "comp comp"; grid-template-rows: auto; }
+  .banco-comprobaciones { border-left: 0; border-top: 1px solid var(--color-border-sub); }
+}
+@media (max-width: 1000px) {
+  .banco-armado, .banco-armado[data-tipo] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "cab" "avisos" "dibujo" "form" "comp"; grid-template-rows: auto; }
+  .banco-form { border-left: 0; border-top: 1px solid var(--color-border-sub); }
+}
+/* La tabla de comprobaciones del banco: la que manda, marcada, y el aprovechamiento dibujado */
+.tb[data-ancha] tr[data-manda] td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
+.tb[data-ancha] td:last-child { white-space: nowrap; }
+.barra-aprov { display: inline-block; width: 54px; height: 6px; margin-right: 7px; border-radius: 3px; background: var(--color-border-sub); vertical-align: middle; overflow: hidden; }
+.barra-aprov i { display: block; height: 100%; border-radius: 3px; background: #16a34a; }
+.barra-aprov[data-estado="warn"] i { background: #d97706; }
+.barra-aprov[data-estado="fail"] i { background: #dc2626; }
+/* El armado de una losa: la base en una tabla y, debajo, los refuerzos y los cercos, una fila cada uno */
+.tabla-armado { width: 100%; margin-top: 2px; }
+.tabla-armado td { vertical-align: middle; }
+.tabla-armado td > div { margin-top: 0; }
+.tabla-armado td, .tabla-armado th, .tabla-armado td.txt, .tabla-armado td label { white-space: nowrap; }
+.tabla-armado td > div { flex-wrap: nowrap; }
+.tabla-armado .elemento-armado td { padding-top: 3px; padding-bottom: 3px; }
+.dock-cuerpo .tabla-armado { min-width: 0; width: 100%; }
+.dock-cuerpo .tabla-base { width: auto; }
+.tabla-armado td, .tabla-armado th { padding-left: 6px; padding-right: 6px; }
+.tabla-base { max-width: 560px; }
+.tabla-base th i, .elemento-armado td button i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: var(--color-border-strong); }
+.tabla-base th i[data-cara="inferior"], .elemento-armado[data-cara="inferior"] td button i { background: #2563eb; }
+.tabla-base th i[data-cara="superior"], .elemento-armado[data-cara="superior"] td button i { background: #dc2626; }
+.elemento-armado[data-cara="cercos"] td button i { background: #0f766e; }
+.listas-armado { min-width: 0; margin-top: 8px; overflow-x: auto; }
+/* En una losa: a un lado la armadura base y, al otro, los refuerzos o los cercos (una lista a la vez) */
+.form-losa { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 18px; align-items: start; }
+.form-losa .listas-armado { margin-top: 2px; }
+@media (max-width: 1700px) { .form-losa { grid-template-columns: minmax(0, 1fr); } .form-losa .listas-armado { margin-top: 8px; } }
+.pestanas-lista { display: inline-flex; gap: 2px; }
+.pestanas-lista button { padding: 2px 9px; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; font: inherit; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+.pestanas-lista button[data-on] { border-bottom-color: var(--color-accent); color: var(--color-text-primary); }
+.titulo-lista { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+.filtro-lista { display: inline-flex; gap: 2px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.filtro-lista button { padding: 1px 7px; border-radius: 10px; font-size: 11px; color: var(--color-text-secondary); }
+.filtro-lista button[data-on] { background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-text-primary); }
 .minima-reducida { margin: 8px 14px 4px; padding: 7px 10px; border: 1px solid var(--color-border-sub); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--color-text-primary); }
 .minima-reducida p { margin-top: 4px; font-size: 11.5px; color: var(--color-text-secondary); }
 /* §8.16: lo que ha hecho «Proponer», y las comprobaciones y las hipótesis de la pieza, bajo el armado */
 .aviso-proponer { margin: 2px 14px 4px; padding: 6px 10px; border-radius: 8px; background: var(--color-bg-sub, rgba(127, 127, 127, 0.08)); color: var(--color-text-primary); }
-.banco-comprobaciones { margin-top: 4px; border-top: 1px solid var(--color-border-sub); }
-.banco-comprobaciones h4 { margin: 8px 14px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
-.banco-comprobaciones h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .hipotesis { margin: 2px 14px 8px; padding-left: 16px; list-style: disc; font-size: 11.5px; line-height: 1.45; color: var(--color-text-secondary); }
 .hipotesis li + li { margin-top: 3px; }
 .barra-proponer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 14px 2px; }
 .enlace-armado { font-size: 11.5px; color: var(--color-accent-text, var(--color-accent)); }
 .enlace-armado:hover { text-decoration: underline; }
-.elemento-armado { margin-top: 5px; padding: 4px 6px 5px 8px; border-left: 3px solid var(--color-border-strong); border-radius: 0 6px 6px 0; }
-.elemento-armado[data-cara="inferior"] { border-left-color: #2563eb; }
-.elemento-armado[data-cara="superior"] { border-left-color: #dc2626; }
-.elemento-armado[data-cara="cercos"] { border-left-color: #0f766e; }
-.elemento-armado[data-on] { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.elemento-armado[data-on] td { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
 .elemento-armado button:hover { text-decoration: underline; }
 .ca-aviso { display: block; margin-top: 2px; color: var(--color-state-warn-text, var(--color-state-warn)); }
 .cq-cota[data-activo] .cq-guia { stroke: var(--color-accent); }

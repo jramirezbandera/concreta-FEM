@@ -68,12 +68,15 @@ const ALTO_ESFUERZO = 92;
 const ESFUERZOS_PORTICO = [
   { id: "My", nombre: "M", titulo: "M (kN·m): envolvente de ELU, lo positivo (tracción abajo) hacia abajo", abajo: true },
   { id: "Vz", nombre: "V", titulo: "V (kN): envolvente de ELU", abajo: false },
+  { id: "T", nombre: "T", titulo: "T (kN·m): envolvente de ELU del torsor", abajo: false },
+  { id: "N", nombre: "N", titulo: "N (kN): envolvente de ELU del axil (negativo, compresión). En un diafragma rígido no tiene valor: se lo lleva el forjado", abajo: false },
 ] as const;
+const ROTULO_ESFUERZO = { My: "M (kN·m)", Vz: "V (kN)", T: "T (kN·m)", N: "N (kN)" } as const;
 
 export function DespiecePortico({ datos, armados, estados, elegida, activo, onVano, esfuerzos }: Props) {
   const caja = useRef<HTMLDivElement>(null);
   const [ancho, setAncho] = useState(0);
-  const [verEsfuerzo, setVerEsfuerzo] = useState<Record<"My" | "Vz", boolean>>({ My: true, Vz: false });
+  const [verEsfuerzo, setVerEsfuerzo] = useState<Record<"My" | "Vz" | "T" | "N", boolean>>({ My: true, Vz: false, T: false, N: false });
   const [sobre, setSobre] = useState<string | null>(null);
   useLayoutEffect(() => {
     const el = caja.current;
@@ -294,7 +297,7 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
             return (
               <g key={e.id} className="dp-esfuerzo" data-esfuerzo={e.id}>
                 <text x={M} y={yEsfuerzo(i) + 9} className="dp-esf-titulo">
-                  {e.id === "My" ? "M (kN·m)" : "V (kN)"} · {esfuerzos!.combinaciones}
+                  {ROTULO_ESFUERZO[e.id]} · {esfuerzos!.combinaciones}
                 </text>
                 <line x1={X(p.x[0])} x2={X(p.x[1])} y1={y0} y2={y0} className="dp-esf-eje" />
                 {ts.map((t, k) => {

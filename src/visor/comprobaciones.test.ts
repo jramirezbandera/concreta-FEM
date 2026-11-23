@@ -121,12 +121,33 @@ describe("CO6: las comprobaciones en el worker", () => {
       for (const x of ps) expect(v.envolvente.some((y) => Math.abs(y.s - tr.base.s - x.x) < 1e-9 && y.max === x.max && y.min === x.min), `${e} en ${x.x}`).toBe(true);
       for (const x of ps) expect(x.max).toBeGreaterThanOrEqual(x.min);
     }
+    // De qué combinación sale cada pésimo: las ternas del tramo, las de la consulta de la pieza, y dentro de la envolvente
+    const ternas = ep.ternas!;
+    for (const [ex, lado] of [["base", 0], ["cabeza", -1]] as const)
+      for (const [k, c, e] of [["N-", 0, "N"], ["N+", 0, "N"], ["My", 4, "My"], ["Mz", 5, "Mz"]] as const) {
+        const t = ternas[ex][k]!;
+        expect(t.comb.length, `${ex} ${k}`).toBeGreaterThan(0);
+        expect(t.esfuerzos.length).toBe(6);
+        const punto = ep.esfuerzos[e]!.flat().at(lado)!;
+        expect(t.esfuerzos[c]! <= punto.max + 1e-6 && t.esfuerzos[c]! >= punto.min - 1e-6, `${ex} ${k}`).toBe(true);
+        if (k === "N-") expect(t.esfuerzos[0]!).toBeCloseTo(punto.min, 6);
+        if (k === "N+") expect(t.esfuerzos[0]!).toBeCloseTo(punto.max, 6);
+      }
     expect((await at.atender({ tipo: "esfuerzos-pilar", pilar: parte.pieza, planta: "no-existe" })).ok).toBe(false);
     // Un pórtico: My y Vz de cada viga en su x; una viga invertida, con el cortante cambiado de signo
     for (const p of porticosDe(q).slice(0, 4)) {
       const viga = p.vigas[0]!.id;
       const e = await pedir<DatosEsfuerzosArmado>({ tipo: "esfuerzos-portico", viga });
       expect(e.combinaciones.length).toBeGreaterThan(0);
+      // El torsor y el axil, también; y los extremos de cada vano con su combinación y sus concomitantes
+      for (const k of ["T", "N"] as const) expect(e.esfuerzos[k]!.length, k).toBeGreaterThan(0);
+      for (const v of p.vanos) {
+        const ex = e.vanos![v.clave]!;
+        for (const k of ["My+", "My-", "Vz", "T"]) {
+          expect(ex[k]!.comb.length, `${v.clave} ${k}`).toBeGreaterThan(0);
+          expect(ex[k]!.esfuerzos!.length).toBe(6);
+        }
+      }
       for (const k of ["My", "Vz"] as const) {
         const ts = e.esfuerzos[k]!;
         expect(ts.length).toBeGreaterThan(0);
@@ -364,7 +385,9 @@ describe("CO6: las comprobaciones en el worker", () => {
       for (const p of tPilares.partes.filter((x) => x.planta === planta)) {
         const ficha = await pedir<FichaComprobacion>({ tipo: "comprobacion", de: "pilares", clave: p.clave, armado: a });
         const huella = ep.primitivas.find((x): x is Extract<Escena["primitivas"][number], { tipo: "poligono" }> => x.tipo === "poligono" && x.estilo === "contorno" && x.objeto === p.pieza)!;
-        const marcas = ep.primitivas.filter((x): x is Extract<Escena["primitivas"][number], { tipo: "marca" }> => x.tipo === "marca" && x.estilo === "armado-barra" && x.objeto === p.pieza);
+        const marcas = ep.primitivas.filter((x): x is Extract<Escena["primitivas"][number], { tipo: "marca" }> => x.tipo === "marca" && x.estilo === "armado-barra" && dentro(x.p, huella.anillos[0]!));
+        // (sin `objeto`: elegido el pilar se resalta su huella, no cada barra)
+        expect(marcas.every((m) => m.objeto === undefined)).toBe(true);
         expect(ficha.armado.tipo === "pilares" && ficha.armado.armado ? barrasDe(ficha.armado.armado) : 0, p.clave).toBe(marcas.length);
         expect(marcas.length).toBeGreaterThanOrEqual(4);
         for (const m of marcas) expect(dentro(m.p, huella.anillos[0]!), p.clave).toBe(true);

@@ -218,7 +218,7 @@ export function CroquisPilar({
   solapes?: Readonly<Record<number, number>> | undefined;
   esfuerzos?: DatosEsfuerzosArmado | null | undefined;
 }) {
-  const [WS, H] = grande ? [400, 360] : [300, 210];
+  const [WS, H] = grande ? [340, 310] : [300, 210];
   const al = seccion && libre !== undefined && libre > 0 ? alzadoPilar(seccion, libre, armado, solapes) : null;
   const curvas = al && esfuerzos ? ESFUERZOS_PILAR.flatMap((e) => (esfuerzos.esfuerzos[e.id]?.length ? [{ ...e, tramos: esfuerzos.esfuerzos[e.id]! }] : [])) : [];
   const [WA, WE] = [al ? 236 : 0, 104];

@@ -260,6 +260,11 @@ describe("CO6 · DOM: Comprobación", () => {
     const ficha = await pedir<FichaComprobacion>({ tipo: "comprobacion", de: "pilares", clave: tabla.partes[0]!.clave, armado: armado() });
     await waitFor(() => expect(within(document.querySelector("[data-filas-modulo]")!).getAllByRole("row").length).toBe(ficha.filas.length + 1));
     expect(document.querySelector("[data-estado-ficha]")!.textContent).toBe("Cumple");
+    // En el banco, las comprobaciones a lo ancho (dónde y con qué combinación) y los esfuerzos del tramo con la combinación de cada pésimo
+    const ancha = document.querySelector("[data-banco-armado] [data-filas-modulo][data-ancha]")!;
+    expect(within(ancha as HTMLElement).getAllByRole("columnheader").map((x) => x.textContent)).toEqual(["Comprobación", "Dónde", "Combinación", "Aprov."]);
+    await waitFor(() => expect(document.querySelectorAll("[data-ternas-tramo] tbody tr").length).toBe(8), { timeout: 60_000 });
+    expect(document.querySelector('[data-ternas-tramo] [data-terna="cabeza N-"]')!.textContent).toMatch(/ELU/);
     // §8.11: el croquis de la sección, con las barras del armado; sigue a lo que se escribe, sin aplicarlo
     const dibujadas = () => document.querySelectorAll(`[data-banco-armado] [data-croquis-armado="pilar"] .ca-barra`).length;
     const suyo = ficha.armado.tipo === "pilares" ? ficha.armado.armado! : undefined;
@@ -341,6 +346,9 @@ describe("CO6 · DOM: Comprobación", () => {
     fireEvent.doubleClick(filasTabla().find((tr) => celdas(tr)[0] === losa)!);
     await waitFor(() => expect(document.querySelectorAll('[data-lista-armado="refuerzos"] .elemento-armado').length).toBe(suyo.refuerzos!.length), { timeout: 60_000 });
     expect(document.querySelector('[data-croquis-armado="losa"]')).toBeTruthy();
+    // La armadura base, en una tabla: una fila por dirección (nervios y, si los hay, ábacos), con la inferior y la superior en columnas
+    expect(document.querySelectorAll("[data-base-losa] tbody tr").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByLabelText(/X inferior: Ø$/)).toBeTruthy();
     const primero = document.querySelector('[data-lista-armado="refuerzos"] .elemento-armado') as HTMLElement;
     fireEvent.click(within(primero).getAllByRole("button")[0]!);
     expect(reg.elegidos.at(-1)).toEqual([`${losa}/R1`]);
@@ -393,6 +401,10 @@ describe("CO6 · DOM: Comprobación", () => {
     const armados = Object.fromEntries(dp.portico.vanos.map((v) => [v.clave, vigas[v.viga]?.[v.vano]]));
     const d = despiecePortico(dp.portico, armados, dp.despiece);
     const raiz = document.querySelector("[data-despiece-portico]")!;
+    // El torsor y el axil del vano elegido, con su combinación, y sus curvas entre las de «Esfuerzos»
+    await waitFor(() => expect(document.querySelector("[data-esfuerzos-vano]")?.textContent).toMatch(/Torsor: .*Axil: /), { timeout: 60_000 });
+    expect(document.querySelectorAll("[data-esfuerzos-vano] tr[data-extremo]").length).toBe(4);
+    expect(within(screen.getByRole("group", { name: "Esfuerzos bajo el despiece" })).getAllByRole("checkbox").length).toBe(4);
     expect(raiz.getAttribute("data-despiece-portico")).toBe(dp.portico.id);
     expect([...raiz.querySelectorAll("[data-barra] .dp-rotulo")].map((x) => x.textContent)).toEqual(d.barras.map((b) => `${b.n}Ø${b.diametro} L=${fmt(b.largo, 2)}`));
     expect(raiz.querySelector("[data-tabla-despiece]")!.querySelectorAll("tbody tr")).toHaveLength(d.medicion.length);

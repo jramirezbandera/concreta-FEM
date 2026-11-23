@@ -164,12 +164,13 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
           const sec = seccionPilarArmada(sc, a as ArmadoTramoPilar, p.recubrimiento);
           if (sec.cerco) {
             const [w, t] = [sec.cerco.ancho / 2, sec.cerco.alto / 2];
-            P.push({ tipo: "linea", puntos: sec.forma === "circular" ? [...circuloPilar(c, w / 1000), circuloPilar(c, w / 1000)[0]!] : [en(-w, -t), en(w, -t), en(w, t), en(-w, t), en(-w, -t)], estilo: "armado-cerco", objeto: p.pieza });
+            P.push({ tipo: "linea", puntos: sec.forma === "circular" ? [...circuloPilar(c, w / 1000), circuloPilar(c, w / 1000)[0]!] : [en(-w, -t), en(w, -t), en(w, t), en(-w, t), en(-w, -t)], estilo: "armado-cerco" });
           }
+          // Sin `objeto`: elegido el pilar, se resalta su huella y no cada barra (los halos se pisaban)
           for (const b of sec.barras) {
             // A escala (se ve con el zoom) y, encima, una marca de tamaño fijo (se ve siempre)
-            P.push({ tipo: "poligono", anillos: [circuloPilar(en(b.x, b.y), b.diametro / 2000, 12)], estilo: "armado-barra", objeto: p.pieza });
-            P.push({ tipo: "marca", p: en(b.x, b.y), forma: "circulo", radio: 1.6, estilo: "armado-barra", objeto: p.pieza });
+            P.push({ tipo: "poligono", anillos: [circuloPilar(en(b.x, b.y), b.diametro / 2000, 12)], estilo: "armado-barra" });
+            P.push({ tipo: "marca", p: en(b.x, b.y), forma: "circulo", radio: 1.6, estilo: "armado-barra" });
           }
         }
         textos.push({ tipo: "texto", p: [c[0], c[1] + lado], texto: `${p.pieza} · ${p.texto ?? "sin armado"}`, tamano: 11, ancla: "medio", dy: -4, fondo: true, prioridad: claseAprovechamiento(p) === "no-cumple" ? 60 : 50, objeto: p.pieza });

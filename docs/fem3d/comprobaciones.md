@@ -896,6 +896,29 @@ En la vivienda: 12 uniones comprobadas y 15 que no se comprueban (P1, P7, P10, P
 
 **Validación:** `src/visor/comprobaciones.test.ts` (los pilares sin unión son los de `transmitidoPilar` nulo, con su motivo, su d y sus hipótesis; las uniones comprobadas traen las suyas; en la planta del punzonamiento ningún ábaco se queda sin su pilar; el 3D, con los superiores por encima de los inferiores y una sola cara si se pide) y los tests de DOM de la app; a mano en la app con la vivienda (Chrome: el clic en un ábaco de borde, «Proponer» en P11, el 3D de las losas, los nervios). Los bancos de Chrome no se han pasado.
 
+### 8.17 CO6: el banco de armado rehecho, los esfuerzos con su combinación y el armado de las losas en tablas (2026-11-23)
+
+De la tercera prueba de uso de Comprobación con la vivienda. El cálculo, las comprobaciones y lo que se propone no cambian.
+
+**El banco, a lo ancho.** Antes, el dibujo a un lado y, en una columna de 390 px, el formulario con las comprobaciones debajo: con la pantalla ancha quedaba medio panel vacío. Ahora:
+
+- arriba, una cabecera fija con la pieza, su estado, su armado en una línea y «Aplicar», «Proponer» y «Quitar» (con «Cambios sin aplicar» si los hay);
+- debajo, tres columnas: el dibujo, el armado y las comprobaciones; con sitio (más de 1500 px), cada una se desplaza por su cuenta, así que el dibujo sigue a la vista al bajar por las comprobaciones; con menos, las comprobaciones pasan debajo a todo el ancho;
+- en una viga, el despiece del pórtico a la izquierda con las comprobaciones y los esfuerzos del vano debajo, y el formulario a la derecha;
+- **las comprobaciones, en una tabla ancha:** la comprobación con su artículo, dónde, la combinación y el aprovechamiento con su barra; la que manda, marcada.
+
+**De qué combinación salen los esfuerzos de un pilar.** `esfuerzos-pilar` da además las `ternas` del tramo (las de `fem consultar pieza`): bajo las envolventes, en la cabeza y en el pie, la combinación del N mínimo, del N máximo y de los mayores |My| y |Mz|, cada una con sus N, Vy, Vz, My y Mz concomitantes (con «±», los signos pésimos del sismo).
+
+**El torsor y el axil de las vigas.** `esfuerzos-portico` da también las envolventes de T y de N (dos casillas más bajo el despiece; en una viga invertida, T cambia de signo como V), los extremos de cada vano con su combinación (`vanos`) y las vigas cuyo axil no tiene valor (`axilSinValor`: van en un diafragma rígido). El banco dice en una línea el mayor |T| con su combinación y el axil, y da la tabla de los extremos del vano (My máx., My mín., Vz y T) con N, Vz, T y My de cada uno.
+
+**El armado de una losa, en tablas** (antes, una rejilla de tarjetas con 8 grupos, 14 refuerzos y 12 zonas de cercos): la armadura base en una tabla (una fila por dirección, de los nervios y de los ábacos; la inferior y la superior, en columnas) y, a su lado, los refuerzos o los cercos de los nervios en dos pestañas, una fila cada uno (número, armadura, zona, barras y «×»). Los refuerzos van por cara y dirección, con un filtro (todos, inferiores, superiores); el elegido en la planta abre su pestaña.
+
+**La vista con el panel grande.** El panel de abajo no pasa de dejar unos 300 px a las vistas (antes, 260 px contando las barras: quedaban ~140 y la planta no se leía), también con un alto guardado con la ventana más grande (`max-height`). Vale para todos los espacios.
+
+**El pilar elegido en la planta.** Las barras y el cerco dibujados en su huella iban con el `objeto` del pilar: elegido, cada barra llevaba su halo y se pisaban. Ahora sólo lo llevan la huella y los rótulos.
+
+**Validación:** `src/visor/comprobaciones.test.ts` (las ternas son de la envolvente del tramo y su N mínimo y máximo, los de ella; T y N en el pórtico y los extremos de cada vano con sus seis esfuerzos; las marcas de las barras, sin objeto) y `app/src/test/comprobacion.test.tsx` (las columnas de la tabla ancha, las ocho ternas, la tabla de la base, los esfuerzos del vano y las cuatro casillas); a mano en la app con la vivienda. Los bancos de Chrome no se han pasado.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.
