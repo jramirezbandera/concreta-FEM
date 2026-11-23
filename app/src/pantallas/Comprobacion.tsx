@@ -158,6 +158,13 @@ function Armado3DLosas({ armado, cara, datos, base, reticula }: { armado: Armado
   return <Fuente3DModelo casetones={reticula} resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Armado de las losas", notas: r.datos.notas } : null, cargando: r.cargando }} />;
 }
 
+/** §8.21: el 3D de Comprobación con el punzonamiento a la vista: el perímetro crítico y los de cercos de cada unión, sobre su losa. */
+function Punzonamiento3D({ armado, datos }: { armado: ArmadoProyecto | undefined; datos: DatosArmado }) {
+  const { proyecto } = useVisor();
+  const r = usePedido(proyecto.cliente, { tipo: "punzonamiento-3d", ...(armado ? { armado } : {}), datos });
+  return <Fuente3DModelo resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Punzonamiento", notas: r.datos.notas } : null, cargando: r.cargando }} />;
+}
+
 function estadoDe(p: ParteComprobada): {
   texto: string;
   tono: "ok" | "fail" | "neu" | "warn";
@@ -910,7 +917,17 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   const elemento = tipo === "losas" && elegidoVista ? elementoDeId(elegidoVista) : null;
   const ultimo = elemento?.losa ?? elegidoVista;
   useEffect(() => {
-    if (!d || !ultimo || elegida?.pieza === ultimo) return;
+    if (!d || !ultimo) return;
+    // §8.21: elegida en el 3D por su clave (la unión de un pilar con la losa de una planta)
+    const porClave = d.partes.find((p) => p.clave === ultimo);
+    if (porClave) {
+      if (elegida?.clave !== porClave.clave) {
+        setClave(porClave.clave);
+        if (pan.pestana !== "avisos") pan.abrirPestana("armado");
+      }
+      return;
+    }
+    if (elegida?.pieza === ultimo) return;
     const suyas = d.partes.filter((p) => p.pieza === ultimo);
     if (suyas.length) {
       setClave((suyas.find((p) => !p.cumple) ?? suyas[0]!).clave);
@@ -1423,6 +1440,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
             fuentes={{
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
               ...(tipo === "losas" && dibujo === "armado" ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
+              ...(tipo === "punzonamiento" ? { tresD: () => <Punzonamiento3D armado={armado} datos={datosObra} /> } : {}),
               planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
               cabeceraPlanta: () => (
                 <>

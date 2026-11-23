@@ -993,7 +993,7 @@ export class Vista3D extends Vista {
           if (k === SIN_OBJETO) continue;
           for (let j = 0; j < 6; j++) seg.push(d.lineas[6 * i + j]!);
           obj.push(k);
-          if (this.elegidos.has(d.objetos[k]!)) for (let j = 0; j < 6; j++) sel.push(d.lineas[6 * i + j]!);
+          if (this.elegidos.has(d.objetos[k]!) || (d.piezaObjeto?.[k] !== undefined && this.elegidos.has(d.piezaObjeto[k]!))) for (let j = 0; j < 6; j++) sel.push(d.lineas[6 * i + j]!);
         }
         this.diagElegible = { segmentos: Float32Array.from(seg), objeto: Uint32Array.from(obj) };
         if (sel.length) {
@@ -1028,10 +1028,11 @@ export class Vista3D extends Vista {
     const fondo = new Color(this.entorno.colores().fondo);
     const [bp, bn] = [cp.clone().lerp(fondo, 0.55), cn.clone().lerp(fondo, 0.55)];
     const cc = new Color(pintura("armado-cercos", t).stroke ?? "#0f766e");
+    const propio = new Color();
     const col = new Float32Array(d.lineas.length);
     for (let i = 0; i < d.signoLinea.length; i++) {
       const k = d.claseLinea?.[i] ?? 0;
-      const c = k === CLASE_CERCOS ? cc : k === CLASE_BASE ? (d.signoLinea[i] ? bp : bn) : d.signoLinea[i] ? cp : cn;
+      const c = k === CLASE_CERCOS ? cc : k === CLASE_BASE ? (d.signoLinea[i] ? bp : bn) : d.colorLinea ? propio.setRGB(d.colorLinea[3 * i]! / 255, d.colorLinea[3 * i + 1]! / 255, d.colorLinea[3 * i + 2]! / 255, "srgb") : d.signoLinea[i] ? cp : cn;
       for (let j = 0; j < 2; j++) col.set([c.r, c.g, c.b], 6 * i + 3 * j);
     }
     return col;

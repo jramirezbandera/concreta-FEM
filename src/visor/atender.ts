@@ -9,6 +9,7 @@ import type { OpcionesCompilacion, ModeloFisico } from "../compilador/fisico.ts"
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
 import { alambrico } from "./alambrico.ts";
+import { punzonamiento3D } from "./armadoPlanta.ts";
 import { armadoLosas3D } from "./armadoLosas3d.ts";
 import { datosArmado, datosFranja } from "./franjas.ts";
 import type { Pedido, Respuestas } from "./protocolo.ts";
@@ -130,6 +131,9 @@ export class Atendedor {
       case "armado-losas-3d":
         if (p.datos !== undefined) s.datosArmado = p.datos;
         return de({ valido: true as const, valor: armadoLosas3D(s.proyecto.modelo, s.origen3D, p.armado, s.datosArmado, { planta: p.planta, ...(p.cara ? { cara: p.cara } : {}), ...(p.base ? { base: true } : {}) }) });
+      case "punzonamiento-3d":
+        if (p.datos !== undefined) s.datosArmado = p.datos;
+        return de(punzonamiento3D(s, p.armado));
       case "valor-armado":
         return de(s.valorArmado(p));
       case "franja":

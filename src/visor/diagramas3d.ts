@@ -15,6 +15,7 @@
  *
  * Puro: sin IO.
  */
+import type { EntradaLeyenda } from "../agente/render/escena.ts";
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { rotulo } from "../agente/render/escena.ts";
 import { axilSinValor, canonico3D, combinacionEn, envolventeGuardada, extremosCurva, ORDENADA_DIAGRAMA, piezasConDiagrama, por, tramosEspacio, trozosTramo, type TramoEspacio, type V3 } from "../agente/render/diagramas.ts";
@@ -81,6 +82,10 @@ export interface Diagramas3D {
   objetoLinea?: Uint32Array;
   /** La clase de cada línea (0, la de su signo; `CLASE_BASE`; `CLASE_CERCOS`). */
   claseLinea?: Uint8Array;
+  /** §8.21 (el punzonamiento): la pieza de cada objeto: elegida ella, se resaltan también sus objetos. */
+  piezaObjeto?: string[];
+  /** §8.21: el color de cada línea (r, g, b de 0 a 255), si no es el de su signo ni el de su clase. */
+  colorLinea?: Uint8Array;
   /** El máximo y el mínimo de lo que se ve. */
   extremos: ExtremoDiagrama[];
   /** Los de cada pieza que se ve (para rotular las elegidas). */
@@ -91,7 +96,7 @@ export interface Diagramas3D {
   ejeS: Float64Array;
   /** De qué conjunto de combinaciones sale. */
   conjunto: { descripcion: string; n: number };
-  leyenda: { estilo: "diagrama-positivo" | "diagrama-negativo"; texto: string }[];
+  leyenda: EntradaLeyenda[];
   notas: string[];
 }
 

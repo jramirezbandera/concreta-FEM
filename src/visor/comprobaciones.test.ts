@@ -495,6 +495,26 @@ describe("CO6: las comprobaciones en el worker", () => {
     expect([...soloInf.signoLinea].every((x) => x === 0)).toBe(true);
   });
 
+  it("§8.21: el punzonamiento en el 3D: el perímetro crítico de cada unión, con su clave y su pilar, sobre su losa", async () => {
+    const a = propuesto.armado;
+    const t = await pedir<DatosComprobaciones>({ tipo: "comprobaciones", de: "punzonamiento", armado: a });
+    const d = await pedir<import("./diagramas3d.ts").Diagramas3D>({ tipo: "punzonamiento-3d", armado: a });
+    // Una unión dibujada por cada parte de la tabla con canto útil, con su clave; su pieza, el pilar
+    const claves = new Set(t.partes.map((x) => x.clave));
+    expect(d.objetos!.length).toBeGreaterThan(0);
+    for (const [k, id] of d.objetos!.entries()) {
+      expect(claves.has(id), id).toBe(true);
+      expect(d.piezaObjeto![k]).toBe(id.split("/")[0]);
+    }
+    expect(new Set(d.objetos).size).toBe(d.objetos!.length);
+    const n = d.lineas.length / 6;
+    expect([d.objetoLinea!.length, d.claseLinea!.length, d.colorLinea!.length / 3]).toEqual([n, n, n]);
+    expect([...d.objetoLinea!].every((k) => k < d.objetos!.length)).toBe(true);
+    // Cada línea, horizontal; y las de una planta, por encima de las de las plantas de debajo
+    for (let i = 0; i < n; i++) expect(d.lineas[6 * i + 2]).toBe(d.lineas[6 * i + 5]);
+    expect(d.leyenda.length).toBeGreaterThan(0);
+  });
+
   it("sin resultados no hay comprobaciones", async () => {
     const otro = new Atendedor("x");
     await otro.atender({ tipo: "abrir", texto: JSON.stringify({ esquema: VERSION_ESQUEMA, modelo }) });

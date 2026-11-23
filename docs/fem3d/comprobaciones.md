@@ -975,6 +975,18 @@ De la quinta prueba de uso: en el 3D del armado de las losas no se podía elegir
 
 **No hecho:** elegir con ventana en el 3D no coge refuerzos; los refuerzos no se estiran ni se añaden en el 3D (eso, en la planta); la parrilla de los ábacos no se dibuja como base.
 
+### 8.21 CO6: el punzonamiento en el 3D (2026-11-23)
+
+De la misma prueba de uso que §8.20: con Punzonamiento a la vista, el 3D enseñaba sólo el modelo, sin nada del punzonamiento, y un clic sólo podía dar el pilar. El cálculo, las comprobaciones y lo que se propone no cambian.
+
+- **Lo que se dibuja** (`punzonamiento3D` en `src/visor/armadoPlanta.ts`, pedido `punzonamiento-3d`): de cada unión de un pilar con una losa, en todas las plantas, lo que la planta dibuja: su perímetro crítico, a 2·d de la cara del pilar, y sus perímetros de cercos, recortados con las losas de su planta, 1 cm por encima de la cara de arriba de su losa (con su desnivel) para que el sólido no los tape.
+- **El color del perímetro crítico, el de su aprovechamiento** (`Diagramas3D.colorLinea`): verde, ámbar, rojo, o gris si no tiene armado o no se comprueba; los perímetros de cercos, en el color de los cercos. La leyenda dice cuáles hay.
+- **Se elige:** cada línea lleva su unión por su clave (`<pilar>/<planta>`) y su pilar (`piezaObjeto`). Un clic en un perímetro elige esa unión y abre su armado (Comprobación busca ahora lo elegido también por su clave, no sólo por su pieza); un clic en el pilar sigue eligiendo el pilar. Elegida la unión, o su pilar desde la planta o la tabla, sus perímetros se resaltan.
+
+**Validación:** `src/visor/comprobaciones.test.ts` (una unión dibujada por parte de la tabla, con su clave y su pilar; el objeto, la clase y el color de cada línea; las líneas, horizontales). En la app con la vivienda: los doce perímetros críticos sobre sus losas con su color y la leyenda; un clic en un pilar abre su unión y resalta su perímetro. **Un clic justo en un perímetro no se ha probado a mano** (va por el mismo camino que los refuerzos de §8.20, que sí). Los bancos de Chrome no se han pasado.
+
+**No hecho:** elegido un pilar con uniones en dos plantas, se resaltan las dos; los perímetros no llevan rótulo en el 3D (el armado y el aprovechamiento, en la planta y en la tabla).
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

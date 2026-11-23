@@ -80,6 +80,8 @@ export type Pedido =
   | ({ tipo: "valor-armado" } & PedidoValorArmado)
   /** CO6 (§8.16): los refuerzos de las losas, barra a barra, en el 3D (null: todas las plantas). */
   | { tipo: "armado-losas-3d"; planta: string | null; armado?: ArmadoProyecto; cara?: CaraDibujada; /** También la armadura base (por defecto, no). */ base?: boolean; datos?: DatosArmadoObra }
+  /** CO6 (§8.21): el punzonamiento en el 3D: el perímetro crítico y los de cercos de cada unión, en todas las plantas. */
+  | { tipo: "punzonamiento-3d"; armado?: ArmadoProyecto; datos?: DatosArmadoObra }
   /** `provisional`: sin el peso propio calculado, para enseñarla antes (luego se pide sin él). */
   | { tipo: "revision"; provisional?: boolean }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
@@ -138,6 +140,7 @@ export interface Respuestas {
   "valor-lamina": ValorLamina | null;
   armado3d: Armado3D;
   "armado-losas-3d": Diagramas3D;
+  "punzonamiento-3d": Diagramas3D;
   "valor-armado": ValorArmado | null;
   revision: DatosRevision;
   precalentar: null;

@@ -27,12 +27,14 @@ import { bandaPolilinea, numeroFijo, type EntradaLeyenda, type Escena, type Esti
 import { anchoViga, fondoModelo, giroTexto, huellaSeccion, PlantaFisica, type DatosVista } from "../agente/render/modelo.ts";
 import { cabecera, caja, circuloPilar } from "../agente/render/resultados.ts";
 import { casetonesLosa, nerviosLosa, reticulaLosa } from "../compilador/abacos.ts";
+import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import { puntoEnRegion, type Region } from "../compilador/poligonos.ts";
 import { ARMADURAS_FORJADO, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type BarrasCara, type CercosViga } from "../comprobaciones/armado.ts";
 import { alzadoVano, cercosDibujados, cotasRefuerzo, nerviosDeRefuerzo, puntosCercos, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { abacosDePilares, alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, trozo, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
+import { CLASE_CERCOS, type Diagramas3D } from "./diagramas3d.ts";
 import type { Sesion } from "./sesion.ts";
 
 type Resultado<T> = { valido: true; valor: T } | { valido: false; diagnosticos: Diagnostico[] };
@@ -404,6 +406,116 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
       notas,
       extremos: extremos.sort((a, b) => b.valor - a.valor),
       caja: caja(pl),
+    },
+  };
+}
+
+/** Lo que se levanta sobre la cara de la losa lo dibujado del punzonamiento en el 3D, m (para que no lo tape el sólido). */
+const SOBRE_LOSA = 0.01;
+
+/**
+ * §8.21: el punzonamiento en el 3D: de cada unión de un pilar con una losa, su perímetro crítico (a 2·d
+ * de la cara del pilar) en la cara de arriba de la losa y del color de su aprovechamiento, y sus
+ * perímetros de cercos, recortados con las losas de su planta: lo que la planta dibuja, en todas las
+ * plantas. Cada línea lleva su unión (`<pilar>/<planta>`, la clave de la comprobación) y su pilar
+ * (`piezaObjeto`): un clic la elige y, elegido el pilar, se resaltan sus uniones.
+ */
+export function punzonamiento3D(s: Sesion, armado: ArmadoProyecto | undefined): Resultado<Diagramas3D> {
+  const r = alDia(s, "punzonamiento", armado);
+  if (!r.valido) return r;
+  const f = s.proyecto.modelo;
+  const origen = s.origen3D;
+  const cotas = cotasPlantas(f.plantas ?? []);
+  const lineas: number[] = [];
+  const objeto: number[] = [];
+  const clase: number[] = [];
+  const color: number[] = [];
+  const objetos: string[] = [];
+  const piezaObjeto: string[] = [];
+  const usadas = new Set<ClaseAprovechamiento>();
+  let conCercos = false;
+  const rgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  (f.plantas ?? []).forEach((planta, k) => {
+    const cota = cotas[k];
+    const fichas = r.valor.fichas.filter((p) => p.planta === planta.id);
+    if (!fichas.length || cota === null || cota === undefined) return;
+    const pl = new PlantaFisica(f, planta.id);
+    const pilares = new Map(pl.pilares().map((x) => [x.p.id, x]));
+    const losas = pl.enPlanta(pl.f.losas);
+    const regiones = [...regionesLosas(losas).values()];
+    for (const p of fichas) {
+      const x = pilares.get(p.pieza);
+      const h = x && huellaSeccion(x.p, x.seccion);
+      const gm = p.geometria.tipo === "punzonamiento" ? p.geometria : undefined;
+      const sc = gm?.seccion;
+      if (!x || !h || !gm?.d || !sc) continue;
+      const c = "anillo" in h ? medio(h.anillo) : h.centro;
+      // La cara de arriba de la losa en la que cae el pilar (con su desnivel)
+      const losa = losas.find((l) => puntoEnRegion(c, { contorno: l.contorno, huecos: l.huecos ?? [] }));
+      const zz = cota + (losa?.desnivel ?? 0) + SOBRE_LOSA - origen[2];
+      const g = ((x.p.giro ?? 0) * Math.PI) / 180;
+      const ez: Vec2 = [Math.cos(g), Math.sin(g)];
+      const ey: Vec2 = [Math.sin(g), -Math.cos(g)];
+      const [a, b] = "D" in sc ? [0, 0] : [sc.h / 2000, sc.b / 2000];
+      const r0 = "D" in sc ? sc.D / 2000 : 0;
+      const cl = claseAprovechamiento(p);
+      const n0 = lineas.length;
+      const io = objetos.length;
+      const anillo = (dist: number, col: [number, number, number], c2: number) => {
+        for (const t of dentroDe(contornoA(c, ez, ey, a, b, r0 + dist), regiones))
+          for (let i = 0; i + 1 < t.length; i++) {
+            lineas.push(t[i]![0] - origen[0], t[i]![1] - origen[1], zz, t[i + 1]![0] - origen[0], t[i + 1]![1] - origen[1], zz);
+            objeto.push(io);
+            clase.push(c2);
+            color.push(...col);
+          }
+      };
+      anillo((2 * gm.d) / 1000, rgb(COLOR_APROVECHAMIENTO[cl]), 0);
+      const arm = p.armado.tipo === "punzonamiento" ? p.armado.armado : undefined;
+      const n = gm.perimetros ?? 0;
+      if (arm && n && gm.alcance)
+        for (let i = 0; i < n; i++) {
+          const ri = (gm.alcance - (n - 1 - i) * arm.separacion) / 1000;
+          if (ri > 0) {
+            anillo(ri, [0, 0, 0], CLASE_CERCOS);
+            conCercos = true;
+          }
+        }
+      if (lineas.length === n0) continue;
+      usadas.add(cl);
+      objetos.push(p.clave);
+      piezaObjeto.push(p.pieza);
+    }
+  });
+  const n = objeto.length;
+  const leyenda: EntradaLeyenda[] = (["no-cumple", "alto", "cumple", "sin-armado", "no-aplica"] as const).filter((x) => usadas.has(x)).map((x) => ({ relleno: COLOR_APROVECHAMIENTO[x], texto: `Perímetro crítico · ${TEXTO_CLASE[x].charAt(0).toLowerCase()}${TEXTO_CLASE[x].slice(1)}` }));
+  if (conCercos) leyenda.push({ estilo: "armado-cercos", texto: "Perímetros de cercos" });
+  return {
+    valido: true,
+    valor: {
+      esfuerzo: "My",
+      unidad: "",
+      origen,
+      escala: { m: 1, valor: 1 },
+      positivo: new Float32Array(0),
+      negativo: new Float32Array(0),
+      lineas: Float32Array.from(lineas),
+      signoLinea: new Uint8Array(n),
+      objetos,
+      objetoLinea: Uint32Array.from(objeto),
+      claseLinea: Uint8Array.from(clase),
+      piezaObjeto,
+      colorLinea: Uint8Array.from(color),
+      extremos: [],
+      piezas: [],
+      ejes: new Float32Array(0),
+      ejePieza: new Uint32Array(0),
+      ejeS: new Float64Array(0),
+      conjunto: { descripcion: "El armado del proyecto", n: 0 },
+      leyenda,
+      notas: objetos.length
+        ? ["De cada unión de un pilar con una losa: su perímetro crítico, a 2·d de la cara del pilar, sobre la losa y del color de su aprovechamiento, y sus perímetros de cercos, cortados en el borde de las losas. Un clic en uno elige la unión."]
+        : ["Ninguna losa pasa carga a un pilar por su huella."],
     },
   };
 }
