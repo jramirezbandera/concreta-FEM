@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { Vec2 } from "../compilador/fisico.ts";
 import type { ArmadoForjado } from "../comprobaciones/armado.ts";
 import { refuerzosDibujados } from "../comprobaciones/dibujoArmado.ts";
-import { asaEn, asasZona, conElemento, conZona, esquinasZona, LADO_MINIMO_ZONA, mismaZona, zonaElemento, zonaEntre, zonaMovida } from "./refuerzosPlanta.ts";
+import { asaEn, asasZona, conElemento, conZona, esquinasZona, LADO_MINIMO_ZONA, lindesNervios, mismaZona, porNervios, zonaElemento, zonaEntre, zonaMovida } from "./refuerzosPlanta.ts";
 
 const base = { "x-inf": { diametro: 12, separacion: 200 }, "x-sup": { diametro: 12, separacion: 200 }, "y-inf": { diametro: 12, separacion: 200 }, "y-sup": { diametro: 12, separacion: 200 } };
 const ARMADO: ArmadoForjado = {
@@ -88,5 +88,67 @@ describe("CO6: la zona de un refuerzo, editada en la planta", () => {
     const c = conElemento({ base } as ArmadoForjado, { direccion: "x", ...zona, cercos: { diametro: 6, separacion: 150 } });
     expect(c.elemento).toEqual({ lista: "cercos", indice: 0 });
     expect(ARMADO.refuerzos).toHaveLength(2);
+  });
+});
+
+describe("§8.19: lo que va por nervios, enganchado a los lindes entre nervios", () => {
+  // Nervios a 0,80 m con los ejes en 0,4, 1,2 … 4,4: los lindes, en 0, 0,8 … 4,8
+  const EJES = [0.4, 1.2, 2.0, 2.8, 3.6, 4.4];
+  const L = lindesNervios(EJES);
+  const z = { d: [1, 0] as Vec2, n: [0, 1] as Vec2, s: [2, 5] as [number, number], t: [0.8, 2.4] as [number, number] };
+
+  it("los lindes: a mitad de casetón, y uno por fuera de cada extremo; entre dos seguidos, un nervio", () => {
+    expect(L).toEqual([0, 0.8, 1.6, 2.4, 3.2, 4, 4.8]);
+    for (let i = 0; i + 1 < L.length; i++) expect(EJES.filter((e) => e > L[i]! && e < L[i + 1]!)).toHaveLength(1);
+    expect(lindesNervios([1])).toEqual([]);
+    expect(lindesNervios([2.0, 0.4, 1.2])).toEqual([0, 0.8, 1.6, 2.4]);
+    // Con los bordes de la losa: ellos también, y nada fuera
+    expect(lindesNervios(EJES, [0.1, 4.5, 4.5, 0.1])).toEqual([0.1, 0.8, 1.6, 2.4, 3.2, 4, 4.5]);
+    expect(lindesNervios(EJES, [0, 4.8, 2.4])).toEqual(L);
+  });
+
+  it("va por nervios un refuerzo de n barras por nervio que no es de ábacos, y unos cercos", () => {
+    const a: ArmadoForjado = {
+      base,
+      refuerzos: [
+        { armadura: "x-inf", s: [0, 4], t: [0.8, 2.4], barras: { diametro: 12, n: 2 }, en: "nervios" },
+        { armadura: "x-sup", s: [0, 4], t: [0.8, 2.4], barras: { diametro: 12, separacion: 200 } },
+        { armadura: "x-sup", s: [0, 2], t: [0, 2], barras: { diametro: 8, n: 1 }, en: "abacos" },
+      ],
+      cercos: [{ direccion: "x", s: [0, 2], t: [0, 0.8], cercos: { diametro: 6, separacion: 150 } }],
+    } as ArmadoForjado;
+    expect([0, 1, 2, 5].map((indice) => porNervios(a, { lista: "refuerzos", indice }))).toEqual([true, false, false, false]);
+    expect(porNervios(a, { lista: "cercos", indice: 0 })).toBe(true);
+  });
+
+  it("un lado transversal va al linde más cercano y deja al menos un nervio; a lo largo, sigue a 5 cm", () => {
+    expect(zonaMovida(z, "t1", [3.5, 2.4], [0, 3.05], L)).toEqual({ s: [2, 5], t: [0.8, 3.2] });
+    expect(zonaMovida(z, "t1", [3.5, 2.4], [0, 2.7], L)).toEqual({ s: [2, 5], t: [0.8, 2.4] });
+    expect(zonaMovida(z, "t0", [3.5, 0.8], [0, 0.3], L)).toEqual({ s: [2, 5], t: [0, 2.4] });
+    // Más allá del lado de enfrente: un nervio
+    expect(zonaMovida(z, "t1", [3.5, 2.4], [0, -3], L).t).toEqual([0.8, 1.6]);
+    expect(zonaMovida(z, "t0", [3.5, 0.8], [0, 9], L).t).toEqual([1.6, 2.4]);
+    // Fuera de la retícula: el último linde
+    expect(zonaMovida(z, "t1", [3.5, 2.4], [0, 30], L).t).toEqual([0.8, 4.8]);
+    expect(zonaMovida(z, "s1", [5, 1.6], [6.23, 3], L)).toEqual({ s: [2, 6.25], t: [0.8, 2.4] });
+  });
+
+  it("el centro la mueve con su ancho, de linde en linde; una que no cuadraba queda con su lado t0 en un linde", () => {
+    expect(zonaMovida(z, "centro", [3.5, 1.6], [4.02, 2.3], L)).toEqual({ s: [2.5, 5.5], t: [1.6, 3.2] });
+    expect(mismaZona(zonaMovida(z, "centro", [3.5, 1.6], [3.51, 1.9], L), z)).toBe(true);
+    const torcida = { ...z, t: [1.0, 2.1] as [number, number] };
+    expect(zonaMovida(torcida, "centro", [3.5, 1.55], [3.5, 1.6], L).t).toEqual([0.8, 1.9]);
+  });
+
+  it("una nueva coge los nervios entre sus dos puntos; al menos, el nervio en el que caen", () => {
+    expect(zonaEntre(0, "x-inf", [2.01, 0.95], [5.02, 2.5], L)).toEqual({ s: [2, 5], t: [0.8, 2.4] });
+    // Los dos puntos, en el mismo nervio (o casi en el mismo linde)
+    expect(zonaEntre(0, "x-inf", [2, 1.0], [5, 1.3], L)!.t).toEqual([0.8, 1.6]);
+    expect(zonaEntre(0, "x-inf", [2, 0.5], [5, 0.7], L)!.t).toEqual([0, 0.8]);
+    expect(zonaEntre(0, "x-inf", [2, 4.7], [5, 4.9], L)!.t).toEqual([4, 4.8]);
+    // Y: t es x
+    expect(zonaEntre(0, "y", [0.95, 2], [2.5, 5], L)).toEqual({ s: [2, 5], t: [0.8, 2.4] });
+    // Sin lindes, como antes
+    expect(zonaEntre(0, "x-inf", [2.01, 0.95], [5.02, 2.5])).toEqual({ s: [2, 5], t: [0.95, 2.5] });
   });
 });

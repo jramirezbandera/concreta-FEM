@@ -8,13 +8,16 @@
  * - **Añadir:** con un elemento nuevo pedido en la barra, dos clics (o una ventana) dan las esquinas
  *   opuestas de su zona, en la losa que tiene debajo.
  * - El clic derecho o Esc sueltan lo que se tiene cogido.
+ * - **En un reticular** (§8.19), lo que va por nervios (un refuerzo por nervio, unos cercos) lleva sus
+ *   lados transversales a los lindes entre nervios, a mitad de casetón: coge nervios enteros.
  *
  * Aquí sólo está el ratón y lo que se pinta encima: la geometría es de `src/editor/refuerzosPlanta.ts`
  * y lo que se escribe en el proyecto lo hace quien recibe `alMover` y `alAnadir`.
  */
 import type { Vec2 } from "../../../src/compilador/fisico.ts";
 import type { ArmadoForjado, ArmaduraForjado } from "../../../src/comprobaciones/armado.ts";
-import { asaEn, asasZona, esquinasZona, mismaZona, zonaElemento, zonaEntre, zonaMovida, type AsaZona, type ElementoLosa, type Rango, type ZonaPlanta } from "../../../src/editor/refuerzosPlanta.ts";
+import { asaEn, asasZona, esquinasZona, lindesNervios, mismaZona, porNervios, zonaElemento, zonaEntre, zonaMovida, type AsaZona, type ElementoLosa, type Rango, type ZonaPlanta } from "../../../src/editor/refuerzosPlanta.ts";
+import { ejesArmadura } from "../../../src/comprobaciones/dibujoArmado.ts";
 import type { Colores } from "../vistas/motor.ts";
 import type { Dibujo2D } from "../vistas/vista2d.ts";
 
@@ -25,13 +28,26 @@ export interface LosaArmada {
   eje1?: number;
   contorno: readonly Vec2[];
   armado?: ArmadoForjado;
+  /** En un reticular, los ejes de sus nervios: `x`, la coordenada según el eje 1 de los que corren en perpendicular; `y`, la perpendicular de los que corren según el eje 1. */
+  nervios?: { x: readonly number[]; y: readonly number[] };
 }
 
 /** Lo que se va a añadir: un refuerzo de una armadura (en un reticular, de los ábacos o de los nervios) o unos cercos de nervios. */
 export type NuevoElemento = { lista: "refuerzos"; armadura: ArmaduraForjado; en?: "abacos" | "nervios" } | { lista: "cercos"; direccion: "x" | "y" };
 
 const metros = (x: number) => x.toFixed(2).replace(".", ",");
-const medidas = (z: Rango) => `${metros(z.s[1] - z.s[0])} × ${metros(z.t[1] - z.t[0])} m`;
+/** Las medidas de una zona y, si va por nervios (`ejes`: los de los nervios que cruza), cuántos coge. */
+const medidas = (z: Rango, ejes: readonly number[] = []) => {
+  const n = ejes.filter((e) => e >= z.t[0] - 1e-6 && e <= z.t[1] + 1e-6).length;
+  return `${metros(z.s[1] - z.s[0])} × ${metros(z.t[1] - z.t[0])} m${n ? ` · ${n} ${n === 1 ? "nervio" : "nervios"}` : ""}`;
+};
+const NADA: Enganche = { ejes: [], lindes: [] };
+
+/** A lo que se enganchan los lados transversales de lo que va por nervios: los ejes de sus nervios y los lindes entre ellos. */
+interface Enganche {
+  ejes: readonly number[];
+  lindes: readonly number[];
+}
 
 function dentro(p: Vec2, anillo: readonly Vec2[]): boolean {
   let d = false;
@@ -88,9 +104,32 @@ export class EditorRefuerzos {
     return this.losas.find((l) => l.planta === planta && dentro(p, l.contorno)) ?? null;
   }
 
+  /** Los nervios transversales a una armadura (o dirección) de una losa y sus lindes, con los bordes de la losa; nada si no es un reticular. */
+  private enganche(losa: LosaArmada, de: ArmaduraForjado | "x" | "y"): Enganche {
+    if (!losa.nervios) return NADA;
+    const { n } = ejesArmadura(losa.eje1, de);
+    const ejes = de[0] === "x" ? losa.nervios.y : losa.nervios.x;
+    return { ejes, lindes: lindesNervios(ejes, losa.contorno.map((q) => q[0] * n[0] + q[1] * n[1])) };
+  }
+
+  /** A lo que van los lados de lo elegido: sólo si va por nervios. */
+  private engancheElegido(losa: LosaArmada): Enganche {
+    const e = this.elegido!.elemento;
+    const x = e.lista === "refuerzos" ? losa.armado?.refuerzos?.[e.indice] : losa.armado?.cercos?.[e.indice];
+    const de = x && ("armadura" in x ? x.armadura : x.direccion);
+    return de && porNervios(losa.armado, e) ? this.enganche(losa, de) : NADA;
+  }
+
+  /** A lo que van los lados de lo nuevo. */
+  private engancheNuevo(losa: LosaArmada): Enganche {
+    const n = this.nuevo;
+    if (!n) return NADA;
+    return n.lista === "cercos" ? this.enganche(losa, n.direccion) : n.en === "nervios" ? this.enganche(losa, n.armadura) : NADA;
+  }
+
   private zonaNueva(losa: LosaArmada, a: Vec2, b: Vec2): Rango | null {
     const n = this.nuevo;
-    return n ? zonaEntre(losa.eje1, n.lista === "refuerzos" ? n.armadura : n.direccion, a, b) : null;
+    return n ? zonaEntre(losa.eje1, n.lista === "refuerzos" ? n.armadura : n.direccion, a, b, this.engancheNuevo(losa).lindes) : null;
   }
 
   private anadir(losa: LosaArmada, a: Vec2, b: Vec2): void {
@@ -136,7 +175,7 @@ export class EditorRefuerzos {
         if (this.cogida) {
           const { asa, desde } = this.cogida;
           this.cogida = null;
-          const zona = zonaMovida(z.z, asa, desde, p);
+          const zona = zonaMovida(z.z, asa, desde, p, this.engancheElegido(z.losa).lindes);
           if (!mismaZona(zona, z.z)) this.alMover(z.losa.id, this.elegido!.elemento, zona);
           return true;
         }
@@ -170,10 +209,13 @@ export class EditorRefuerzos {
         if (!this.q) return null;
         if (this.nuevo) {
           const zona = this.primero ? this.zonaNueva(this.primero.losa, this.primero.p, this.q) : null;
-          return { p: this.q, texto: this.primero ? (zona ? `${medidas(zona)} · clic: la esquina opuesta` : "clic: la esquina opuesta") : "clic: una esquina de la zona" };
+          return { p: this.q, texto: this.primero ? (zona ? `${medidas(zona, this.engancheNuevo(this.primero.losa).ejes)} · clic: la esquina opuesta` : "clic: la esquina opuesta") : "clic: una esquina de la zona" };
         }
         const z = this.zona(planta);
-        if (z && this.cogida) return { p: this.q, texto: `${medidas(zonaMovida(z.z, this.cogida.asa, this.cogida.desde, this.q))} · clic para dejarlo, Esc lo suelta` };
+        if (z && this.cogida) {
+          const g = this.engancheElegido(z.losa);
+          return { p: this.q, texto: `${medidas(zonaMovida(z.z, this.cogida.asa, this.cogida.desde, this.q, g.lindes), g.ejes)} · clic para dejarlo, Esc lo suelta` };
+        }
         if (z && this.bajo) return { p: this.q, texto: this.bajo === "centro" ? "clic o arrastrar: mover la zona" : "clic o arrastrar: estirar este lado" };
         return null;
       },
@@ -217,12 +259,13 @@ export class EditorRefuerzos {
     ctx.save();
     const z = this.nuevo ? null : this.zona(planta);
     if (z) {
-      const previa: ZonaPlanta | null = this.cogida && this.q ? { ...z.z, ...zonaMovida(z.z, this.cogida.asa, this.cogida.desde, this.q) } : null;
+      const g = this.engancheElegido(z.losa);
+      const previa: ZonaPlanta | null = this.cogida && this.q ? { ...z.z, ...zonaMovida(z.z, this.cogida.asa, this.cogida.desde, this.q, g.lindes) } : null;
       // Con un asa cogida: la zona de partida, a rayas, y la que quedaría, entera
       trazo(esquinasZona(z.z), previa ? [4, 4] : [], previa ? 1 : 1.5);
       if (previa) {
         trazo(esquinasZona(previa), [], 2);
-        rotulo(asasZona(previa).find((x) => x.asa === "centro")!.p, medidas(previa));
+        rotulo(asasZona(previa).find((x) => x.asa === "centro")!.p, medidas(previa, g.ejes));
       }
       for (const a of asasZona(previa ?? z.z)) {
         const [x, y] = aPx(a.p);
@@ -244,7 +287,7 @@ export class EditorRefuerzos {
       if (zona) {
         const zp: ZonaPlanta = { ...zonaElemento(this.primero.losa.eje1, n.lista === "refuerzos" ? { refuerzos: [{ armadura: n.armadura, ...zona, barras: { diametro: 12 } }] } : { cercos: [{ direccion: n.direccion, ...zona, cercos: { diametro: 6, separacion: 150 } }] }, { lista: n.lista, indice: 0 })!, ...zona };
         trazo(esquinasZona(zp), [], 2);
-        rotulo(asasZona(zp).find((x) => x.asa === "centro")!.p, medidas(zona));
+        rotulo(asasZona(zp).find((x) => x.asa === "centro")!.p, medidas(zona, this.engancheNuevo(this.primero.losa).ejes));
       }
     }
     ctx.restore();

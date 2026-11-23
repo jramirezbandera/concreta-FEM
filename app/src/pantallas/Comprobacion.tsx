@@ -26,6 +26,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ArmadoProyecto } from "../../../src/agente/armaduraBase.ts";
 import type { TramoEnvolvente } from "../../../src/agente/consultas.ts";
+import { reticulaLosa } from "../../../src/compilador/abacos.ts";
 import type { ArmadoForjado, ArmadoVanoViga, CercosForjado, DatosArmado, RefuerzoForjado } from "../../../src/comprobaciones/armado.ts";
 import { armadoDeBorrador, armadoParcial, borradorArmado, DIAMETROS_BARRA, elementoDeId, gruposArmado, idElemento, ponerArmado, sinElemento, type GrupoArmado } from "../../../src/editor/armadoBarras.ts";
 import { conElemento, conZona } from "../../../src/editor/refuerzosPlanta.ts";
@@ -925,9 +926,18 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     setAvisoPlanta(x.ok ? null : x.errores.map((y) => textoApp(y.mensaje)).join(" "));
     return x.ok;
   };
-  er.losas = useMemo(() => (losasModelo ?? []).map((l) => ({ id: l.id, planta: l.planta, eje1: l.eje1, contorno: l.contorno, armado: entero?.forjados?.[l.id] })), [losasModelo, entero?.forjados]);
+  er.losas = useMemo(
+    () =>
+      (losasModelo ?? []).map((l) => {
+        // §8.19: en un reticular, lo que va por nervios se engancha a los lindes entre ellos
+        const ret = l.reticular ? reticulaLosa(l) : null;
+        return { id: l.id, planta: l.planta, eje1: l.eje1, contorno: l.contorno, armado: entero?.forjados?.[l.id], ...(ret ? { nervios: { x: ret.x, y: ret.y } } : {}) };
+      }),
+    [losasModelo, entero?.forjados],
+  );
   er.elegido = editable && elemento ? { losa: elemento.losa, elemento: { lista: elemento.lista, indice: elemento.indice } } : null;
-  er.nuevo = editable ? (ANADIR.find((x) => x.id === anadir)?.nuevo ?? null) : null;
+  const nuevoElegido = editable ? (ANADIR.find((x) => x.id === anadir)?.nuevo ?? null) : null;
+  er.nuevo = nuevoElegido?.lista === "refuerzos" ? { ...nuevoElegido, en: anadirEn } : nuevoElegido;
   er.alAvisar = setAvisoPlanta;
   er.alMover = (losa, e, zona) => {
     const a = entero?.forjados?.[losa];

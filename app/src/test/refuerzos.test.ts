@@ -111,3 +111,61 @@ describe("CO6: los refuerzos de las losas, con el ratón", () => {
     expect(a.agarrar!([5, 1.5], RADIO)).toBe(false);
   });
 });
+
+describe("§8.19: en un reticular, lo que va por nervios se engancha a los lindes entre nervios", () => {
+  const NERVIOS = { x: [0.4, 1.2, 2.0, 2.8, 3.6, 4.4, 5.2, 6.0, 6.8, 7.6, 8.4, 9.2], y: [0.4, 1.2, 2.0, 2.8, 3.6, 4.4, 5.2, 6.0, 6.8, 7.6] };
+  const RET: ArmadoForjado = {
+    base,
+    refuerzos: [
+      { armadura: "x-inf", s: [2, 5], t: [0.8, 2.4], barras: { diametro: 12, n: 2 }, en: "nervios" },
+      { armadura: "x-sup", s: [2, 5], t: [4, 5], barras: { diametro: 12, separacion: 200 }, en: "abacos" },
+    ],
+  } as ArmadoForjado;
+  function reticular() {
+    const e = new EditorRefuerzos();
+    e.losas = [{ id: "L1", planta: "P1", contorno: [[0, 0], [10, 0], [10, 8], [0, 8]], armado: RET, nervios: NERVIOS }];
+    const movidos: Rango[] = [];
+    const anadidos: Rango[] = [];
+    e.alMover = (_l, _e, zona) => movidos.push(zona);
+    e.alAnadir = (_l, _n, zona) => anadidos.push(zona);
+    return { e, a: e.adaptador("P1"), movidos, anadidos };
+  }
+
+  it("estirar el lado de un refuerzo por nervio lo lleva al linde, y el rótulo dice cuántos nervios", () => {
+    const { e, a, movidos } = reticular();
+    e.elegido = { losa: "L1", elemento: { lista: "refuerzos", indice: 0 } };
+    expect(a.clic([3.5, 2.4], RADIO, false, false)).toBe(true);
+    a.pasar([3.5, 3.9], RADIO, false, [0, 0]);
+    expect(a.cursor()!.texto).toMatch(/^3,00 × 3,20 m · 4 nervios/);
+    a.clic([3.5, 3.9], RADIO, false, false);
+    expect(movidos).toEqual([{ s: [2, 5], t: [0.8, 4] }]);
+    // Hasta el borde de la losa (y = 0), y no más allá
+    a.clic([3.5, 0.8], RADIO, false, false);
+    a.clic([3.5, -2], RADIO, false, false);
+    expect(movidos[1]).toEqual({ s: [2, 5], t: [0, 2.4] });
+  });
+
+  it("el de los ábacos sigue a 5 cm", () => {
+    const { e, a, movidos } = reticular();
+    e.elegido = { losa: "L1", elemento: { lista: "refuerzos", indice: 1 } };
+    a.clic([3.5, 5], RADIO, false, false);
+    a.clic([3.5, 5.52], RADIO, false, false);
+    expect(movidos).toEqual([{ s: [2, 5], t: [4, 5.5] }]);
+  });
+
+  it("uno nuevo de los nervios y unos cercos cogen nervios enteros; uno de los ábacos, no", () => {
+    const { e, a, anadidos } = reticular();
+    e.nuevo = { lista: "refuerzos", armadura: "y-sup", en: "nervios" };
+    a.clic([1.0, 2], RADIO, false, false);
+    a.clic([2.5, 5], RADIO, false, false);
+    e.nuevo = { lista: "cercos", direccion: "x" };
+    a.ventana([2, 1.0, 5, 1.3]);
+    e.nuevo = { lista: "refuerzos", armadura: "x-sup", en: "abacos" };
+    a.ventana([2, 1.02, 5, 1.31]);
+    expect(anadidos).toEqual([
+      { s: [2, 5], t: [0.8, 2.4] },
+      { s: [2, 5], t: [0.8, 1.6] },
+      { s: [2, 5], t: [1, 1.3] },
+    ]);
+  });
+});

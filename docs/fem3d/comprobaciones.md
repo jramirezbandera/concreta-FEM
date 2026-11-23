@@ -943,7 +943,22 @@ De la cuarta prueba de uso de Comprobación con la vivienda: en la planta de las
 
 **Validación:** `src/compilador/nervios.test.ts` (los casetones caen en la losa, fuera de los ábacos y de lo macizo, y ningún eje de nervio los atraviesa), `src/comprobaciones/dibujoArmado.test.ts` (los nervios de un refuerzo) y, a mano en la app con la vivienda, la planta de las losas con y sin casetones, el pórtico de Z-CUB-S-2 con sus cuatro envolventes y el cursor, y el tramo de P8. `validacion/co6/planta.ts` saca la planta con el armado a PNG desde Node. Los bancos de Chrome no se han pasado.
 
-**No hecho:** al estirar o añadir un refuerzo con el ratón, sus lados no se enganchan a la retícula (siguen a 5 cm); el 3D de las losas sigue como estaba.
+**No hecho:** el 3D de las losas sigue como estaba. El enganche de los lados a la retícula al editar con el ratón, en §8.19.
+
+### 8.19 CO6: lo que va por nervios, enganchado a los nervios al editarlo con el ratón (2026-11-23)
+
+Lo que quedaba de §8.18: al estirar, mover o añadir en la planta un refuerzo por nervio o unos cercos de nervios, sus lados transversales iban a 5 cm, así que una zona podía acabar en cualquier punto de un casetón. El cálculo y lo que se propone no cambian.
+
+- **Los lindes** (`lindesNervios` en `src/editor/refuerzosPlanta.ts`): el punto medio entre cada dos ejes de nervio seguidos (la mitad del casetón, que es donde acaban las franjas de armado de un reticular y las zonas que se proponen) y los bordes de la losa (la coordenada transversal de los vértices de su contorno): lo que llega al borde acaba en él. Entre dos lindes seguidos de la retícula hay un nervio.
+- **A quién se aplica** (`porNervios`): a un refuerzo de n barras por nervio que no es de los ábacos y a los cercos de los nervios. Los de una maciza, los de los ábacos y los que van a una separación siguen a 5 cm.
+- **Estirar un lado transversal** lo lleva al linde más cercano que deja al menos un nervio dentro; **el centro** mueve la zona de linde en linde con su ancho (una que no cuadraba queda con su lado t0 en un linde); **una nueva** coge los nervios entre sus dos esquinas y, como poco, el nervio en el que caen. A lo largo de las barras, a 5 cm como antes.
+- El rótulo del cursor y el de la zona dicen cuántos nervios coge: «3,00 × 3,20 m · 4 nervios».
+
+**Medido en la vivienda:** de los lados transversales de lo propuesto por nervios, 58 de 70 están ya en un linde de la retícula; los otros 12 son bordes de la losa (10 cm o 8,5 cm más allá del último linde) o entrantes de su contorno. Con los bordes como lindes, los 70 están en uno: estirar lo propuesto no lo descuadra.
+
+**Validación:** `src/editor/refuerzosPlanta.test.ts` (los lindes, a quién se aplica, estirar, mover y añadir) y `app/src/test/refuerzos.test.ts` (el adaptador de la vista, con un reticular: un refuerzo por nervio, uno de ábacos, uno nuevo y unos cercos). En la app con la vivienda sólo se ha visto que la pantalla carga y elige un refuerzo sin errores: **estirar con el ratón no se ha probado a mano** (en el panel del navegador, la planta queda demasiado pequeña para coger un asa). Los bancos de Chrome no se han pasado.
+
+**No hecho:** los huecos de la losa no cuentan como bordes; a lo largo de las barras no se engancha a nada.
 
 ## 9. Fuera de esta fase
 
