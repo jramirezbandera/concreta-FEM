@@ -70,7 +70,7 @@ describe("la plantilla DXF (V2c-4)", () => {
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // Una obra nueva abre el gestor de plantas: aquí no se toca
     fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Plantas" }, { timeout: 10_000 })).getByRole("button", { name: "Cerrar" }));
 
     // Un plano en mm: un rectángulo de muros y una línea de cotas
     const bytes = escribirDxf(

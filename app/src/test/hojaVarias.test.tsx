@@ -88,7 +88,7 @@ describe("la hoja con varias filas elegidas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     fireEvent.click(within(screen.getByRole("dialog", { name: "Datos de la obra" })).getByRole("button", { name: "Más tarde" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Plantas" }, { timeout: 10_000 })).getByRole("button", { name: "Cerrar" }));
 
     elegirTabla("secciones");
     fireEvent.mouseDown(celda("secciones", 0, "id"));
