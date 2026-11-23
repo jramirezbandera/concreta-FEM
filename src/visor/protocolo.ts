@@ -48,7 +48,8 @@ export type Pedido =
   /** El 3D alámbrico del modelo físico (I2). */
   | { tipo: "alambrico" }
   /** El 3D sólido: las secciones extruidas, con sus aristas (I3). */
-  | { tipo: "solido" }
+  /** `casetones: false`: los reticulares, sin sus casetones (como una maciza de su canto). */
+  | { tipo: "solido"; casetones?: false }
   | { tipo: "objeto"; id: string }
   | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa; malla?: boolean; envolvente?: Envolvente }
   | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number; escala?: EscalaMapa; envolvente?: Envolvente }
@@ -78,7 +79,7 @@ export type Pedido =
   | ({ tipo: "armado3d" } & PedidoArmado3D)
   | ({ tipo: "valor-armado" } & PedidoValorArmado)
   /** CO6 (§8.16): los refuerzos de las losas, barra a barra, en el 3D (null: todas las plantas). */
-  | { tipo: "armado-losas-3d"; planta: string | null; armado?: ArmadoProyecto; cara?: CaraDibujada; datos?: DatosArmadoObra }
+  | { tipo: "armado-losas-3d"; planta: string | null; armado?: ArmadoProyecto; cara?: CaraDibujada; /** También la armadura base (por defecto, no). */ base?: boolean; datos?: DatosArmadoObra }
   /** `provisional`: sin el peso propio calculado, para enseñarla antes (luego se pide sin él). */
   | { tipo: "revision"; provisional?: boolean }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */

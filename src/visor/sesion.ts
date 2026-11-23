@@ -93,7 +93,7 @@ export type VistaResultadosPlanta = (
   | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number }
   /** CO6-d: las partes de un tipo de comprobación, del color de su aprovechamiento; el armado va en el pedido, como el de AB. */
   /** `dibujo: "armado"` (§8.11): con el armado en barras dibujado; `cara`, los refuerzos de las losas que se ven. */
-  | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto; dibujo?: "armado"; cara?: CaraDibujada; /** En un reticular, sus casetones de fondo (por defecto, sí). */ reticula?: boolean; /** Los datos de armado de la obra, si han cambiado desde que se abrió (`Sesion.datosArmado`). */ datos?: DatosArmadoObra }
+  | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto; dibujo?: "armado"; cara?: CaraDibujada; /** En un reticular, sus casetones de fondo (por defecto, sí). */ reticula?: boolean; /** También la armadura base de las losas, barra a barra (por defecto, no). */ base?: boolean; /** Los datos de armado de la obra, si han cambiado desde que se abrió (`Sesion.datosArmado`). */ datos?: DatosArmadoObra }
 ) & { malla?: boolean };
 
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
@@ -689,7 +689,7 @@ export class Sesion {
           e = { ...r.valor, primitivas: [...r.valor.primitivas.filter((p) => p.tipo !== "texto"), ...m.primitivas, ...textos], leyenda: [...r.valor.leyenda, ...m.leyenda], notas: [...r.valor.notas, ...m.notas] };
         } else if (v.vista === "malla") e = vistaMalla(rr, planta, d);
         else if (v.vista === "comprobacion") {
-          const c = v.dibujo === "armado" ? vistaArmadoBarras(this, planta, v.de, v.armado, d, v.cara, v.reticula !== false) : vistaComprobacion(this, planta, v.de, v.armado, d);
+          const c = v.dibujo === "armado" ? vistaArmadoBarras(this, planta, v.de, v.armado, d, v.cara, v.reticula !== false, v.base === true) : vistaComprobacion(this, planta, v.de, v.armado, d);
           if (!c.valido) return c;
           e = c.valor;
         }
@@ -771,15 +771,18 @@ export class Sesion {
   }
 
   private solidoC: Solido | null = null;
+  private solidoLisoC: Solido | null = null;
 
   /**
    * El 3D sólido (I3), en el origen del 3D y con las viguetas de la compilación si compila. Se hace
    * una vez (en el reticular grande, ~1,5 s) y se da una copia: la respuesta se va por Transferable.
    * Sin paños no usa la compilación, así que no la espera.
    */
-  solido(): Solido {
+  solido(casetones = true): Solido {
     const f = this.proyecto.modelo;
-    const x = (this.solidoC ??= solido(f, this.origen3D, f.panos?.length ? this.compilado : null));
+    const hacer = (c: boolean) => solido(f, this.origen3D, f.panos?.length ? this.compilado : null, c ? {} : { casetones: false });
+    // §8.20: sin los casetones de los reticulares (si no hay ninguno, es el mismo)
+    const x = casetones || !f.losas?.some((l) => l.reticular) ? (this.solidoC ??= hacer(true)) : (this.solidoLisoC ??= hacer(false));
     return { ...x, triangulos: x.triangulos.slice(), objeto: x.objeto.slice(), planta: x.planta.slice(), caseton: x.caseton.slice(), aristas: x.aristas.slice(), objetoArista: x.objetoArista.slice(), plantaArista: x.plantaArista.slice() };
   }
 

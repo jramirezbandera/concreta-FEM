@@ -71,7 +71,7 @@ import { fmt } from "../fmt.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Solido } from "../../../src/visor/solido.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
-import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
+import { CLASE_BASE, CLASE_CERCOS, SIN_OBJETO, type Diagramas3D } from "../../../src/visor/diagramas3d.ts";
 import type { MallaIsovalores } from "../../../src/visor/isovalores3d.ts";
 import { SIN_BANDA, type Pilares3D } from "../../../src/visor/pilares3d.ts";
 import { COLOR_REACCION, type Reacciones3D } from "../../../src/visor/reacciones3d.ts";
@@ -317,6 +317,8 @@ export class Vista3D extends Vista {
   private diag: Diagramas3D | null = null;
   private iso: MallaIsovalores | null = null;
   private objsDiag: (Mesh | LineSegments2)[] = [];
+  /** §8.20: las líneas de los diagramas que llevan objeto (los refuerzos de las losas), para elegirlas. */
+  private diagElegible: { segmentos: Float32Array; objeto: Uint32Array } | null = null;
   private objsIso: (Mesh | LineSegments)[] = [];
   private pil: Pilares3D | null = null;
   private reac: Reacciones3D | null = null;
@@ -573,6 +575,7 @@ export class Vista3D extends Vista {
   ponerElegidos(ids: ReadonlySet<string>): void {
     this.elegidos = ids;
     this.construirElegidos();
+    if (this.diag?.objetos) this.construirDiagramas();
     if (this.carg) this.construirCargas(false);
     if (this.malla) this.colores();
     this.entorno.pintar();
@@ -981,17 +984,54 @@ export class Vista3D extends Vista {
         o.renderOrder = 6;
         this.objsDiag.push(o);
       }
-    }
+      // §8.20: las líneas con objeto (se eligen) y, encima, las de lo elegido
+      this.diagElegible = null;
+      if (d.objetos && d.objetoLinea) {
+        const [seg, obj, sel]: [number[], number[], number[]] = [[], [], []];
+        for (let i = 0; i < d.objetoLinea.length; i++) {
+          const k = d.objetoLinea[i]!;
+          if (k === SIN_OBJETO) continue;
+          for (let j = 0; j < 6; j++) seg.push(d.lineas[6 * i + j]!);
+          obj.push(k);
+          if (this.elegidos.has(d.objetos[k]!)) for (let j = 0; j < 6; j++) sel.push(d.lineas[6 * i + j]!);
+        }
+        this.diagElegible = { segmentos: Float32Array.from(seg), objeto: Uint32Array.from(obj) };
+        if (sel.length) {
+          const g = new LineSegmentsGeometry();
+          g.setPositions(sel);
+          MAT.elegidas.color.set(this.entorno.colores().seleccion);
+          const o = this.situar(new LineSegments2(g, MAT.elegidas), d.origen);
+          o.renderOrder = 11;
+          this.objsDiag.push(o);
+        }
+      }
+    } else this.diagElegible = null;
     this.entorno.pintar();
+  }
+
+  /** §8.20: el objeto de una línea de los diagramas bajo un píxel (un refuerzo o unos cercos de una losa); null si ninguno. */
+  diagramaEn(x: number, y: number): string | null {
+    const d = this.diag;
+    const e = this.diagElegible;
+    if (!d?.objetos || !e) return null;
+    const h = this.segmentoEn(e.segmentos, d.origen, x, y, RADIO_CLIC);
+    if (!h) return null;
+    const P = [0, 1, 2].map((j) => e.segmentos[6 * h.i + j]! + h.t * (e.segmentos[6 * h.i + 3 + j]! - e.segmentos[6 * h.i + j]!) + d.origen[j]!);
+    return this.enCaja(P[0]!, P[1]!, P[2]!) ? (d.objetos[e.objeto[h.i]!] ?? null) : null;
   }
 
   /** El color de cada segmento de las curvas: el trazo de su signo. */
   private coloresCurvas(d: Diagramas3D): Float32Array {
     const t = this.entorno.tema();
     const [cp, cn] = [new Color(pintura("diagrama-positivo", t).stroke ?? "#b91c1c"), new Color(pintura("diagrama-negativo", t).stroke ?? "#1d4ed8")];
+    // §8.20: la armadura base, a medio camino del fondo; los cercos, en su color
+    const fondo = new Color(this.entorno.colores().fondo);
+    const [bp, bn] = [cp.clone().lerp(fondo, 0.55), cn.clone().lerp(fondo, 0.55)];
+    const cc = new Color(pintura("armado-cercos", t).stroke ?? "#0f766e");
     const col = new Float32Array(d.lineas.length);
     for (let i = 0; i < d.signoLinea.length; i++) {
-      const c = d.signoLinea[i] ? cp : cn;
+      const k = d.claseLinea?.[i] ?? 0;
+      const c = k === CLASE_CERCOS ? cc : k === CLASE_BASE ? (d.signoLinea[i] ? bp : bn) : d.signoLinea[i] ? cp : cn;
       for (let j = 0; j < 2; j++) col.set([c.r, c.g, c.b], 6 * i + 3 * j);
     }
     return col;
@@ -1566,8 +1606,8 @@ export class Vista3D extends Vista {
   protected clic(x: number, y: number, ctrl: boolean, doble: boolean): void {
     const v = this.cuboEn(x, y);
     if (v) return this.vistaEstandar(v);
-    // Las cargas, antes que las piezas que cargan
-    const o = this.cargaEn(x, y) ?? this.objetoEn(x, y);
+    // Las cargas y el armado dibujado, antes que las piezas que los llevan
+    const o = this.cargaEn(x, y) ?? this.diagramaEn(x, y) ?? this.objetoEn(x, y);
     this.eventos.elegir?.(o ? [o] : [], ctrl, doble);
   }
 

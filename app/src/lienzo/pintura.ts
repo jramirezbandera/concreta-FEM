@@ -74,6 +74,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "armado-inferior": { stroke: "#60a5fa", sw: 2.4 },
   "armado-inferior-fino": { stroke: "#60a5fa", sw: 1 },
   "armado-inferior-nervio": { stroke: "#60a5fa", sw: 1.7 },
+  "armado-inferior-base": { stroke: "#4470ad", sw: 1 },
+  "armado-superior-base": { stroke: "#ad5252", sw: 1 },
   "armado-superior-nervio": { stroke: "#f87171", sw: 1.7 },
   "armado-inferior-zona": { stroke: "#60a5fa", sw: 0.8, dash: "5 4" },
   "armado-superior": { stroke: "#f87171", sw: 2.4 },

@@ -55,6 +55,12 @@ export interface ExtremoDiagrama {
   comb?: string;
 }
 
+/** Clases de una línea (`claseLinea`): la de siempre, más tenue (la armadura base) o del color de los cercos. */
+export const CLASE_BASE = 1;
+export const CLASE_CERCOS = 2;
+/** En `objetoLinea`: la línea no es de ningún objeto (no se elige). */
+export const SIN_OBJETO = 0xffffffff;
+
 export interface Diagramas3D {
   esfuerzo: Esfuerzo3D;
   unidad: string;
@@ -67,6 +73,14 @@ export interface Diagramas3D {
   /** Segmentos de las curvas y su signo (1 positivo, 0 negativo). */
   lineas: Float32Array;
   signoLinea: Uint8Array;
+  /**
+   * §8.20 (el armado de las losas): lo que se elige con un clic en sus líneas (los ids, los de la
+   * planta) y el de cada línea (índice en `objetos`, o `SIN_OBJETO`). Sin ellos, las líneas no se eligen.
+   */
+  objetos?: string[];
+  objetoLinea?: Uint32Array;
+  /** La clase de cada línea (0, la de su signo; `CLASE_BASE`; `CLASE_CERCOS`). */
+  claseLinea?: Uint8Array;
   /** El máximo y el mínimo de lo que se ve. */
   extremos: ExtremoDiagrama[];
   /** Los de cada pieza que se ve (para rotular las elegidas). */

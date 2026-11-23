@@ -105,6 +105,8 @@ export type Estilo =
   | "armado-inferior-fino"
   /** La barra de un refuerzo sobre cada nervio que arma (más fina que la de un refuerzo a una separación). */
   | "armado-inferior-nervio"
+  | "armado-inferior-base"
+  | "armado-superior-base"
   | "armado-superior-nervio"
   | "armado-inferior-zona"
   | "armado-superior"

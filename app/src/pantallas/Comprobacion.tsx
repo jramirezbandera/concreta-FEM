@@ -118,8 +118,12 @@ const DIBUJOS: { id: Dibujo; nombre: string; title: string }[] = [
   { id: "aprovechamiento", nombre: "Aprovechamiento", title: "La planta con cada pieza del color de su aprovechamiento, sin el armado" },
 ];
 const RETICULA: { id: "si" | "no"; nombre: string; title: string }[] = [
-  { id: "si", nombre: "Sí", title: "En un reticular, sus casetones de fondo: los nervios van entre ellos" },
-  { id: "no", nombre: "No", title: "Sin los casetones: sólo el armado" },
+  { id: "si", nombre: "Sí", title: "En un reticular, sus casetones de fondo, en la planta y en el 3D sólido o translúcido: los nervios van entre ellos" },
+  { id: "no", nombre: "No", title: "Sin los casetones, en la planta y en el 3D: sólo el armado" },
+];
+const BASE: { id: "si" | "no"; nombre: string; title: string }[] = [
+  { id: "no", nombre: "No", title: "Sólo los refuerzos y los cercos: la armadura base es de toda la losa y va en la leyenda" },
+  { id: "si", nombre: "Sí", title: "También la armadura base, barra a barra y más fina, en la planta y en el 3D: en un reticular, una línea por nervio" },
 ];
 const CARAS: { id: CaraDibujada; nombre: string; title: string }[] = [
   { id: "todas", nombre: "Todo", title: "Los refuerzos de las dos caras (los inferiores en azul y los superiores en rojo) y los cercos de los nervios" },
@@ -148,10 +152,10 @@ const aprov = (x: number | null) => (x === null ? "—" : fmt(x, 2));
  * §8.16: el 3D de Comprobación con las losas a la vista: los refuerzos de las losas barra a barra, en la
  * cota de su cara (los superiores en rojo y los inferiores en azul), sobre el modelo en alámbrico.
  */
-function Armado3DLosas({ armado, cara, datos }: { armado: ArmadoProyecto | undefined; cara: CaraDibujada; datos: DatosArmado }) {
+function Armado3DLosas({ armado, cara, datos, base, reticula }: { armado: ArmadoProyecto | undefined; cara: CaraDibujada; datos: DatosArmado; base: boolean; reticula: boolean }) {
   const { proyecto } = useVisor();
-  const r = usePedido(proyecto.cliente, { tipo: "armado-losas-3d", planta: null, ...(armado ? { armado } : {}), ...(cara !== "todas" ? { cara } : {}), datos });
-  return <Fuente3DModelo resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Armado de las losas", notas: r.datos.notas } : null, cargando: r.cargando }} />;
+  const r = usePedido(proyecto.cliente, { tipo: "armado-losas-3d", planta: null, ...(armado ? { armado } : {}), ...(cara !== "todas" ? { cara } : {}), ...(base ? { base } : {}), datos });
+  return <Fuente3DModelo casetones={reticula} resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Armado de las losas", notas: r.datos.notas } : null, cargando: r.cargando }} />;
 }
 
 function estadoDe(p: ParteComprobada): {
@@ -840,6 +844,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   const [cara, setCara] = useState<CaraDibujada>("todas");
   /** Los casetones de los reticulares, de fondo del armado de las losas. */
   const [reticula, setReticula] = useState(true);
+  const [base, setBase] = useState(false);
   const [anadir, setAnadir] = useState<string>("");
   const [anadirEn, setAnadirEn] = useState<"nervios" | "abacos">("nervios");
   const [avisoPlanta, setAvisoPlanta] = useState<string | null>(null);
@@ -1130,7 +1135,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       <Separador />
       <Segmentado etiqueta="En planta" opciones={DIBUJOS} valor={dibujo} onCambio={setDibujo} />
       {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Se ve" opciones={CARAS} valor={cara} onCambio={setCara} />}
-      {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Casetones" opciones={RETICULA} valor={reticula ? "si" : "no"} onCambio={(v) => setReticula(v === "si")} />}
+      {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Base" opciones={BASE} valor={base ? "si" : "no"} onCambio={(v) => setBase(v === "si")} />}
+      {tipo === "losas" && dibujo === "armado" && hayReticular && <Segmentado etiqueta="Retícula" opciones={RETICULA} valor={reticula ? "si" : "no"} onCambio={(v) => setReticula(v === "si")} />}
       {editable && (
         <div role="group" aria-label="Añadir a una losa" className="flex items-center gap-1.5">
           <select className="sel" style={{ height: 28 }} value={anadir} onChange={(x) => setAnadir(x.target.value)} aria-label="Añadir a una losa" title="Un refuerzo o una zona de cercos nuevos: elija cuál y dé en la planta dos esquinas opuestas de su zona">
@@ -1416,8 +1422,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           <ZonaVistas
             fuentes={{
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
-              ...(tipo === "losas" && dibujo === "armado" ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} /> } : {}),
-              planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
+              ...(tipo === "losas" && dibujo === "armado" ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
+              planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
               cabeceraPlanta: () => (
                 <>
                   <Chip acento>

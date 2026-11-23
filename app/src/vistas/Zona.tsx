@@ -900,7 +900,7 @@ export function Fuente3D({ alambrico, solido = null, analitico = null, deformada
 }
 
 /** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir; con resultados (I4) o con las cargas de un caso, encima. */
-export function Fuente3DModelo({ deformada, modo, resultados, cargas }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D; cargas?: { datos: Cargas3D | null; aviso?: ReactNode; cargando?: boolean } }) {
+export function Fuente3DModelo({ deformada, modo, resultados, cargas, casetones }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D; cargas?: { datos: Cargas3D | null; aviso?: ReactNode; cargando?: boolean }; /** false: el sólido de los reticulares, sin sus casetones. */ casetones?: boolean }) {
   const { proyecto, elegidos, setElegidos } = useVisor();
   const { v } = useCelda();
   const e = proyecto.estado!;
@@ -908,7 +908,7 @@ export function Fuente3DModelo({ deformada, modo, resultados, cargas }: { deform
   // Con resultados, el sólido taparía lo pintado: pasa a alámbrico (`modo3dVisto`)
   const modoEf: Modo3D = modo ?? modo3dVisto(v.modo3d, !!resultados);
   const quiereSolido = modoEf === "solido" || modoEf === "translucido";
-  const sol = usePedido(proyecto.cliente, quiereSolido ? { tipo: "solido" } : null);
+  const sol = usePedido(proyecto.cliente, quiereSolido ? { tipo: "solido", ...(casetones === false ? { casetones: false as const } : {}) } : null);
   const quiereAnalitico = modoEf === "analitico" && e.compila;
   const geo = usePedido(proyecto.cliente, quiereAnalitico ? { tipo: "geometria" } : null);
   const ultimo = useRef(elegidos);

@@ -20,6 +20,7 @@
  * El color de cada pieza sigue siendo el de su aprovechamiento. Dónde va cada barra lo dice
  * `comprobaciones/dibujoArmado.ts`; los números (aprovechamientos) son los de las fichas.
  */
+import { baseDibujada } from "./armadoBase.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { recorteTramos, regionesLosas, trozosEnLosa } from "../agente/render/armado.ts";
 import { bandaPolilinea, numeroFijo, type EntradaLeyenda, type Escena, type Estilo, type ExtremoRotulado, type Primitiva } from "../agente/render/escena.ts";
@@ -118,8 +119,9 @@ const NOMBRE_ARMADURA = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf":
  * La planta con el armado en barras dibujado: la escena de la vista `comprobacion` con `dibujo: "armado"`.
  * `reticula`: en un reticular, sus casetones de fondo (por defecto, sí): los nervios son lo que queda
  * entre ellos. Con ella o sin ella, cada refuerzo por nervio se dibuja con una barra sobre cada nervio que arma.
+ * `base` (§8.20; por defecto, no): también la armadura base de las losas, barra a barra y más fina.
  */
-export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined, d: DatosVista, cara: CaraDibujada = "todas", reticula = true): Resultado<Escena> {
+export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined, d: DatosVista, cara: CaraDibujada = "todas", reticula = true, base = false): Resultado<Escena> {
   const r = alDia(s, tipo, armado);
   if (!r.valido) return r;
   const pl = new PlantaFisica(s.proyecto.modelo, planta);
@@ -269,6 +271,8 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     let hayNervios = false;
     let porNervios = false;
     let porZona = false;
+    const carasBase = new Set<"inferior" | "superior">();
+    let baseSalteada = false;
     const puntosPilares = pl.pilares().map((x): Vec2 => [x.p.x, x.p.y]);
     const ejesVigas = pl.enPlanta(pl.f.vigas).map((v) => v.puntos);
     // Lo macizo de la planta además de los ábacos: las huellas de las vigas y de los pilares (ahí no hay casetón)
@@ -298,6 +302,13 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
         if (cs.length) hayNervios = true;
         for (const anillos of cs) P.push({ tipo: "poligono", anillos, estilo: "armado-caseton" });
       }
+      // §8.20: la armadura base, barra a barra y más fina, debajo de lo demás
+      if (base)
+        for (const b of baseDibujada(l, a, region, cara)) {
+          carasBase.add(b.cara);
+          if (b.una > 1) baseSalteada = true;
+          for (const tr of b.tramos) P.push({ tipo: "linea", puntos: tr, estilo: b.cara === "inferior" ? "armado-inferior-base" : "armado-superior-base", objeto: p.pieza });
+        }
       // Los cercos de los nervios: el contorno de su zona, a trazos, y un punto por cerco sobre el eje de cada nervio
       const zonasCercos = cara === "todas" || cara === "cercos" ? cercosDibujados(l.eje1, a) : [];
       const nervios = zonasCercos.length ? nerviosLosa(l) : [];
@@ -371,6 +382,9 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     }
     if (caras.has("inferior")) leyenda.push({ estilo: "armado-inferior", texto: "Refuerzo inferior: la barra y lo que cubre" });
     if (caras.has("superior")) leyenda.push({ estilo: "armado-superior", texto: "Refuerzo superior: la barra y lo que cubre" });
+    if (carasBase.has("inferior")) leyenda.push({ estilo: "armado-inferior-base", texto: "Armadura base inferior" });
+    if (carasBase.has("superior")) leyenda.push({ estilo: "armado-superior-base", texto: "Armadura base superior" });
+    if (carasBase.size) notas.push(`La armadura base, más fina: en un reticular, una línea por nervio; en una maciza, una barra cada separación${baseSalteada ? " (con muchas, una de cada pocas)" : ""}. Cada cara va 3 cm a un lado de su sitio, para que se vean las dos.`);
     if (hayCercos) leyenda.push({ estilo: "armado-cercos-punto", texto: "Cercos de los nervios: un punto por cerco, con sus ramas (R)" });
     if (hayNervios) leyenda.push({ estilo: "armado-caseton", texto: "Casetones del reticular: los nervios van entre ellos" });
     if (porNervios) notas.push("En los nervios, cada refuerzo se dibuja con una barra sobre el eje de cada nervio que arma, unidas por su línea de reparto. Rótulo: cuántos nervios, las barras de cada uno y su largo. Se suma a la armadura base.");

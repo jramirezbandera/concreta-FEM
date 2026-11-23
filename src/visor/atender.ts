@@ -106,7 +106,7 @@ export class Atendedor {
       case "alambrico":
         return bien("alambrico", alambrico(s.proyecto.modelo));
       case "solido":
-        return bien("solido", s.solido());
+        return bien("solido", s.solido(p.casetones !== false));
       case "objeto":
         return de(datosObjeto(s, p.id));
       case "losas":
@@ -129,7 +129,7 @@ export class Atendedor {
         return de(s.armado3D(p));
       case "armado-losas-3d":
         if (p.datos !== undefined) s.datosArmado = p.datos;
-        return de({ valido: true as const, valor: armadoLosas3D(s.proyecto.modelo, s.origen3D, p.armado, s.datosArmado, { planta: p.planta, ...(p.cara ? { cara: p.cara } : {}) }) });
+        return de({ valido: true as const, valor: armadoLosas3D(s.proyecto.modelo, s.origen3D, p.armado, s.datosArmado, { planta: p.planta, ...(p.cara ? { cara: p.cara } : {}), ...(p.base ? { base: true } : {}) }) });
       case "valor-armado":
         return de(s.valorArmado(p));
       case "franja":

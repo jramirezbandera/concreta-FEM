@@ -960,6 +960,21 @@ Lo que quedaba de §8.18: al estirar, mover o añadir en la planta un refuerzo p
 
 **No hecho:** los huecos de la losa no cuentan como bordes; a lo largo de las barras no se engancha a nada.
 
+### 8.20 CO6: el armado de las losas en el 3D se elige y se resalta; la armadura base y la retícula, a voluntad (2026-11-23)
+
+De la quinta prueba de uso: en el 3D del armado de las losas no se podía elegir un refuerzo ni se veía cuál estaba elegido, y ni en la planta ni en el 3D se podía poner la armadura base o quitar la retícula del reticular. El cálculo, las comprobaciones y lo que se propone no cambian.
+
+**Por qué no se elegía:** los refuerzos iban al 3D como líneas sin identidad (la estructura de los diagramas de las barras), así que un clic sólo podía dar la losa de detrás y lo elegido en la tabla no tenía qué resaltar.
+
+- **Cada línea, con su objeto** (`Diagramas3D.objetos`, `objetoLinea`; `src/visor/armadoLosas3d.ts`): el refuerzo `<losa>/R<n>` o los cercos `<losa>/C<n>`, los ids de la planta. En el 3D (`app/src/vistas/vista3d.ts`), un clic en una línea elige su objeto antes que la pieza de detrás (`diagramaEn`), y lo elegido —con un clic en el 3D, en la planta o en la tabla de refuerzos— se pinta encima en el color de la selección.
+- **Los cercos de los nervios, también en el 3D:** el contorno de cada zona, a media altura de la losa y en su color (`CLASE_CERCOS`); con «Se ve: Cercos», sólo ellos (antes, nada).
+- **«Base: No | Sí»** (por defecto, no: es de toda la losa y sigue en palabras en la leyenda), en la planta y en el 3D (`baseDibujada` en `src/visor/armadoBase.ts`, común a los dos): en un reticular, una línea por cada nervio paralelo a la armadura, en su zona aligerada; en una maciza, una barra cada separación de lado a lado, recortada con la losa (con más de 80, una de cada pocas). Más fina y más tenue que los refuerzos, y sin objeto: un clic en ella elige la losa. Las dos caras de una dirección caerían en la misma línea, así que la inferior va 3 cm a un lado de su sitio y la superior al otro. Sigue a «Se ve» (una cara, la suya).
+- **«Retícula: Sí | No»** (antes «Casetones», y sólo con algún reticular en el proyecto): en la planta, los casetones de fondo, como en §8.18; en el 3D sólido o translúcido, el sólido de los reticulares sin sus casetones (`OpcionesSolido.casetones`, pedido `solido` con `casetones: false`, con su propia copia en la sesión). En alámbrico no hay retícula que quitar.
+
+**Validación:** `src/visor/armadoBase.test.ts` (la base de una maciza con hueco y de un reticular, el salto con muchas barras, el objeto y la clase de cada línea del 3D, la base sin objeto, y el sólido sin casetones: el volumen de la maciza de su canto), con `comprobaciones.test.ts`, `solido.test.ts` y `diferida.test.ts` sin cambios. En la app con la vivienda: un clic en un refuerzo en el 3D lo elige, lo resalta y abre el armado de su losa; «Base: Sí» pinta la base; en translúcido, «Retícula: No» deja la losa lisa. `validacion/co6/planta.ts … --base` saca la planta con la base. Los bancos de Chrome no se han pasado.
+
+**No hecho:** elegir con ventana en el 3D no coge refuerzos; los refuerzos no se estiran ni se añaden en el 3D (eso, en la planta); la parrilla de los ábacos no se dibuja como base.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

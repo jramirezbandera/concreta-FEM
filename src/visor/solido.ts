@@ -730,11 +730,16 @@ function cantoPano(f: ModeloFisico, seccion: string): number | null {
   return fs && !fs.sinForma ? fs.h : null;
 }
 
+/** `casetones: false`: los reticulares se dibujan sin sus casetones, como una maciza de su canto (§8.20: para ver el armado sin la retícula). */
+export interface OpcionesSolido {
+  casetones?: boolean;
+}
+
 /**
  * Las piezas del sólido, con sus caras en coordenadas del modelo (Float64). Con `compilado`, los
  * paños con sus viguetas; sin él, como placas.
  */
-export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null): { piezas: PiezaSolida[]; notas: string[] } {
+export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null, o: OpcionesSolido = {}): { piezas: PiezaSolida[]; notas: string[] } {
   // MA2: los ábacos que usa el compilador (los de los pilares y los unidos)
   f = resolverAbacos(f).modelo;
   const plantas = (f.plantas ?? []).map((p) => p.id);
@@ -955,7 +960,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const e = l.espesor;
     const vs = vigasEn(k, region);
     const enViga = (q: Vec2) => vs.some((v) => dentroAnillos(q, [v.huella]));
-    if (!ret || !(ret.capa > 0 && ret.capa < e && ret.nervio > 0 && ret.intereje > ret.nervio)) {
+    if (!ret || o.casetones === false || !(ret.capa > 0 && ret.capa < e && ret.nervio > 0 && ret.intereje > ret.nervio)) {
       prismas(descomponer(region, vs.map((v) => [v.huella]), d), d, (fr) => bajoVigas(fr, 0, vs, zp, e, dz) ?? [[zc - e, zc]], caras);
     } else {
       const { intereje: s, nervio: bw, capa: hf } = ret;
@@ -1333,8 +1338,8 @@ export function aristasDe(caras: readonly Cara[]): [Vec3, Vec3][] {
  * El sólido en búferes: triángulos (en abanico de cada cara) con su objeto y su planta,
  * y las aristas de cada pieza, en Float32 respecto a `origen`.
  */
-export function solido(f: ModeloFisico, origen: [number, number, number], compilado?: CompiladoSolido | null): Solido {
-  const { piezas, notas } = piezasSolido(f, compilado);
+export function solido(f: ModeloFisico, origen: [number, number, number], compilado?: CompiladoSolido | null, o: OpcionesSolido = {}): Solido {
+  const { piezas, notas } = piezasSolido(f, compilado, o);
   const objetos: Solido["objetos"] = [];
   const indice = new Map<string, number>();
   let nt = 0;

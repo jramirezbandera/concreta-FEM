@@ -115,6 +115,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "armado-inferior": { stroke: "#1d4ed8", sw: 2.4 },
   "armado-inferior-fino": { stroke: "#1d4ed8", sw: 1 },
   "armado-inferior-nervio": { stroke: "#1d4ed8", sw: 1.7 },
+  "armado-inferior-base": { stroke: "#7ea2ee", sw: 1 },
+  "armado-superior-base": { stroke: "#ec8f8f", sw: 1 },
   "armado-superior-nervio": { stroke: "#dc2626", sw: 1.7 },
   "armado-inferior-zona": { stroke: "#1d4ed8", sw: 0.8, dash: "5 4" },
   "armado-superior": { stroke: "#dc2626", sw: 2.4 },
