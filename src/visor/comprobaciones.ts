@@ -18,6 +18,9 @@ import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { DATOS_ARMADO, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraPunzonamiento, type DatosArmado } from "../comprobaciones/armado.ts";
 import { armadoPropuestoLosas, comprobarLosas } from "../comprobaciones/losas.ts";
 import { armadoPropuesto, comprobarPilares } from "../comprobaciones/pilares.ts";
+import { solapesPilar } from "../comprobaciones/armar/pilares.ts";
+import { SITUACIONES_ELU } from "../comprobaciones/demandas/pilares.ts";
+import { datosViga, type Esfuerzo } from "./datos.ts";
 import { armadoPropuestoPunzonamiento, comprobarPunzonamientos } from "../comprobaciones/punzonamiento.ts";
 import { armadoPropuestoVigas, comprobarVigas } from "../comprobaciones/vigas.ts";
 import type { DatosDespiece } from "../comprobaciones/despieceVigas.ts";
@@ -101,9 +104,15 @@ export type ArmadoParte =
  * vano entre las caras de sus apoyos (m) y la sección de la losa.
  */
 export type GeometriaParte =
-  | { tipo: "pilares"; seccion?: { b: number; h: number } | { D: number } }
+  | {
+      tipo: "pilares";
+      seccion?: { b: number; h: number } | { D: number };
+      /** CO1-f: el tramo flexible (m) y el solape de cada diámetro en su pie (m), para sus zonas de cercos (`alzadoPilar`). */
+      libre?: number;
+      solapes?: Record<number, number>;
+    }
   | { tipo: "vigas"; seccion?: { b: number; h: number }; luz: number; apoyos: [string | null, string | null] }
-  | { tipo: "losas"; espesor: number; reticular?: { intereje: number; nervio: number; capa: number } }
+  | { tipo: "losas"; espesor: number; reticular?: { intereje: number; nervio: number; capa: number }; /** Es una losa de cimentación (CO3-k: admite la armadura mínima reducida). */ cimentacion?: true }
   | { tipo: "punzonamiento"; seccion?: { b: number; h: number } | { D: number }; d?: number; perimetros?: number; alcance?: number; posicion?: string };
 
 /** La ficha de una parte: todas las filas del módulo y su armado, como dato. */
@@ -207,13 +216,20 @@ const rect = (m: { b: number; h: number } | { D: number } | undefined) => (m && 
 function geometriaLosa(q: Consultas, id: string): GeometriaParte {
   const l = q.fisico.losas?.find((x) => x.id === id);
   const r = l?.reticular;
-  return { tipo: "losas", espesor: (l?.espesor ?? 0) * 1000, ...(r ? { reticular: { intereje: r.intereje * 1000, nervio: r.nervio * 1000, capa: r.capa * 1000 } } : {}) };
+  return { tipo: "losas", espesor: (l?.espesor ?? 0) * 1000, ...(r ? { reticular: { intereje: r.intereje * 1000, nervio: r.nervio * 1000, capa: r.capa * 1000 } } : {}), ...(l?.cimentacion !== undefined ? { cimentacion: true as const } : {}) };
 }
 
 /** La sección del tramo de un pilar que llega a una planta por debajo (la de su huella en la losa). */
 function seccionEnPlanta(q: Consultas, pilar: string, planta: string): { b: number; h: number } | { D: number } | undefined {
   const p = q.fisico.pilares?.find((x) => x.id === pilar);
   return p ? medidas(q, p.tramos?.find((t) => t.planta === planta)?.seccion ?? p.seccion) : undefined;
+}
+
+/** El fck del material de una sección, si es hormigón. */
+function fckDe(q: Consultas, seccion: string): number | undefined {
+  const sc = q.fisico.secciones.find((x) => x.id === seccion);
+  const m = sc && q.fisico.materiales.find((x) => x.id === sc.material);
+  return m?.tipo === "hormigon" ? m.fck : undefined;
 }
 
 const NOMBRE_ARMADURA: Record<string, string> = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf": "Y inferior", "y-sup": "Y superior" };
@@ -246,7 +262,7 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
           filas,
           armado: { tipo, ...(t.armado ? { armado: t.armado } : {}), ...(circulares.has(t.seccion) ? { circular: true as const } : {}) },
           datos: [{ nombre: "Combinaciones de ELU", valor: p.combinaciones }],
-          geometria: { tipo, ...(medidas(q, t.seccion) ? { seccion: medidas(q, t.seccion)! } : {}) },
+          geometria: { tipo, ...(medidas(q, t.seccion) ? { seccion: medidas(q, t.seccion)! } : {}), ...(t.libre !== undefined ? { libre: t.libre } : {}), ...(fckDe(q, t.seccion) !== undefined ? { solapes: solapesPilar(fckDe(q, t.seccion)!, datos) } : {}) },
         });
       }
     return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
@@ -355,15 +371,18 @@ export function alDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto 
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const cache = cacheDe(q)[tipo];
   const ids = piezasDe(q, tipo);
-  const faltan = ids.filter((id) => cache.piezas.get(id)?.con !== armadoDe(tipo, id, armado));
+  // Lo comprobado vale para su armado y para los datos de armado de la obra (cambian sin recalcular)
+  const obra = JSON.stringify(s.datosArmado ?? null);
+  const con = (id: string) => `${armadoDe(tipo, id, armado)}|${obra}`;
+  const faltan = ids.filter((id) => cache.piezas.get(id)?.con !== con(id));
   let comprobadas = 0;
   if (faltan.length) {
-    const r = comprobar(q, tipo, faltan, armado, s.proyecto.obra?.armado);
+    const r = comprobar(q, tipo, faltan, armado, s.datosArmado);
     if (!r.valido) return r;
     for (const id of faltan) {
       const fichas = r.valor.fichas.get(id) ?? [];
       comprobadas += fichas.length;
-      cache.piezas.set(id, { con: armadoDe(tipo, id, armado), fichas });
+      cache.piezas.set(id, { con: con(id), fichas });
     }
     // Los avisos que cuentan piezas («3 de 12 tramos sin armado») son de la llamada: se dan sólo los
     // de una llamada con todas; de una parcial, los demás que no estaban
@@ -388,7 +407,89 @@ export function datosPortico(s: Sesion, viga: string): Resultado<DatosPortico> {
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const portico = porticoDe(q, viga);
   if (!portico) return no("visor/comprobacion", `No hay ninguna viga «${viga}» con vanos.`);
-  return { valido: true, valor: { portico, despiece: datosDespiece(portico, s.proyecto.obra?.armado) } };
+  return { valido: true, valor: { portico, despiece: datosDespiece(portico, s.datosArmado) } };
+}
+
+/** Un punto de una envolvente: la coordenada del dibujo (m) y el máximo y el mínimo de las combinaciones. */
+export interface PuntoEsfuerzo {
+  x: number;
+  max: number;
+  min: number;
+}
+
+/**
+ * Las envolventes de ELU para dibujarlas con el armado (§8.14): por esfuerzo, sus tramos continuos
+ * (se cortan en las zonas rígidas) en la coordenada del dibujo. En un pórtico, su x; en un tramo de
+ * pilar, la altura desde la cara de su nudo de abajo. kN y kN·m.
+ */
+export interface DatosEsfuerzosArmado {
+  esfuerzos: Partial<Record<Esfuerzo, PuntoEsfuerzo[][]>>;
+  /** Qué combinaciones envuelven («ELU: 12 combinaciones»). */
+  combinaciones: string;
+}
+
+const ELU = { tipo: "situaciones" as const, situaciones: [...SITUACIONES_ELU] };
+
+/** Los puntos de una envolvente entre dos estaciones de su pieza, por tramos flexibles contiguos. */
+function tramosEnvolvente(v: { envolvente: { s: number; max: number; min: number }[]; flexibles: [number, number][] }, desde: number, hasta: number): { s: number; max: number; min: number }[][] {
+  const continuos: [number, number][] = [];
+  for (const [a, b] of [...v.flexibles].sort((x, y) => x[0] - y[0])) {
+    const u = continuos[continuos.length - 1];
+    if (u && a - u[1] < 1e-9) u[1] = Math.max(u[1], b);
+    else continuos.push([a, b]);
+  }
+  const r: { s: number; max: number; min: number }[][] = [];
+  for (const [a, b] of continuos) {
+    const [p, q] = [Math.max(a, desde), Math.min(b, hasta)];
+    if (!(q > p + 1e-9)) continue;
+    const ps = v.envolvente.filter((x) => x.s >= p - 1e-9 && x.s <= q + 1e-9);
+    if (ps.length > 1) r.push(ps);
+  }
+  return r;
+}
+
+/** Las envolventes de My y Vz de las vigas de un pórtico, en su x y en su sentido (pedido `esfuerzos-portico`). */
+export function esfuerzosPortico(s: Sesion, viga: string): Resultado<DatosEsfuerzosArmado> {
+  const q = s.q;
+  if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
+  const p = porticoDe(q, viga);
+  if (!p) return no("visor/comprobacion", `No hay ninguna viga «${viga}» con vanos.`);
+  const esfuerzos: DatosEsfuerzosArmado["esfuerzos"] = {};
+  let combinaciones = "";
+  for (const e of ["My", "Vz"] as const) {
+    const tramos: PuntoEsfuerzo[][] = [];
+    for (const v of p.vigas) {
+      const d = datosViga(s, v.id, e, ELU);
+      if (!d.valido) return d;
+      combinaciones = d.valor.combinaciones.descripcion;
+      for (const t of tramosEnvolvente(d.valor, -Infinity, Infinity)) {
+        // Una viga dibujada al revés: su s va de derecha a izquierda, y su cortante cambia de signo
+        const ps = t.map((x): PuntoEsfuerzo => (v.invertida ? { x: v.x[1] - x.s, max: e === "Vz" ? -x.min : x.max, min: e === "Vz" ? -x.max : x.min } : { x: v.x[0] + x.s, max: x.max, min: x.min }));
+        tramos.push(v.invertida ? ps.reverse() : ps);
+      }
+    }
+    esfuerzos[e] = tramos.sort((a, b) => a[0]!.x - b[0]!.x);
+  }
+  return { valido: true, valor: { esfuerzos, combinaciones } };
+}
+
+/** Las envolventes de N, My, Mz, Vy y Vz de un tramo de pilar (el de la cabeza en `planta`), desde la cara de su nudo de abajo (pedido `esfuerzos-pilar`). */
+export function esfuerzosTramoPilar(s: Sesion, pilar: string, planta: string): Resultado<DatosEsfuerzosArmado> {
+  const q = s.q;
+  if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
+  const ts = q.pilar(pilar);
+  if (!ts.valido) return ts;
+  const t = ts.valor.find((x) => x.planta === planta);
+  if (!t) return no("visor/comprobacion", `${pilar} no tiene ningún tramo con la cabeza en ${planta}.`);
+  const esfuerzos: DatosEsfuerzosArmado["esfuerzos"] = {};
+  let combinaciones = "";
+  for (const e of ["N", "My", "Mz", "Vz", "Vy"] as const) {
+    const d = datosViga(s, pilar, e, ELU);
+    if (!d.valido) return d;
+    combinaciones = d.valor.combinaciones.descripcion;
+    esfuerzos[e] = tramosEnvolvente(d.valor, t.base.s, t.cabeza.s).map((ps) => ps.map((x) => ({ x: x.s - t.base.s, max: x.max, min: x.min })));
+  }
+  return { valido: true, valor: { esfuerzos, combinaciones } };
 }
 
 export const sinFilas = ({ filas: _f, armado: _a, datos: _d, geometria: _g, recubrimiento: _r, ...p }: FichaComprobacion): ParteComprobada => p;
@@ -406,7 +507,7 @@ export function datosComprobaciones(s: Sesion, tipo: TipoComprobacion, armado: A
       tipo,
       partes,
       resumen: { piezas: new Set(partes.map((p) => p.pieza)).size, partes: partes.length, cumplen: partes.filter((p) => p.cumple).length, noCumplen: partes.filter((p) => !p.cumple).length, sinArmado },
-      datos: { ...DATOS_ARMADO, ...s.proyecto.obra?.armado },
+      datos: { ...DATOS_ARMADO, ...s.datosArmado },
       diagnosticos,
       comprobadas: r.valor.comprobadas,
     },
@@ -426,6 +527,8 @@ export function datosComprobacion(s: Sesion, tipo: TipoComprobacion, clave: stri
 export interface PedidoArmar {
   tipos: readonly TipoComprobacion[];
   armado?: ArmadoProyecto;
+  /** Los datos de armado de la obra con los que se propone (`Sesion.datosArmado`); sin ellos, los de la sesión. */
+  datos?: DatosArmado;
   /** Sólo estas piezas (pilares, vigas o losas; el punzonamiento, el de esos pilares). */
   ids?: readonly string[];
   /**
@@ -453,7 +556,7 @@ export interface DatosArmar {
 export function datosArmar(s: Sesion, p: PedidoArmar): Resultado<DatosArmar> {
   const q = s.q;
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
-  const datos = s.proyecto.obra?.armado;
+  const datos = s.datosArmado;
   const previo = p.armado;
   const armado: ArmadoProyecto = { ...previo };
   const resumen: DatosArmar["resumen"] = {};

@@ -12,6 +12,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { losaEnDosApoyos, losaPlana, PESO_HORMIGON, type VarianteLosaPlana } from "../../validacion/co/modelosLosas.ts";
+import { aceroLosa, conLosaCimentacion } from "../../validacion/co/medirMinimaReducida.ts";
+import { asMinRectangular } from "./concreta/lib/calculations/cuantiaMinima.ts";
+import { getConcrete, getFyd } from "./concreta/data/materials.ts";
+import { cuantiaGeometrica, FACTOR_MINIMA_REDUCIDA } from "./armado.ts";
 import { comprobarArmado } from "../agente/armaduraBase.ts";
 import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { compilar } from "../compilador/compilar.ts";
@@ -558,5 +562,92 @@ describe("CO3: las losas de un proyecto", () => {
     expect(comprobarArmado({ forjados: { L: { base: cuatro(D12A200) } } }, m)).toEqual([]);
     expect(comprobarArmado({ forjados: { L: { base: cuatro(D12A200), abacos: cuatro(D12A200), cercos: [] } } }, m).length).toBe(2);
     expect(comprobarArmado({ forjados: { L: { base: cuatro({ diametro: 12, n: 2 }) } } }, m).length).toBe(8);
+  });
+});
+
+describe("CO3-k: la armadura mínima reducida de las losas de cimentación", () => {
+  const REDUCIDA = { minimaReducidaCimentacion: true };
+  const montar = (o: Parameters<typeof conLosaCimentacion>[0] = {}) => {
+    const q = consultas(conLosaCimentacion(o));
+    return { q, d: demandas(q, "LC"), arriba: demandas(q, "L") };
+  };
+
+  it("sólo actúa en una losa de cimentación y donde no se llega a la mínima del módulo; sin la opción, nada cambia", () => {
+    const { d, arriba } = montar();
+    expect(d.cimentacion).toBe(true);
+    expect(arriba.cimentacion).toBe(false);
+    // La losa de arriba no es de cimentación: con la opción, lo mismo
+    expect(proponerLosa(arriba, REDUCIDA)).toEqual(proponerLosa(arriba, undefined));
+    // Un armado que ya llega a la mínima de (9.1): con la opción, las mismas filas
+    const sin = proponerLosa(d, undefined);
+    expect(sin.armado).not.toBeNull();
+    expect(comprobarLosa(d, armadoLosa(sin.armado!, REDUCIDA)).filas).toEqual(comprobarLosa(d, armadoLosa(sin.armado!, undefined)).filas);
+    expect(sin.comprobacion!.filas.some((f) => f.id.endsWith("/as-min-elu"))).toBe(false);
+  });
+
+  it("con la opción, la base baja hasta el suelo geométrico y lo que falta hasta 1,2 veces lo necesario en ELU va en refuerzos", () => {
+    const { d } = montar();
+    if (d.material.tipo !== "hormigon") throw new Error("sin hormigón");
+    const h = 1000 * d.espesor;
+    const minima = asMinRectangular(1000, h, getConcrete(d.material.fck).fctm, getFyd(500));
+    const suelo = cuantiaGeometrica(500) * 1000 * h;
+    expect(suelo).toBeCloseTo(540, 9);
+    expect(suelo).toBeLessThan(minima);
+    const [sin, con] = [proponerLosa(d, undefined), proponerLosa(d, REDUCIDA)];
+    for (const k of ARMADURAS_FORJADO) {
+      // Sin la opción, la base llega a la mínima del módulo; con ella, al suelo, y es la primera de la tabla que llega
+      expect(areaBarrasForjado(sin.armado!.base[k])).toBeGreaterThanOrEqual(minima);
+      const As = areaBarrasForjado(con.armado!.base[k]);
+      expect(As).toBeGreaterThanOrEqual(suelo);
+      expect(As).toBeLessThan(minima);
+      const anterior = tablaParrillas()[tablaParrillas().findIndex((b) => b.diametro === con.armado!.base[k].diametro && b.separacion === con.armado!.base[k].separacion) - 1]!;
+      expect(areaBarrasForjado(anterior)).toBeLessThan(suelo);
+    }
+    expect(con.comprobacion!.cumple).toBe(true);
+    expect(con.sinRefuerzo).toEqual([]);
+    expect((con.armado!.refuerzos ?? []).length).toBeGreaterThan(sin.armado!.refuerzos?.length ?? 0);
+    const area = 13 * 13;
+    const kg = (a: typeof con) => aceroLosa(a.armado!, area).base + aceroLosa(a.armado!, area).refuerzos;
+    expect(kg(con)).toBeLessThan(0.85 * kg(sin));
+    // Las filas: donde no llega a la mínima del módulo, el suelo y 1,2 veces la flexión de su mismo grupo
+    const filas = con.comprobacion!.filas;
+    const elu = filas.filter((f) => f.id.endsWith("/as-min-elu"));
+    expect(elu.length).toBeGreaterThan(0);
+    for (const f of elu) {
+      const flexion = filas.find((x) => x.id === `${f.armadura}/bending` && x.seccion === f.seccion && JSON.stringify(x.refuerzos) === JSON.stringify(f.refuerzos))!;
+      expect(f.aprovechamiento).toBeCloseTo(FACTOR_MINIMA_REDUCIDA * flexion.aprovechamiento, 12);
+      expect(f.aprovechamiento).toBeLessThanOrEqual(1 + 1e-9);
+      expect([f.franja, f.s, f.comb]).toEqual([flexion.franja, flexion.s, flexion.comb]);
+      const geo = filas.find((x) => x.id === `${f.armadura}/as-min` && x.seccion === f.seccion && JSON.stringify(x.refuerzos) === JSON.stringify(f.refuerzos))!;
+      expect(geo.descripcion).toContain("suelo geométrico");
+      expect(geo.aprovechamiento).toBeLessThanOrEqual(1 + 1e-9);
+    }
+    // El suelo, contra el acero de la base escrito aparte
+    const base = filas.find((f) => f.id === "x-inf/as-min" && f.refuerzos.length === 0 && f.descripcion.includes("suelo geométrico"))!;
+    // (el módulo redondea el área de cada barra: 113 mm² el Ø12, CO4-1)
+    expect(base.aprovechamiento).toBeCloseTo(suelo / areaBarrasForjado(con.armado!.base["x-inf"]), 3);
+    // Lo propuesto con la opción, comprobado sin ella, no cumple: le falta la mínima del módulo
+    const estricta = comprobarLosa(d, armadoLosa(con.armado!, undefined));
+    expect(estricta.cumple).toBe(false);
+    expect(estricta.filas.filter((f) => f.estado === "fail").every((f) => f.id.endsWith("/as-min"))).toBe(true);
+  });
+
+  it("una base bajo el suelo no vale, y donde 1,2·MEd pasa de MRd falla la fila de ELU aunque la flexión cumpla", () => {
+    const { d } = montar({ cm: 12, q: 20 });
+    const base = (b: BarrasForjado) => ({ "x-inf": b, "x-sup": b, "y-inf": b, "y-sup": b });
+    // Ø12/250 (452 mm²/m) no llega al suelo de 540
+    const corta = comprobarLosa(d, armadoLosa({ base: base({ diametro: 12, separacion: 250 }) }, REDUCIDA));
+    expect(corta.filas.some((f) => f.id.endsWith("/as-min") && f.estado === "fail" && f.descripcion.includes("suelo geométrico"))).toBe(true);
+    // Ø12/200 llega al suelo; con esta carga, bajo los pilares 1,2·MEd pasa de MRd
+    const justa = comprobarLosa(d, armadoLosa({ base: base({ diametro: 12, separacion: 200 }) }, REDUCIDA));
+    expect(justa.filas.filter((f) => f.id.endsWith("/as-min")).every((f) => f.estado !== "fail")).toBe(true);
+    const fallan = justa.filas.filter((f) => f.id.endsWith("/as-min-elu") && f.estado === "fail");
+    expect(fallan.length).toBeGreaterThan(0);
+    for (const f of fallan) expect(f.aprovechamiento).toBeGreaterThan(1);
+    // Las estaciones que piden refuerzo son las de 1,2·MEd > MRd: más que las de la flexión sola
+    const armado = armadoLosa({ base: base({ diametro: 12, separacion: 200 }) }, REDUCIDA);
+    const [conOpcion, soloFlexion] = [estacionesQueFallan(d, armado, "x-inf"), estacionesQueFallan(d, { ...armado, minimaReducida: false }, "x-inf")];
+    expect(conOpcion.length).toBeGreaterThan(soloFlexion.length);
+    for (const e of soloFlexion) expect(conOpcion).toContain(e);
   });
 });

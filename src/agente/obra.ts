@@ -90,6 +90,8 @@ export function comprobarObra(o: ObraProyecto | undefined, m: ModeloFisico): Dia
   rango(a?.recubrimientoZapatas, "El recubrimiento de las zapatas (recubrimientoZapatas)", 20, 150, " mm");
   if (a?.exposicion !== undefined && !EXPOSICIONES.includes(a.exposicion))
     r.push({ codigo: "obra/armado", severidad: "error", mensaje: `La clase de exposición de las armaduras de la obra tiene que ser una de ${EXPOSICIONES.join(", ")}, y es ${String(a.exposicion)}.` });
+  if (a?.minimaReducidaCimentacion !== undefined && typeof a.minimaReducidaCimentacion !== "boolean")
+    r.push({ codigo: "obra/armado", severidad: "error", mensaje: `La armadura mínima reducida de las losas de cimentación (minimaReducidaCimentacion) es true o false, y es ${String(a.minimaReducidaCimentacion)}.` });
   if (a?.flechaActiva !== undefined && !(FLECHAS_ACTIVAS as readonly number[]).includes(a.flechaActiva))
     r.push({ codigo: "obra/armado", severidad: "error", mensaje: `El límite de la flecha activa de la obra (flechaActiva) tiene que ser ${FLECHAS_ACTIVAS.join(", ")} (L/…), y es ${String(a.flechaActiva)}.` });
   // CO5: el terreno

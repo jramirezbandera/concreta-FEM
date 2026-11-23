@@ -1311,6 +1311,42 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .editor-armado { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 8px; align-items: start; }
 .editor-armado .croquis { margin: 4px 0 8px; }
 @media (max-width: 900px) { .editor-armado { grid-template-columns: 1fr; } }
+/* Las envolventes de ELU dibujadas con el armado (§8.14): bajo el despiece del pórtico y junto al alzado del pilar */
+.despiece-capas { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-secondary); }
+.despiece-capas label { display: inline-flex; align-items: center; gap: 3px; color: var(--color-text-primary); cursor: pointer; }
+.dp-esf-eje { stroke: var(--color-text-tertiary); stroke-width: 1; }
+.dp-esf-area { stroke: none; opacity: .22; }
+.dp-esf-linea { fill: none; stroke-width: 1.2; }
+.dp-esf-area[data-signo="pos"] { fill: var(--ca-inferior); }
+.dp-esf-area[data-signo="neg"] { fill: var(--ca-superior); }
+.dp-esf-area[data-signo="v"] { fill: #0d9488; }
+.dp-esf-linea[data-signo="pos"] { stroke: var(--ca-inferior); }
+.dp-esf-linea[data-signo="neg"] { stroke: var(--ca-superior); }
+.dp-esf-linea[data-signo="v"] { stroke: #0d9488; }
+.despiece .dp-esfuerzo text { font: 10px var(--font-mono); fill: var(--color-text-secondary); paint-order: stroke; stroke: var(--color-bg-surface); stroke-width: 3px; stroke-linejoin: round; }
+.despiece .dp-esfuerzo text.dp-esf-valor[data-signo="pos"] { fill: var(--ca-inferior); }
+.despiece .dp-esfuerzo text.dp-esf-valor[data-signo="neg"] { fill: var(--ca-superior); }
+.despiece .dp-esfuerzo text.dp-esf-valor[data-signo="v"] { fill: #0d9488; }
+.ca-esf-banda { fill: var(--color-accent); opacity: .16; stroke: none; }
+.ca-esf-linea { fill: none; stroke: var(--color-accent); stroke-width: 1.2; }
+.croquis text.ca-esf-valor { font-size: calc(var(--cq-letra, 11px) - 1px); }
+.croquis tspan.ca-unidad { fill: var(--color-text-tertiary); font-weight: 400; }
+.cq-guia { stroke: var(--color-text-tertiary); stroke-width: 1; }
+
+/* El banco de armado (Comprobación, panel de abajo): el dibujo de la pieza y, al lado, su formulario */
+.banco-armado { display: grid; grid-template-columns: minmax(0, 1fr) 390px; align-items: start; min-height: 100%; }
+.banco-armado[data-tipo="losas"] { grid-template-columns: 372px minmax(0, 1fr); }
+.banco-dibujo { min-width: 0; padding: 4px 0 8px; }
+.banco-dibujo > .croquis { margin: 4px auto 8px; max-width: 760px; }
+.banco-dibujo > .croquis[data-croquis-armado="pilar"] { max-width: 980px; }
+.banco-form { align-self: stretch; padding-bottom: 6px; border-left: 1px solid var(--color-border-main); }
+.banco-armado[data-tipo="losas"] .grupos-armado, .banco-armado[data-tipo="losas"] .lista-armado { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 0 16px; align-items: start; }
+@media (max-width: 1000px) {
+  .banco-armado, .banco-armado[data-tipo="losas"] { grid-template-columns: 1fr; }
+  .banco-form { border-left: 0; border-top: 1px solid var(--color-border-main); }
+}
+.minima-reducida { margin: 8px 14px 4px; padding: 7px 10px; border: 1px solid var(--color-border-sub); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--color-text-primary); }
+.minima-reducida p { margin-top: 4px; font-size: 11.5px; color: var(--color-text-secondary); }
 .enlace-armado { font-size: 11.5px; color: var(--color-accent-text, var(--color-accent)); }
 .enlace-armado:hover { text-decoration: underline; }
 .elemento-armado { margin-top: 5px; padding: 4px 6px 5px 8px; border-left: 3px solid var(--color-border-strong); border-radius: 0 6px 6px 0; }

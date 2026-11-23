@@ -4,8 +4,8 @@
  *
  * - **Losas:** cada refuerzo con su barra (a lo largo de las suyas, de punta a punta de su zona), su
  *   línea de reparto (lo que cubre en transversal) y su rótulo («Ø12/200 · 2,40 m»), los inferiores en
- *   azul y los superiores en rojo; las zonas de cercos de los nervios, rayadas en la dirección de los
- *   cercos; la armadura base, en la leyenda. Todo recortado con la losa. Cada refuerzo y cada zona de
+ *   azul y los superiores en rojo; los cercos de los nervios, un punto por cerco sobre el eje de cada
+ *   nervio de su zona (su contorno, a trazos), rotulados con sus ramas; la armadura base, en la leyenda. Todo recortado con la losa. Cada refuerzo y cada zona de
  *   cercos se elige por su id (`<losa>/R<n>`, `<losa>/C<n>`: `idElemento` del editor).
  *   Cada refuerzo va acotado a lo largo de sus barras (§8.12, `cotasRefuerzo`) respecto a los pilares
  *   de su ancho y a los ejes de las vigas que lo cruzan: lo que sale a cada lado del eje que tiene
@@ -22,13 +22,14 @@
  */
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { recorteTramos, regionesLosas, trozosEnLosa } from "../agente/render/armado.ts";
-import { bandaPolilinea, numeroFijo, rayado, type EntradaLeyenda, type Escena, type Estilo, type ExtremoRotulado, type Primitiva } from "../agente/render/escena.ts";
+import { bandaPolilinea, numeroFijo, type EntradaLeyenda, type Escena, type Estilo, type ExtremoRotulado, type Primitiva } from "../agente/render/escena.ts";
 import { anchoViga, fondoModelo, giroTexto, huellaSeccion, PlantaFisica, type DatosVista } from "../agente/render/modelo.ts";
 import { cabecera, caja, circuloPilar } from "../agente/render/resultados.ts";
+import { nerviosLosa } from "../compilador/abacos.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import { puntoEnRegion, type Region } from "../compilador/poligonos.ts";
 import { ARMADURAS_FORJADO, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type BarrasCara, type CercosViga } from "../comprobaciones/armado.ts";
-import { alzadoVano, cercosDibujados, cotasRefuerzo, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
+import { alzadoVano, cercosDibujados, cotasRefuerzo, puntosCercos, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, trozo, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
 import type { Sesion } from "./sesion.ts";
@@ -262,13 +263,15 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
       anotar(p, c);
       // El contorno de la losa, del color de su aprovechamiento
       P.push({ tipo: "linea", puntos: [...l.contorno.map((q) => [q[0], q[1]] as Vec2), [l.contorno[0]![0], l.contorno[0]![1]]], estilo: "contorno", objeto: p.pieza });
-      // Los cercos de los nervios: su zona rayada con rayas en la dirección de los cercos (a través de los nervios)
-      for (const z of cara === "todas" || cara === "cercos" ? cercosDibujados(l.eje1, a) : []) {
+      // Los cercos de los nervios: el contorno de su zona, a trazos, y un punto por cerco sobre el eje de cada nervio
+      const zonasCercos = cara === "todas" || cara === "cercos" ? cercosDibujados(l.eje1, a) : [];
+      const nervios = zonasCercos.length ? nerviosLosa(l) : [];
+      for (const z of zonasCercos) {
         const anillos = recorteTramos(region, z.zona);
         if (!anillos.length) continue;
         hayCercos = true;
         for (const an of anillos) P.push({ tipo: "linea", puntos: [...an, an[0]!], estilo: "armado-cercos", objeto: `${p.pieza}/C${z.indice + 1}` });
-        for (const t of rayado(anillos, [-z.d[1], z.d[0]], 0.2)) P.push({ tipo: "linea", puntos: t, estilo: "armado-cercos", objeto: `${p.pieza}/C${z.indice + 1}` });
+        for (const q of puntosCercos(z, nervios)) if (!region || puntoEnRegion(q, region)) P.push({ tipo: "marca", p: q, forma: "circulo", radio: 1.7, estilo: "armado-cercos-punto", objeto: `${p.pieza}/C${z.indice + 1}` });
         textos.push({ tipo: "texto", p: z.centro, texto: z.texto, tamano: 11, ancla: "medio", dy: 4, giro: giroTexto(z.d), color: COLOR_CERCOS, fondo: true, prioridad: 30, objeto: `${p.pieza}/C${z.indice + 1}` });
       }
       // Los refuerzos: la zona, la barra, la línea de reparto y el rótulo
@@ -315,7 +318,7 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     }
     if (caras.has("inferior")) leyenda.push({ estilo: "armado-inferior", texto: "Refuerzo inferior: la barra y lo que cubre" });
     if (caras.has("superior")) leyenda.push({ estilo: "armado-superior", texto: "Refuerzo superior: la barra y lo que cubre" });
-    if (hayCercos) leyenda.push({ estilo: "armado-cercos", texto: "Cercos de los nervios" });
+    if (hayCercos) leyenda.push({ estilo: "armado-cercos-punto", texto: "Cercos de los nervios: un punto por cerco, con sus ramas (R)" });
     notas.push("Cada refuerzo: su barra, de punta a punta, y la línea de reparto, que cruza lo que cubre; se suma a la armadura base. Rótulo: las barras y su largo.");
     if (hayCotas) notas.push("Bajo cada barra, sus cotas en metros: lo que sale a cada lado del eje del pilar o de la viga que cruza o, si no cruza ninguno, lo que falta de cada punta hasta el más cercano.");
   }

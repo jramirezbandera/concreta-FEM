@@ -14,6 +14,12 @@
  * vigas, como hace Concreta en sus pórticos) y, donde el pilar tracciona, la flexotracción contra la
  * envolvente N–M que da el propio módulo para ese armado.
  *
+ * **Tres secciones (CO1-f):** la base, el centro y la cabeza del tramo, cada una con los cercos de su
+ * zona (`cercosPie`, `cercos`, `cercosCabeza`). En el centro, el cortante con todas sus demandas; el
+ * módulo, una vez (las reglas de sus cercos) y con las demandas cuyo momento pasa del de los dos
+ * extremos (cargas a lo largo del pilar): sin ellas el diagrama es lineal y la flexión del centro queda
+ * cubierta por la de los extremos. La fila de la zona densificada (§9.5.3(4)) es sólo de los extremos.
+ *
  * Unidades del armado: mm y MPa, las del módulo.
  */
 import { buildColumnInteraction, calcRCColumn, type CheckRow, type CheckStatus, type InteractionPoint } from "../concreta/lib/calculations/rcColumns.ts";
@@ -23,13 +29,14 @@ import { getConcrete, getFyd } from "../concreta/data/materials.ts";
 import { getBarArea } from "../concreta/data/rebar.ts";
 import { dec } from "../concreta/lib/units/format.ts";
 import type { RCColumnInputs } from "../concreta/data/defaults.ts";
-import type { ArmadoPilar } from "../armado.ts";
+import { cercosEnPilar, type ArmadoPilar, type SeccionPilar } from "../armado.ts";
 import type { Demanda, DemandasPilar, DemandasTramo } from "../demandas/pilares.ts";
 import { entradaPilar, geometriaPilar, ND_MINIMO, type EntradaPilar } from "./entradaPilar.ts";
 
 export type { ArmadoPilar, BarrasCara } from "../armado.ts";
 
-export type Extremo = "base" | "cabeza";
+/** La sección del tramo: uno de sus extremos o, CO1-f, su centro. */
+export type Extremo = SeccionPilar;
 
 export interface FilaPilar {
   id: string;
@@ -249,6 +256,23 @@ function filasCortanteCircular(e: Pick<EntradaPilar, "D" | "fck">, a: ArmadoPila
   ];
 }
 
+/**
+ * CO1-f: si el cortante de la sección central falla con los cercos del centro de `a`, en alguna de sus
+ * demandas. Lo único del centro que depende de sus cercos: para probar separaciones sin repetir la
+ * comprobación de los extremos (`aflojarCentro`).
+ */
+export function fallaCortanteCentro(t: DemandasTramo, a: ArmadoPilar): boolean {
+  const geo = geometriaPilar(t);
+  if ("motivo" in geo || !t.centro) return false;
+  const centro: ArmadoPilar = { ...a, cercos: cercosEnPilar(a, "centro") };
+  for (const d of t.centro.demandas) {
+    const [N, Vy, Vz] = d.esfuerzos as [number, number, number];
+    const filas = geo.sectionType === "rectangular" ? filasCortante(geo, centro, N, Vy, Vz) : filasCortanteCircular(geo, centro, N, Vy, Vz);
+    if (filas.some((f) => f.status === "fail")) return true;
+  }
+  return false;
+}
+
 /** `hastaFallo`: lo deja en la primera fila que falla (para probar armados de una tabla). */
 export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true, hastaFallo = false): ComprobacionTramo {
   const filas = new Map<string, FilaPilar>();
@@ -287,7 +311,24 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
   let env: Envolventes | { error: string } | undefined;
   let traccionada: { d: Demanda; extremo: Extremo } | undefined;
   let falla = false;
-  recorrido: for (const [extremo, ext] of [["base", t.base], ["cabeza", t.cabeza]] as const) {
+  // El mayor momento de cada combinación en los dos extremos: en el centro, el módulo sólo con lo que lo pasa
+  const enExtremos = new Map<string, [number, number]>();
+  for (const ext of [t.base, t.cabeza])
+    for (const d of ext.demandas) {
+      const k = `${d.comb}|${d.pesimos ? 1 : 0}`;
+      const m = enExtremos.get(k) ?? enExtremos.set(k, [0, 0]).get(k)!;
+      m[0] = Math.max(m[0], Math.abs(d.esfuerzos[4]!));
+      m[1] = Math.max(m[1], Math.abs(d.esfuerzos[5]!));
+    }
+  const pasaDeLosExtremos = (d: Demanda) => {
+    const m = enExtremos.get(`${d.comb}|${d.pesimos ? 1 : 0}`);
+    return !m || Math.abs(d.esfuerzos[4]!) > m[0] * (1 + 1e-9) + 1e-9 || Math.abs(d.esfuerzos[5]!) > m[1] * (1 + 1e-9) + 1e-9;
+  };
+  let reglasCentro = false;
+  const total = a;
+  recorrido: for (const [extremo, ext] of [["base", t.base], ...(t.centro ? [["centro", t.centro] as const] : []), ["cabeza", t.cabeza]] as const) {
+    // La sección, con los cercos de su zona
+    const a: ArmadoPilar = { ...total, cercos: cercosEnPilar(total, extremo) };
     for (const d of ext.demandas) {
       if (hastaFallo && falla) break recorrido;
       if ("motivo" in geo) {
@@ -312,13 +353,16 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
         anotar(filasTraccion(env, e.N, e.My, e.Mz), d, extremo);
         continue;
       }
+      if (extremo === "centro" && reglasCentro && !pasaDeLosExtremos(d)) continue;
       const r = calcRCColumn(entradaModulo(e.entrada, a));
       llamadas++;
       if (!r.valid) {
         pendiente(`el módulo no admite la entrada: ${r.error ?? "sin motivo"}`, d, extremo);
         continue;
       }
-      anotar(r.checks, d, extremo);
+      if (extremo === "centro") reglasCentro = true;
+      // La zona densificada (§9.5.3(4)) es la de los extremos: en el centro esa fila no cuenta
+      anotar(extremo === "centro" ? r.checks.filter((f) => f.id !== "stirrup-densification") : r.checks, d, extremo);
     }
   }
   // Un pilar que sólo tracciona: las reglas de armado, de la llamada con la compresión mínima

@@ -14,7 +14,7 @@
  *  - las combinaciones del generador, ya amplificadas por γz (SO): la comprobación va con β = 1.
  *    Con el segundo orden desactivado y la estructura traslacional, β = 1 no vale (`betaUno`);
  *  - los dos extremos del tramo flexible, en las caras (LV-d, RV-b), y su longitud libre entre ellas
- *    (CO-g).
+ *    (CO-g); y su sección central, a media altura (CO1-f: la de los cercos del centro del tramo).
  */
 import { conjuntoCombinaciones } from "../../agente/combinaciones.ts";
 import { ternasPesimas } from "../../agente/consultas.ts";
@@ -54,6 +54,8 @@ export interface DemandasTramo {
   longitudLibre: number;
   base: ExtremoDemandas;
   cabeza: ExtremoDemandas;
+  /** A media altura del tramo flexible (CO1-f). Sin ella, el tramo se comprueba sólo en sus extremos. */
+  centro?: ExtremoDemandas;
 }
 
 export interface DemandasPilar {
@@ -109,6 +111,7 @@ export function demandasPilar(q: Consultas, id: string, situaciones: readonly Si
       longitudLibre: t.cabeza.s - t.base.s,
       base: extremo(t.base.esfuerzos, t.base.s),
       cabeza: extremo(t.cabeza.esfuerzos, t.cabeza.s),
+      centro: extremo(t.centro.esfuerzos, t.centro.s),
     });
   }
   return { valido: true, valor: { pilar: id, situaciones: [...situaciones], combinaciones: factores.length, betaUno: !sinAmplificar, tramos }, diagnosticos };

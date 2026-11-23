@@ -9,9 +9,9 @@
  * comprobaciones; aquí sólo se pinta.
  */
 import type { CSSProperties, ReactNode } from "react";
-import { areaDe, barrasDe, ramasDe, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraForjado, type ArmaduraPunzonamiento, type BarrasCara, type BarrasForjado, type CercosViga } from "../../../src/comprobaciones/armado.ts";
-import { alzadoVano, seccionPilarArmada, seccionVigaArmada, ZONAS_VANO, type GrupoBarras, type SeccionArmada, type ZonaVano } from "../../../src/comprobaciones/dibujoArmado.ts";
-import type { GeometriaParte } from "../../../src/visor/comprobaciones.ts";
+import { areaDe, barrasDe, ramasDe, textoBarrasForjado, textoCercosPilar, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraForjado, type ArmaduraPunzonamiento, type BarrasCara, type BarrasForjado, type CercosViga } from "../../../src/comprobaciones/armado.ts";
+import { alzadoPilar, alzadoVano, seccionPilarArmada, seccionVigaArmada, ZONAS_VANO, type AlzadoPilar, type GrupoBarras, type SeccionArmada, type ZonaVano } from "../../../src/comprobaciones/dibujoArmado.ts";
+import type { DatosEsfuerzosArmado, GeometriaParte, PuntoEsfuerzo } from "../../../src/visor/comprobaciones.ts";
 import { fmt } from "../fmt.ts";
 import { useLetra } from "./CroquisForjado.tsx";
 
@@ -30,7 +30,7 @@ const RUTA_GRUPO: Record<GrupoBarras, readonly string[]> = {
   superior: ["superior", "superiorInicio", "superiorFin"],
   piel: ["piel"],
 };
-const RUTAS_CERCOS = ["cercos", "cercosInicio", "cercosFin"];
+const RUTAS_CERCOS = ["cercos", "cercosInicio", "cercosFin", "cercosPie", "cercosCabeza"];
 const es = (activo: string | null, rutas: readonly string[]) => (activo !== null && rutas.includes(activo)) || undefined;
 
 /** Una sección con su armado, a escala, en una caja de w × h px con sus cotas. */
@@ -88,9 +88,141 @@ function Avisos({ avisos }: { avisos: readonly string[] }) {
 
 const SIN_SECCION = <div className="croquis croquis-vacio">La sección no es rectangular ni circular: su armado no se dibuja.</div>;
 
-/** La sección de un tramo de pilar con su armado. */
-export function CroquisPilar({ seccion, armado, recubrimiento, activo, grande }: { seccion: { b: number; h: number } | { D: number } | undefined; armado: Partial<ArmadoTramoPilar> | undefined; recubrimiento: number; activo: string | null; grande?: boolean }) {
-  const [W, H] = grande ? [420, 360] : [300, 210];
+const ZONA_PILAR = { pie: { nombre: "Pie", ruta: "cercosPie" }, centro: { nombre: "Centro", ruta: "cercos" }, cabeza: { nombre: "Cabeza", ruta: "cercosCabeza" } } as const;
+
+/**
+ * El tramo de un pilar en alzado (CO1-f): entre las caras de sus dos nudos, con cada cerco en su sitio
+ * y sus zonas (pie, centro y cabeza) acotadas y rotuladas con los cercos que llevan.
+ */
+function AlzadoTramo({ al, lado, x0, h, activo }: { al: AlzadoPilar; lado: number; x0: number; h: number; activo: string | null }) {
+  const [yt, yb] = [34, h - 28];
+  const k = (yb - yt) / Math.max(al.libre, 1e-9);
+  const Y = (s: number) => yb - s * k;
+  const ancho = Math.min(Math.max((lado / 1000) * k, 22), 60);
+  const xc = x0 + 54;
+  const [xa, xb] = [xc - ancho / 2, xc + ancho / 2];
+  return (
+    <g data-alzado-pilar>
+      <text x={xc} y={11} textAnchor="middle" className="ca-titulo">
+        Tramo · {fmt(al.libre, 2)} m libres
+      </text>
+      {/* Los nudos de arriba y de abajo, y el tramo entre sus caras */}
+      <rect x={xa - 18} y={yt - 12} width={ancho + 36} height={12} className="cq-hormigon" />
+      <rect x={xa - 18} y={yb} width={ancho + 36} height={12} className="cq-hormigon" />
+      <rect x={xa} y={yt} width={ancho} height={yb - yt} className="cq-hormigon" />
+      {al.zonas.map((z) => {
+        if (!z.cercos || !z.posiciones.length) return null;
+        const px = (k * z.cercos.separacion) / 1000;
+        const salto = Math.max(1, Math.ceil(2.5 / Math.max(px, 1e-9)));
+        return (
+          <g key={z.zona} className="ca-cerco" data-fino data-zona={z.zona} data-activo={es(activo, [z.propios ? ZONA_PILAR[z.zona].ruta : "cercos"])}>
+            {z.posiciones.filter((_, i) => i % salto === 0).map((s, i) => (
+              <line key={i} x1={xa + 2.5} x2={xb - 2.5} y1={Y(s)} y2={Y(s)} />
+            ))}
+          </g>
+        );
+      })}
+      {/* Las barras, por dentro de los cercos, entrando en los nudos */}
+      <line x1={xa + 4} x2={xa + 4} y1={yt - 9} y2={yb + 9} className="ca-linea" />
+      <line x1={xb - 4} x2={xb - 4} y1={yt - 9} y2={yb + 9} className="ca-linea" />
+      {/* Cada zona: su llave, lo que mide y sus cercos contados */}
+      {al.zonas.map((z) => {
+        const [y1, y2] = [Y(z.hasta), Y(z.desde)];
+        const ym = (y1 + y2) / 2;
+        const on = es(activo, [z.propios ? ZONA_PILAR[z.zona].ruta : "cercos"]);
+        return (
+          <g key={z.zona} data-zona-pilar={z.zona}>
+            <path d={`M ${xb + 7} ${y1 + 1.5} h 5 V ${y2 - 1.5} h -5`} className="cq-guia" fill="none" />
+            <text x={xb + 18} y={ym - 2}>
+              {ZONA_PILAR[z.zona].nombre} · {fmt(z.hasta - z.desde, 2)} m
+            </text>
+            <text x={xb + 18} y={ym + 11} className="ca-rotulo" data-activo={on}>
+              {z.cercos ? `${z.posiciones.length} cØ${z.cercos.diametro}/${z.cercos.separacion}` : "sin cercos"}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+const ESFUERZOS_PILAR = [
+  { id: "N", titulo: "N", unidad: "kN" },
+  { id: "My", titulo: "My", unidad: "kN·m" },
+  { id: "Mz", titulo: "Mz", unidad: "kN·m" },
+] as const;
+
+/** La envolvente de ELU de un esfuerzo a lo largo del tramo, junto a su alzado y a su misma altura: el máximo y el mínimo, con sus valores en el pie y en la cabeza. */
+function EsfuerzoTramo({ titulo, unidad, tramos, libre, x0, w, h }: { titulo: string; unidad: string; tramos: PuntoEsfuerzo[][]; libre: number; x0: number; w: number; h: number }) {
+  const [yt, yb] = [34, h - 28];
+  const k = (yb - yt) / Math.max(libre, 1e-9);
+  const Y = (s: number) => yb - s * k;
+  const todos = tramos.flat();
+  const tope = Math.max(1e-9, ...todos.flatMap((p) => [Math.abs(p.max), Math.abs(p.min)]));
+  const xc = x0 + w / 2;
+  const medio = w / 2 - 12;
+  const X = (v: number) => xc + (v / tope) * medio;
+  const valor = (v: number) => fmt(v, Math.abs(v) < 9.95 ? 1 : 0);
+  const [pie, cabeza] = [todos[0], todos[todos.length - 1]];
+  return (
+    <g data-esfuerzo-pilar={titulo}>
+      <text x={xc} y={11} textAnchor="middle" className="ca-titulo">
+        {titulo} <tspan className="ca-unidad">{unidad}</tspan>
+      </text>
+      <line x1={xc} x2={xc} y1={yt} y2={yb} className="cq-eje" />
+      {tramos.map((t, i) => {
+        const banda = `M ${X(t[0]!.min)} ${Y(t[0]!.x)} ${t.map((p) => `L ${X(p.min)} ${Y(p.x)}`).join(" ")} ${[...t].reverse().map((p) => `L ${X(p.max)} ${Y(p.x)}`).join(" ")} Z`;
+        return (
+          <g key={i}>
+            <path d={banda} className="ca-esf-banda" />
+            <path d={`M ${t.map((p) => `${X(p.max)} ${Y(p.x)}`).join(" L ")}`} className="ca-esf-linea" />
+            <path d={`M ${t.map((p) => `${X(p.min)} ${Y(p.x)}`).join(" L ")}`} className="ca-esf-linea" />
+          </g>
+        );
+      })}
+      {cabeza && (
+        <text x={xc} y={yt - 5} textAnchor="middle" className="ca-esf-valor">
+          {valor(cabeza.min)} … {valor(cabeza.max)}
+        </text>
+      )}
+      {pie && (
+        <text x={xc} y={yb + 13} textAnchor="middle" className="ca-esf-valor">
+          {valor(pie.min)} … {valor(pie.max)}
+        </text>
+      )}
+    </g>
+  );
+}
+
+/**
+ * La sección de un tramo de pilar con su armado. Con `libre` (el tramo entre las caras de sus nudos),
+ * además su alzado con las zonas de cercos (CO1-f) y, con `esfuerzos`, las envolventes de ELU de N, My
+ * y Mz a su misma altura (§8.14).
+ */
+export function CroquisPilar({
+  seccion,
+  armado,
+  recubrimiento,
+  activo,
+  grande,
+  libre,
+  solapes,
+  esfuerzos,
+}: {
+  seccion: { b: number; h: number } | { D: number } | undefined;
+  armado: Partial<ArmadoTramoPilar> | undefined;
+  recubrimiento: number;
+  activo: string | null;
+  grande?: boolean;
+  libre?: number | undefined;
+  solapes?: Readonly<Record<number, number>> | undefined;
+  esfuerzos?: DatosEsfuerzosArmado | null | undefined;
+}) {
+  const [WS, H] = grande ? [400, 360] : [300, 210];
+  const al = seccion && libre !== undefined && libre > 0 ? alzadoPilar(seccion, libre, armado, solapes) : null;
+  const curvas = al && esfuerzos ? ESFUERZOS_PILAR.flatMap((e) => (esfuerzos.esfuerzos[e.id]?.length ? [{ ...e, tramos: esfuerzos.esfuerzos[e.id]! }] : [])) : [];
+  const [WA, WE] = [al ? 236 : 0, 104];
+  const W = WS + WA + curvas.length * WE;
   const [svg, letra] = useLetra(W);
   if (!seccion) return SIN_SECCION;
   const s = seccionPilarArmada(seccion, armado, recubrimiento);
@@ -100,20 +232,28 @@ export function CroquisPilar({ seccion, armado, recubrimiento, activo, grande }:
   const a = armado ?? {};
   return (
     <figure className="croquis" data-croquis-armado="pilar">
-      <svg ref={svg} style={letra} viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Sección del pilar con ${s.barras.length} barras`}>
-        <Seccion s={s} w={W} h={H} activo={activo} />
+      <svg ref={svg} style={letra} viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Sección del pilar con ${s.barras.length} barras${al ? ", su tramo en alzado con las zonas de cercos" : ""}${curvas.length ? " y sus esfuerzos" : ""}`}>
+        <Seccion s={s} w={WS} h={H} activo={activo} />
         {!s.barras.length && (
-          <text x={W / 2} y={H / 2 + 4} textAnchor="middle" className="ca-falta">
+          <text x={WS / 2} y={H / 2 + 4} textAnchor="middle" className="ca-falta">
             sin armado
           </text>
         )}
+        {al && <AlzadoTramo al={al} lado={"D" in seccion ? seccion.D : seccion.h} x0={WS} h={H} activo={activo} />}
+        {al && curvas.map((e, i) => <EsfuerzoTramo key={e.id} titulo={e.titulo} unidad={e.unidad} tramos={e.tramos} libre={al.libre} x0={WS + WA + i * WE} w={WE} h={H} />)}
       </svg>
       <figcaption>
         {a.anillo?.n ? <Entrada grupo="anillo" activo={es(activo, ["anillo"])}>{barras(a.anillo)} en el anillo</Entrada> : null}
         {a.esquinas ? <Entrada grupo="esquinas" activo={es(activo, ["esquinas"])}>4Ø{a.esquinas} en las esquinas</Entrada> : null}
         {a.caraB?.n && a.caraB.diametro ? <Entrada grupo="caraB" activo={es(activo, ["caraB"])}>{2 * a.caraB.n}Ø{a.caraB.diametro} en las caras b</Entrada> : null}
         {a.caraH?.n && a.caraH.diametro ? <Entrada grupo="caraH" activo={es(activo, ["caraH"])}>{2 * a.caraH.n}Ø{a.caraH.diametro} en las caras h</Entrada> : null}
-        {a.cercos?.diametro && a.cercos.separacion ? <Entrada grupo="cercos" activo={es(activo, RUTAS_CERCOS)}>cercos Ø{a.cercos.diametro} cada {a.cercos.separacion} mm</Entrada> : null}
+        {a.cercos?.diametro && a.cercos.separacion ? (
+          <Entrada grupo="cercos" activo={es(activo, RUTAS_CERCOS)}>
+            cercos {textoCercosPilar(a as ArmadoTramoPilar)}
+            {al ? ` · ${al.cercos} en el tramo` : ""}
+          </Entrada>
+        ) : null}
+        {curvas.length > 0 && <span className="ca-dato">Esfuerzos: el mínimo y el máximo de {esfuerzos!.combinaciones}, a la altura del tramo; arriba, los de la cabeza y abajo, los del pie.</span>}
         {completo && (
           <span className="ca-dato" data-as>
             {barrasDe(armado as ArmadoTramoPilar)} barras · As = {fmt(As / 100, 2)} cm² · ρ = {fmt((100 * As) / Ac, 2)} %

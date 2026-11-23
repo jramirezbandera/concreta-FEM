@@ -784,6 +784,94 @@ En la vivienda sólo se encadenan VPG-2 y Z-CUB-S-2 (14,10 m, cuatro vanos); enc
 
 **No hecho:** cortar las barras por la envolvente de momentos (CO6-11); los solapes de una barra de más de 12 m (se avisa); dos capas; mover una barra con el ratón; el despiece en `fem` (hoy sólo está en la app); y los planos.
 
+### 8.14 CO6 y CO1-f: Comprobación como espacio propio, el armado propuesto solo, las tres zonas de cercos de los pilares y los esfuerzos con el armado (2026-11-23)
+
+De la primera prueba de uso de Resultados · Comprobación por el usuario (con la vivienda). Lo que pidió y lo que se ha hecho:
+
+**Comprobación, espacio propio.** Deja de ser un modo de Resultados: es una pestaña de la barra superior (Modelo, Cargas, Resultados, Comprobación, Revisión), con su barra de herramientas (Pilares, Vigas, Losas y Punzonamiento como herramientas). La dirección antigua (`?espacio=resultados&modo=comprobacion`) lleva a él.
+
+**El armado viene propuesto** (antes había que pulsar «Proponer»). Al llegar la tabla de un tipo con partes sin armado, el programa pide lo que falta en toda la obra (`armar` con `soloSinArmado`, los cuatro tipos) y lo escribe con la operación `armado`: un paso de deshacer. Una vez por cálculo (por huella) y sesión de la página: deshecho, no vuelve solo (están los botones). Si no cambia nada, no escribe. `ModoComprobacion` lleva `automatico` (por defecto, sí) para las pruebas de lo demás.
+
+**El banco de armado.** El formulario del armado sale de Propiedades (estaba apretado en 360 px) al panel de abajo, en la pestaña «Armado»: a un lado el dibujo a escala de la pieza y al otro su formulario, con «Aplicar», «Proponer» y «Quitar». En una losa, la base, los ábacos, los refuerzos y los cercos van en columnas. Lo abre elegir una pieza en la planta, el doble clic en una fila de la tabla o «Editar el armado» de Propiedades, que se queda con el estado, las filas del módulo y los datos. Con una viga, el dibujo del banco es el despiece de su pórtico (§8.13: ya no es una pestaña aparte). Fuera «Ampliar el dibujo».
+
+**Los cercos de los nervios, como puntos.** En la planta de las losas, cada cerco es un punto sobre el eje de cada nervio de su zona (`puntosCercos`, con los ejes de `nerviosLosa`; el primero, a media separación del principio); el contorno de la zona, a trazos. El rótulo lleva siempre las ramas («cØ6/150 (2R)»), y el campo «ramas» del formulario enseña en gris lo que vale vacío (2).
+
+**CO1-f, los pilares en tres secciones y con tres zonas de cercos.**
+
+- **Datos:** `armado.pilares.<pilar>.<planta>` gana `cercosPie` y `cercosCabeza` (opcionales); `cercos` son los del centro del tramo y, donde no se dan los de un extremo, también los de ese extremo. Los armados de antes valen igual.
+- **Demandas:** `Consultas.pilar` da además la sección central del tramo flexible (`centro`), con los esfuerzos de cada caso a media altura (en los modos, interpolados entre los extremos de su barra: no tienen cargas a lo largo). `DemandasTramo.centro`.
+- **Comprobar** (`comprobarTramo`): base, centro y cabeza, cada una con los cercos de su zona. En el centro, el cortante con todas sus demandas; el módulo, una vez (las reglas de sus cercos) y con las demandas cuyo momento pase del de los dos extremos (cargas a lo largo del pilar): sin ellas el diagrama es lineal y la flexión del centro queda cubierta por la de los extremos. La fila de la zona densificada del módulo (`stirrup-densification`, §9.5.3(4)) es sólo de los extremos.
+- **Las zonas** (`zonasCercosPilar`, `dibujoArmado.ts`): junto a cada nudo, la mayor dimensión de la sección (§9.5.3(4)); junto al pie, además el solape de las barras si son de más de 14 mm (1,5·lb,rqd, `solapesPilar`). Al módulo de 5 cm. Con menos de 30 cm de centro, el tramo no tiene zona central (los tramos cortos entre cubiertas).
+- **Proponer** (`aflojarCentro`): elegido el armado y aplicadas las reglas de obra (con cercos uniformes, como antes), los cercos de la tabla se quedan junto al pie y junto a la cabeza y el centro lleva la separación más abierta de 300, 250, 200, 180, 150 o 125 mm que no pasa de mín(15·Ø, la menor dimensión, 300) con la que todo sigue cumpliendo. Opción `zonasCercos: false`, lo de antes.
+- **Lo que cambia** (`validacion/co/cambiosZonas.ts`, `out_cambiosZonas.txt`; referencia de CO1 regenerada a sabiendas): el armado longitudinal, lo que cumple y las filas que no son de cercos ni de cortante, idénticos (diferencia 0). En la vivienda, 23 de 36 tramos pasan de cØ6/100 a cØ6/180 con /100 en pie y cabeza (los otros 13 son tramos cortos); un tramo de 3,10 m, de 31 cercos a 20. En el edificio con viento, los 27; con sismo y mucha carga, 4 de 13 (en los demás el cortante del centro no deja abrirlos).
+- **Dibujo:** junto a la sección, el tramo en alzado entre las caras de sus nudos, con cada cerco en su sitio (`alzadoPilar`) y cada zona acotada y rotulada con sus cercos contados.
+
+**Los esfuerzos, con el armado** (pedidos `esfuerzos-portico` y `esfuerzos-pilar` del worker, con el banco abierto): las envolventes de las situaciones de ELU, que son las de `envolventePieza` (las de Resultados · Diagramas) en la coordenada del dibujo.
+
+- **Pórtico:** bajo el despiece y a su misma escala, la envolvente de M (lo positivo, hacia abajo y en el azul de la inferior; lo negativo, en el rojo de la superior) con el pico de cada tramo, y la de V al marcarla. Una viga dibujada al revés va en el sentido del pórtico, con su cortante cambiado de signo.
+- **Pilar:** junto al alzado del tramo y a su misma altura, las de N, My y Mz, con el mínimo y el máximo en el pie y en la cabeza.
+
+**Validación.**
+
+- `comprobar/pilares.test.ts`: la identidad con el módulo llamado a mano (ahora con la llamada del centro) y la prueba nueva de las tres secciones (cada fila es la peor de las tres, cada una con sus cercos).
+- `armar/pilares.test.ts`: con zonas y sin ellas, el mismo armado longitudinal y los mismos cercos en los extremos; el centro, el más abierto que cumple; comprobado como armado del proyecto da lo mismo.
+- `dibujoArmado.test.ts`: las zonas, el alzado con cada cerco y los puntos de los cercos de los nervios.
+- `src/visor/comprobaciones.test.ts`: la geometría del tramo y los dos pedidos de esfuerzos, punto a punto con el pedido `viga`.
+- `app/src/test/comprobacion.test.tsx`: la propuesta automática (una vez por cálculo), el banco, el alzado del pilar con sus esfuerzos y la envolvente bajo el pórtico.
+- A mano en la app con la vivienda. Los bancos de Chrome no se han pasado; el de CO6 (`validacion/co6/chrome.ts`) está sin adaptar a la pestaña nueva ni a la propuesta automática.
+
+**Lo que no se ha hecho de lo que pidió el usuario.**
+
+- **La losa de cimentación sin refuerzos y con la base «grande».** No es que el programa intente cubrirlo todo con la base: la base es la cuantía mínima del módulo (CE A19 §9.2.1.1, ec. 9.1: As,mín = W/(0,8·h)·fctm,fl/fyd) donde la cara tracciona, que en una losa de 60 cm de HA-30 son 833 mm²/m por cara y dirección: Ø12/125. Con ella todo cumple al 0,56 y no hace falta ningún refuerzo. Lo que suele hacerse (la nota de §9.2.1.1(1): 1,2 veces lo que pide el ELU, con la mínima geométrica por debajo) daría una base menor con refuerzos, pero es cambiar una regla de la norma en el adaptador: **lo decide el usuario** (CO3-k). **Decidido y hecho el mismo día, como opción de la obra: §8.15.**
+- **Las vigas ya se comprueban en tres zonas** (los cuartos de la luz junto a los apoyos y el centro, CO2-a), con `superiorInicio`, `superiorFin`, `cercosInicio` y `cercosFin`. Lo que pasa es que la propuesta no abre los cercos del centro como ahora en los pilares: por hacer (CO2-i).
+- El cuadro de pilares, el armado en el 3D y los planos.
+
+**Decisiones, de Claude, por confirmar por el usuario.**
+
+- **CO1-f:** las zonas (la mayor dimensión; el solape en el pie con Ø > 14, con α6 = 1,5), el centro mínimo de 30 cm, las separaciones del centro y que la flexión del centro sólo se compruebe con cargas a lo largo del pilar.
+- **CO6-i:** la propuesta automática al entrar (una vez por cálculo; escribe en el proyecto, deshacible). En un edificio grande tarda lo que «Toda la obra» (un minuto o más en el edificio objetivo con sismo), con el worker ocupado.
+- **CO6-j:** el formulario, en el panel de abajo y no en un diálogo aparte; un clic en la tabla elige y el doble clic abre el armado.
+
+### 8.15 CO3-k: la armadura mínima reducida de las losas de cimentación, como opción de la obra (2026-11-23)
+
+Decidido por el usuario («Sí, como opción») tras ver que su losa de cimentación de 60 cm salía con la base Ø12/125 y sin refuerzos (§8.14). Por defecto, nada cambia.
+
+**El dato:** `obra.armado.minimaReducidaCimentacion` (`true` o `false`; por defecto, no). Fuera de la huella: no cambia el cálculo.
+
+**La regla** (`comprobar/losas.ts`). Sólo en una losa de cimentación y sólo en las secciones que no llegan a la armadura mínima del módulo (CE A19 §9.2.1.1, ec. 9.1). Allí, la fila `as-min` del módulo se sustituye por las dos de la alternativa del mismo apartado (la que el módulo de Concreta deja al proyectista, `cuantiaMinima.ts`):
+
+- **`as-min`, el suelo geométrico:** As ≥ 0,9 ‰ de la sección bruta por cara y dirección con B500 (1,0 ‰ con menos): la mitad de la cuantía geométrica de las losas de la tabla 42.3.5 de la EHE-08, que el CE ya no trae. Es una regla de armado: la cumple la base.
+- **`as-min-elu`:** As ≥ 1,2 veces la necesaria en ELU, comprobada como 1,2·MEd ≤ MRd. Del lado seguro: MRd es cóncavo en As, así que la armadura necesaria no pasa de As·MEd/MRd. Depende de la demanda, como la flexión: lleva la franja, la estación y la combinación de su momento.
+
+Donde la sección sí llega a la mínima del módulo, sus filas son las de siempre.
+
+**Proponer** (`armar/losas.ts`). La fila `as-min-elu` cuenta como demanda: la base es la primera de la tabla que cumple el suelo (y las demás reglas), y donde 1,2·MEd pasa de MRd van refuerzos, como donde no llega la flexión (`estacionesQueFallan`).
+
+**Medido** (`validacion/co/medirMinimaReducida.ts`, `out_medirMinimaReducida.txt`): una losa de cimentación de 13 × 13 m bajo la losa plana de 3 × 3 pilares a 6 m, HA-25.
+
+| | Sin la opción | Con la opción |
+|---|---|---|
+| 60 cm, cargas de vivienda | base Ø12/150, 1 refuerzo, 4 004 kg | base Ø12/200, 4 refuerzos, 3 016 kg (−25 %) |
+| 60 cm, muy cargada (CM 12, Q 20) | base Ø12/150, 6 refuerzos, 4 524 kg | base Ø12/200, 14 refuerzos, 4 591 kg (+1,5 %) |
+| 80 cm, muy cargada | base Ø16/200, 6 refuerzos, 5 387 kg | base Ø12/150, 6 refuerzos, 4 250 kg (−21 %) |
+
+En la de 60 cm muy cargada no cumple el cortante con ninguna de las dos (la sección no basta); con mucha carga, la base menor se compensa con refuerzos y el acero no baja.
+
+**En la app.** En el banco de armado de una losa de cimentación, la casilla «Armadura mínima reducida en las losas de cimentación de la obra», con lo que es y a quién le toca decidirlo; marcada, «Proponer» da la base menor. La escribe la operación `obra`.
+
+**Los datos de armado de la obra, en cada pedido.** Cambiar un dato de la obra reabría el proyecto en el worker y daba los resultados por desactualizados. Ahora `obra.armado` va con los pedidos de comprobación (`datos`, en `comprobaciones`, `comprobacion`, `portico`, `armar` y la vista `comprobacion`; `Sesion.datosArmado`), como el armado, y no reabre nada (`soloFueraDelWorker`). Lo ya comprobado se guarda por armado y por esos datos.
+
+**Aviso** `comprobacion/minima-reducida` (info), con las losas de cimentación a las que se aplica. La skill lo explica y prohíbe al agente activarla por su cuenta.
+
+**Validación.**
+
+- `losas.test.ts`: fuera de una losa de cimentación, o con un armado que ya llega a la mínima del módulo, las mismas filas; con la opción, la base es la primera que llega al suelo, las filas `as-min-elu` son 1,2 veces la flexión de su mismo grupo y todo cumple; lo propuesto con la opción no cumple sin ella (le falta la mínima del módulo); una base bajo el suelo falla, y las estaciones que piden refuerzo son más que las de la flexión sola.
+- `src/visor/comprobaciones.test.ts`: los datos en el pedido rehacen lo comprobado sin reabrir.
+- `app/src/test/armado.test.tsx`: los datos de armado de la obra no reabren el proyecto; lo demás de la obra, sí.
+- A mano en la app, con una obra con losa de cimentación: la casilla, «Proponer» (de Ø12/150 con 1 refuerzo a Ø12/200 con 4) y el estado, que sigue en «Calculado».
+
+**Por confirmar por el usuario (CO3-k):** el suelo (0,9 ‰; con B400, 1,0 ‰) y que la opción sea de toda la obra y sólo de las losas de cimentación (no de las zapatas ni de las demás losas).
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

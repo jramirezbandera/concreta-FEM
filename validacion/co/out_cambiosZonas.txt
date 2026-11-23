@@ -1,0 +1,24 @@
+== edificio-viento: 27 tramos
+  resumen antes {"pilares":9,"tramos":27,"cumplen":27,"noCumplen":0,"sinArmado":0}
+  resumen ahora {"pilares":9,"tramos":27,"cumplen":27,"noCumplen":0,"sinArmado":0}
+  cambia el armado longitudinal en 0; con zonas de cercos, 27; dejan de cumplir 0; pasan a cumplir 0
+  mayor diferencia en una fila que no es de cercos ni de cortante: 0.00e+0
+    27 × cØ6/100  →  cØ6/180 (pie y cabeza, /100)
+
+== edificio-cargado-sismo: 27 tramos
+  resumen antes {"pilares":9,"tramos":27,"cumplen":13,"noCumplen":14,"sinArmado":14}
+  resumen ahora {"pilares":9,"tramos":27,"cumplen":13,"noCumplen":14,"sinArmado":14}
+  cambia el armado longitudinal en 0; con zonas de cercos, 4; dejan de cumplir 0; pasan a cumplir 0
+  mayor diferencia en una fila que no es de cercos ni de cortante: 0.00e+0
+    14 ×   →  
+     9 × cØ8/100  →  cØ8/100
+     4 × cØ8/100  →  cØ8/150 (pie y cabeza, /100)
+
+== vivienda: 36 tramos
+  resumen antes {"pilares":23,"tramos":36,"cumplen":36,"noCumplen":0,"sinArmado":0}
+  resumen ahora {"pilares":23,"tramos":36,"cumplen":36,"noCumplen":0,"sinArmado":0}
+  cambia el armado longitudinal en 0; con zonas de cercos, 23; dejan de cumplir 0; pasan a cumplir 0
+  mayor diferencia en una fila que no es de cercos ni de cortante: 0.00e+0
+    23 × cØ6/100  →  cØ6/180 (pie y cabeza, /100)
+    13 × cØ6/100  →  cØ6/100
+

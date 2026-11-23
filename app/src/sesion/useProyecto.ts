@@ -143,7 +143,8 @@ export const AUTOGUARDADO_MS = 400;
 /**
  * Lo del proyecto que el worker no usa: no entra en la huella ni en el cálculo, y la app lo lee del
  * proyecto que se edita. La armadura base (AB, va en cada pedido), las plantillas DXF (V2c-4: se
- * leen y dibujan en el hilo principal) y las vistas guardadas (I3: las listas leen las editadas).
+ * leen y dibujan en el hilo principal) y las vistas guardadas (I3: las listas leen las editadas); y,
+ * de la obra, sus datos de armado (`obra.armado`, CO3-k: van con cada pedido de comprobación).
  * Antes, apagar una capa del DXF reabría el proyecto en un worker nuevo: el dibujo se quedaba sin su
  * versión, la barra pasaba por «Compilando…» y, en Resultados, se perdían los resultados.
  */
@@ -154,8 +155,21 @@ export function soloFueraDelWorker(a: Proyecto | null, b: Proyecto): boolean {
   if (!a) return false;
   const claves = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const k of FUERA_DEL_WORKER) claves.delete(k);
-  for (const k of claves) if ((a as unknown as Record<string, unknown>)[k] !== (b as unknown as Record<string, unknown>)[k]) return false;
+  for (const k of claves) {
+    const [x, y] = [(a as unknown as Record<string, unknown>)[k], (b as unknown as Record<string, unknown>)[k]];
+    if (x === y) continue;
+    // Los datos de armado de la obra (`obra.armado`) van con cada pedido de comprobación, como el armado
+    if (k === "obra" && JSON.stringify(sinArmadoObra(x)) === JSON.stringify(sinArmadoObra(y))) continue;
+    return false;
+  }
   return true;
+}
+
+/** La obra sin sus datos de armado (lo que de ella sí usa el worker). */
+function sinArmadoObra(o: unknown): unknown {
+  if (!o || typeof o !== "object") return {};
+  const { armado: _a, ...resto } = o as Record<string, unknown>;
+  return resto;
 }
 
 /** AB: el nombre de antes (sólo la armadura base). */

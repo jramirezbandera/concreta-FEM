@@ -29,6 +29,7 @@ import { EspacioModelo } from "./espacios/Modelo.tsx";
 import { EspacioResultados } from "./espacios/Resultados.tsx";
 import { cota, fmt } from "./fmt.ts";
 import { Inicio, abrirDesdeUrl } from "./Inicio.tsx";
+import { ModoComprobacion } from "./pantallas/Comprobacion.tsx";
 import { EspacioRevision } from "./pantallas/Revision.tsx";
 import { useProyecto, type ACarpeta, type ProyectoAbierto } from "./sesion/useProyecto.ts";
 import { claveEstadoApp, FICHERO_APP, textoEstadoApp } from "../../src/agente/estadoApp.ts";
@@ -40,6 +41,7 @@ const ESPACIOS: { id: Espacio; nombre: string; calculo: boolean }[] = [
   { id: "modelo", nombre: "Modelo", calculo: false },
   { id: "cargas", nombre: "Cargas", calculo: false },
   { id: "resultados", nombre: "Resultados", calculo: true },
+  { id: "comprobacion", nombre: "Comprobación", calculo: true },
   { id: "revision", nombre: "Revisión", calculo: true },
 ];
 
@@ -52,7 +54,6 @@ const MODOS: { id: ModoResultados; nombre: string; claves: string }[] = [
   { id: "deformada", nombre: "Deformada y desplomes", claves: "deriva desplome viento sismo" },
   { id: "modal", nombre: "Modal: masas, modos y sismo", claves: "modos vibracion periodo masa sismo espectro cortante" },
   { id: "reacciones", nombre: "Reacciones", claves: "cimentacion apoyos cargas en cimentacion" },
-  { id: "comprobacion", nombre: "Comprobación y armado", claves: "comprobar armar armado barras cercos aprovechamiento pilares vigas losas punzonamiento" },
 ];
 
 /** Pausa tras un cambio de lo elegido antes de dejarlo para el agente (`.fem/app.json`). */
@@ -63,7 +64,9 @@ function inicial(): { espacio: Espacio; modo: ModoResultados } {
   const q = new URLSearchParams(location.search);
   const viejo: Record<string, [Espacio, ModoResultados?]> = { modelo: ["modelo"], losas: ["resultados", "losas"], vigas: ["resultados", "diagramas"], pilares: ["resultados", "pilares"], desplomes: ["resultados", "deformada"], revision: ["revision"] };
   const p = viejo[q.get("pantalla") ?? ""];
-  const espacio = (q.get("espacio") as Espacio | null) ?? p?.[0] ?? "modelo";
+  // Comprobación fue un modo de Resultados (`?espacio=resultados&modo=comprobacion`): es su espacio
+  const eraModo = q.get("modo") === "comprobacion";
+  const espacio = eraModo ? "comprobacion" : ((q.get("espacio") as Espacio | null) ?? p?.[0] ?? "modelo");
   const modo = (q.get("modo") as ModoResultados | null) ?? p?.[1] ?? "losas";
   return { espacio: ESPACIOS.some((x) => x.id === espacio) ? espacio : "modelo", modo: MODOS.some((x) => x.id === modo) ? modo : "losas" };
 }
@@ -165,7 +168,7 @@ export function App() {
   // Resultados y Revisión sólo con un cálculo de esta huella (criterio 3 de I1). UI-9: tras editar o
   // deshacer no se sale de ellos; se ve que lo de antes ya no vale, con su «Calcular», y al volver el
   // cálculo siguen el modo, la planta y la cámara
-  const sinCalculo = (espacio === "resultados" || espacio === "revision") && !e?.calculado;
+  const sinCalculo = (espacio === "resultados" || espacio === "comprobacion" || espacio === "revision") && !e?.calculado;
   const espacioValido: Espacio = sinCalculo && !e ? "modelo" : espacio;
   const clave = espacioValido === "resultados" ? `resultados:${modo}` : espacioValido;
 
@@ -298,7 +301,7 @@ export function App() {
   // Órdenes de la paleta
   const ordenes = useMemo<Orden[]>(() => {
     const r: Orden[] = [];
-    for (const x of ESPACIOS) r.push({ id: `esp-${x.id}`, grupo: "Espacio", nombre: x.nombre, hacer: () => irA(x.id), deshabilitada: x.calculo && !e?.calculado });
+    for (const x of ESPACIOS) r.push({ id: `esp-${x.id}`, grupo: "Espacio", nombre: x.nombre, ...(x.id === "comprobacion" ? { claves: "comprobar armar armado barras cercos aprovechamiento pilares vigas losas punzonamiento despiece" } : {}), hacer: () => irA(x.id), deshabilitada: x.calculo && !e?.calculado });
     for (const m of MODOS) r.push({ id: `modo-${m.id}`, grupo: "Resultados", nombre: m.nombre, claves: m.claves, hacer: () => irA("resultados", m.id), deshabilitada: !e?.calculado });
     for (const p of e?.plantas ?? []) r.push({ id: `planta-${p.id}`, grupo: "Planta", nombre: `${p.id} ${cota(p.cota)}${p.nombre ? ` · ${p.nombre}` : ""}`, hacer: () => setPlanta(p.id) });
     if (ed) for (const t of TABLAS) r.push({ id: `tabla-${t}`, grupo: "Tabla", nombre: DEF_TABLAS[t].titulo, hacer: () => pedirTabla(t) });
@@ -596,7 +599,7 @@ export function App() {
               }}
             />
           )}
-          {recienCalculado && espacioValido !== "resultados" && espacioValido !== "revision" && e?.calculado && (
+          {recienCalculado && espacioValido !== "resultados" && espacioValido !== "comprobacion" && espacioValido !== "revision" && e?.calculado && (
             // Flotando sobre la vista: como banda, empujaba el dibujo 39 px al aparecer y otra vez al irse
             <div className="aviso-calculado" role="status">
               <span className="min-w-0 flex-1">
@@ -661,9 +664,11 @@ export function App() {
             {proyecto.fase === "error" && !e ? (
               <PantallaError p={proyecto} />
             ) : sinCalculo && e ? (
-              <EsperaCalculo p={proyecto} donde={espacioValido === "revision" ? "Revisión" : "Resultados"} onModelo={() => irA("modelo")} />
+              <EsperaCalculo p={proyecto} donde={espacioValido === "revision" ? "Revisión" : espacioValido === "comprobacion" ? "Comprobación" : "Resultados"} onModelo={() => irA("modelo")} />
             ) : espacioValido === "resultados" ? (
               <EspacioResultados />
+            ) : espacioValido === "comprobacion" ? (
+              <ModoComprobacion />
             ) : espacioValido === "revision" ? (
               <EspacioRevision />
             ) : (

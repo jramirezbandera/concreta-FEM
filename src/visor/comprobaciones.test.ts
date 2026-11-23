@@ -23,7 +23,9 @@ import { aplicar } from "../editor/operaciones.ts";
 import { calcular } from "../motor/calcular.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { Atendedor } from "./atender.ts";
-import type { DatosArmar, DatosComprobaciones, DatosPortico, FichaComprobacion, TipoComprobacion } from "./comprobaciones.ts";
+import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, TipoComprobacion } from "./comprobaciones.ts";
+import type { DatosViga } from "./datos.ts";
+import { alzadoPilar } from "../comprobaciones/dibujoArmado.ts";
 import { despiecePortico } from "../comprobaciones/despieceVigas.ts";
 import { datosDespiece, porticoDe, porticosDe } from "../comprobaciones/porticos.ts";
 import { claseAprovechamiento, COLOR_APROVECHAMIENTO, TIPOS_COMPROBACION } from "./comprobaciones.ts";
@@ -68,6 +70,82 @@ beforeAll(async () => {
 }, 600_000);
 
 describe("CO6: las comprobaciones en el worker", () => {
+  it("CO3-k: los datos de armado de la obra van en el pedido: lo comprobado se rehace con ellos, sin reabrir ni recalcular, y la ficha de una losa dice si es de cimentación", async () => {
+    const armado = { forjados: propuesto.armado.forjados! };
+    const antes = await tabla("losas", armado);
+    expect((await tabla("losas", armado)).comprobadas).toBe(0);
+    expect(antes.datos.minimaReducidaCimentacion).toBe(false);
+    const ficha = await pedir<FichaComprobacion>({ tipo: "comprobacion", de: "losas", clave: antes.partes[0]!.clave, armado });
+    expect(ficha.geometria.tipo === "losas" && ficha.geometria.cimentacion).toBeFalsy();
+    // Con la armadura mínima reducida en el pedido: todo vuelto a comprobar, con el mismo cálculo
+    const despues = await pedir<DatosComprobaciones>({ tipo: "comprobaciones", de: "losas", armado, datos: { minimaReducidaCimentacion: true } });
+    expect(despues.comprobadas).toBe(antes.partes.length);
+    expect(despues.datos.minimaReducidaCimentacion).toBe(true);
+    // Sin losas de cimentación, lo mismo que antes; y los pedidos siguientes sin datos siguen con los últimos
+    expect(despues.partes).toEqual(antes.partes);
+    expect((await tabla("losas", armado)).comprobadas).toBe(0);
+    expect((await tabla("losas", armado)).datos.minimaReducidaCimentacion).toBe(true);
+    // De vuelta a los de la obra (ninguno)
+    const vuelta = await pedir<DatosComprobaciones>({ tipo: "comprobaciones", de: "losas", armado, datos: {} });
+    expect(vuelta.datos.minimaReducidaCimentacion).toBe(false);
+    expect(vuelta.comprobadas).toBe(antes.partes.length);
+  });
+
+  it("§8.14: la ficha de un tramo de pilar trae su tramo libre y los solapes (sus zonas de cercos), y los pedidos de esfuerzos dan las envolventes de ELU del pórtico y del tramo en la coordenada de su dibujo", async () => {
+    const ELU = { tipo: "situaciones" as const, situaciones: ["ELU-PT", "ELU-ACC", "ELU-SIS"] as ("ELU-PT" | "ELU-ACC" | "ELU-SIS")[] };
+    // Un tramo de pilar: su geometría y sus esfuerzos desde la cara del nudo de abajo
+    const t = await tabla("pilares", propuesto.armado);
+    const parte = t.partes[0]!;
+    const ficha = await pedir<FichaComprobacion>({ tipo: "comprobacion", de: "pilares", clave: parte.clave, armado: propuesto.armado });
+    const g = ficha.geometria;
+    if (g.tipo !== "pilares" || !g.seccion || g.libre === undefined || !g.solapes) throw new Error("sin geometría");
+    const tramo = q.pilar(parte.pieza);
+    if (!tramo.valido) throw new Error("sin tramos");
+    const tr = tramo.valor.find((x) => x.planta === parte.planta)!;
+    expect(g.libre).toBeCloseTo(tr.cabeza.s - tr.base.s, 12);
+    expect(g.solapes[16]!).toBeGreaterThan(g.solapes[12]!);
+    const al = alzadoPilar(g.seccion, g.libre, ficha.armado.tipo === "pilares" ? ficha.armado.armado : undefined, g.solapes);
+    expect(al.cercos).toBeGreaterThan(0);
+    expect(al.zonas.at(-1)!.hasta).toBeCloseTo(g.libre, 12);
+    const ep = await pedir<DatosEsfuerzosArmado>({ tipo: "esfuerzos-pilar", pilar: parte.pieza, planta: parte.planta! });
+    for (const e of ["N", "My", "Mz", "Vy", "Vz"] as const) {
+      const ts = ep.esfuerzos[e]!;
+      expect(ts.length, e).toBeGreaterThan(0);
+      const v = await pedir<DatosViga>({ tipo: "viga", id: parte.pieza, esfuerzo: e, combinaciones: ELU });
+      const ps = ts.flat();
+      expect(ps[0]!.x).toBeCloseTo(0, 9);
+      expect(ps.at(-1)!.x).toBeCloseTo(g.libre, 9);
+      // Cada punto es uno de la envolvente del pilar entero, desplazado a la cara de abajo del tramo
+      for (const x of ps) expect(v.envolvente.some((y) => Math.abs(y.s - tr.base.s - x.x) < 1e-9 && y.max === x.max && y.min === x.min), `${e} en ${x.x}`).toBe(true);
+      for (const x of ps) expect(x.max).toBeGreaterThanOrEqual(x.min);
+    }
+    expect((await at.atender({ tipo: "esfuerzos-pilar", pilar: parte.pieza, planta: "no-existe" })).ok).toBe(false);
+    // Un pórtico: My y Vz de cada viga en su x; una viga invertida, con el cortante cambiado de signo
+    for (const p of porticosDe(q).slice(0, 4)) {
+      const viga = p.vigas[0]!.id;
+      const e = await pedir<DatosEsfuerzosArmado>({ tipo: "esfuerzos-portico", viga });
+      expect(e.combinaciones.length).toBeGreaterThan(0);
+      for (const k of ["My", "Vz"] as const) {
+        const ts = e.esfuerzos[k]!;
+        expect(ts.length).toBeGreaterThan(0);
+        for (const tm of ts) for (let i = 1; i < tm.length; i++) expect(tm[i]!.x).toBeGreaterThanOrEqual(tm[i - 1]!.x - 1e-9);
+        for (const x of ts.flat()) expect(x.x >= p.x[0] - 1e-9 && x.x <= p.x[1] + 1e-9).toBe(true);
+        for (const v of p.vigas) {
+          const d = await pedir<DatosViga>({ tipo: "viga", id: v.id, esfuerzo: k, combinaciones: ELU });
+          const suyos = ts.flat().filter((x) => x.x >= v.x[0] - 1e-9 && x.x <= v.x[1] + 1e-9);
+          expect(suyos.length).toBeGreaterThan(0);
+          for (const x of suyos) {
+            const s = v.invertida ? v.x[1] - x.x : x.x - v.x[0];
+            const cambia = v.invertida && k === "Vz";
+            const casa = (y: { s: number; max: number; min: number }) => Math.abs(y.s - s) < 1e-9 && (cambia ? -y.min === x.max && -y.max === x.min : y.max === x.max && y.min === x.min);
+            // (en un pilar compartido por dos vigas del pórtico, el punto puede ser de la otra)
+            if (!d.envolvente.some(casa)) expect(p.vigas.length, `${k} de ${v.id} en ${x.x}`).toBeGreaterThan(1);
+          }
+        }
+      }
+    }
+  });
+
   it("§8.13: el pedido `portico` da el pórtico de la viga y lo que su despiece necesita; con el armado propuesto, cada vano armado tiene sus barras y sus cercos", async () => {
     const vigas = modelo.vigas!.map((v) => v.id);
     for (const viga of [vigas[0]!, vigas[vigas.length - 1]!]) {

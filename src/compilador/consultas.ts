@@ -94,6 +94,8 @@ export interface TramoPilar {
   /** En los extremos de su tramo flexible: la base (justo encima de su zona rígida) y la cabeza (justo debajo). */
   base: SeccionPieza;
   cabeza: SeccionPieza;
+  /** A media altura de su tramo flexible (CO1-f: la sección de los cercos del centro). */
+  centro: SeccionPieza;
 }
 
 export interface ApoyoPieza {
@@ -443,7 +445,7 @@ export class Consultas {
 
   // ─── Pilares ────────────────────────────────────────────────────────────────────────────────
 
-  /** Tramos del pilar (de la base a la cabeza), con sus esfuerzos por caso base en base y cabeza. */
+  /** Tramos del pilar (de la base a la cabeza), con sus esfuerzos por caso base en base, centro y cabeza. */
   pilar(id: string): Respuesta<TramoPilar[]> {
     const p = this.ctx.pilarDe.get(id);
     if (!p) return this.noExiste("El pilar", id);
@@ -456,15 +458,25 @@ export class Consultas {
       const [a, b] = [ts[0]!, ts[ts.length - 1]!];
       const base = new Float64Array(6 * nc);
       const cabeza = new Float64Array(6 * nc);
+      const centro = new Float64Array(6 * nc);
+      // La sección central: a media altura del tramo flexible, en la barra que la contiene
+      const sm = (a.s0 + b.s1) / 2;
+      const m = ts.find((t) => sm >= t.s0 - 1e-12 && sm <= t.s1 + 1e-12) ?? a;
+      const xm = Math.min(Math.max(sm - m.s0, 0), m.s1 - m.s0);
+      const fm = m.s1 > m.s0 ? xm / (m.s1 - m.s0) : 0;
       for (let c = 0; c < nc; c++) {
-        // (en un caso de un modo, de sus resultados, sin hacer el diagrama: `EsfuerzosPiezas.extremos`)
+        // (en un caso de un modo, de sus resultados, sin hacer el diagrama: `EsfuerzosPiezas.extremos`;
+        // sin cargas a lo largo, sus esfuerzos son lineales entre los dos extremos de la barra)
         if (c >= ep.ligeros) {
           base.set(ep.extremos(a.barra, c).subarray(0, 6), 6 * c);
           cabeza.set(ep.extremos(b.barra, c).subarray(6, 12), 6 * c);
+          const e = ep.extremos(m.barra, c);
+          for (let k = 0; k < 6; k++) centro[6 * c + k] = e[k]! + fm * (e[6 + k]! - e[k]!);
           continue;
         }
         base.set(ep.diagrama(a.barra, c).esfuerzosEn(0, 1), 6 * c);
         cabeza.set(ep.diagrama(b.barra, c).esfuerzosEn(b.s1 - b.s0, -1), 6 * c);
+        centro.set(ep.diagrama(m.barra, c).esfuerzosEn(xm, 1), 6 * c);
       }
       const planta = this.ctx.plantas[k]!.id;
       r.push({
@@ -475,6 +487,7 @@ export class Consultas {
         giro: p.giro ?? 0,
         base: { s: a.s0, esfuerzos: base },
         cabeza: { s: b.s1, esfuerzos: cabeza },
+        centro: { s: sm, esfuerzos: centro },
       });
     }
     return { valido: true, valor: r, diagnosticos: [] };

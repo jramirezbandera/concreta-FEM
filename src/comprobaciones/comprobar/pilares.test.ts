@@ -51,6 +51,45 @@ const ARMADO_GIRADO: ArmadoPilar = { ...ARMADO, caraB: ARMADO.caraH!, caraH: ARM
 const CIRCULAR: ArmadoPilar = { recubrimiento: 30, fyk: 500, cercos: { diametro: 8, separacion: 150 }, anillo: { n: 10, diametro: 16 } };
 
 describe("CO1: comprobar un pilar con un armado dado", () => {
+  it("CO1-f: tres secciones, cada una con los cercos de su zona; el centro, con su cortante y sin la fila de la zona densificada", () => {
+    const d = demandas(edificio(), "P1");
+    const t = d.tramos[0]!;
+    // El centro es la media de los extremos (sin cargas a lo largo): cortante igual, momento intermedio
+    t.centro!.demandas.forEach((c, k) => {
+      const [b, h] = [t.base.demandas[k]!.esfuerzos, t.cabeza.demandas[k]!.esfuerzos];
+      expect(c.comb).toBe(t.base.demandas[k]!.comb);
+      for (const i of [1, 2, 4, 5]) expect(c.esfuerzos[i]!).toBeCloseTo((b[i]! + h[i]!) / 2, 8);
+      expect(c.esfuerzos[0]!).toBeGreaterThanOrEqual(Math.min(b[0]!, h[0]!) - 1e-9);
+      expect(c.esfuerzos[0]!).toBeLessThanOrEqual(Math.max(b[0]!, h[0]!) + 1e-9);
+    });
+    expect(t.centro!.s).toBeCloseTo((t.base.s + t.cabeza.s) / 2, 12);
+    const uniforme = (separacion: number) => ({ ...ARMADO, cercos: { diametro: 8, separacion } });
+    const zonas = { ...ARMADO, cercos: { diametro: 8, separacion: 240 }, cercosPie: { diametro: 8, separacion: 100 }, cercosCabeza: { diametro: 8, separacion: 105 } };
+    const c = comprobarTramo(t, zonas);
+    const solo = (que: "base" | "centro" | "cabeza") => ({ ...t, base: { ...t.base, demandas: que === "base" ? t.base.demandas : [] }, cabeza: { ...t.cabeza, demandas: que === "cabeza" ? t.cabeza.demandas : [] }, centro: { ...t.centro!, demandas: que === "centro" ? t.centro!.demandas : [] } });
+    const partes = { base: comprobarTramo(solo("base"), uniforme(100)), centro: comprobarTramo(solo("centro"), uniforme(240)), cabeza: comprobarTramo(solo("cabeza"), uniforme(105)) };
+    // Cada fila es la peor de las tres secciones, cada una con sus cercos
+    for (const f of c.filas) {
+      if (f.informativa) continue;
+      const suyas = (["base", "centro", "cabeza"] as const).flatMap((k) => partes[k].filas.filter((x) => x.id === f.id && !(k === "centro" && x.id === "stirrup-densification")).map((x) => ({ k, x })));
+      expect(suyas.length, f.id).toBeGreaterThan(0);
+      expect(f.aprovechamiento, f.id).toBe(Math.max(...suyas.map((y) => y.x.aprovechamiento)));
+      expect(suyas.some((y) => y.k === f.extremo && y.x.aprovechamiento === f.aprovechamiento), f.id).toBe(true);
+    }
+    // La separación que manda es la del centro (240 > 105 > 100; con Ø12, la zona densificada admite 108), y la zona densificada mira sólo los extremos
+    expect(c.filas.find((f) => f.id === "stirrup-spacing")!.extremo).toBe("centro");
+    const densa = c.filas.find((f) => f.id === "stirrup-densification")!;
+    expect(densa.extremo).not.toBe("centro");
+    expect(densa.aprovechamiento).toBe(partes.cabeza.filas.find((f) => f.id === "stirrup-densification")!.aprovechamiento);
+    // Con todo a 240, la zona densificada avisa; con las zonas, no
+    expect(comprobarTramo(t, uniforme(240)).filas.find((f) => f.id === "stirrup-densification")!.estado).toBe("warn");
+    expect(densa.estado).toBe("ok");
+    // El cortante del centro, con los cercos del centro: menos resistencia que en los extremos
+    const cortantes = c.filas.filter((f) => /^cortante-[yz]$/.test(f.id));
+    expect(cortantes.length).toBeGreaterThan(0);
+    for (const f of cortantes) expect(f.extremo).toBe("centro");
+  });
+
   it("cada fila es el máximo de llamar al módulo a mano, demanda a demanda", () => {
     const d = demandas(edificio(), "P1");
     const c = comprobarPilar(d, () => ARMADO);
@@ -60,8 +99,10 @@ describe("CO1: comprobar un pilar con un armado dado", () => {
       const alcanzan = new Map<string, Set<string>>();
       const informativas = new Set<string>();
       let llamadas = 0;
-      for (const [nombre, ext] of [["base", t.base], ["cabeza", t.cabeza]] as const)
-        for (const dm of ext.demandas) {
+      // CO1-f: en el centro, el módulo una vez (las reglas de sus cercos), con su primera demanda: sin
+      // cargas a lo largo del pilar, ningún momento del centro pasa del de los extremos
+      for (const [nombre, lista] of [["base", t.base.demandas], ["centro", t.centro!.demandas.slice(0, 1)], ["cabeza", t.cabeza.demandas]] as const)
+        for (const dm of lista) {
           const [N, , , , My, Mz] = dm.esfuerzos as [number, number, number, number, number, number];
           expect(-N).toBeGreaterThan(1); // todo comprimido en este edificio
           // La entrada, escrita aparte: 40 × 40 cm, HA-25… lo del modelo, en mm y con compresión positiva
@@ -73,6 +114,8 @@ describe("CO1: comprobar un pilar con un armado dado", () => {
           expect(r.valid).toBe(true);
           llamadas++;
           for (const f of r.checks) {
+            // La zona densificada es de los extremos
+            if (nombre === "centro" && f.id === "stirrup-densification") continue;
             // Las informativas del módulo (NaN, nunca fallan) no tienen máximo
             if (!Number.isFinite(f.utilization)) {
               expect(f.status).toBe("ok");
@@ -152,7 +195,7 @@ describe("CO1: comprobar un pilar con un armado dado", () => {
   it("el cortante: en cada dirección, las fórmulas del CE escritas aparte, con el axil de la demanda", () => {
     const t = demandas(edificio(), "P1").tramos[0]!;
     // Una sola demanda: 600 kN de compresión, Vy = 40 y Vz = 90 kN
-    const uno = { ...t, base: { ...t.base, demandas: [{ comb: "a mano", esfuerzos: [-600, 40, -90, 0, 30, 10] }] }, cabeza: { ...t.cabeza, demandas: [] } };
+    const uno = { ...t, base: { ...t.base, demandas: [{ comb: "a mano", esfuerzos: [-600, 40, -90, 0, 30, 10] }] }, cabeza: { ...t.cabeza, demandas: [] }, centro: { ...t.centro!, demandas: [] } };
     const r = comprobarTramo(uno, ARMADO);
     const fck = t.material.tipo === "hormigon" ? t.material.fck : NaN;
     const fcd = getConcrete(fck).fcd;
@@ -189,7 +232,7 @@ describe("CO1: comprobar un pilar con un armado dado", () => {
   it("el cortante de un pilar circular (CO1-b): el cuadrado inscrito, con las fórmulas del CE escritas aparte, y del lado seguro", () => {
     const t = demandas(edificio(), "P1").tramos[0]!;
     const sec = { ...t, seccion: { id: "c", forma: "circular" as const, D: 0.5, material: t.seccion.material } };
-    const una = (e: number[]) => ({ ...sec, base: { ...sec.base, demandas: [{ comb: "a mano", esfuerzos: e }] }, cabeza: { ...sec.cabeza, demandas: [] } });
+    const una = (e: number[]) => ({ ...sec, base: { ...sec.base, demandas: [{ comb: "a mano", esfuerzos: e }] }, cabeza: { ...sec.cabeza, demandas: [] }, centro: { ...sec.centro!, demandas: [] } });
     const fck = t.material.tipo === "hormigon" ? t.material.fck : NaN;
     const fcd = getConcrete(fck).fcd;
     const fyd = 500 / 1.15;
@@ -243,7 +286,7 @@ describe("CO1: comprobar un pilar con un armado dado", () => {
     const NRdMax = mat.fcd * (400 * 400 - AsTot) + Math.min(fyd, 400) * AsTot;
     const MRd = (capas: BarGroup[], N: number) => computeAxis(-N * 1e3, 400, 400, capas, mat.fcd, fyd, pr, NRdMax).MRd_Nmm / 1e6;
     for (const [N, My, Mz] of [[120, 25, 0], [120, 0, 18], [60, 20, 12], [0.3 * NtRd, 30, 10], [-0.5, 40, 0]] as const) {
-      const uno = { ...t, base: { ...t.base, demandas: [{ comb: "a mano", esfuerzos: [N, 0, 0, 0, My, -Mz] }] }, cabeza: { ...t.cabeza, demandas: [] } };
+      const uno = { ...t, base: { ...t.base, demandas: [{ comb: "a mano", esfuerzos: [N, 0, 0, 0, My, -Mz] }] }, cabeza: { ...t.cabeza, demandas: [] }, centro: { ...t.centro!, demandas: [] } };
       const r = comprobarTramo(uno, ARMADO);
       expect(r.pendientes).toEqual([]);
       expect(r.llamadas).toBe(0);
@@ -257,7 +300,7 @@ describe("CO1: comprobar un pilar con un armado dado", () => {
       expect(r.filas.some((f) => f.id === "nBars-min")).toBe(true);
     }
     // Más tracción de la que aguanta el acero: falla, sin cociente
-    const roto = comprobarTramo({ ...t, base: { ...t.base, demandas: [{ comb: "a mano", esfuerzos: [1.01 * NtRd, 0, 0, 0, 5, 0] }] }, cabeza: { ...t.cabeza, demandas: [] } }, ARMADO);
+    const roto = comprobarTramo({ ...t, base: { ...t.base, demandas: [{ comb: "a mano", esfuerzos: [1.01 * NtRd, 0, 0, 0, 5, 0] }] }, cabeza: { ...t.cabeza, demandas: [] }, centro: { ...t.centro!, demandas: [] } }, ARMADO);
     expect(roto.cumple).toBe(false);
     expect(roto.filas.find((f) => f.id === "traccion")!.estado).toBe("fail");
     expect(roto.filas.find((f) => f.id === "flexotraccion")!.aprovechamiento).toBe(Infinity);
@@ -284,7 +327,7 @@ describe("CO1: comprobar un pilar con un armado dado", () => {
     expect(sinBeta.cumple).toBe(false);
     expect(sinBeta.pendientes[0]!.motivo).toContain("β = 1");
 
-    const vacio = comprobarTramo({ ...t, base: { ...t.base, demandas: [] }, cabeza: { ...t.cabeza, demandas: [] } }, ARMADO);
+    const vacio = comprobarTramo({ ...t, base: { ...t.base, demandas: [] }, cabeza: { ...t.cabeza, demandas: [] }, centro: { ...t.centro!, demandas: [] } }, ARMADO);
     expect(vacio.cumple).toBe(false);
     expect(vacio.llamadas).toBe(0);
 

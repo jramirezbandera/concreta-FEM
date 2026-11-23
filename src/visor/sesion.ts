@@ -25,6 +25,7 @@ import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, capaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type ModoAlzado, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/armado.ts";
+import type { DatosArmado as DatosArmadoObra } from "../comprobaciones/armado.ts";
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
@@ -92,7 +93,7 @@ export type VistaResultadosPlanta = (
   | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number }
   /** CO6-d: las partes de un tipo de comprobación, del color de su aprovechamiento; el armado va en el pedido, como el de AB. */
   /** `dibujo: "armado"` (§8.11): con el armado en barras dibujado; `cara`, los refuerzos de las losas que se ven. */
-  | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto; dibujo?: "armado"; cara?: CaraDibujada }
+  | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto; dibujo?: "armado"; cara?: CaraDibujada; /** Los datos de armado de la obra, si han cambiado desde que se abrió (`Sesion.datosArmado`). */ datos?: DatosArmadoObra }
 ) & { malla?: boolean };
 
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
@@ -292,6 +293,12 @@ function cuentaPorPlanta(p: Proyecto, diagnosticos: readonly Diagnostico[]): Map
 
 export class Sesion {
   readonly proyecto: Proyecto;
+  /**
+   * Los datos de armado de la obra (`obra.armado`: acero, recubrimiento, exposición, la armadura mínima
+   * reducida…). No entran en la huella ni en el cálculo: como el armado, la app los manda con cada
+   * pedido de comprobación (`datos`), y cambian sin reabrir el proyecto ni perder los resultados.
+   */
+  datosArmado: DatosArmadoObra | undefined;
   /** sha256 del núcleo WASM con el que se calcula (el de los resultados guardados tiene que coincidir). */
   readonly motor: string;
   private readonly previa: Diagnostico[];
@@ -315,6 +322,7 @@ export class Sesion {
 
   private constructor(proyecto: Proyecto, motor: string, diferir: boolean) {
     this.proyecto = proyecto;
+    this.datosArmado = proyecto.obra?.armado;
     this.motor = motor;
     this.previa = sensatezPrevia(proyecto.modelo, proyecto.opciones).flatMap((x) => x.avisos);
     if (!diferir) this.compilar();

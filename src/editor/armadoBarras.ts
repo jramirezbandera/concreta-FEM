@@ -18,6 +18,8 @@ export interface CampoArmado {
   clase: "n" | "diametro" | "mm";
   /** Puede quedar vacío aunque su grupo esté. */
   opcional?: boolean;
+  /** Lo que vale vacío (las ramas de un cerco: 2): se enseña en gris en el campo. */
+  defecto?: string;
 }
 
 export interface GrupoArmado {
@@ -60,7 +62,7 @@ const cercos = (ruta: string, titulo: string, opcional = false, ramas = true): G
   campos: [
     { ruta: `${ruta}.diametro`, etiqueta: "Ø", clase: "diametro" },
     { ruta: `${ruta}.separacion`, etiqueta: "cada (mm)", clase: "mm" },
-    ...(ramas ? [{ ruta: `${ruta}.ramas`, etiqueta: "ramas", clase: "n" as const, opcional: true }] : []),
+    ...(ramas ? [{ ruta: `${ruta}.ramas`, etiqueta: "ramas", clase: "n" as const, opcional: true, defecto: "2" }] : []),
   ],
 });
 
@@ -74,12 +76,14 @@ const ARMADURAS = [
 /** Los grupos de campos del armado de una parte, según lo que es. */
 export function gruposArmado(p: ArmadoParte): GrupoArmado[] {
   if (p.tipo === "pilares") {
-    if (p.circular || p.armado?.anillo) return [barras("anillo", "Barras del anillo"), cercos("cercos", "Cercos", false, false)];
+    // CO1-f: los cercos del centro del tramo y, si son otros, los de junto al pie y junto a la cabeza
+    const zonas = [cercos("cercos", "Cercos", false, false), cercos("cercosPie", "Cercos junto al pie", true, false), cercos("cercosCabeza", "Cercos junto a la cabeza", true, false)];
+    if (p.circular || p.armado?.anillo) return [barras("anillo", "Barras del anillo"), ...zonas];
     return [
       { titulo: "Esquinas (4 barras)", ruta: "", campos: [{ ruta: "esquinas", etiqueta: "Ø", clase: "diametro" }] },
       barras("caraB", "Intermedias en cada cara b", true, "por cara"),
       barras("caraH", "Intermedias en cada cara h", true, "por cara"),
-      cercos("cercos", "Cercos", false, false),
+      ...zonas,
     ];
   }
   if (p.tipo === "vigas")

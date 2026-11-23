@@ -6,10 +6,10 @@ import { createContext, useContext } from "react";
 import type { NombreTabla } from "../../src/editor/tablas.ts";
 import type { ProyectoAbierto } from "./sesion/useProyecto.ts";
 
-export type Espacio = "modelo" | "cargas" | "resultados" | "revision";
+export type Espacio = "modelo" | "cargas" | "resultados" | "comprobacion" | "revision";
 
 /** Los modos de Resultados: lo que eran las pantallas Losas, Vigas, Pilares y Desplomes de V1. */
-export type ModoResultados = "losas" | "diagramas" | "pilares" | "armado" | "deformada" | "reacciones" | "modal" | "comprobacion";
+export type ModoResultados = "losas" | "diagramas" | "pilares" | "armado" | "deformada" | "reacciones" | "modal";
 
 export interface Visor {
   proyecto: ProyectoAbierto;

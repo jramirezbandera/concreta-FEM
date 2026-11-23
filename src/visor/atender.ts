@@ -4,7 +4,7 @@
  *
  * Puro: el núcleo WASM ya iniciado por quien lo crea.
  */
-import { datosArmar, datosComprobacion, datosComprobaciones, datosPortico } from "./comprobaciones.ts";
+import { datosArmar, datosComprobacion, datosComprobaciones, datosPortico, esfuerzosPortico, esfuerzosTramoPilar } from "./comprobaciones.ts";
 import type { OpcionesCompilacion, ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
@@ -90,6 +90,7 @@ export class Atendedor {
       case "estado":
         return bien("estado", s.estado());
       case "escena": {
+        if (p.vista.vista === "comprobacion" && p.vista.datos !== undefined) s.datosArmado = p.vista.datos;
         const r = s.escena(p.planta, p.vista);
         return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
@@ -181,12 +182,20 @@ export class Atendedor {
         return bien("segundo-orden", s.segundoOrdenDatos());
       // CO6: las comprobaciones con el armado en barras
       case "comprobaciones":
+        if (p.datos !== undefined) s.datosArmado = p.datos;
         return de(datosComprobaciones(s, p.de, p.armado));
       case "comprobacion":
+        if (p.datos !== undefined) s.datosArmado = p.datos;
         return de(datosComprobacion(s, p.de, p.clave, p.armado));
       case "portico":
+        if (p.datos !== undefined) s.datosArmado = p.datos;
         return de(datosPortico(s, p.viga));
+      case "esfuerzos-portico":
+        return de(esfuerzosPortico(s, p.viga));
+      case "esfuerzos-pilar":
+        return de(esfuerzosTramoPilar(s, p.pilar, p.planta));
       case "armar":
+        if (p.datos !== undefined) s.datosArmado = p.datos;
         return de(datosArmar(s, p));
     }
   }

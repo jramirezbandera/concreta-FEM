@@ -250,6 +250,25 @@ describe("Fase AB · la armadura base y las zonas de refuerzo en el DOM", () => 
     expect(soloArmado(r.proyecto, r3.proyecto)).toBe(false);
   });
 
+  it("CO3-k: los datos de armado de la obra tampoco reabren el proyecto (van con cada pedido de comprobación); lo demás de la obra, sí", () => {
+    const p = proyectoBase(undefined);
+    const r = aplicar(p, { op: "obra", obra: { armado: { minimaReducidaCimentacion: true } } });
+    if (!r.ok) throw new Error(r.errores[0]?.mensaje);
+    expect(r.proyecto.obra?.armado?.minimaReducidaCimentacion).toBe(true);
+    expect(soloFueraDelWorker(p, r.proyecto)).toBe(true);
+    // Quitarla, o cambiar otro dato de armado: igual
+    const r2 = aplicar(r.proyecto, { op: "obra", obra: { armado: { recubrimiento: 35 } } });
+    if (!r2.ok) throw new Error(r2.errores[0]?.mensaje);
+    expect(soloFueraDelWorker(r.proyecto, r2.proyecto)).toBe(true);
+    expect(soloFueraDelWorker(p, r2.proyecto)).toBe(true);
+    // El uso de la obra sí lo usa el worker
+    const r3 = aplicar(r2.proyecto, { op: "obra", obra: { ...r2.proyecto.obra, uso: "B" } });
+    if (!r3.ok) throw new Error(r3.errores[0]?.mensaje);
+    expect(soloFueraDelWorker(r2.proyecto, r3.proyecto)).toBe(false);
+    // Un valor que no vale no se escribe
+    expect(aplicar(p, { op: "obra", obra: { armado: { minimaReducidaCimentacion: "sí" as never } } }).ok).toBe(false);
+  });
+
   it("las plantillas DXF y las vistas guardadas tampoco reabren el proyecto (apagar una capa congelaba la app)", () => {
     const p = proyectoBase(undefined);
     const t = { nombre: "Planta", fichero: "planta.dxf", sha256: "0".repeat(64), unidades: "m" as const, plantas: [MODELO.plantas[0]!.id] };

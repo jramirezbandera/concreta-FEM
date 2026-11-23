@@ -464,6 +464,14 @@
           "description": "Barras repartidas en el anillo de una sección circular."
         },
         "cercos": {
+          "$ref": "#/$defs/Cercos",
+          "description": "Los cercos del centro del tramo y, donde no se dan los de un extremo, también los de ese extremo."
+        },
+        "cercosPie": {
+          "$ref": "#/$defs/Cercos",
+          "description": "CO1-f: los de la zona junto al pie y junto a la cabeza del tramo (`zonasCercosPilar`), si son otros."
+        },
+        "cercosCabeza": {
           "$ref": "#/$defs/Cercos"
         }
       },
@@ -1273,6 +1281,10 @@
         "recubrimientoZapatas": {
           "type": "number",
           "description": "CO5: recubrimiento geométrico de las parrillas de las zapatas, mm (hasta la cara de la barra)."
+        },
+        "minimaReducidaCimentacion": {
+          "type": "boolean",
+          "description": "CO3-k: en las losas de cimentación, la armadura mínima de tracción reducida (CE A19 §9.2.1.1(1),\nla alternativa: 1,2 veces la necesaria en ELU), con el suelo geométrico de `CUANTIA_GEOMETRICA`.\nEs una decisión del proyectista sobre el elemento; por defecto, no."
         }
       },
       "additionalProperties": false,

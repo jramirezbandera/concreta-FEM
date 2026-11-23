@@ -179,6 +179,14 @@ export function comprobarLosas(q: Consultas, armado: ArmadoLosas | undefined, da
   }
   if (resumen.losas && datos?.exposicion === undefined)
     diagnosticos.push({ codigo: "comprobacion/losas-por-defecto", severidad: "aviso", mensaje: `Las losas se comprueban con la clase de exposición ${DATOS_ARMADO.exposicion} (fisura admisible de 0,3 mm), por defecto: confírmala o escríbela en obra.armado (exposicion; con XC1, en interiores secos, la fisuración no se comprueba).` });
+  const reducidas = datos?.minimaReducidaCimentacion ? losas.filter((l) => q.fisico.losas?.find((x) => x.id === l.losa)?.cimentacion !== undefined).map((l) => l.losa) : [];
+  if (reducidas.length)
+    diagnosticos.push({
+      codigo: "comprobacion/minima-reducida",
+      severidad: "info",
+      mensaje: `${reducidas.length > 1 ? "Las losas de cimentación" : "La losa de cimentación"} ${reducidas.join(", ")} se ${reducidas.length > 1 ? "comprueban" : "comprueba"} con la armadura mínima reducida de la obra: donde no llega a la del Código Estructural (Anejo 19 §9.2.1.1, ec. 9.1), vale 1,2 veces la necesaria en ELU, con un suelo geométrico. Es una decisión del proyectista (obra.armado.minimaReducidaCimentacion).`,
+      ids: reducidas,
+    });
   if (conPilares)
     diagnosticos.push({ codigo: "comprobacion/punzonamiento-aparte", severidad: "info", mensaje: "El cortante de las losas no se comprueba en el metro de los pilares (es del punzonamiento, que se comprueba aparte, pilar a pilar) ni en las estaciones de paso a menos de dos cantos de ellos; sí en la cara de las vigas y los apoyos junto a ellos." });
   if (resumen.sinArmado && !op.proponer)

@@ -1,0 +1,36 @@
+== una planta, cargas de vivienda (CM 2, Q 3 kN/m²): losa de cimentación de 60 cm, 169.0 m²
+  sin la opción (la mínima de la ec. 9.1):
+    base x-inf Ø12/150 · x-sup Ø12/150 · y-inf Ø12/150 · y-sup Ø12/150
+    refuerzos 1 (y-inf Ø8/300 2.30×1.00)
+    acero 4004 kg (base 4001, refuerzos 3); cumple true; sin refuerzo 0; manda x-inf/as-min 0.976
+    filas de la mínima: x-inf/as-min ok, x-sup/as-min ok, y-inf/as-min ok, y-sup/as-min ok; la mayor 0.976; 66 armados probados en 0.0 s
+  con la mínima reducida:
+    base x-inf Ø12/200 · x-sup Ø12/200 · y-inf Ø12/200 · y-sup Ø12/200
+    refuerzos 4 (x-inf Ø8/250 2.45×1.00; y-inf Ø8/200 2.45×1.00; y-inf Ø8/300 2.30×1.00; y-inf Ø8/300 2.30×1.00)
+    acero 3016 kg (base 3001, refuerzos 15); cumple true; sin refuerzo 0; manda x-inf/as-min-elu 0.982
+    filas de la mínima: x-inf/as-min ok, x-inf/as-min-elu ok, x-sup/as-min ok, x-sup/as-min-elu ok, y-inf/as-min ok, y-inf/as-min-elu ok, y-sup/as-min ok, y-sup/as-min-elu ok; la mayor 0.982; 60 armados probados en 0.0 s
+
+== una planta muy cargada (CM 12, Q 20 kN/m²): losa de cimentación de 60 cm, 169.0 m²
+  sin la opción (la mínima de la ec. 9.1):
+    base x-inf Ø12/150 · x-sup Ø12/150 · y-inf Ø12/150 · y-sup Ø12/150
+    refuerzos 6 (x-inf Ø25/300 5.00×3.00; x-inf Ø12/125 3.50×1.00; x-inf Ø12/125 3.50×1.00; y-inf Ø25/250 5.00×3.00; y-inf Ø12/125 3.50×1.00; y-inf Ø12/125 3.50×1.00)
+    acero 4524 kg (base 4001, refuerzos 523); cumple false; sin refuerzo 0; manda y/shear 1.289
+    filas de la mínima: x-inf/as-min ok, x-sup/as-min ok, y-inf/as-min ok, y-sup/as-min ok; la mayor 0.976; 327 armados probados en 0.0 s
+  con la mínima reducida:
+    base x-inf Ø12/200 · x-sup Ø12/200 · y-inf Ø12/200 · y-sup Ø12/200
+    refuerzos 14 (x-inf Ø12/100 4.50×2.00; x-inf Ø25/250 5.50×5.00; x-inf Ø12/100 4.50×2.00; x-sup Ø8/250 5.70×3.00; x-sup Ø8/250 5.70×3.00; x-sup Ø8/250 5.15×5.00; x-sup Ø8/250 5.70×3.00; x-sup Ø8/250 5.70×3.00; x-sup Ø8/250 5.15×5.00; y-inf Ø12/100 4.50×2.00; y-inf Ø25/250 5.50×5.00; y-inf Ø12/100 4.50×2.00; y-sup Ø8/250 5.70×13.00; y-sup Ø8/250 5.70×13.00)
+    acero 4591 kg (base 3001, refuerzos 1591); cumple false; sin refuerzo 0; manda y/shear 1.289
+    filas de la mínima: x-inf/as-min ok, x-inf/as-min-elu ok, x-sup/as-min ok, x-sup/as-min-elu ok, y-inf/as-min ok, y-inf/as-min-elu ok, y-sup/as-min ok; la mayor 0.990; 357 armados probados en 0.0 s
+
+== lo mismo, con la losa de 80 cm: losa de cimentación de 80 cm, 169.0 m²
+  sin la opción (la mínima de la ec. 9.1):
+    base x-inf Ø16/200 · x-sup Ø16/200 · y-inf Ø16/200 · y-sup Ø16/200
+    refuerzos 6 (x-inf Ø16/300 3.55×1.00; x-inf Ø8/300 2.70×1.00; x-inf Ø8/300 2.70×1.00; y-inf Ø12/150 3.25×1.00; y-inf Ø8/300 2.70×1.00; y-inf Ø8/300 2.70×1.00)
+    acero 5387 kg (base 5335, refuerzos 52); cumple true; sin refuerzo 0; manda x-inf/bending 0.998
+    filas de la mínima: x-inf/as-min ok, x-sup/as-min ok, y-inf/as-min ok, y-sup/as-min ok; la mayor 0.976; 151 armados probados en 0.0 s
+  con la mínima reducida:
+    base x-inf Ø12/150 · x-sup Ø12/150 · y-inf Ø12/150 · y-sup Ø12/150
+    refuerzos 6 (x-inf Ø10/200 3.70×1.00; x-inf Ø16/200 4.20×3.00; x-inf Ø10/200 3.70×1.00; y-inf Ø12/250 3.90×1.00; y-inf Ø16/200 4.20×3.00; y-inf Ø12/250 3.90×1.00)
+    acero 4250 kg (base 4001, refuerzos 249); cumple true; sin refuerzo 0; manda x-inf/bending 0.996
+    filas de la mínima: x-inf/as-min ok, x-inf/as-min-elu ok, x-sup/as-min ok, x-sup/as-min-elu ok, y-inf/as-min ok, y-inf/as-min-elu ok, y-sup/as-min ok, y-sup/as-min-elu ok; la mayor 0.962; 217 armados probados en 0.0 s
+

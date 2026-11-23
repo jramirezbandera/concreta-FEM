@@ -20,9 +20,10 @@ import type { Pilares3D } from "./pilares3d.ts";
 import type { Reacciones3D } from "./reacciones3d.ts";
 import type { Cargas3D } from "./cargas3d.ts";
 import type { DatosArmado, DatosFranja } from "./franjas.ts";
+import type { DatosArmado as DatosArmadoObra } from "../comprobaciones/armado.ts";
 import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
-import type { DatosArmar, DatosComprobaciones, DatosPortico, FichaComprobacion, PedidoArmar, TipoComprobacion } from "./comprobaciones.ts";
+import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, PedidoArmar, TipoComprobacion } from "./comprobaciones.ts";
 import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
@@ -87,10 +88,14 @@ export type Pedido =
   /** SO: el segundo orden global (con resultados). */
   | { tipo: "segundo-orden" }
   /** CO6: la tabla de comprobaciones de un tipo de pieza con el armado dado, la ficha de una parte y el armado que proponen las tablas. */
-  | { tipo: "comprobaciones"; de: TipoComprobacion; armado?: ArmadoProyecto }
-  | { tipo: "comprobacion"; de: TipoComprobacion; clave: string; armado?: ArmadoProyecto }
+  /** `datos`: los de armado de la obra (`obra.armado`) con los que se comprueba desde ese pedido (`Sesion.datosArmado`); sin ellos, los de la sesión. */
+  | { tipo: "comprobaciones"; de: TipoComprobacion; armado?: ArmadoProyecto; datos?: DatosArmadoObra }
+  | { tipo: "comprobacion"; de: TipoComprobacion; clave: string; armado?: ArmadoProyecto; datos?: DatosArmadoObra }
   /** CO6 (§8.13): el pórtico de una viga (las vigas alineadas con ella), para su despiece. No depende del armado. */
-  | { tipo: "portico"; viga: string }
+  | { tipo: "portico"; viga: string; datos?: DatosArmadoObra }
+  /** §8.14: las envolventes de ELU para dibujarlas con el armado: las de un pórtico (My, Vz) o las de un tramo de pilar. */
+  | { tipo: "esfuerzos-portico"; viga: string }
+  | { tipo: "esfuerzos-pilar"; pilar: string; planta: string }
   | ({ tipo: "armar" } & PedidoArmar);
 
 /** Lo que devuelve cada pedido cuando sale bien. */
@@ -139,6 +144,8 @@ export interface Respuestas {
   comprobaciones: DatosComprobaciones;
   comprobacion: FichaComprobacion;
   portico: DatosPortico;
+  "esfuerzos-portico": DatosEsfuerzosArmado;
+  "esfuerzos-pilar": DatosEsfuerzosArmado;
   armar: DatosArmar;
 }
 

@@ -14,7 +14,7 @@ import { ramasDe, type ArmadoVanoViga, type CercosViga } from "../../../src/comp
 import { despiecePortico, filasBarras, type BarraDespiece, type OrigenBarra } from "../../../src/comprobaciones/despieceVigas.ts";
 import { armadoDeZona, seccionVigaArmada, type ZonaVano } from "../../../src/comprobaciones/dibujoArmado.ts";
 import type { VanoPortico } from "../../../src/comprobaciones/porticos.ts";
-import type { DatosPortico } from "../../../src/visor/comprobaciones.ts";
+import type { DatosEsfuerzosArmado, DatosPortico, PuntoEsfuerzo } from "../../../src/visor/comprobaciones.ts";
 import { fmt } from "../fmt.ts";
 import { SeccionDibujada } from "./CroquisArmado.tsx";
 
@@ -25,6 +25,8 @@ export interface EstadoVano {
 }
 
 interface Props {
+  /** §8.14: las envolventes de ELU de My y Vz en la x del pórtico; se dibujan bajo el despiece. */
+  esfuerzos?: DatosEsfuerzosArmado | null | undefined;
   datos: DatosPortico;
   /** El armado de cada vano, por su clave (el dato del proyecto, en el sentido de su viga). */
   armados: Readonly<Record<string, Partial<ArmadoVanoViga> | null | undefined>>;
@@ -61,9 +63,17 @@ function repartir(xs: readonly (readonly [number, number])[]): number[] {
   });
 }
 
-export function DespiecePortico({ datos, armados, estados, elegida, activo, onVano }: Props) {
+/** Alto de la banda de un esfuerzo bajo el despiece, px. */
+const ALTO_ESFUERZO = 92;
+const ESFUERZOS_PORTICO = [
+  { id: "My", nombre: "M", titulo: "M (kN·m): envolvente de ELU, lo positivo (tracción abajo) hacia abajo", abajo: true },
+  { id: "Vz", nombre: "V", titulo: "V (kN): envolvente de ELU", abajo: false },
+] as const;
+
+export function DespiecePortico({ datos, armados, estados, elegida, activo, onVano, esfuerzos }: Props) {
   const caja = useRef<HTMLDivElement>(null);
   const [ancho, setAncho] = useState(0);
+  const [verEsfuerzo, setVerEsfuerzo] = useState<Record<"My" | "Vz", boolean>>({ My: true, Vz: false });
   const [sobre, setSobre] = useState<string | null>(null);
   useLayoutEffect(() => {
     const el = caja.current;
@@ -109,7 +119,9 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
   const nCer = d.cercos.length ? 1 + Math.max(...filaCercos) : 0;
   const yCer = (f: number) => yInf(nInf + nPiel) + 4 + f * 22;
   const yCota = yCer(nCer) + 8;
-  const H = yCota + 20;
+  const curvas = ESFUERZOS_PORTICO.filter((e) => verEsfuerzo[e.id] && esfuerzos?.esfuerzos[e.id]?.length);
+  const yEsfuerzo = (i: number) => yCota + 26 + i * ALTO_ESFUERZO;
+  const H = yCota + 20 + (curvas.length ? 6 + curvas.length * ALTO_ESFUERZO : 0);
 
   /** Lo que resalta: el campo con el foco del vano elegido, o lo que está bajo el ratón. */
   const resalta = (o: readonly OrigenBarra[], id: string) => sobre === id || (activo !== null && elegida !== null && o.some((x) => x.clave === elegida && x.ruta === activo)) || undefined;
@@ -143,6 +155,16 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
         {d.barras.length > 0 && (
           <span data-acero-portico>
             Acero: {fmt(d.acero.total, 0)} kg ({d.acero.porDiametro.map((x) => `Ø${x.diametro} ${fmt(x.kg, 0)}`).join(" · ")})
+          </span>
+        )}
+        {esfuerzos && (
+          <span role="group" aria-label="Esfuerzos bajo el despiece" className="despiece-capas">
+            Esfuerzos
+            {ESFUERZOS_PORTICO.map((e) => (
+              <label key={e.id} title={e.titulo}>
+                <input type="checkbox" checked={verEsfuerzo[e.id]} onChange={(x) => setVerEsfuerzo((v) => ({ ...v, [e.id]: x.target.checked }))} /> {e.nombre}
+              </label>
+            ))}
           </span>
         )}
       </div>
@@ -258,6 +280,49 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
             );
           })}
           {/* Las cotas: la luz de cada vano entre las caras de sus apoyos, y el ancho de cada apoyo */}
+          {/* §8.14: las envolventes de ELU, bajo el despiece y a su misma escala a lo largo */}
+          {curvas.map((e, i) => {
+            const ts = esfuerzos!.esfuerzos[e.id]!;
+            const tope = Math.max(1e-9, ...ts.flatMap((t) => t.flatMap((q) => [Math.abs(q.max), Math.abs(q.min)])));
+            const medio = (ALTO_ESFUERZO - 40) / 2;
+            const y0 = yEsfuerzo(i) + 20 + medio;
+            const sg = e.abajo ? 1 : -1;
+            const Yv = (v: number) => y0 + sg * (v / tope) * medio;
+            const area = (t: readonly PuntoEsfuerzo[], de: (q: PuntoEsfuerzo) => number) => `M ${X(t[0]!.x)} ${y0} ${t.map((q) => `L ${X(q.x)} ${Yv(de(q))}`).join(" ")} L ${X(t[t.length - 1]!.x)} ${y0} Z`;
+            const linea = (t: readonly PuntoEsfuerzo[], k: "max" | "min") => `M ${t.map((q) => `${X(q.x)} ${Yv(q[k])}`).join(" L ")}`;
+            const valor = (v: number) => fmt(v, Math.abs(v) < 9.95 ? 1 : 0);
+            return (
+              <g key={e.id} className="dp-esfuerzo" data-esfuerzo={e.id}>
+                <text x={M} y={yEsfuerzo(i) + 9} className="dp-esf-titulo">
+                  {e.id === "My" ? "M (kN·m)" : "V (kN)"} · {esfuerzos!.combinaciones}
+                </text>
+                <line x1={X(p.x[0])} x2={X(p.x[1])} y1={y0} y2={y0} className="dp-esf-eje" />
+                {ts.map((t, k) => {
+                  // Los picos del tramo: el mayor positivo y el menor negativo, con su valor
+                  const mas = t.reduce((a, q) => (q.max > a.max ? q : a), t[0]!);
+                  const menos = t.reduce((a, q) => (q.min < a.min ? q : a), t[0]!);
+                  return (
+                    <g key={k}>
+                      <path d={area(t, (q) => Math.max(q.max, 0))} className="dp-esf-area" data-signo={e.id === "My" ? "pos" : "v"} />
+                      <path d={area(t, (q) => Math.min(q.min, 0))} className="dp-esf-area" data-signo={e.id === "My" ? "neg" : "v"} />
+                      <path d={linea(t, "max")} className="dp-esf-linea" data-signo={e.id === "My" ? "pos" : "v"} />
+                      <path d={linea(t, "min")} className="dp-esf-linea" data-signo={e.id === "My" ? "neg" : "v"} />
+                      {mas.max > 0.02 * tope && (
+                        <text x={centrado(X(mas.x), 6)} y={Yv(mas.max) + (sg > 0 ? 11 : -3)} textAnchor="middle" className="dp-esf-valor" data-signo={e.id === "My" ? "pos" : "v"}>
+                          {valor(mas.max)}
+                        </text>
+                      )}
+                      {menos.min < -0.02 * tope && (
+                        <text x={centrado(X(menos.x), 6)} y={Yv(menos.min) + (sg > 0 ? -3 : 11)} textAnchor="middle" className="dp-esf-valor" data-signo={e.id === "My" ? "neg" : "v"}>
+                          {valor(menos.min)}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
           <g className="cq-cota dp-cotas">
             <line x1={X(p.x[0])} x2={X(p.x[1])} y1={yCota} y2={yCota} />
             {[...new Set([...p.apoyos.flatMap((a) => a.caras), ...p.vanos.flatMap((v) => [v.desde, v.hasta])].map((x) => Math.round(x * 1000) / 1000))].map((x) => (

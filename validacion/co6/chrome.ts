@@ -176,7 +176,9 @@ try {
 
   // ─── Sin armado ──────────────────────────────────────────────────────────────────────────────
   log("\n## Resultados · Comprobación, sin armado");
-  await pagina(`__c.boton("Resultados").click(); await __c.esperar(() => __c.boton("Comprobación")); __c.boton("Comprobación").click(); await __c.esperar(() => __c.filas().length);`);
+  // PENDIENTE (§8.14): Comprobación es ya un espacio propio y propone solo lo que falta al entrar; este
+  // banco se escribió para el modo de Resultados sin propuesta automática y no se ha vuelto a pasar
+  await pagina(`__c.boton("Comprobación").click(); await __c.esperar(() => __c.filas().length);`);
   const sin = datosComprobaciones(s, "pilares", undefined);
   if (!sin.valido) throw new Error("no comprueba en Node");
   const filasSin = await pagina<string[][]>(`return __c.filas();`);

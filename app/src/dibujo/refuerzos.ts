@@ -1,6 +1,6 @@
 /**
  * CO6 (`docs/fem3d/comprobaciones.md` §8.12): los refuerzos y las zonas de cercos de las losas, con el
- * ratón, en la planta de Resultados · Comprobación.
+ * ratón, en la planta del espacio Comprobación.
  *
  * - **Con uno elegido** (un clic en él o en su fila de la ficha) se pintan su zona y sus cinco asas:
  *   la del medio de cada lado lo estira y la del centro lo mueve entero. Un clic en un asa la coge y

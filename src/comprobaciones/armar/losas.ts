@@ -44,6 +44,10 @@
  *    módulo);
  *  - cercos de los nervios: de dos ramas, Ø6, Ø8 o Ø10 a 200, 150, 100 o 75 mm, de menos a más acero.
  *
+ * **Con la armadura mínima reducida de las losas de cimentación (CO3-k):** la base es la primera que
+ * cumple el suelo geométrico (y no la mínima del módulo), y donde no llega a 1,2 veces lo que pide el
+ * ELU van refuerzos, como donde no llega la flexión.
+ *
  * En una maciza y en los ábacos no propone armadura transversal: una fila de cortante que falla ahí
  * deja la losa sin cumplir (junto a los pilares es del punzonamiento, CO4).
  */
@@ -104,7 +108,8 @@ export interface OpcionesProponerLosa {
   momentoBase?: Partial<Record<ArmaduraForjado, number>>;
 }
 
-const DEMANDA = /\/(bending|cracking)$/;
+/** Las filas que dependen de la demanda: las arregla un refuerzo, no la base (la mínima reducida de CO3-k, también). */
+const DEMANDA = /\/(bending|cracking|as-min-elu)$/;
 const EPS = 1e-9;
 
 /** El despiece (cabecera): las puntas de un refuerzo o de una zona de cercos van a este módulo, m. */

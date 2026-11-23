@@ -32,7 +32,24 @@ export interface ArmadoTramoPilar {
   caraH?: BarrasCara;
   /** Barras repartidas en el anillo de una sección circular. */
   anillo?: BarrasCara;
+  /** Los cercos del centro del tramo y, donde no se dan los de un extremo, también los de ese extremo. */
   cercos: Cercos;
+  /** CO1-f: los de la zona junto al pie y junto a la cabeza del tramo (`zonasCercosPilar`), si son otros. */
+  cercosPie?: Cercos;
+  cercosCabeza?: Cercos;
+}
+
+/** Las tres secciones en que se comprueba un tramo de pilar, de abajo arriba (CO1-f). */
+export const SECCIONES_PILAR = ["base", "centro", "cabeza"] as const;
+export type SeccionPilar = (typeof SECCIONES_PILAR)[number];
+
+/** Los cercos de una sección del tramo: los de su zona o, sin ellos, los del centro. */
+export const cercosEnPilar = (t: Pick<ArmadoTramoPilar, "cercos" | "cercosPie" | "cercosCabeza">, s: SeccionPilar): Cercos => (s === "base" ? (t.cercosPie ?? t.cercos) : s === "cabeza" ? (t.cercosCabeza ?? t.cercos) : t.cercos);
+
+/** Los cercos más fuertes de los dos extremos del tramo: el mayor Ø y la menor separación. */
+export function cercosExtremos(t: Pick<ArmadoTramoPilar, "cercos" | "cercosPie" | "cercosCabeza">): Cercos {
+  const [p, c] = [cercosEnPilar(t, "base"), cercosEnPilar(t, "cabeza")];
+  return { diametro: Math.max(p.diametro, c.diametro), separacion: Math.min(p.separacion, c.separacion) };
 }
 
 /** Clases de exposición del módulo de vigas: fijan la abertura de fisura admisible (CE A19 tabla 7.1N). */
@@ -56,9 +73,20 @@ export interface DatosArmado {
   flechaActiva?: number;
   /** CO5: recubrimiento geométrico de las parrillas de las zapatas, mm (hasta la cara de la barra). */
   recubrimientoZapatas?: number;
+  /**
+   * CO3-k: en las losas de cimentación, la armadura mínima de tracción reducida (CE A19 §9.2.1.1(1),
+   * la alternativa: 1,2 veces la necesaria en ELU), con el suelo geométrico de `CUANTIA_GEOMETRICA`.
+   * Es una decisión del proyectista sobre el elemento; por defecto, no.
+   */
+  minimaReducidaCimentacion?: boolean;
 }
 
-export const DATOS_ARMADO: Required<DatosArmado> = { fyk: 500, recubrimiento: 30, phiEf: 2, exposicion: "XC2", flechaActiva: 400, recubrimientoZapatas: 50 };
+/** CO3-k: la armadura mínima reducida es este factor por la necesaria en ELU (CE A19 §9.2.1.1(1)). */
+export const FACTOR_MINIMA_REDUCIDA = 1.2;
+/** CO3-k: el suelo de la mínima reducida, por cara y dirección, sobre la sección bruta: 0,9 ‰ con B500 y 1,0 ‰ con menos (la mitad de la geométrica de las losas de la EHE-08, tabla 42.3.5). */
+export const cuantiaGeometrica = (fyk: number): number => (fyk >= 500 ? 0.0009 : 0.001);
+
+export const DATOS_ARMADO: Required<DatosArmado> = { fyk: 500, recubrimiento: 30, phiEf: 2, exposicion: "XC2", flechaActiva: 400, recubrimientoZapatas: 50, minimaReducidaCimentacion: false };
 
 /** El armado de un tramo con los datos de la obra: lo que se le da a la comprobación. */
 export interface ArmadoPilar extends ArmadoTramoPilar {
@@ -85,7 +113,20 @@ export function areaDe(t: ArmadoTramoPilar): number {
   return 4 * area(t.esquinas ?? 0) + 2 * (t.caraB?.n ?? 0) * area(t.caraB?.diametro ?? 0) + 2 * (t.caraH?.n ?? 0) * area(t.caraH?.diametro ?? 0);
 }
 
-/** «4Ø16 + 4Ø12 (caras b) · cØ6/100», para una tabla o un texto. */
+const igualesCercos = (a: Cercos, b: Cercos) => a.diametro === b.diametro && a.separacion === b.separacion;
+
+/** «cØ6/180 (pie y cabeza, /100)»: los cercos del centro y, si son otros, los de los extremos. */
+export function textoCercosPilar(t: Pick<ArmadoTramoPilar, "cercos" | "cercosPie" | "cercosCabeza">): string {
+  const c = t.cercos;
+  const de = (x: Cercos) => (x.diametro === c.diametro ? `/${x.separacion}` : `cØ${x.diametro}/${x.separacion}`);
+  const [p, k] = [cercosEnPilar(t, "base"), cercosEnPilar(t, "cabeza")];
+  const centro = `cØ${c.diametro}/${c.separacion}`;
+  if (igualesCercos(p, c) && igualesCercos(k, c)) return centro;
+  if (igualesCercos(p, k)) return `${centro} (pie y cabeza, ${de(p)})`;
+  return `${centro} (${[igualesCercos(p, c) ? "" : `pie, ${de(p)}`, igualesCercos(k, c) ? "" : `cabeza, ${de(k)}`].filter(Boolean).join("; ")})`;
+}
+
+/** «4Ø16 + 4Ø12 (caras b) · cØ6/180 (pie y cabeza, /100)», para una tabla o un texto. */
 export function textoArmado(t: ArmadoTramoPilar): string {
   const partes: string[] = [];
   if (t.anillo) partes.push(`${t.anillo.n}Ø${t.anillo.diametro}`);
@@ -94,7 +135,7 @@ export function textoArmado(t: ArmadoTramoPilar): string {
     if (t.caraB?.n) partes.push(`${2 * t.caraB.n}Ø${t.caraB.diametro} (caras b)`);
     if (t.caraH?.n) partes.push(`${2 * t.caraH.n}Ø${t.caraH.diametro} (caras h)`);
   }
-  return `${partes.join(" + ")} · cØ${t.cercos.diametro}/${t.cercos.separacion}`;
+  return `${partes.join(" + ")} · ${textoCercosPilar(t)}`;
 }
 
 export const DIAMETROS = [6, 8, 10, 12, 16, 20, 25, 32];
@@ -119,9 +160,10 @@ export function erroresArmado(t: ArmadoTramoPilar): string[] {
     cara(t.caraH, "las caras h", 0);
   }
   if (!t.cercos) r.push("faltan los cercos");
-  else {
-    diam(t.cercos.diametro, "los cercos");
-    if (!(Number.isFinite(t.cercos.separacion) && t.cercos.separacion > 0)) r.push(`los cercos: la separación ${String(t.cercos.separacion)} no vale (mm, > 0)`);
+  for (const [c, que] of [[t.cercos, "los cercos"], [t.cercosPie, "los cercos del pie"], [t.cercosCabeza, "los cercos de la cabeza"]] as const) {
+    if (!c) continue;
+    diam(c.diametro, que);
+    if (!(Number.isFinite(c.separacion) && c.separacion > 0)) r.push(`${que}: la separación ${String(c.separacion)} no vale (mm, > 0)`);
   }
   return r;
 }

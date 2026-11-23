@@ -8,7 +8,7 @@
 import type { Consultas, Respuesta } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { areaDe, armadoPilar, barrasDe, DATOS_ARMADO, textoArmado, type ArmadoTramoPilar, type DatosArmado } from "./armado.ts";
-import { diametroDe, domina, proponerTramo, subirTramo } from "./armar/pilares.ts";
+import { aflojarCentro, diametroDe, domina, proponerTramo, subirTramo } from "./armar/pilares.ts";
 import { comprobarTramo, type ComprobacionTramo, type FilaPilar, type Pendiente } from "./comprobar/pilares.ts";
 import { demandasPilar, type DemandasTramo } from "./demandas/pilares.ts";
 
@@ -33,6 +33,8 @@ export interface TramoComprobado {
   planta: string;
   plantaBase: string;
   seccion: string;
+  /** El tramo flexible, entre las caras de sus nudos, m (para sus zonas de cercos, CO1-f). */
+  libre?: number;
   /** De dónde sale el armado: del proyecto, de la tabla, o no hay. */
   origen: "proyecto" | "propuesto" | "sin-armado";
   armado?: ArmadoTramoPilar;
@@ -77,6 +79,8 @@ export interface OpcionesPilares {
   filas?: boolean;
   /** Con `proponer`: las reglas de obra de CO1-e, continuidad en altura y agrupar (por defecto, sí). */
   reglasObra?: boolean;
+  /** Con `proponer`: CO1-f, los cercos del centro del tramo más abiertos que los de sus extremos (por defecto, sí). */
+  zonasCercos?: boolean;
 }
 
 const finito = (x: number) => (Number.isFinite(x) ? x : null);
@@ -103,7 +107,7 @@ function manda(c: ComprobacionTramo): FilaPilar | undefined {
   return m;
 }
 
-function componer(base: Pick<TramoComprobado, "planta" | "plantaBase" | "seccion">, origen: TramoComprobado["origen"], a: ArmadoTramoPilar | undefined, c: ComprobacionTramo | null, extra: Partial<TramoComprobado>, filas?: boolean): TramoComprobado {
+function componer(base: Pick<TramoComprobado, "planta" | "plantaBase" | "seccion" | "libre">, origen: TramoComprobado["origen"], a: ArmadoTramoPilar | undefined, c: ComprobacionTramo | null, extra: Partial<TramoComprobado>, filas?: boolean): TramoComprobado {
   const m = c ? manda(c) : undefined;
   return {
     ...base,
@@ -148,7 +152,7 @@ function reglasObra(pilares: PilarComprobado[], contexto: Contexto[], datos: Dat
     const s = subirTramo(c.t, x.armado!, minimo, datos, c.betaUno);
     if (!s) return false;
     const filas = x.filas !== undefined;
-    const nuevo = componer({ planta: x.planta, plantaBase: x.plantaBase, seccion: x.seccion }, "propuesto", s.armado, s.comprobacion, { posicion: s.posicion, ...(x.probados !== undefined ? { probados: x.probados } : {}), ajuste: porque }, filas);
+    const nuevo = componer({ planta: x.planta, plantaBase: x.plantaBase, seccion: x.seccion, ...(x.libre !== undefined ? { libre: x.libre } : {}) }, "propuesto", s.armado, s.comprobacion, { posicion: s.posicion, ...(x.probados !== undefined ? { probados: x.probados } : {}), ajuste: porque }, filas);
     for (const k of Object.keys(x) as (keyof TramoComprobado)[]) delete x[k];
     Object.assign(x, nuevo);
     return true;
@@ -206,7 +210,7 @@ export function comprobarPilares(q: Consultas, armado: ArmadoPilares | undefined
     }
     const tramos: TramoComprobado[] = d.valor.tramos.map((t, k) => {
       contexto.push({ pilar: id, t, betaUno: d.valor.betaUno, k });
-      const base = { planta: t.planta, plantaBase: t.plantaBase, seccion: t.seccion.id };
+      const base = { planta: t.planta, plantaBase: t.plantaBase, seccion: t.seccion.id, libre: t.longitudLibre };
       const suyo = armado?.[id]?.[t.planta];
       let a: ArmadoTramoPilar | undefined = suyo;
       let c: ComprobacionTramo | null;
@@ -228,6 +232,17 @@ export function comprobarPilares(q: Consultas, armado: ArmadoPilares | undefined
     pilares.push({ pilar: id, cumple: false, combinaciones: d.valor.combinaciones, tramos });
   }
   if (op.proponer && op.reglasObra !== false) reglasObra(pilares, contexto, datos);
+  // CO1-f: lo propuesto, con el centro de cada tramo más abierto si sigue cumpliendo
+  if (op.proponer && op.zonasCercos !== false)
+    for (const c of contexto) {
+      const x = pilares.find((p) => p.pilar === c.pilar)!.tramos[c.k]!;
+      if (x.origen !== "propuesto" || !x.armado) continue;
+      const s = aflojarCentro(c.t, x.armado, datos, c.betaUno);
+      if (!s) continue;
+      const nuevo = componer({ planta: x.planta, plantaBase: x.plantaBase, seccion: x.seccion, ...(x.libre !== undefined ? { libre: x.libre } : {}) }, "propuesto", s.armado, s.comprobacion, { ...(x.posicion !== undefined ? { posicion: x.posicion } : {}), ...(x.probados !== undefined ? { probados: x.probados } : {}), ...(x.ajuste ? { ajuste: x.ajuste } : {}) }, x.filas !== undefined);
+      for (const k of Object.keys(x) as (keyof TramoComprobado)[]) delete x[k];
+      Object.assign(x, nuevo);
+    }
   for (const p of pilares) {
     p.cumple = p.tramos.every((t) => t.cumple);
     for (const t of p.tramos) {

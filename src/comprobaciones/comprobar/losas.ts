@@ -39,12 +39,22 @@
  *
  * Lo que no se comprueba no sale nunca como «cumple»: va a `pendientes`.
  *
+ * **La armadura mínima reducida (CO3-k,** `obra.armado.minimaReducidaCimentacion`**):** sólo en una losa
+ * de cimentación y sólo donde la del módulo no se cumple (§9.2.1.1, ec. 9.1). Su fila `as-min` se
+ * sustituye por las dos de la alternativa del mismo apartado:
+ *  - `as-min`: el suelo geométrico, As ≥ `cuantiaGeometrica`·b·h (una regla de armado);
+ *  - `as-min-elu`: As ≥ 1,2 veces la necesaria en ELU, comprobada como 1,2·MEd ≤ MRd. Es del lado
+ *    seguro: MRd es cóncavo en As, así que la armadura necesaria no pasa de As·MEd/MRd. Depende de la
+ *    demanda, como la flexión: donde no cumple, hace falta un refuerzo.
+ *
  * Unidades del armado: mm y MPa, las del módulo.
  */
 import { calcForjados, type ForjadosResult } from "../concreta/lib/calculations/rcSlabs.ts";
+import { asMinRectangular } from "../concreta/lib/calculations/cuantiaMinima.ts";
+import { getConcrete, getFyd } from "../concreta/data/materials.ts";
 import type { CheckRow, CheckStatus } from "../concreta/lib/calculations/types.ts";
 import { forjadosDefaults, type ForjadosInputs } from "../concreta/data/defaults.ts";
-import { areaBarra, DATOS_ARMADO, ramasDe, type ArmadoForjado, type ArmaduraForjado, type BarrasForjado, type CercosForjado, type DatosArmado, type Exposicion, type RefuerzoForjado } from "../armado.ts";
+import { areaBarra, cuantiaGeometrica, DATOS_ARMADO, FACTOR_MINIMA_REDUCIDA, ramasDe, type ArmadoForjado, type ArmaduraForjado, type BarrasForjado, type CercosForjado, type DatosArmado, type Exposicion, type RefuerzoForjado } from "../armado.ts";
 import { armaduraDe, direccionArmadura, type DemandasLosa, type EstacionLosa, type SeccionLosa } from "../demandas/losas.ts";
 
 /** El armado de una losa con los datos de la obra: lo que se le da a la comprobación. */
@@ -52,10 +62,15 @@ export interface ArmadoLosa extends ArmadoForjado {
   recubrimiento: number;
   fyk: number;
   exposicion: Exposicion;
+  /** CO3-k: en una losa de cimentación, la armadura mínima reducida (1,2 veces la necesaria en ELU, con su suelo geométrico). */
+  minimaReducida?: boolean;
 }
 
+/** CO3-k: ¿vale la alternativa de la armadura mínima en esta losa con este armado? */
+export const conMinimaReducida = (d: Pick<DemandasLosa, "cimentacion">, a: Pick<ArmadoLosa, "minimaReducida">): boolean => !!a.minimaReducida && d.cimentacion;
+
 export function armadoLosa(a: ArmadoForjado, d?: DatosArmado): ArmadoLosa {
-  return { ...a, recubrimiento: d?.recubrimiento ?? DATOS_ARMADO.recubrimiento, fyk: d?.fyk ?? DATOS_ARMADO.fyk, exposicion: d?.exposicion ?? DATOS_ARMADO.exposicion };
+  return { ...a, recubrimiento: d?.recubrimiento ?? DATOS_ARMADO.recubrimiento, fyk: d?.fyk ?? DATOS_ARMADO.fyk, exposicion: d?.exposicion ?? DATOS_ARMADO.exposicion, ...(d?.minimaReducidaCimentacion ? { minimaReducida: true } : {}) };
 }
 
 /**
@@ -330,10 +345,14 @@ export function comprobarLosa(d: DemandasLosa, a: ArmadoLosa, op: OpcionesCompro
       ] as const) {
         const armadura = armaduraDe(k, cara);
         const tracciona = x[cara] > MOMENTO_MINIMO;
-        for (const f of sec.checks) {
-          if (f.id.startsWith("anchorage-")) continue;
-          if (FILAS_TRACCION.has(f.id) && !tracciona) continue;
-          const de = f.id === "bending" ? x.de[cara] : f.id === "cracking" ? x.de[cara === "inferior" ? "cpInferior" : "cpSuperior"] : undefined;
+        const flexion = sec.checks.find((f) => f.id === "bending");
+        for (const f0 of sec.checks) {
+          if (f0.id.startsWith("anchorage-")) continue;
+          if (FILAS_TRACCION.has(f0.id) && !tracciona) continue;
+          // CO3-k: donde la mínima del módulo no se cumple, las dos filas de su alternativa
+          const alternativa = f0.id === "as-min" && f0.status === "fail" && conMinimaReducida(d, a) && flexion && Number.isFinite(flexion.utilization) && f0.utilization > 0 ? filasMinimaReducida(f0, flexion, 1000 * d.espesor, a.fyk, d.material.fck) : null;
+          for (const f of alternativa ?? [f0]) {
+          const de = f.id === "bending" || f.id === "as-min-elu" ? x.de[cara] : f.id === "cracking" ? x.de[cara === "inferior" ? "cpInferior" : "cpSuperior"] : undefined;
           filas.push({
             id: `${armadura}/${f.id}`,
             armadura,
@@ -344,12 +363,13 @@ export function comprobarLosa(d: DemandasLosa, a: ArmadoLosa, op: OpcionesCompro
             articulo: f.article,
             aprovechamiento: f.utilization,
             estado: f.status,
-            ...(de ? { franja: de.franja, s: de.s, comb: f.id === "bending" ? (cara === "inferior" ? de.combInferior : de.combSuperior) : "ELS-CP" } : {}),
+            ...(de ? { franja: de.franja, s: de.s, comb: f.id === "bending" || f.id === "as-min-elu" ? (cara === "inferior" ? de.combInferior : de.combSuperior) : "ELS-CP" } : {}),
             ...(f.id === "bending" ? { resistente: sec.MRd / ancho } : {}),
             // La separación máxima de una maciza es de su parrilla base; la cuantía máxima no la arregla más acero
             grupo: f.id === "as-max" ? "seccion" : f.id === "bar-spacing-maciza" ? (`${g.seccion === "abaco" ? "abacos" : "base"}:${armadura}` as GrupoLosa) : basico(cara),
             fila: f,
           });
+          }
         }
       }
       if (x.conCortante)
@@ -375,6 +395,23 @@ export function comprobarLosa(d: DemandasLosa, a: ArmadoLosa, op: OpcionesCompro
   const r = fin();
   if (!op.solo) r.sinEstaciones = (a.refuerzos ?? []).map((_, i) => i).filter((i) => !cubiertas.has(i));
   return r;
+}
+
+/**
+ * CO3-k: las dos filas de la armadura mínima reducida de una cara, de la fila `as-min` del módulo (que
+ * no cumple: su aprovechamiento es As,mín/As) y de la de su flexión (MEd/MRd). `h`, el canto, mm.
+ */
+function filasMinimaReducida(minima: CheckRow, flexion: CheckRow, h: number, fyk: number, fck: number): CheckRow[] {
+  // El acero de la cara, de la cuenta del módulo: su fila es As,mín/As, con As,mín el de (9.1) en un metro de losa
+  const As = asMinRectangular(1000, h, getConcrete(fck).fctm, getFyd(fyk)) / minima.utilization;
+  const geo = cuantiaGeometrica(fyk) * 1000 * h;
+  const uGeo = As > 0 ? geo / As : Infinity;
+  const uElu = FACTOR_MINIMA_REDUCIDA * flexion.utilization;
+  const estado = (u: number): CheckStatus => (u <= 1 + 1e-9 ? "ok" : "fail");
+  return [
+    { ...minima, description: `Armadura mínima de tracción reducida: suelo geométrico (${(1000 * cuantiaGeometrica(fyk)).toFixed(1).replace(".", ",")} ‰ de la sección)`, value: `As,geo = ${geo.toFixed(0)} mm²`, limit: `As = ${Number.isFinite(As) ? As.toFixed(0) : "—"} mm²`, utilization: uGeo, status: estado(uGeo), article: "CE Anejo 19 §9.2.1.1(1), alternativa; suelo de la EHE-08, tabla 42.3.5" },
+    { ...minima, id: "as-min-elu", description: `Armadura mínima de tracción reducida: ${String(FACTOR_MINIMA_REDUCIDA).replace(".", ",")} veces la necesaria en ELU (${String(FACTOR_MINIMA_REDUCIDA).replace(".", ",")}·MEd ≤ MRd)`, value: `${String(FACTOR_MINIMA_REDUCIDA).replace(".", ",")}·MEd/MRd = ${uElu.toFixed(3).replace(".", ",")}`, limit: "≤ 1,0", utilization: uElu, status: estado(uElu), article: "CE Anejo 19 §9.2.1.1(1), alternativa" },
+  ];
 }
 
 /**
@@ -404,6 +441,9 @@ export function estacionesSinCortante(d: DemandasLosa, a: ArmadoLosa, k: 1 | 2):
  * con el que la fisura cumple (por bisección sobre el módulo: la abertura crece con el momento); la
  * estación falla si su momento pasa de uno de los dos. Con ello, un grupo cumple esas dos filas si y
  * sólo si no falla ninguna de sus estaciones.
+ *
+ * Con la armadura mínima reducida (CO3-k) y un grupo que no llega a la mínima del módulo, el momento
+ * no puede pasar de MRd/1,2 (la fila `as-min-elu`).
  */
 export function estacionesQueFallan(d: DemandasLosa, a: ArmadoLosa, armadura: ArmaduraForjado): EstacionLosa[] {
   const k = direccionArmadura(armadura);
@@ -422,7 +462,9 @@ export function estacionesQueFallan(d: DemandasLosa, a: ArmadoLosa, armadura: Ar
     const falla = (sec: NonNullable<ReturnType<typeof con>>, id: string) => sec.checks.some((f) => f.id === id && f.status === "fail");
     const sec = con(M, Mcp);
     if (!sec) continue;
-    const fallaM = falla(sec, "bending");
+    // CO3-k: sin la mínima del módulo, la alternativa: 1,2·MEd ≤ MRd
+    const reducida = conMinimaReducida(d, a) && M > MOMENTO_MINIMO && falla(sec, "as-min");
+    const fallaM = reducida ? FACTOR_MINIMA_REDUCIDA * M > sec.MRd * (1 + 1e-9) : falla(sec, "bending");
     // El mayor momento cuasipermanente con el que la fisura cumple
     let cpLimite = Infinity;
     if (falla(sec, "cracking")) {
@@ -438,7 +480,7 @@ export function estacionesQueFallan(d: DemandasLosa, a: ArmadoLosa, armadura: Ar
     for (const e of g.estaciones) {
       const [m, cp] = inferior ? [e.inferior, e.cpInferior] : [e.superior, e.cpSuperior];
       // «falla» del módulo: aprovechamiento ≥ 1
-      if ((fallaM && m * e.ancho >= sec.MRd) || cp * e.ancho > cpLimite) r.push(e);
+      if ((fallaM && (reducida ? FACTOR_MINIMA_REDUCIDA * m * e.ancho > sec.MRd * (1 + 1e-9) : m * e.ancho >= sec.MRd)) || cp * e.ancho > cpLimite) r.push(e);
     }
   }
   return r;

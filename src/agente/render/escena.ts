@@ -109,6 +109,8 @@ export type Estilo =
   | "armado-superior-zona"
   /** Las zonas de cercos de los nervios de un reticular. */
   | "armado-cercos"
+  /** Cada cerco de un nervio: un punto sobre su eje. */
+  | "armado-cercos-punto"
   /** El cerco de un pilar, los perímetros de cercos de punzonamiento y las barras de punta. */
   | "armado-cerco"
   | "armado-barra"
