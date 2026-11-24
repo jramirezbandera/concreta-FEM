@@ -28,7 +28,7 @@ import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/
 import type { DatosArmado as DatosArmadoObra } from "../comprobaciones/armado.ts";
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
-import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
+import { armado3D, puntoArmado, tramosPlanta, type Armado3D, type FueraArmado, type ValorArmado } from "./armado.ts";
 import { casosSueltos, propositoCampo, UNIDADES_CAMPO, type Envolvente, type EsfuerzoPlanta } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
@@ -838,14 +838,14 @@ export class Sesion {
     return armado3D(rr, this.origen3D, p.armadura, conj.valor, { planta: p.planta, ...(p.escala ? { escala: p.escala } : {}), ...(p.armado ? { armado: p.armado } : {}), ...(p.soloExceso !== undefined ? { soloExceso: p.soloExceso } : {}), ...(p.filtro ? { filtro: p.filtro } : {}) });
   }
 
-  /** AB: el valor del mapa de armado en un punto de una planta (null: fuera de las franjas). */
-  valorArmado(p: PedidoValorArmado): { valido: true; valor: ValorArmado | null } | { valido: false; diagnosticos: Diagnostico[] } {
+  /** AB: el valor del mapa de armado en un punto de una planta o, fuera de las franjas, por qué. */
+  valorArmado(p: PedidoValorArmado): { valido: true; valor: ValorArmado | FueraArmado } | { valido: false; diagnosticos: Diagnostico[] } {
     const q = this.q;
     if (!q) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
     if (!this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
     const conj = this.conjunto(p.combinaciones, "esfuerzos");
     if (!conj.valido) return conj;
-    return valorArmado(q, p.planta, p.armadura, conj.valor, p.x, p.y, p.armado);
+    return puntoArmado(q, p.planta, p.armadura, conj.valor, p.x, p.y, p.armado);
   }
 
   /** El valor de un mapa en un punto de una lámina, en la combinación dibujada (null: sin mapa o fuera de ella). */

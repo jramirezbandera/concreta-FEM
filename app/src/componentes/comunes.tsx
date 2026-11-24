@@ -1,4 +1,5 @@
 /** Piezas comunes de los paneles: secciones, filas, combinaciones, diagnósticos y equilibrio. */
+import { TablaEnColumnas } from "./TablaEnColumnas.tsx";
 import { useState, type ComponentType, type KeyboardEvent, type ReactNode } from "react";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion, PropositoVista } from "../../../src/visor/sesion.ts";
@@ -141,24 +142,26 @@ export function TablaCombinaciones({ c, resaltar }: { c: Combinaciones; resaltar
   return (
     <Seccion titulo={TITULO_COMBINACIONES} valor={`${c.nombres.length} · ${c.descripcion}`}>
       <div>
-        <table className="tb">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th style={{ textAlign: "left" }}>Expresión</th>
-            </tr>
-          </thead>
-          <tbody>
-            {c.nombres.map((n, i) => (
-              <tr key={n} className={n === resaltar ? "max" : undefined}>
-                <td>{n}</td>
-                <td className="txt" style={{ textAlign: "left" }}>
-                  {coma(c.etiquetas[i]!)}
-                </td>
+        <TablaEnColumnas>
+          <table className="tb">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th style={{ textAlign: "left" }}>Expresión</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {c.nombres.map((n, i) => (
+                <tr key={n} className={n === resaltar ? "max" : undefined}>
+                  <td>{n}</td>
+                  <td className="txt" style={{ textAlign: "left" }}>
+                    {coma(c.etiquetas[i]!)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TablaEnColumnas>
       </div>
     </Seccion>
   );

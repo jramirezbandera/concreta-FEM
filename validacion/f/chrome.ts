@@ -245,7 +245,7 @@ try {
   const enPagina = await pagina<{ planta: string; filas: { id: string; inferior: string; superior: string }[] }>(`
     const t = document.querySelector("table[aria-label='Franjas de la planta']");
     const planta = t.closest("section").querySelector("h2 span").textContent.replace("Franjas de ", "");
-    return { planta, filas: [...t.querySelectorAll("tbody tr")].map((tr) => ({ id: tr.querySelector("td").firstChild.textContent, inferior: tr.querySelector("[data-inferior]").dataset.inferior, superior: tr.querySelector("[data-superior]").dataset.superior })) };`);
+    return { planta, filas: [...document.querySelectorAll("table[aria-label^='Franjas de la planta'] tbody tr")].map((tr) => ({ id: tr.querySelector("td").firstChild.textContent, inferior: tr.querySelector("[data-inferior]").dataset.inferior, superior: tr.querySelector("[data-superior]").dataset.superior })) };`);
   // En Node, la misma sesión
   const wasm = readFileSync(join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm"));
   await iniciarNucleo(wasm);
@@ -261,7 +261,7 @@ try {
   const t5 = await ahora();
   const ms5 = await pagina<number>(`
     const t0 = performance.now();
-    [...document.querySelectorAll("table[aria-label='Franjas de la planta'] tbody tr")].find((tr) => tr.querySelector("td").firstChild.textContent === ${JSON.stringify(id)}).click();
+    [...document.querySelectorAll("table[aria-label^='Franjas de la planta'] tbody tr")].find((tr) => tr.querySelector("td").firstChild.textContent === ${JSON.stringify(id)}).click();
     await __v2.esperar(() => document.querySelector("table[aria-label='Caras y apoyos de ${id}']"));
     return performance.now() - t0;`);
   comprobar(ms5 <= 1000, `el detalle de ${id} (diagrama y estaciones) sale en ${(ms5 / 1000).toFixed(2)} s (≤ 1 s)`);

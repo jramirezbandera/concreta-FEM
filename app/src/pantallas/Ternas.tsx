@@ -7,6 +7,7 @@
  *
  * La usan el cuadro de la planta y el pilar elegido en Pilares, y un pilar en Diagramas.
  */
+import { TablaEnColumnas } from "../componentes/TablaEnColumnas.tsx";
 import { Fragment, type ReactNode } from "react";
 import type { FilaPilar } from "../../../src/visor/datos.ts";
 import { fmt } from "../fmt.ts";
@@ -57,75 +58,77 @@ export function TablaTernas({ filas, titulo, cabecera, activa, onFila, compacta 
   const n = EXTREMOS_TRAMO.length * TERNAS.length;
   const izquierda = { textAlign: "left" } as const;
   return (
-    <table className="tb">
-      <thead>
-        <tr>
-          {!compacta && <th>{cabecera}</th>}
-          <th style={izquierda}>Dónde</th>
-          <th style={izquierda} title="El pésimo de la fila, y su combinación">
-            Pésimo
-          </th>
-          <th>N kN</th>
-          <th>My kN·m</th>
-          <th>Mz kN·m</th>
-          {!compacta && <th className="nu">ν</th>}
-        </tr>
-      </thead>
-      <tbody>
-        {filas.map((f) => (
-          <Fragment key={`${f.pilar}@${f.planta}`}>
-            {compacta && (
-              <tr className={`grupo${onFila ? " clic" : ""}`} data-on={activa?.(f) || undefined} {...(onFila ? filaElegible(() => onFila(f), !!activa?.(f)) : {})}>
-                <td className="et" colSpan={5}>
-                  {titulo(f)}
-                  {f.nu && (
-                    <small className={f.nu.nu > LIMITE_NU ? "text-state-warn" : undefined}>
-                      ν {fmt(f.nu.nu, 2)}
-                      {f.nu.nu > LIMITE_NU ? ` > ${fmt(LIMITE_NU, 2)} !` : ""} · {f.nu.comb}
-                    </small>
-                  )}
-                </td>
-              </tr>
-            )}
-            {EXTREMOS_TRAMO.map((ex, i) =>
-              TERNAS.map((t, j) => {
-                const x = f.tramo[ex.k][t.k];
-                const primera = !compacta && i === 0 && j === 0;
-                return (
-                  // C-19: con el teclado, una parada por tramo (su primera fila; en la compacta, la del título)
-                  <tr key={`${ex.k}${t.k}`} className={onFila ? "clic" : undefined} data-on={activa?.(f) || undefined} data-terna={`${ex.k} ${t.k}`} {...(onFila ? (!compacta && i === 0 && j === 0 ? filaElegible(() => onFila(f), !!activa?.(f)) : { onClick: () => onFila(f) }) : {})}>
-                    {primera && (
-                      <td className="et" rowSpan={n}>
-                        {titulo(f)}
-                      </td>
-                    )}
-                    {j === 0 && (
-                      <td className="et" rowSpan={TERNAS.length}>
-                        {ex.nombre}
-                      </td>
-                    )}
-                    <td className="et" title={t.title}>
-                      {t.nombre}
-                      <small style={{ whiteSpace: "nowrap" }}>
-                        {x?.comb ?? ""}
-                        {x?.pesimos && (
-                          <span title={TITULO_PESIMOS} aria-label={`, ${TITULO_PESIMOS.toLowerCase()}`}>
-                            {" "}±
-                          </span>
-                        )}
+    <TablaEnColumnas filasMinimas={3}>
+      <table className="tb">
+        <thead>
+          <tr>
+            {!compacta && <th>{cabecera}</th>}
+            <th style={izquierda}>Dónde</th>
+            <th style={izquierda} title="El pésimo de la fila, y su combinación">
+              Pésimo
+            </th>
+            <th>N kN</th>
+            <th>My kN·m</th>
+            <th>Mz kN·m</th>
+            {!compacta && <th className="nu">ν</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => (
+            <Fragment key={`${f.pilar}@${f.planta}`}>
+              {compacta && (
+                <tr className={`grupo${onFila ? " clic" : ""}`} data-on={activa?.(f) || undefined} {...(onFila ? filaElegible(() => onFila(f), !!activa?.(f)) : {})}>
+                  <td className="et" colSpan={5}>
+                    {titulo(f)}
+                    {f.nu && (
+                      <small className={f.nu.nu > LIMITE_NU ? "text-state-warn" : undefined}>
+                        ν {fmt(f.nu.nu, 2)}
+                        {f.nu.nu > LIMITE_NU ? ` > ${fmt(LIMITE_NU, 2)} !` : ""} · {f.nu.comb}
                       </small>
-                    </td>
-                    <td>{x ? fmt(x.esfuerzos[0], 1) : "—"}</td>
-                    <td>{x ? fmt(x.esfuerzos[4], 1) : "—"}</td>
-                    <td>{x ? fmt(x.esfuerzos[5], 1) : "—"}</td>
-                    {primera && <CeldaNu f={f} rowSpan={n} />}
-                  </tr>
-                );
-              }),
-            )}
-          </Fragment>
-        ))}
-      </tbody>
-    </table>
+                    )}
+                  </td>
+                </tr>
+              )}
+              {EXTREMOS_TRAMO.map((ex, i) =>
+                TERNAS.map((t, j) => {
+                  const x = f.tramo[ex.k][t.k];
+                  const primera = !compacta && i === 0 && j === 0;
+                  return (
+                    // C-19: con el teclado, una parada por tramo (su primera fila; en la compacta, la del título)
+                    <tr key={`${ex.k}${t.k}`} className={onFila ? "clic" : undefined} data-on={activa?.(f) || undefined} data-terna={`${ex.k} ${t.k}`} {...(onFila ? (!compacta && i === 0 && j === 0 ? filaElegible(() => onFila(f), !!activa?.(f)) : { onClick: () => onFila(f) }) : {})}>
+                      {primera && (
+                        <td className="et" rowSpan={n}>
+                          {titulo(f)}
+                        </td>
+                      )}
+                      {j === 0 && (
+                        <td className="et" rowSpan={TERNAS.length}>
+                          {ex.nombre}
+                        </td>
+                      )}
+                      <td className="et" title={t.title}>
+                        {t.nombre}
+                        <small style={{ whiteSpace: "nowrap" }}>
+                          {x?.comb ?? ""}
+                          {x?.pesimos && (
+                            <span title={TITULO_PESIMOS} aria-label={`, ${TITULO_PESIMOS.toLowerCase()}`}>
+                              {" "}±
+                            </span>
+                          )}
+                        </small>
+                      </td>
+                      <td>{x ? fmt(x.esfuerzos[0], 1) : "—"}</td>
+                      <td>{x ? fmt(x.esfuerzos[4], 1) : "—"}</td>
+                      <td>{x ? fmt(x.esfuerzos[5], 1) : "—"}</td>
+                      {primera && <CeldaNu f={f} rowSpan={n} />}
+                    </tr>
+                  );
+                }),
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </TablaEnColumnas>
   );
 }

@@ -14,6 +14,7 @@
  * varias combinaciones, cada objeto con la de su mayor |Fz| (dicha en su fila). Cada número es de la
  * consulta; bajo el cursor, los de la flecha.
  */
+import { TablaEnColumnas } from "../componentes/TablaEnColumnas.tsx";
 import { useState, type ReactNode } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
@@ -216,37 +217,39 @@ export function ModoReacciones() {
 
   const tabla = d ? (
     <Seccion titulo="Reacciones de lo dibujado" valor={`${d.objetos.length} · ${queSeDibuja(d.conjunto)}`}>
-      <table className="tb">
-        <thead>
-          <tr>
-            <th>Objeto</th>
-            <th>Fx kN</th>
-            <th>Fy kN</th>
-            <th>Fz kN</th>
-            <th>Mx kN·m</th>
-            <th>My kN·m</th>
-            <th>Mz kN·m</th>
-          </tr>
-        </thead>
-        <tbody>
-          {d.objetos.map((o) => (
-            <tr key={o.id} className="clic" data-on={o.id === seleccion} {...filaElegible(() => setSeleccion(o.id), o.id === seleccion)}>
-              <td>
-                {o.id}
-                <small>
-                  {o.tipo} · {o.planta}
-                  {d.conjunto.n > 1 ? ` · ${o.comb}` : ""}
-                </small>
-              </td>
-              {o.R.map((v, i) => (
-                <td key={i} data-reaccion={i === 2 ? v : undefined}>
-                  {fmt(v, 1)}
-                </td>
-              ))}
+      <TablaEnColumnas>
+        <table className="tb">
+          <thead>
+            <tr>
+              <th>Objeto</th>
+              <th>Fx kN</th>
+              <th>Fy kN</th>
+              <th>Fz kN</th>
+              <th>Mx kN·m</th>
+              <th>My kN·m</th>
+              <th>Mz kN·m</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {d.objetos.map((o) => (
+              <tr key={o.id} className="clic" data-on={o.id === seleccion} {...filaElegible(() => setSeleccion(o.id), o.id === seleccion)}>
+                <td>
+                  {o.id}
+                  <small>
+                    {o.tipo} · {o.planta}
+                    {d.conjunto.n > 1 ? ` · ${o.comb}` : ""}
+                  </small>
+                </td>
+                {o.R.map((v, i) => (
+                  <td key={i} data-reaccion={i === 2 ? v : undefined}>
+                    {fmt(v, 1)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TablaEnColumnas>
       <p className="nota">La resultante de cada objeto respecto al centro de sus nudos coartados, en ejes globales; Fz &gt; 0, hacia arriba (el apoyo empuja la estructura).</p>
     </Seccion>
   ) : (
@@ -256,26 +259,28 @@ export function ModoReacciones() {
   const porCasos = d?.conjunto.descripcion === "casos";
   const totales = d ? (
     <Seccion titulo={porCasos ? "Totales por caso" : "Totales por combinación"} valor={`${d.totales.length} · ${d.conjunto.descripcion}`}>
-      <table className="tb">
-        <thead>
-          <tr>
-            <th>{porCasos ? "Caso" : "Combinación"}</th>
-            <th>ΣFx kN</th>
-            <th>ΣFy kN</th>
-            <th>ΣFz kN</th>
-          </tr>
-        </thead>
-        <tbody>
-          {d.totales.map((t) => (
-            <tr key={t.comb}>
-              <td>{t.comb}</td>
-              <td>{fmt(t.F[0], 1)}</td>
-              <td>{fmt(t.F[1], 1)}</td>
-              <td>{fmt(t.F[2], 1)}</td>
+      <TablaEnColumnas>
+        <table className="tb">
+          <thead>
+            <tr>
+              <th>{porCasos ? "Caso" : "Combinación"}</th>
+              <th>ΣFx kN</th>
+              <th>ΣFy kN</th>
+              <th>ΣFz kN</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {d.totales.map((t) => (
+              <tr key={t.comb}>
+                <td>{t.comb}</td>
+                <td>{fmt(t.F[0], 1)}</td>
+                <td>{fmt(t.F[1], 1)}</td>
+                <td>{fmt(t.F[2], 1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TablaEnColumnas>
       <p className="nota">La suma de todas las reacciones de {porCasos ? "cada caso" : "cada combinación"}: equilibra sus cargas (ΣF y ΣM se comprueban a 1e-9 en cada cálculo).</p>
     </Seccion>
   ) : (

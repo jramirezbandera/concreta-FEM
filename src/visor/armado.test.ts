@@ -15,7 +15,7 @@ import { VERSION_ESQUEMA } from "../agente/proyecto.ts";
 import { sha256 } from "../compilador/huella.ts";
 import { serializar } from "../editor/serializar.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
-import { tramosPlanta, type Armado3D, type ValorArmado } from "./armado.ts";
+import { tramosPlanta, type Armado3D, type FueraArmado, type ValorArmado } from "./armado.ts";
 import { Atendedor } from "./atender.ts";
 import type { EscenaPreparada } from "./escena.ts";
 import type { DatosArmado } from "./franjas.ts";
@@ -71,8 +71,8 @@ describe("valor de un punto (criterio 2)", () => {
         }
       }
       expect(n).toBeGreaterThan(50);
-      // Fuera de la losa, nada
-      expect(await pedir({ tipo: "valor-armado", planta, armadura: a, combinaciones: { tipo: "defecto" }, x: -100, y: -100 })).toBeNull();
+      // Fuera de la losa, sin valor y diciendo por qué
+      expect(await pedir({ tipo: "valor-armado", planta, armadura: a, combinaciones: { tipo: "defecto" }, x: -100, y: -100 })).toMatchObject({ fuera: true, corto: "fuera de las losas" });
     }, 60_000);
 
   it("con base, la de su losa y el exceso", async () => {
@@ -83,6 +83,35 @@ describe("valor de un punto (criterio 2)", () => {
     const v = (await pedir<ValorArmado | null>({ tipo: "valor-armado", planta, armadura: "x-sup", combinaciones: { tipo: "defecto" }, x: (t.rectangulo[0]![0] + t.rectangulo[2]![0]) / 2, y: (t.rectangulo[0]![1] + t.rectangulo[2]![1]) / 2, armado }))!;
     expect(v.base).toBe(10);
     expect(v.exceso).toBe(v.valor - 10);
+  });
+});
+
+describe("sin valor en un punto: por qué", () => {
+  it("cada hueco entre dos tramos de una franja dice su motivo, con la franja o la pieza", async () => {
+    const q = sesion().q!;
+    const fs = tramosPlanta(q, planta, "x-sup", conjunto());
+    if (!fs.valido) throw new Error();
+    const motivos = new Map<string, number>();
+    for (const { franja: f, tramos } of fs.valor)
+      for (let i = 0; i + 1 < tramos.length; i++) {
+        const [a, b] = [tramos[i]!.b, tramos[i + 1]!.a];
+        if (b - a < 1e-3) continue;
+        const s = (a + b) / 2;
+        const t = (f.t0 + f.t1) / 2;
+        const v = await pedir<ValorArmado | FueraArmado>({ tipo: "valor-armado", planta, armadura: "x-sup", combinaciones: { tipo: "defecto" }, x: s * f.d[0] + t * f.n[0], y: s * f.d[1] + t * f.n[1] });
+        expect("fuera" in v).toBe(true);
+        const w = v as FueraArmado;
+        expect(w.motivo.length).toBeGreaterThan(20);
+        expect(w.franja === f.id || w.piezas.length > 0).toBe(true);
+        motivos.set(w.corto.split(" ")[0]!, (motivos.get(w.corto.split(" ")[0]!) ?? 0) + 1);
+      }
+    expect([...motivos.values()].reduce((x, y) => x + y, 0)).toBeGreaterThan(0);
+  });
+
+  it("dentro de un pilar, el pilar; en un hueco de la losa, el hueco", async () => {
+    const pi = MODELO.pilares![0]!;
+    const v = await pedir<ValorArmado | FueraArmado>({ tipo: "valor-armado", planta, armadura: "x-sup", combinaciones: { tipo: "defecto" }, x: pi.x, y: pi.y });
+    if ("fuera" in v) expect(v.corto).toBe(`pilar ${pi.id}`);
   });
 });
 

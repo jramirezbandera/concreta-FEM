@@ -1480,6 +1480,12 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
    valores de la misma fila a 1920); con la fila resaltada al pasar y un cebreado tenue */
 .dock-cuerpo .tb { width: auto; min-width: min(100%, 640px); max-width: 1180px; }
 .dock-cuerpo .tb td:not(:first-child), .dock-cuerpo .tb th:not(:first-child) { min-width: 96px; }
+/* Una tabla larga y estrecha, en varias columnas que llenan el ancho (`TablaEnColumnas`) */
+.tb-columnas { display: block; }
+.tb-columnas:not([data-columnas="1"]) { display: flex; align-items: flex-start; gap: 28px; }
+.tb-columnas:not([data-columnas="1"]) > .tb { flex: 1 1 0; width: auto; min-width: 0; max-width: none; }
+.tb-columnas:not([data-columnas="1"]) > .tb + .tb { position: relative; }
+.tb-columnas:not([data-columnas="1"]) > .tb + .tb::before { content: ""; position: absolute; left: -14px; top: 0; bottom: 0; border-left: 1px solid var(--color-border-sub); }
 .dock-cuerpo .tb tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--color-bg-surface) 70%, transparent); }
 .tb tbody tr:hover td { background: var(--color-bg-elevated); }
 /* D-17: un id no se parte por su guion («ELU-PT-» y «3» en dos líneas parecían dos) */

@@ -23,6 +23,7 @@
  * Todo número sale de los pedidos `comprobaciones`, `comprobacion` y `armar` de la sesión, que
  * llaman a lo que da la orden de comprobar del agente. El armado va en cada pedido.
  */
+import { TablaEnColumnas } from "../componentes/TablaEnColumnas.tsx";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ArmadoProyecto } from "../../../src/agente/armaduraBase.ts";
 import type { TramoEnvolvente } from "../../../src/agente/consultas.ts";
@@ -1263,48 +1264,50 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
         <p className="nota">{tipo === "punzonamiento" ? "Ninguna losa pasa carga a un pilar por su huella (los pilares van dentro del ancho de sus vigas, o no hay losas)." : `No hay ${varios} que comprobar.`}</p>
       ) : (
         <>
-          <table className="tb" data-tabla-comprobacion>
-            <thead>
-              <tr>
-                <th>{tipo === "vigas" ? "Viga" : tipo === "losas" ? "Losa" : "Pilar"}</th>
-                <th>{tipo === "losas" ? "Tipo" : tipo === "punzonamiento" ? "Planta · losa" : tipo === "vigas" ? "Vano" : "Tramo"}</th>
-                {tipo !== "punzonamiento" && <th>{tipo === "losas" ? "Planta" : "Sección"}</th>}
-                <th>Armado</th>
-                <th>Aprov.</th>
-                <th>Manda</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {partes.map((p) => {
-                const e = estadoDe(p);
-                return (
-                  <tr
-                    key={p.clave}
-                    data-on={p.clave === clave}
-                    style={{ cursor: "pointer" }}
-                    {...filaElegible(() => elegir(p), p.clave === clave)}
-                    onDoubleClick={() => {
-                      elegir(p);
-                      pan.abrirPestana("armado");
-                    }}
-                    title="Doble clic: su armado"
-                  >
-                    <td>{p.pieza}</td>
-                    <td>{p.parte}</td>
-                    {tipo !== "punzonamiento" && <td>{(tipo === "losas" ? p.planta : p.seccion) ?? "—"}</td>}
-                    <td className="txt">{p.texto ?? "—"}</td>
-                    <td className={e.tono === "fail" ? "f" : undefined}>{aprov(p.aprovechamiento)}</td>
-                    <td className="txt">
-                      {p.manda ? textoApp(p.manda.descripcion) : p.pendientes[0] ? textoApp(p.pendientes[0]) : "—"}
-                      {p.manda && <small>{lugarDe(p.manda)}</small>}
-                    </td>
-                    <td className={e.tono === "fail" ? "f" : e.tono === "warn" ? "w" : undefined}>{e.texto}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <TablaEnColumnas>
+            <table className="tb" data-tabla-comprobacion>
+              <thead>
+                <tr>
+                  <th>{tipo === "vigas" ? "Viga" : tipo === "losas" ? "Losa" : "Pilar"}</th>
+                  <th>{tipo === "losas" ? "Tipo" : tipo === "punzonamiento" ? "Planta · losa" : tipo === "vigas" ? "Vano" : "Tramo"}</th>
+                  {tipo !== "punzonamiento" && <th>{tipo === "losas" ? "Planta" : "Sección"}</th>}
+                  <th>Armado</th>
+                  <th>Aprov.</th>
+                  <th>Manda</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partes.map((p) => {
+                  const e = estadoDe(p);
+                  return (
+                    <tr
+                      key={p.clave}
+                      data-on={p.clave === clave}
+                      style={{ cursor: "pointer" }}
+                      {...filaElegible(() => elegir(p), p.clave === clave)}
+                      onDoubleClick={() => {
+                        elegir(p);
+                        pan.abrirPestana("armado");
+                      }}
+                      title="Doble clic: su armado"
+                    >
+                      <td>{p.pieza}</td>
+                      <td>{p.parte}</td>
+                      {tipo !== "punzonamiento" && <td>{(tipo === "losas" ? p.planta : p.seccion) ?? "—"}</td>}
+                      <td className="txt">{p.texto ?? "—"}</td>
+                      <td className={e.tono === "fail" ? "f" : undefined}>{aprov(p.aprovechamiento)}</td>
+                      <td className="txt">
+                        {p.manda ? textoApp(p.manda.descripcion) : p.pendientes[0] ? textoApp(p.pendientes[0]) : "—"}
+                        {p.manda && <small>{lugarDe(p.manda)}</small>}
+                      </td>
+                      <td className={e.tono === "fail" ? "f" : e.tono === "warn" ? "w" : undefined}>{e.texto}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TablaEnColumnas>
           <p className="nota">
             <label className="mr-3 inline-flex items-center gap-1.5">
               <input type="checkbox" checked={peores} onChange={(x) => setPeores(x.target.checked)} /> Los peores, primero

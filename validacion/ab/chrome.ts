@@ -215,7 +215,8 @@ try {
     return { ms: performance.now() - t0, p, valor: el.dataset.valorArmado };`);
   const vn = ses.valorArmado({ planta, armadura: "x-sup", combinaciones: { tipo: "defecto" }, x: clic.p[0], y: clic.p[1], armado: BASE });
   if (!vn.valido) throw new Error(JSON.stringify(vn.diagnosticos));
-  comprobar(vn.valor !== null && String(vn.valor.valor) === clic.valor, `un clic en (${clic.p[0].toFixed(3)}; ${clic.p[1].toFixed(3)}) da ${clic.valor} kN·m/m: el de Node bit a bit (${vn.valor?.franja}, s = ${vn.valor?.s.toFixed(3)})`);
+  const vv = "fuera" in vn.valor ? null : vn.valor;
+  comprobar(vv !== null && String(vv.valor) === clic.valor, `un clic en (${clic.p[0].toFixed(3)}; ${clic.p[1].toFixed(3)}) da ${clic.valor} kN·m/m: el de Node bit a bit (${vv?.franja}, s = ${vv?.s.toFixed(3)})`);
   comprobar(clic.ms <= 50, `el valor del punto sale en ${clic.ms.toFixed(0)} ms (≤ 50 ms)`);
   await captura("armado-clic");
 
@@ -274,7 +275,7 @@ try {
     return (await __ab.esperar(async () => (await __ab.dep(0)).sonda, 20000).catch(() => null)) ?? null;`);
   const plantaZ = (conBase.modelo.losas ?? []).find((l) => z.objeto.startsWith(`${l.id}:`))!.planta;
   const vz = ses.valorArmado({ planta: plantaZ, armadura: "x-sup", combinaciones: { tipo: "defecto" }, x: z.punto[0], y: z.punto[1], armado: { base: { "x-sup": 25 } } });
-  const esperado = vz.valido && vz.valor ? vz.valor.valor.toFixed(1).replace(".", ",") : "?";
+  const esperado = vz.valido && !("fuera" in vz.valor) ? vz.valor.valor.toFixed(1).replace(".", ",") : "?";
   comprobar(!!sonda && sonda[0]!.startsWith(`${esperado} kN·m/m`), `la sonda en el máximo de ${z.objeto}: «${sonda?.join(" · ")}» (Node: ${esperado} kN·m/m)`);
   await captura("armado-3d");
 } catch (e) {

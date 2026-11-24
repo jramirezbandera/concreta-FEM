@@ -15,7 +15,7 @@ import type { Alambrico } from "./alambrico.ts";
 import type { Solido } from "./solido.ts";
 import type { Diagramas3D } from "./diagramas3d.ts";
 import type { Isovalores3D } from "./isovalores3d.ts";
-import type { Armado3D, ValorArmado } from "./armado.ts";
+import type { Armado3D, FueraArmado, ValorArmado } from "./armado.ts";
 import type { Pilares3D } from "./pilares3d.ts";
 import type { Reacciones3D } from "./reacciones3d.ts";
 import type { Cargas3D } from "./cargas3d.ts";
@@ -141,7 +141,7 @@ export interface Respuestas {
   armado3d: Armado3D;
   "armado-losas-3d": Diagramas3D;
   "punzonamiento-3d": Diagramas3D;
-  "valor-armado": ValorArmado | null;
+  "valor-armado": ValorArmado | FueraArmado;
   revision: DatosRevision;
   precalentar: null;
   viento: DatosViento;

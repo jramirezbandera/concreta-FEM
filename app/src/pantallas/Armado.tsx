@@ -13,13 +13,14 @@
  *
  * Cada número es de una consulta, nunca del dibujo.
  */
+import { TablaEnColumnas } from "../componentes/TablaEnColumnas.tsx";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ARMADURAS as LISTA_ARMADURAS, baseDe, hayBase, type ArmadoProyecto, type BasesArmado } from "../../../src/agente/armaduraBase.ts";
 import { NOMBRE_CORTO, UNIDAD_ARMADO, type Armadura, type FiltroArmado, type OpcionesArmado } from "../../../src/agente/render/armado.ts";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { DemandaFranja, EstacionFranjaEnvolvente, FilaRefuerzo } from "../../../src/agente/consultas.ts";
 import { leerNumero, textoNumero } from "../../../src/editor/celdas.ts";
-import type { ValorArmado } from "../../../src/visor/armado.ts";
+import { esFueraArmado, type FueraArmado, type ValorArmado } from "../../../src/visor/armado.ts";
 import type { DatosFranja } from "../../../src/visor/franjas.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
 import { CampoLista, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
@@ -44,7 +45,7 @@ const U = UNIDAD_ARMADO;
 
 /** Lo que va en cada pedido del mapa: la base, la escala y el filtro (no reabren la sesión). */
 type OpMapa = Pick<OpcionesArmado, "armado" | "escala" | "filtro">;
-type Punto = { p: Vec2; v: ValorArmado | null; planta: string; clave: string };
+type Punto = { p: Vec2; v: ValorArmado | FueraArmado | null; planta: string; clave: string };
 
 /** Una demanda con su estación y su combinación (si hay más de una). */
 function Demanda({ v, varias }: { v: DemandaFranja | null; varias: boolean }) {
@@ -103,7 +104,8 @@ function TresDArmado({ planta, armadura, eleccion, op }: { planta: string | null
           const pl = datos.plantas[o.lamina];
           if (!pl) return null;
           const r = await cliente.pedir({ tipo: "valor-armado", planta: pl, armadura, combinaciones: eleccion, x: o.p[0], y: o.p[1], ...(armado ? { armado } : {}) });
-          const v = r.ok ? (r.valor as ValorArmado | null) : null;
+          const v = r.ok ? (r.valor as ValorArmado | FueraArmado) : null;
+          if (esFueraArmado(v)) return [`sin valor · ${v.corto}`];
           return v ? [`${fmt(v.valor, 1)} ${U}${v.exceso !== null ? ` (${v.exceso > 0 ? "+" : ""}${fmt(v.exceso, 1)} sobre la base)` : ""}`, `${v.franja} · s = ${fmt(v.s, 2)} m · ${v.comb}`] : ["fuera de las franjas"];
         }
       : null,
@@ -332,7 +334,17 @@ function DetalleFranja({ d, varias, base }: { d: DatosFranja; varias: boolean; b
 function ValorPunto({ punto, armadura, varias }: { punto: Punto | null; armadura: Armadura; varias: boolean }) {
   if (!punto) return <p className="nota">Clic en el mapa para leer el valor de un punto.</p>;
   const v = punto.v;
-  if (!v) return <p className="nota">Fuera de las franjas: fuera de las losas, en un hueco o entre las caras de un pilar (allí mandan las caras).</p>;
+  if (!v) return <p className="nota">Sin valor en este punto.</p>;
+  if (esFueraArmado(v))
+    return (
+      <div className="px-3.5 py-2" data-fuera-armado={v.corto}>
+        <div className="mono text-[11px] text-text-muted">
+          ({fmt(punto.p[0], 2)}; {fmt(punto.p[1], 2)}) m{v.franja ? ` · ${v.franja}` : ""}
+        </div>
+        <div className="text-[13px] font-medium">Sin valor: {v.corto}</div>
+        <p className="mt-1 text-[12px] leading-snug text-text-secondary">{v.motivo}</p>
+      </div>
+    );
   const e = v.estacion;
   return (
     <div className="px-3.5 py-2" data-valor-armado={v.valor}>
@@ -601,9 +613,9 @@ export function ModoArmado() {
     // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
     const x = await sinObsoleto(proyecto.cliente.pedir({ tipo: "valor-armado", planta: pl, armadura, combinaciones: eleccion, x: p[0], y: p[1], ...(armado ? { armado } : {}) }));
     if (!x) return;
-    const v = x.ok ? (x.valor as ValorArmado | null) : null;
+    const v = x.ok ? (x.valor as ValorArmado | FueraArmado) : null;
     setPunto({ p, v, planta: pl, clave: clave(pl) });
-    setSeleccion(v ? v.franja : null);
+    setSeleccion(v ? (v.franja ?? null) : null);
   };
   const puntoValido = punto && planta && punto.planta === planta && punto.clave === clave(planta) ? punto : null;
 
@@ -649,7 +661,7 @@ export function ModoArmado() {
       fuentes={{
         planta: (v) => {
           const pl = v.planta;
-          const marcas: Marca[] = punto && pl && punto.planta === pl && punto.clave === clave(pl) ? [{ p: punto.p, texto: punto.v ? `${fmt(punto.v.valor, 1)} ${U}` : "fuera" }] : [];
+          const marcas: Marca[] = punto && pl && punto.planta === pl && punto.clave === clave(pl) ? [{ p: punto.p, texto: esFueraArmado(punto.v) ? (punto.v.corto.startsWith("fuera") ? punto.v.corto : `fuera · ${punto.v.corto}`) : punto.v ? `${fmt(punto.v.valor, 1)} ${U}` : "fuera" }] : [];
           return <EscenaArmado fuente={pl ? { tipo: "planta", planta: pl, vista: conMalla({ vista: "armado" as const, combinaciones: eleccion, armadura, ...op }, v) } : null} objetos={objetos} marcas={marcas} onPunto={(p, x) => void clic(p, x)} />;
         },
         cabeceraPlanta: (v, i) => cabecera(v, i),
@@ -667,35 +679,37 @@ export function ModoArmado() {
       {d.filas.length === 0 ? (
         <p className="nota">Esta planta no tiene losas macizas ni reticulares.</p>
       ) : (
-        <table className="tb" aria-label="Franjas de la planta">
-          <thead>
-            <tr>
-              <th>Franja</th>
-              <th>Ancho m</th>
-              <th>Inferior {U}</th>
-              <th>Superior {U}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.filas.map((f) => (
-              <tr key={f.id} className="clic" data-on={f.id === seleccion} {...filaElegible(() => setSeleccion(f.id), f.id === seleccion)}>
-                <td>
-                  {f.id}
-                  <small>
-                    t de {fmt(f.t[0], 2)} a {fmt(f.t[1], 2)}
-                  </small>
-                </td>
-                <td>{fmt(f.ancho, 2)}</td>
-                <td data-inferior={f.inferior?.v ?? 0} className={inferior ? "font-medium" : undefined}>
-                  <Demanda v={f.inferior} varias={varias} />
-                </td>
-                <td data-superior={f.superior?.v ?? 0} className={inferior ? undefined : "font-medium"}>
-                  <Demanda v={f.superior} varias={varias} />
-                </td>
+        <TablaEnColumnas>
+          <table className="tb" aria-label="Franjas de la planta">
+            <thead>
+              <tr>
+                <th>Franja</th>
+                <th>Ancho m</th>
+                <th>Inferior {U}</th>
+                <th>Superior {U}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {d.filas.map((f) => (
+                <tr key={f.id} className="clic" data-on={f.id === seleccion} {...filaElegible(() => setSeleccion(f.id), f.id === seleccion)}>
+                  <td>
+                    {f.id}
+                    <small>
+                      t de {fmt(f.t[0], 2)} a {fmt(f.t[1], 2)}
+                    </small>
+                  </td>
+                  <td>{fmt(f.ancho, 2)}</td>
+                  <td data-inferior={f.inferior?.v ?? 0} className={inferior ? "font-medium" : undefined}>
+                    <Demanda v={f.inferior} varias={varias} />
+                  </td>
+                  <td data-superior={f.superior?.v ?? 0} className={inferior ? undefined : "font-medium"}>
+                    <Demanda v={f.superior} varias={varias} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TablaEnColumnas>
       )}
       <p className="nota">Mayor momento de dimensionado de Wood–Armer de cada franja (por metro), por combinación con los momentos medios de su ancho, y dónde está (s, a lo largo).</p>
       {aviso}
@@ -711,57 +725,59 @@ export function ModoArmado() {
       ) : zonas.length === 0 ? (
         <p className="nota">La base cubre toda la demanda de {NOMBRE_CORTO[armadura]} en esta planta.</p>
       ) : (
-        <table className="tb" aria-label="Zonas de refuerzo">
-          <thead>
-            <tr>
-              <th>Zona</th>
-              <th>Franjas</th>
-              <th>s m</th>
-              <th>Longitud m</th>
-              <th>Ancho m</th>
-              <th>Máximo {U}</th>
-              <th>Exceso {U}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {zonas.map((z) => (
-              <tr
-                key={z.id}
-                className="clic"
-                data-on={z.id === seleccion}
-                {...filaElegible(() => {
-                  setSeleccion(z.id);
-                  encuadrarCajaActiva(z.caja);
-                }, z.id === seleccion)}
-              >
-                <td>
-                  {z.id}
-                  <small>base {fmt(z.base, 1)}</small>
-                </td>
-                <td>
-                  {z.franjas.length}
-                  <small>
-                    {z.franjas[0]}
-                    {z.franjas.length > 1 ? ` a ${z.franjas[z.franjas.length - 1]}` : ""}
-                  </small>
-                </td>
-                <td>
-                  {fmt(z.s[0], 2)} a {fmt(z.s[1], 2)}
-                </td>
-                <td>{fmt(z.longitud, 2)}</td>
-                <td>{fmt(z.t[1] - z.t[0], 2)}</td>
-                <td data-maximo={z.maximo.v}>
-                  {fmt(z.maximo.v, 1)}
-                  <small>
-                    {z.maximo.franja} · s = {fmt(z.maximo.s, 2)}
-                    {varias ? ` · ${z.maximo.comb}` : ""}
-                  </small>
-                </td>
-                <td data-exceso={z.maximo.exceso}>{fmt(z.maximo.exceso, 1)}</td>
+        <TablaEnColumnas>
+          <table className="tb" aria-label="Zonas de refuerzo">
+            <thead>
+              <tr>
+                <th>Zona</th>
+                <th>Franjas</th>
+                <th>s m</th>
+                <th>Longitud m</th>
+                <th>Ancho m</th>
+                <th>Máximo {U}</th>
+                <th>Exceso {U}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {zonas.map((z) => (
+                <tr
+                  key={z.id}
+                  className="clic"
+                  data-on={z.id === seleccion}
+                  {...filaElegible(() => {
+                    setSeleccion(z.id);
+                    encuadrarCajaActiva(z.caja);
+                  }, z.id === seleccion)}
+                >
+                  <td>
+                    {z.id}
+                    <small>base {fmt(z.base, 1)}</small>
+                  </td>
+                  <td>
+                    {z.franjas.length}
+                    <small>
+                      {z.franjas[0]}
+                      {z.franjas.length > 1 ? ` a ${z.franjas[z.franjas.length - 1]}` : ""}
+                    </small>
+                  </td>
+                  <td>
+                    {fmt(z.s[0], 2)} a {fmt(z.s[1], 2)}
+                  </td>
+                  <td>{fmt(z.longitud, 2)}</td>
+                  <td>{fmt(z.t[1] - z.t[0], 2)}</td>
+                  <td data-maximo={z.maximo.v}>
+                    {fmt(z.maximo.v, 1)}
+                    <small>
+                      {z.maximo.franja} · s = {fmt(z.maximo.s, 2)}
+                      {varias ? ` · ${z.maximo.comb}` : ""}
+                    </small>
+                  </td>
+                  <td data-exceso={z.maximo.exceso}>{fmt(z.maximo.exceso, 1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TablaEnColumnas>
       )}
       {d.sinBase.length > 0 && conBase && <p className="nota">Sin base en {NOMBRE_CORTO[armadura]} (el mapa entero): {d.sinBase.join(", ")}.</p>}
       <p className="nota">Lo que supera la base, conexo por franjas seguidas o vecinas. La extensión es la de los tramos de sus estaciones (±0,125 m), sin anclajes ni solapes. Un clic la encuadra.</p>
