@@ -31,6 +31,8 @@ export interface DiagramaLeible {
   readonly L: number;
   estaciones(): number[];
   esfuerzosEn(x: number, lado?: -1 | 1): number[];
+  /** `esfuerzosEn(x, lado)[c]`, con las mismas cuentas y sin una lista por punto. */
+  esfuerzoEn(c: number, x: number, lado?: -1 | 1): number;
   desplazamientosEn(x: number): number[];
 }
 
@@ -409,6 +411,13 @@ export class DiagramaCompuesto implements DiagramaLeible {
       const e = p.espectral.esfuerzosEn(x, l);
       for (let c = 0; c < 6; c++) r[c]! += p.factor * e[c]!;
     }
+    return r;
+  }
+
+  esfuerzoEn(c: number, x: number, lado: -1 | 1 = 1): number {
+    const l = x <= 0 ? 1 : x >= this.L ? -1 : lado;
+    let r = this.estatico(x, l)[c]!;
+    for (const p of this.partes) r += p.factor * p.espectral.esfuerzosEn(x, l)[c]!;
     return r;
   }
 

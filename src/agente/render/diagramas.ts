@@ -22,7 +22,7 @@ import type { TramoFlexible } from "../../compilador/resultados.ts";
 import { marcoBarra } from "../../elementos/barra.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { esfuerzoProyectado } from "../../motor/diagramaCompuesto.ts";
-import { envolventeTramo, type PuntoEnvolvente, type ResultadosRender } from "./resultados.ts";
+import { envolventeGuardada, type PuntoEnvolvente, type ResultadosRender } from "./resultados.ts";
 
 export type V3 = [number, number, number];
 
@@ -83,23 +83,7 @@ export function tramosEspacio(r: ResultadosRender, pieza: string, canonico: (d: 
   return r0.map((x) => ({ ...x, signo: (S * (pe(x.e1, D) >= 0 ? 1 : -1)) as 1 | -1 }));
 }
 
-const CACHE = new WeakMap<ResultadosRender, Map<string, PuntoEnvolvente[]>>();
-
-/**
- * `envolventeTramo` guardada. `clave` distingue lo que se evalúa: el conjunto y la componente (o los
- * coeficientes de una combinación de componentes).
- */
-export function envolventeGuardada(r: ResultadosRender, t: TramoFlexible, conjunto: ConjuntoCombinaciones, comp: number | readonly (readonly [number, number])[]): PuntoEnvolvente[] {
-  let m = CACHE.get(r);
-  if (!m) CACHE.set(r, (m = new Map()));
-  const clave = JSON.stringify([t.barra, conjunto.descripcion, conjunto.nombres, comp]);
-  let x = m.get(clave);
-  if (!x) {
-    const f = typeof comp === "number" ? comp : comp.length === 1 && comp[0]![1] === 1 ? comp[0]![0] : comp;
-    m.set(clave, (x = envolventeTramo(r, t, conjunto, f)));
-  }
-  return x;
-}
+export { envolventeGuardada };
 
 /** Un trozo de una curva de un solo signo: el pie de cada punto en el eje y su punta. */
 export interface Trozo {

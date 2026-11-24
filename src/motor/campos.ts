@@ -764,8 +764,8 @@ export class CamposLaminas implements IntegradorCampos {
   }
 
   /** Evaluador de los campos de unos desplazamientos `u` (6 por nudo), con sus cachés. */
-  evaluador(u: ArrayLike<number>): EvaluadorCampos {
-    return new EvaluadorCampos(this, u);
+  evaluador(u: ArrayLike<number>, solo?: "flexion" | "membrana"): EvaluadorCampos {
+    return new EvaluadorCampos(this, u, solo);
   }
 
   /**
@@ -1360,6 +1360,7 @@ export class EvaluadorCampos {
   private static readonly R = new Float64Array(8);
   private static readonly UG = new Float64Array(24);
   private static readonly UL = new Float64Array(24);
+  private readonly solo: "flexion" | "membrana" | undefined;
   private readonly muestrasFlexion = (k: number) => this.muestrasDe(k, this.flexion);
   private readonly muestrasMembrana = (k: number) => this.muestrasDe(k, this.membrana);
 
@@ -1379,9 +1380,14 @@ export class EvaluadorCampos {
     return this.flexion.usadas?.size ?? 0;
   }
 
-  constructor(campos: CamposLaminas, u: ArrayLike<number>) {
+  /**
+   * @param solo la única partición que se le va a pedir (un evaluador de usar y tirar: el de un modo
+   * en un bloque de un mapa): las muestras de la otra no se hacen. Las de la pedida, con las mismas cuentas.
+   */
+  constructor(campos: CamposLaminas, u: ArrayLike<number>, solo?: "flexion" | "membrana") {
     this.c = campos;
     this.u = u;
+    this.solo = solo;
     const nl = (campos.modelo.laminas ?? []).length;
     this.flexion = new EvaluadorParticion(campos.flexion, nl);
     this.membrana = new EvaluadorParticion(campos.membrana, nl);
@@ -1395,6 +1401,8 @@ export class EvaluadorCampos {
   private muestrasDe(k: number, e: EvaluadorParticion): Float64Array {
     const hecho = e.muestras[k];
     if (hecho) return hecho;
+    const solo = this.solo;
+    if (solo && e !== (solo === "flexion" ? this.flexion : this.membrana)) throw new Error(`EvaluadorCampos: es sólo de ${solo}`);
     const pl = this.c._lamina(k)!;
     const nudos = this.c.modelo.laminas![k]!.nudos;
     // Sin crear arrays más que los que se guardan (un mapa recorre decenas de miles de láminas por
@@ -1412,8 +1420,10 @@ export class EvaluadorCampos {
     }
     const OP = this.c._operador(k);
     const r = EvaluadorCampos.R;
-    const vf = new Float64Array(MUESTRAS_LAMINA * FLEXION.nv);
-    const vm = new Float64Array(MUESTRAS_LAMINA * MEMBRANA.nv);
+    // Las resultantes de la partición pedida: N (0–2), o M y Q (3–7)
+    const [fa, fb] = solo === "flexion" ? [3, NV] : solo === "membrana" ? [0, 3] : [0, NV];
+    const vf = solo === "membrana" ? null : new Float64Array(MUESTRAS_LAMINA * FLEXION.nv);
+    const vm = solo === "flexion" ? null : new Float64Array(MUESTRAS_LAMINA * MEMBRANA.nv);
     const cf = this.flexion.part.cambio;
     const cm = this.membrana.part.cambio;
     const f11 = cf[5 * k]!;
@@ -1426,21 +1436,27 @@ export class EvaluadorCampos {
     const m21 = cm[5 * k + 2]!;
     const m22 = cm[5 * k + 3]!;
     for (let g = 0; g < 4; g++) {
-      for (let f = 0; f < NV; f++) {
+      for (let f = fa; f < fb; f++) {
         let s = 0;
         const o = 192 * g + 24 * f;
         for (let q = 0; q < 24; q++) s += OP[o + q]! * ul[q]!;
         r[f] = s;
       }
-      girarTensor(vm, MEMBRANA.nv * g, r[0]!, r[1]!, r[2]!, 1, m11, m12, m21, m22);
-      girarTensor(vf, FLEXION.nv * g, r[3]!, r[4]!, r[5]!, fs3, f11, f12, f21, f22);
-      vf[FLEXION.nv * g + 3] = fs3 * (f11 * r[6]! + f12 * r[7]!);
-      vf[FLEXION.nv * g + 4] = fs3 * (f21 * r[6]! + f22 * r[7]!);
+      if (vm) girarTensor(vm, MEMBRANA.nv * g, r[0]!, r[1]!, r[2]!, 1, m11, m12, m21, m22);
+      if (vf) {
+        girarTensor(vf, FLEXION.nv * g, r[3]!, r[4]!, r[5]!, fs3, f11, f12, f21, f22);
+        vf[FLEXION.nv * g + 3] = fs3 * (f11 * r[6]! + f12 * r[7]!);
+        vf[FLEXION.nv * g + 4] = fs3 * (f21 * r[6]! + f22 * r[7]!);
+      }
     }
-    centroide(vf, FLEXION.nv);
-    centroide(vm, MEMBRANA.nv);
-    this.flexion.muestras[k] = vf;
-    this.membrana.muestras[k] = vm;
+    if (vf) {
+      centroide(vf, FLEXION.nv);
+      this.flexion.muestras[k] = vf;
+    }
+    if (vm) {
+      centroide(vm, MEMBRANA.nv);
+      this.membrana.muestras[k] = vm;
+    }
     return e.muestras[k]!;
   }
 

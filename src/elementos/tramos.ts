@@ -110,6 +110,30 @@ export class Tramos {
     return new Tramos(xs, c, s, 0);
   }
 
+  /**
+   * Σ aᵢ·fᵢ sobre `cortes` (que contienen a los de cada fᵢ): lo mismo, con los mismos bits, que
+   * partir de `cero(cortes)` y sumarle una a una cada fᵢ refinada (`mas(fᵢ.refinar(cortes), aᵢ)`),
+   * sin una función intermedia por sumando. Con los mismos cortes (lo normal entre los casos de
+   * una barra), sin refinar: desplazar un polinomio 0 da sus coeficientes, y sumados a un acumulado
+   * que empieza en +0 el signo de un cero no cuenta.
+   */
+  static combinacion(cortes: Float64Array, fs: readonly Tramos[], as: readonly number[]): Tramos {
+    const n = cortes.length - 1;
+    const c = new Float64Array(NC * n);
+    const s = new Float64Array(n + 1);
+    let inicial = 0;
+    for (let k = 0; k < fs.length; k++) {
+      const a = as[k]!;
+      let g = fs[k]!;
+      if (g.cortes !== cortes && !mismosCortes(g.cortes, cortes)) g = g.refinar(cortes);
+      const [gc, gs] = [g.c, g.saltos];
+      for (let i = 0; i < c.length; i++) c[i]! += a * gc[i]!;
+      for (let i = 0; i < s.length; i++) s[i]! += a * gs[i]!;
+      inicial += a * g.inicial;
+    }
+    return new Tramos(cortes, c, s, inicial);
+  }
+
   /** f + a·g, con los mismos cortes. */
   mas(g: Tramos, a = 1): Tramos {
     if (g.cortes !== this.cortes) throw new Error("Tramos.mas: cortes distintos");
@@ -170,8 +194,18 @@ export class Tramos {
   }
 }
 
+/** Los mismos cortes, número a número. */
+export function mismosCortes(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 /** Unión ordenada de cortes (sin repetidos exactos). */
 export function unirCortes(...listas: ArrayLike<number>[]): Float64Array {
+  // Todas iguales (lo normal entre los casos de una barra): la primera, sin ordenar nada
+  const l0 = listas[0];
+  if (l0 instanceof Float64Array && listas.every((l) => l === l0 || mismosCortes(l, l0))) return l0;
   const todos: number[] = [];
   for (const l of listas) for (let i = 0; i < l.length; i++) todos.push(l[i]!);
   todos.sort((a, b) => a - b);

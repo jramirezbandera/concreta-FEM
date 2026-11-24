@@ -245,7 +245,7 @@ ${planta}`;
     const ls = x.laminas;
     for (let b0 = 0; b0 < ls.length; b0 += BLOQUE_MAPA) {
       const b1 = Math.min(ls.length, b0 + BLOQUE_MAPA);
-      const evs: [number, EvaluadorCampos][] = [...estaticos, ...modos.map((k): [number, EvaluadorCampos] => [k, this.campos.evaluador(this.q.casos[k]!.u)])];
+      const evs: [number, EvaluadorCampos][] = [...estaticos, ...modos.map((k): [number, EvaluadorCampos] => [k, this.campos.evaluador(this.q.casos[k]!.u, p)])];
       // Lámina a lámina y, en cada una, todos los casos: el operador de resultantes de una lámina y de
       // sus vecinas se calcula una vez, no una por caso (cada evaluador da lo mismo en otro orden)
       for (let i = b0; i < b1; i++) {
@@ -853,7 +853,7 @@ export interface PuntoEnvolvente {
 export function envolventePieza(r: ResultadosRender, id: string, conjunto: ConjuntoCombinaciones, comp: number): PuntoEnvolvente[] {
   const curva: PuntoEnvolvente[] = [];
   for (const t of r.ep.tramos(id))
-    for (const e of envolventeTramo(r, t, conjunto, comp)) {
+    for (const e of envolventeGuardada(r, t, conjunto, comp)) {
       const prev = curva[curva.length - 1];
       if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
       curva.push(e);
@@ -870,19 +870,60 @@ export function envolventeTramo(r: ResultadosRender, t: TramoFlexible, conjunto:
   const curva: PuntoEnvolvente[] = [];
   const D = conjunto.factores.map((f) => r.q.diagramaBarra(t.barra, f));
   const L = t.s1 - t.s0;
-  const xs = [...new Set([...D.flatMap((x) => x.estaciones()), ...Array.from({ length: DIVISIONES + 1 }, (_, i) => (L * i) / DIVISIONES)])].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
+  const puntos = new Set<number>();
+  for (const dg of D) for (const x of dg.estaciones()) puntos.add(x);
+  for (let i = 0; i <= DIVISIONES; i++) puntos.add((L * i) / DIVISIONES);
+  const xs = [...puntos].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
   // Con varias componentes ([c, k]…), su combinación lineal: en una combinación con casos del sismo, la de cada modo, combinada
-  const valor = typeof comp === "number" ? (dg: DiagramaLeible, x: number, lado: -1 | 1) => dg.esfuerzosEn(x, lado)[comp]! : (dg: DiagramaLeible, x: number, lado: -1 | 1) => esfuerzoProyectado(dg, x, lado, comp);
+  const valor = typeof comp === "number" ? (dg: DiagramaLeible, x: number, lado: -1 | 1) => dg.esfuerzoEn(comp, x, lado) : (dg: DiagramaLeible, x: number, lado: -1 | 1) => esfuerzoProyectado(dg, x, lado, comp);
   for (const x of xs)
     for (const lado of [-1, 1] as const) {
       if ((x === 0 && lado < 0) || (x === L && lado > 0)) continue;
-      const vs = D.map((dg) => valor(dg, x, lado));
-      const e = { s: t.s0 + x, max: Math.max(...vs), min: Math.min(...vs) };
+      // El mayor y el menor como `Math.max(...)` y `Math.min(...)` de los valores (un NaN los hace NaN)
+      let [max, min] = [-Infinity, Infinity];
+      for (const dg of D) {
+        const v = valor(dg, x, lado);
+        max = Math.max(max, v);
+        min = Math.min(min, v);
+      }
+      const e = { s: t.s0 + x, max, min };
       const prev = curva[curva.length - 1];
       if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
       curva.push(e);
     }
   return curva;
+}
+
+/** Envolventes de tramo que se guardan: las de un esfuerzo en todas las barras del edificio objetivo, dos veces. */
+const ENVOLVENTES_GUARDADAS = 50_000;
+const ENVOLVENTES = new WeakMap<ResultadosRender, { conjuntos: Map<string, number>; deConjunto: WeakMap<ConjuntoCombinaciones, number>; tramos: Map<string, PuntoEnvolvente[]> }>();
+
+/**
+ * `envolventeTramo` guardada (quien la lee no la cambia): la planta, el alzado, el 3D y el detalle de una
+ * pieza piden las mismas, y hacerlas es casi todo lo que cuestan los diagramas. La clave distingue el
+ * tramo, el conjunto (su descripción y sus nombres) y la componente (o los coeficientes de una
+ * combinación de componentes).
+ */
+export function envolventeGuardada(r: ResultadosRender, t: TramoFlexible, conjunto: ConjuntoCombinaciones, comp: number | readonly (readonly [number, number])[]): PuntoEnvolvente[] {
+  let g = ENVOLVENTES.get(r);
+  if (!g) ENVOLVENTES.set(r, (g = { conjuntos: new Map(), deConjunto: new WeakMap(), tramos: new Map() }));
+  // El conjunto, por un número: su clave (con el nombre de cada combinación) se hace una vez, no por tramo
+  let nc = g.deConjunto.get(conjunto);
+  if (nc === undefined) {
+    const k = JSON.stringify([conjunto.descripcion, conjunto.nombres]);
+    nc = g.conjuntos.get(k);
+    if (nc === undefined) g.conjuntos.set(k, (nc = g.conjuntos.size));
+    g.deConjunto.set(conjunto, nc);
+  }
+  const f = typeof comp === "number" ? comp : comp.length === 1 && comp[0]![1] === 1 ? comp[0]![0] : comp;
+  const clave = `${t.barra}|${nc}|${typeof f === "number" ? f : JSON.stringify(f)}`;
+  let x = g.tramos.get(clave);
+  if (!x) {
+    g.tramos.set(clave, (x = envolventeTramo(r, t, conjunto, f)));
+    // Acotada: sale la más antigua (se rehace con las mismas cuentas si se vuelve a pedir)
+    if (g.tramos.size > ENVOLVENTES_GUARDADAS) g.tramos.delete(g.tramos.keys().next().value!);
+  }
+  return x;
 }
 
 /**
@@ -949,8 +990,32 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: Es
     return v.valido && v.valor.axilSinValor;
   }) : [];
   const piezas = sinAxil.length ? todas.filter((id) => !sinAxil.includes(id)) : todas;
-  const curvas = piezas.map((id) => ({ pieza: id, curva: envolventePieza(r, id, conjunto, comp) }));
-  const maxReal = Math.max(0, ...curvas.flatMap((x) => x.curva.map((e) => Math.max(Math.abs(e.max), Math.abs(e.min)))));
+  const deVano = esfuerzo === "My" || esfuerzo === "Vz";
+  type ExtremoVano = { v: number; s: number; comb: string };
+  // Los extremos de cada vano en cada combinación (My y Vz), pieza a pieza detrás de su envolvente: los
+  // diagramas combinados de sus barras están recién hechos (`Consultas.diagramaBarra` guarda los de las
+  // últimas), y no se rehacen
+  const extremosVanos = (id: string): [ExtremoVano | null, ExtremoVano | null][] => {
+    const v = q.viga(id);
+    if (!v.valido) return [];
+    return v.valor.vanos.map((_, i) => {
+      let mx: ExtremoVano | null = null;
+      let mn: ExtremoVano | null = null;
+      conjunto.factores.forEach((f, kc) => {
+        const e = q.vano(id, i, f);
+        if (!e.valido) return;
+        const [a, b] = esfuerzo === "My" ? [e.valor.maxMy, e.valor.minMy] : [e.valor.maxVz, e.valor.minVz];
+        if (!mx || a.valor > mx.v) mx = { v: a.valor, s: a.s, comb: conjunto.nombres[kc]! };
+        if (!mn || b.valor < mn.v) mn = { v: b.valor, s: b.s, comb: conjunto.nombres[kc]! };
+      });
+      return [mx, mn];
+    });
+  };
+  const curvas = piezas.map((id) => ({ pieza: id, curva: envolventePieza(r, id, conjunto, comp), vanos: deVano ? extremosVanos(id) : [] }));
+  // Sin `Math.max(...)`: con los puntos de todas las piezas de una planta como argumentos, la pila del
+  // worker del navegador se desborda («Maximum call stack size exceeded»)
+  let maxReal = 0;
+  for (const x of curvas) for (const e of x.curva) maxReal = Math.max(maxReal, Math.abs(e.max), Math.abs(e.min));
   const nulo = esfuerzo !== "My" && esfuerzo !== "Vz" && maxReal < DIAGRAMA_NULO;
   const maxAbs = nulo ? 0 : maxReal;
   const [x0, y0, x1, y1] = caja(pl);
@@ -1012,21 +1077,13 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: Es
   // Extremos de cada vano: de Consultas.vano en cada combinación (My y Vz) o de la envolvente de la pieza
   const extremos: ExtremoRotulado[] = [];
   const unidad = esfuerzo === "My" || esfuerzo === "Mz" || esfuerzo === "T" ? "kN·m" : "kN";
-  const deVano = esfuerzo === "My" || esfuerzo === "Vz";
-  for (const { pieza: id, curva } of nulo ? [] : curvas) {
+  for (const { pieza: id, curva, vanos: deVanos } of nulo ? [] : curvas) {
     const v = q.viga(id);
     if (!v.valido) continue;
     v.valor.vanos.forEach((vano, i) => {
       let mx: { v: number; s: number; comb: string } | null = null;
       let mn: { v: number; s: number; comb: string } | null = null;
-      if (deVano)
-        conjunto.factores.forEach((f, kc) => {
-          const e = q.vano(id, i, f);
-          if (!e.valido) return;
-          const [a, b] = esfuerzo === "My" ? [e.valor.maxMy, e.valor.minMy] : [e.valor.maxVz, e.valor.minVz];
-          if (!mx || a.valor > mx.v) mx = { v: a.valor, s: a.s, comb: conjunto.nombres[kc]! };
-          if (!mn || b.valor < mn.v) mn = { v: b.valor, s: b.s, comb: conjunto.nombres[kc]! };
-        });
+      if (deVano) [mx, mn] = deVanos[i] ?? [null, null];
       else {
         // Las estaciones de la envolvente dentro del vano (de cara a cara), y la combinación que da cada extremo
         for (const e of curva) {

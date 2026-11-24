@@ -60,6 +60,7 @@ import { calcularSismo, sismoDelCalculo, tieneEspectro, type EspectroSismo, type
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 import { dimensionesPlanta, resolverViento } from "./viento.ts";
 import { calcularImperfeccion, resolverImperfeccion, type ImperfeccionCalculada } from "./imperfeccion.ts";
+import { Recientes } from "../motor/recientes.ts";
 import { DESPLAZAMIENTO_SIN_SEGUNDO_ORDEN, LIMITE_SEGUNDO_ORDEN, periodoFundamental, simplificado } from "../normas/ncse02.ts";
 
 /** A2-60: los cortes de machones o dinteles que no valen (sus esfuerzos son NaN), en un aviso. */
@@ -72,6 +73,13 @@ export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[]
 
 /** Barras de las que se guarda lo que no depende de la combinación en los diagramas con sismo (`Consultas.diagramaBarra`). */
 const BARRAS_RECIENTES = 256;
+/**
+ * Barras de las que se guarda el diagrama ya combinado de cada combinación pedida: quien busca la
+ * envolvente de una pieza y luego los extremos de sus vanos, o mueve la estación de una viga, pide
+ * las mismas combinaciones de las mismas barras, y combinar es casi todo lo que cuesta. Lo que sale
+ * se rehace con las mismas cuentas.
+ */
+const BARRAS_COMBINADAS = 192;
 
 /** Seno mínimo del ángulo entre una pieza y un muro o una viga para que sea su apoyo (≈ 5,7°): más paralelos, la pieza corre por ellos. */
 export const SENO_MINIMO_APOYO = 0.1;
@@ -343,6 +351,7 @@ export class Consultas {
   private readonly flechasGeo = new Map<string, GeometriaFlechas>();
   /** VS3: de las últimas barras con diagramas de combinaciones con sismo, lo que no depende de la combinación (`diagramaBarra`). */
   private readonly combinacionesVistas = new WeakMap<object, { copia: Float64Array; partes: PartesCombinacion; clave: string }>();
+  private readonly combinados = new Recientes<number, Map<object, DiagramaBarra | DiagramaCompuesto>>(BARRAS_COMBINADAS);
   private readonly barrasSismo = new Map<number, { extremos: Map<Int32Array, Float64Array>; espectrales: Map<CasoEspectral, EspectralBarra>; estaticos: Map<string, DiagramaBarra> }>();
   private readonly apoyoEnNudo = new Map<number, string>();
   private readonly coartado = new Set<number>();
@@ -605,7 +614,6 @@ export class Consultas {
    * (`DiagramaCompuesto`).
    */
   diagramaBarra(b: number, f: ArrayLike<number>): DiagramaBarra | DiagramaCompuesto {
-    const ep = this.piezas();
     // La combinación partida, una vez por combinación y no por barra (quien recorre las barras pasa los
     // mismos vectores de factores): se reconoce por ser el mismo vector con los mismos números
     let u = typeof f === "object" ? this.combinacionesVistas.get(f) : undefined;
@@ -614,7 +622,19 @@ export class Consultas {
       u = { copia: Float64Array.from(f), partes, clave: partes.espectrales.length ? partes.lineal.join(",") : "" };
       if (typeof f === "object") this.combinacionesVistas.set(f, u);
     }
-    const { lineal, espectrales } = u.partes;
+    // Lo ya combinado de esta barra con esta combinación (la clave es `u`: cambia si cambian los factores)
+    let hechos = this.combinados.get(b);
+    if (!hechos) this.combinados.set(b, (hechos = new Map()));
+    const hecho = hechos.get(u);
+    if (hecho) return hecho;
+    const D = this.combinarBarra(b, u.partes, u.clave);
+    hechos.set(u, D);
+    return D;
+  }
+
+  private combinarBarra(b: number, partes: PartesCombinacion, clave: string): DiagramaBarra | DiagramaCompuesto {
+    const ep = this.piezas();
+    const { lineal, espectrales } = partes;
     const estatico = (): DiagramaBarra => {
       const ks: number[] = [];
       for (let k = 0; k < lineal.length; k++) if (lineal[k]) ks.push(k);
@@ -633,7 +653,6 @@ export class Consultas {
     else cb = { extremos: new Map(), espectrales: new Map(), estaticos: new Map() };
     this.barrasSismo.set(b, cb);
     if (this.barrasSismo.size > BARRAS_RECIENTES) this.barrasSismo.delete(this.barrasSismo.keys().next().value!);
-    const clave = u.clave;
     let D = cb.estaticos.get(clave);
     if (!D) cb.estaticos.set(clave, (D = estatico()));
     const guardada = cb;

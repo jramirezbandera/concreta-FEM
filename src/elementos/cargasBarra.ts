@@ -202,6 +202,11 @@ export class DiagramaBarra {
     return this.esfuerzos.map((t) => t.en(x, l));
   }
 
+  /** El esfuerzo c en x: `esfuerzosEn(x, lado)[c]`, sin hacer los otros cinco. */
+  esfuerzoEn(c: number, x: number, lado: -1 | 1 = 1): number {
+    return this.esfuerzos[c]!.en(x, x <= 0 ? 1 : x >= this.L ? -1 : lado);
+  }
+
   /** Desplazamientos locales en x (continuos). */
   desplazamientosEn(x: number): number[] {
     return this.desplazamientos.map((t) => t.en(x, x >= this.L ? -1 : 1));
@@ -211,14 +216,17 @@ export class DiagramaBarra {
   static combinar(diagramas: readonly DiagramaBarra[], factores: readonly number[]): DiagramaBarra {
     const d0 = diagramas[0]!;
     const cortes = unirCortes(...diagramas.map((d) => d.cortes));
-    const sumar = (sel: (d: DiagramaBarra) => Tramos[]) =>
-      sel(d0).map((_, c) => {
-        let t = Tramos.cero(cortes);
-        diagramas.forEach((d, k) => {
-          t = t.mas(sel(d)[c]!.refinar(cortes), factores[k]!);
-        });
-        return t;
-      });
+    // Cada componente, acumulada de una vez (`Tramos.combinacion`: los bits de sumar una a una)
+    const sumar = (sel: (d: DiagramaBarra) => Tramos[]) => {
+      const de = diagramas.map(sel);
+      return de[0]!.map((_, c) =>
+        Tramos.combinacion(
+          cortes,
+          de.map((x) => x[c]!),
+          factores,
+        ),
+      );
+    };
     let pares: Float64Array | null = null;
     diagramas.forEach((d, k) => {
       if (!d.pares) return;
@@ -252,12 +260,16 @@ export class DiagramaBarra {
    * Vz (donde se anula su carga: una trapecial que cambia de signo en el tramo, A2-42).
    */
   estaciones(): number[] {
+    // Una vez por diagrama (quien las lee no las cambia): la envolvente de una pieza y los extremos de sus
+    // vanos las piden de cada combinación
+    if (this.estacionesC) return this.estacionesC;
     const L = this.L;
     const xs = new Set<number>([0, L / 4, L / 2, (3 * L) / 4, L, ...this.cortes]);
     for (const c of [1, 2]) for (const x of this.ceros(c, this.pares?.[3 - c] ?? 0)) xs.add(x);
     for (const c of [0, 1, 2]) for (const x of this.vertices(c)) xs.add(x);
-    return [...xs].sort((a, b) => a - b);
+    return (this.estacionesC = [...xs].sort((a, b) => a - b));
   }
+  private estacionesC: number[] | null = null;
 
   /** Vértices interiores de la componente `c` (de grado 2 por tramo: N, Vy o Vz), donde su derivada se anula. */
   private vertices(c: number): number[] {
