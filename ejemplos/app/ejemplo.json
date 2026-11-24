@@ -1,0 +1,269 @@
+{
+  "esquema": "concreta-fem/proyecto@1",
+  "nombre": "Pórtico de dos plantas con losa",
+  "modelo": {
+    "plantas": [
+      {
+        "id": "P2",
+        "altura": null
+      },
+      {
+        "id": "P1",
+        "altura": 3
+      },
+      {
+        "id": "CIM",
+        "altura": 3.5
+      }
+    ],
+    "materiales": [
+      {
+        "id": "HA-25",
+        "tipo": "hormigon",
+        "fck": 25
+      }
+    ],
+    "secciones": [
+      {
+        "id": "P30x30",
+        "material": "HA-25",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.3
+      },
+      {
+        "id": "V30x50",
+        "material": "HA-25",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.5
+      },
+      {
+        "id": "V30x20",
+        "material": "HA-25",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.2
+      }
+    ],
+    "pilares": [
+      {
+        "id": "A1",
+        "x": 0,
+        "y": 0,
+        "desde": "CIM",
+        "hasta": "P2",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "A2",
+        "x": 6,
+        "y": 0,
+        "desde": "CIM",
+        "hasta": "P2",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "B1",
+        "x": 0,
+        "y": 5,
+        "desde": "CIM",
+        "hasta": "P2",
+        "seccion": "P30x30"
+      },
+      {
+        "id": "B2",
+        "x": 6,
+        "y": 5,
+        "desde": "CIM",
+        "hasta": "P2",
+        "seccion": "P30x30"
+      }
+    ],
+    "vigas": [
+      {
+        "id": "VX0-P1",
+        "planta": "P1",
+        "puntos": [[0, 0], [6, 0]],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX5-P1",
+        "planta": "P1",
+        "puntos": [[0, 5], [6, 5]],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX0-P2",
+        "planta": "P2",
+        "puntos": [[0, 0], [6, 0]],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX5-P2",
+        "planta": "P2",
+        "puntos": [[0, 5], [6, 5]],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "Z-P1-1",
+        "planta": "P1",
+        "puntos": [[6, 0], [6, 5]],
+        "seccion": "V30x20"
+      },
+      {
+        "id": "Z-P1-2",
+        "planta": "P1",
+        "puntos": [[0, 5], [0, 0]],
+        "seccion": "V30x20"
+      },
+      {
+        "id": "Z-P2-1",
+        "planta": "P2",
+        "puntos": [[6, 0], [6, 5]],
+        "seccion": "V30x20"
+      },
+      {
+        "id": "Z-P2-2",
+        "planta": "P2",
+        "puntos": [[0, 5], [0, 0]],
+        "seccion": "V30x20"
+      }
+    ],
+    "losas": [
+      {
+        "id": "L-P1",
+        "planta": "P1",
+        "contorno": [[0, 0], [6, 0], [6, 5], [0, 5]],
+        "espesor": 0.2,
+        "material": "HA-25"
+      },
+      {
+        "id": "L-P2",
+        "planta": "P2",
+        "contorno": [[0, 0], [6, 0], [6, 5], [0, 5]],
+        "espesor": 0.2,
+        "material": "HA-25"
+      }
+    ],
+    "casos": [
+      {
+        "id": "G",
+        "nombre": "Peso propio",
+        "pesoPropio": true,
+        "accion": {
+          "tipo": "G"
+        }
+      },
+      {
+        "id": "CM",
+        "nombre": "Cargas muertas",
+        "accion": {
+          "tipo": "G"
+        }
+      },
+      {
+        "id": "Q",
+        "accion": {
+          "tipo": "Q",
+          "psi": "uso-A"
+        }
+      },
+      {
+        "id": "S",
+        "nombre": "Nieve",
+        "accion": {
+          "tipo": "S",
+          "psi": "nieve-hasta-1000"
+        }
+      }
+    ],
+    "cargas": [
+      {
+        "tipo": "superficie",
+        "id": "CM-P1",
+        "caso": "CM",
+        "planta": "P1",
+        "q": [0, 0, -2],
+        "losa": "L-P1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "CM-P2",
+        "caso": "CM",
+        "planta": "P2",
+        "q": [0, 0, -1.5],
+        "losa": "L-P2"
+      },
+      {
+        "tipo": "superficie",
+        "id": "SU-P1",
+        "caso": "Q",
+        "planta": "P1",
+        "q": [0, 0, -2],
+        "losa": "L-P1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "SU-P2",
+        "caso": "Q",
+        "planta": "P2",
+        "q": [0, 0, -1],
+        "losa": "L-P2"
+      },
+      {
+        "tipo": "lineal",
+        "id": "FACH-P1",
+        "caso": "CM",
+        "planta": "P1",
+        "puntos": [[0, 0], [6, 0]],
+        "q": [0, 0, -7]
+      },
+      {
+        "tipo": "superficie",
+        "id": "S-P2",
+        "caso": "S",
+        "planta": "P2",
+        "q": [0, 0, -0.2],
+        "losa": "L-P2"
+      }
+    ],
+    "acciones": {
+      "emplazamiento": {
+        "ine": "29067",
+        "municipio": "Málaga",
+        "altitud": 10
+      },
+      "viento": {
+        "zona": "A",
+        "aspereza": "IV"
+      },
+      "sismo": {
+        "terreno": "II",
+        "mu": 2
+      }
+    }
+  },
+  "obra": {
+    "uso": "A",
+    "materiales": {
+      "forjados": "HA-25",
+      "pilares": "HA-25",
+      "muros": "HA-25",
+      "zapatas": "HA-25"
+    },
+    "armado": {
+      "fyk": 500,
+      "recubrimiento": 30,
+      "exposicion": "XC2",
+      "flechaActiva": 400,
+      "recubrimientoZapatas": 50
+    },
+    "terreno": {
+      "tensionAdmisible": 200,
+      "pesoEspecifico": 18,
+      "rozamiento": 0.5,
+      "tierras": 0.5
+    }
+  }
+}

@@ -82,7 +82,8 @@ describe("Situación", () => {
     } catch {
       // sin almacenamiento
     }
-    const p = JSON.parse(readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8")) as Proyecto;
+    // El muestrario de la pantalla de inicio: la copia al día (`scripts/ejemplos-app.ts`)
+    const p = JSON.parse(readFileSync(join(RAIZ, "ejemplos", "app", "muestrario.json"), "utf8")) as Proyecto;
     const { container } = render(
       <ThemeProvider>
         <App />

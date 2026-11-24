@@ -1,0 +1,1034 @@
+{
+  "esquema": "concreta-fem/proyecto@1",
+  "nombre": "Estructura de acero de siete plantas",
+  "modelo": {
+    "plantas": [
+      {
+        "id": "N7",
+        "altura": null
+      },
+      {
+        "id": "N6",
+        "altura": 3.9623999999999997
+      },
+      {
+        "id": "N5",
+        "altura": 3.9623999999999997
+      },
+      {
+        "id": "N4",
+        "altura": 3.9623999999999997
+      },
+      {
+        "id": "N3",
+        "altura": 3.9623999999999997
+      },
+      {
+        "id": "N2",
+        "altura": 3.9623999999999997
+      },
+      {
+        "id": "N1",
+        "altura": 4.1148
+      },
+      {
+        "id": "B",
+        "altura": 4.1148
+      }
+    ],
+    "materiales": [
+      {
+        "id": "S275",
+        "tipo": "acero"
+      },
+      {
+        "id": "HA-25",
+        "tipo": "hormigon",
+        "fck": 25
+      }
+    ],
+    "secciones": [
+      {
+        "id": "W14X176",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.033354772,
+        "Iy": 0.0008948975650399998,
+        "Iz": 0.0002982991883466666,
+        "J": 0.000004162314255999999
+      },
+      {
+        "id": "W14X211",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.040064436,
+        "Iy": 0.0011113379063519997,
+        "Iz": 0.0003704459687839999,
+        "J": 0.000004162314255999999
+      },
+      {
+        "id": "W14X246",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.046645068,
+        "Iy": 0.0013444275046879998,
+        "Iz": 0.0004481425015626666,
+        "J": 0.000004162314255999999
+      },
+      {
+        "id": "W14X287",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.054451504000000005,
+        "Iy": 0.0016274648740959997,
+        "Iz": 0.0005424882913653332,
+        "J": 0.000004162314255999999
+      },
+      {
+        "id": "W24X110",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.0016129,
+        "Iy": 0.0013860506472479998,
+        "Iz": 0.0004620168824159999,
+        "J": 0.000004162314255999999
+      },
+      {
+        "id": "W24X130",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.024709627999999997,
+        "Iy": 0.0016732503309119997,
+        "Iz": 0.0005577501103039999,
+        "J": 0.000004162314255999999
+      },
+      {
+        "id": "W24X160",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.030387036,
+        "Iy": 0.0021311048990719996,
+        "Iz": 0.0007103682996906666,
+        "J": 0.000004162314255999999
+      },
+      {
+        "id": "CHS139x8",
+        "material": "S275",
+        "forma": "general",
+        "A": 0.00331,
+        "Iy": 0.0000072,
+        "Iz": 0.0000072,
+        "J": 0.0000144
+      }
+    ],
+    "pilares": [
+      {
+        "id": "izquierda-A",
+        "x": 0,
+        "y": 0,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X246",
+        "tramos": [
+          {
+            "planta": "N4",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X176"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X176"
+          }
+        ]
+      },
+      {
+        "id": "izquierda-B",
+        "x": 0,
+        "y": 6,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X246",
+        "tramos": [
+          {
+            "planta": "N4",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X176"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X176"
+          }
+        ]
+      },
+      {
+        "id": "centro-A",
+        "x": 9.144,
+        "y": 0,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X287",
+        "tramos": [
+          {
+            "planta": "N4",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X211"
+          }
+        ]
+      },
+      {
+        "id": "centro-B",
+        "x": 9.144,
+        "y": 6,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X287",
+        "tramos": [
+          {
+            "planta": "N4",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X211"
+          }
+        ]
+      },
+      {
+        "id": "derecha-A",
+        "x": 18.288,
+        "y": 0,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X246",
+        "tramos": [
+          {
+            "planta": "N4",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X176"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X176"
+          }
+        ]
+      },
+      {
+        "id": "derecha-B",
+        "x": 18.288,
+        "y": 6,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X246",
+        "tramos": [
+          {
+            "planta": "N4",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X176"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X176"
+          }
+        ]
+      }
+    ],
+    "vigas": [
+      {
+        "id": "V-N1-A",
+        "planta": "N1",
+        "puntos": [[0, 0], [18.288, 0]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N1-B",
+        "planta": "N1",
+        "puntos": [[0, 6], [18.288, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N1-Y1",
+        "planta": "N1",
+        "puntos": [[0, 0], [0, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N1-Y2",
+        "planta": "N1",
+        "puntos": [[9.144, 0], [9.144, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N1-Y3",
+        "planta": "N1",
+        "puntos": [[18.288, 0], [18.288, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N2-A",
+        "planta": "N2",
+        "puntos": [[0, 0], [18.288, 0]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N2-B",
+        "planta": "N2",
+        "puntos": [[0, 6], [18.288, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N2-Y1",
+        "planta": "N2",
+        "puntos": [[0, 0], [0, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N2-Y2",
+        "planta": "N2",
+        "puntos": [[9.144, 0], [9.144, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N2-Y3",
+        "planta": "N2",
+        "puntos": [[18.288, 0], [18.288, 6]],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N3-A",
+        "planta": "N3",
+        "puntos": [[0, 0], [18.288, 0]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N3-B",
+        "planta": "N3",
+        "puntos": [[0, 6], [18.288, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N3-Y1",
+        "planta": "N3",
+        "puntos": [[0, 0], [0, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N3-Y2",
+        "planta": "N3",
+        "puntos": [[9.144, 0], [9.144, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N3-Y3",
+        "planta": "N3",
+        "puntos": [[18.288, 0], [18.288, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N4-A",
+        "planta": "N4",
+        "puntos": [[0, 0], [18.288, 0]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N4-B",
+        "planta": "N4",
+        "puntos": [[0, 6], [18.288, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N4-Y1",
+        "planta": "N4",
+        "puntos": [[0, 0], [0, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N4-Y2",
+        "planta": "N4",
+        "puntos": [[9.144, 0], [9.144, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N4-Y3",
+        "planta": "N4",
+        "puntos": [[18.288, 0], [18.288, 6]],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N5-A",
+        "planta": "N5",
+        "puntos": [[0, 0], [18.288, 0]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N5-B",
+        "planta": "N5",
+        "puntos": [[0, 6], [18.288, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N5-Y1",
+        "planta": "N5",
+        "puntos": [[0, 0], [0, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N5-Y2",
+        "planta": "N5",
+        "puntos": [[9.144, 0], [9.144, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N5-Y3",
+        "planta": "N5",
+        "puntos": [[18.288, 0], [18.288, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N6-A",
+        "planta": "N6",
+        "puntos": [[0, 0], [18.288, 0]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N6-B",
+        "planta": "N6",
+        "puntos": [[0, 6], [18.288, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N6-Y1",
+        "planta": "N6",
+        "puntos": [[0, 0], [0, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N6-Y2",
+        "planta": "N6",
+        "puntos": [[9.144, 0], [9.144, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N6-Y3",
+        "planta": "N6",
+        "puntos": [[18.288, 0], [18.288, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N7-A",
+        "planta": "N7",
+        "puntos": [[0, 0], [18.288, 0]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N7-B",
+        "planta": "N7",
+        "puntos": [[0, 6], [18.288, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N7-Y1",
+        "planta": "N7",
+        "puntos": [[0, 0], [0, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N7-Y2",
+        "planta": "N7",
+        "puntos": [[9.144, 0], [9.144, 6]],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N7-Y3",
+        "planta": "N7",
+        "puntos": [[18.288, 0], [18.288, 6]],
+        "seccion": "W24X110"
+      }
+    ],
+    "barras": [
+      {
+        "id": "D-N1-I",
+        "inicio": {
+          "planta": "B",
+          "x": 0,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N1",
+          "x": 0,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N1-D",
+        "inicio": {
+          "planta": "B",
+          "x": 18.288,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N1",
+          "x": 18.288,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N2-I",
+        "inicio": {
+          "planta": "N1",
+          "x": 0,
+          "y": 6
+        },
+        "fin": {
+          "planta": "N2",
+          "x": 0,
+          "y": 0
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N2-D",
+        "inicio": {
+          "planta": "N1",
+          "x": 18.288,
+          "y": 6
+        },
+        "fin": {
+          "planta": "N2",
+          "x": 18.288,
+          "y": 0
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N3-I",
+        "inicio": {
+          "planta": "N2",
+          "x": 0,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N3",
+          "x": 0,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N3-D",
+        "inicio": {
+          "planta": "N2",
+          "x": 18.288,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N3",
+          "x": 18.288,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N4-I",
+        "inicio": {
+          "planta": "N3",
+          "x": 0,
+          "y": 6
+        },
+        "fin": {
+          "planta": "N4",
+          "x": 0,
+          "y": 0
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N4-D",
+        "inicio": {
+          "planta": "N3",
+          "x": 18.288,
+          "y": 6
+        },
+        "fin": {
+          "planta": "N4",
+          "x": 18.288,
+          "y": 0
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N5-I",
+        "inicio": {
+          "planta": "N4",
+          "x": 0,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N5",
+          "x": 0,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N5-D",
+        "inicio": {
+          "planta": "N4",
+          "x": 18.288,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N5",
+          "x": 18.288,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N6-I",
+        "inicio": {
+          "planta": "N5",
+          "x": 0,
+          "y": 6
+        },
+        "fin": {
+          "planta": "N6",
+          "x": 0,
+          "y": 0
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N6-D",
+        "inicio": {
+          "planta": "N5",
+          "x": 18.288,
+          "y": 6
+        },
+        "fin": {
+          "planta": "N6",
+          "x": 18.288,
+          "y": 0
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N7-I",
+        "inicio": {
+          "planta": "N6",
+          "x": 0,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N7",
+          "x": 0,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      },
+      {
+        "id": "D-N7-D",
+        "inicio": {
+          "planta": "N6",
+          "x": 18.288,
+          "y": 0
+        },
+        "fin": {
+          "planta": "N7",
+          "x": 18.288,
+          "y": 6
+        },
+        "seccion": "CHS139x8",
+        "liberaciones": {
+          "inicio": [false, false, false, false, true, true],
+          "fin": [false, false, false, false, true, true]
+        }
+      }
+    ],
+    "casos": [
+      {
+        "id": "G",
+        "nombre": "Peso propio",
+        "pesoPropio": true,
+        "accion": {
+          "tipo": "G"
+        }
+      },
+      {
+        "id": "CM",
+        "nombre": "Cargas muertas",
+        "accion": {
+          "tipo": "G"
+        }
+      },
+      {
+        "id": "Q",
+        "nombre": "Uso administrativo",
+        "accion": {
+          "tipo": "Q",
+          "psi": "uso-B"
+        }
+      }
+    ],
+    "cargas": [
+      {
+        "tipo": "viga",
+        "id": "CM-V-N1-A",
+        "caso": "CM",
+        "viga": "V-N1-A",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N1-A",
+        "caso": "Q",
+        "viga": "V-N1-A",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N1-B",
+        "caso": "CM",
+        "viga": "V-N1-B",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N1-B",
+        "caso": "Q",
+        "viga": "V-N1-B",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N2-A",
+        "caso": "CM",
+        "viga": "V-N2-A",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N2-A",
+        "caso": "Q",
+        "viga": "V-N2-A",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N2-B",
+        "caso": "CM",
+        "viga": "V-N2-B",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N2-B",
+        "caso": "Q",
+        "viga": "V-N2-B",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N3-A",
+        "caso": "CM",
+        "viga": "V-N3-A",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N3-A",
+        "caso": "Q",
+        "viga": "V-N3-A",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N3-B",
+        "caso": "CM",
+        "viga": "V-N3-B",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N3-B",
+        "caso": "Q",
+        "viga": "V-N3-B",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N4-A",
+        "caso": "CM",
+        "viga": "V-N4-A",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N4-A",
+        "caso": "Q",
+        "viga": "V-N4-A",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N4-B",
+        "caso": "CM",
+        "viga": "V-N4-B",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N4-B",
+        "caso": "Q",
+        "viga": "V-N4-B",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N5-A",
+        "caso": "CM",
+        "viga": "V-N5-A",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N5-A",
+        "caso": "Q",
+        "viga": "V-N5-A",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N5-B",
+        "caso": "CM",
+        "viga": "V-N5-B",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N5-B",
+        "caso": "Q",
+        "viga": "V-N5-B",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N6-A",
+        "caso": "CM",
+        "viga": "V-N6-A",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N6-A",
+        "caso": "Q",
+        "viga": "V-N6-A",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N6-B",
+        "caso": "CM",
+        "viga": "V-N6-B",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N6-B",
+        "caso": "Q",
+        "viga": "V-N6-B",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N7-A",
+        "caso": "CM",
+        "viga": "V-N7-A",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N7-A",
+        "caso": "Q",
+        "viga": "V-N7-A",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      },
+      {
+        "tipo": "viga",
+        "id": "CM-V-N7-B",
+        "caso": "CM",
+        "viga": "V-N7-B",
+        "ejes": "global",
+        "q": [0, 0, -12]
+      },
+      {
+        "tipo": "viga",
+        "id": "Q-V-N7-B",
+        "caso": "Q",
+        "viga": "V-N7-B",
+        "ejes": "global",
+        "q": [0, 0, -6]
+      }
+    ],
+    "acciones": {
+      "emplazamiento": {
+        "ine": "04013",
+        "municipio": "Almería",
+        "altitud": 20
+      },
+      "viento": {
+        "aspereza": "IV"
+      },
+      "sismo": {
+        "terreno": "II",
+        "mu": 2
+      }
+    }
+  },
+  "obra": {
+    "uso": "B",
+    "materiales": {
+      "perfiles": "S275",
+      "zapatas": "HA-25"
+    },
+    "armado": {
+      "fyk": 500,
+      "recubrimiento": 30,
+      "exposicion": "XC2",
+      "flechaActiva": 400,
+      "recubrimientoZapatas": 50
+    },
+    "terreno": {
+      "tensionAdmisible": 200,
+      "pesoEspecifico": 18,
+      "rozamiento": 0.5,
+      "tierras": 0.5
+    }
+  }
+}

@@ -52,11 +52,14 @@ vi.mock("../sesion/cliente.ts", async () => {
 
 const RAIZ = join(__dirname, "..", "..", "..");
 const EJEMPLO = readFileSync(join(RAIZ, ".claude", "skills", "fem", "ejemplo.json"), "utf8");
-const CANONICO = (() => {
-  const l = leerProyecto(EJEMPLO);
-  if (!l.valido) throw new Error("el ejemplo de la skill no es válido");
+const canonico = (texto: string) => {
+  const l = leerProyecto(texto);
+  if (!l.valido) throw new Error("el ejemplo no es válido");
   return serializar(l.proyecto);
-})();
+};
+const CANONICO = canonico(EJEMPLO);
+/** El ejemplo sencillo de la pantalla de inicio: la copia al día del de la skill (`scripts/ejemplos-app.ts`). */
+const CANONICO_APP = canonico(readFileSync(join(RAIZ, "ejemplos", "app", "ejemplo.json"), "utf8"));
 const huella = (p: Proyecto) => huellaCompilacion(p.modelo, resolverOpciones(p.opciones));
 const global = globalThis as unknown as { __motor: string };
 let motor = "";
@@ -219,7 +222,7 @@ describe("criterio 2 y la pantalla de inicio", () => {
     fireEvent.click(screen.getByRole("button", { name: /Guardar en mis proyectos/ }));
     await waitFor(() => expect(screen.getByRole("status", { name: "Estado del guardado" }).textContent).toMatch(/Guardado/), { timeout: 5_000 });
     const [f] = await listar();
-    expect((await leer(f!.id))!.texto).toBe(CANONICO);
+    expect((await leer(f!.id))!.texto).toBe(CANONICO_APP);
     expect(location.search).toBe(`?local=${f!.id}`);
   }, 120_000);
 

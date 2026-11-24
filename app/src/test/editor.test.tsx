@@ -56,6 +56,8 @@ vi.mock("../sesion/cliente.ts", async () => {
 const RAIZ = join(__dirname, "..", "..", "..");
 const EJEMPLO = readFileSync(join(RAIZ, ".claude", "skills", "fem", "ejemplo.json"), "utf8");
 const huella = (p: Proyecto) => huellaCompilacion(p.modelo, resolverOpciones(p.opciones));
+/** El muestrario que abre la pantalla de inicio: la copia al día (`scripts/ejemplos-app.ts`). */
+const MUESTRARIO_APP = () => JSON.parse(readFileSync(join(RAIZ, "ejemplos", "app", "muestrario.json"), "utf8")) as Proyecto;
 
 class SinTamano {
   observe() {}
@@ -486,8 +488,7 @@ function escribirEnFila(tabla: NombreTabla, id: string, valores: Record<string, 
 
 describe("Forjados: cambiar el tipo en la tabla", () => {
   it("de reticular a unidireccional: la fila queda pendiente hasta tener lo que necesita y entonces pasa a los paños", async () => {
-    const texto = readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8");
-    const p = JSON.parse(texto) as Proyecto;
+    const p = MUESTRARIO_APP();
     const { container } = render(
       <ThemeProvider>
         <App />
@@ -531,7 +532,7 @@ describe("Forjados: cambiar el tipo en la tabla", () => {
 
 describe("Ábacos en los pilares", () => {
   it("el diálogo dice qué haría antes de hacerlo: en el muestrario todos los pilares ya tienen ábaco", async () => {
-    const p = JSON.parse(readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8")) as Proyecto;
+    const p = MUESTRARIO_APP();
     const { container } = render(
       <ThemeProvider>
         <App />
@@ -556,7 +557,7 @@ describe("Ábacos en los pilares", () => {
 
 describe("Alinear (MA5)", () => {
   it("el diálogo dice qué está casi alineado antes de mover nada: en el muestrario, nada; a 20 cm de tolerancia, no admite más", async () => {
-    const p = JSON.parse(readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8")) as Proyecto;
+    const p = MUESTRARIO_APP();
     const { container } = render(
       <ThemeProvider>
         <App />

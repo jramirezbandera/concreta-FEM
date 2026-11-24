@@ -20,17 +20,19 @@ import { abrirGestor, cerrarGestor } from "./editor/referencia.tsx";
 import { fechaCorta, tamano } from "./fmt.ts";
 
 /**
- * Proyectos de ejemplo del repositorio (el muestrario y la vivienda de `ejemplos/`, la skill y los tres de A2), del más
- * sencillo al más grande. El nombre accesible de cada tarjeta empieza por su título.
+ * Proyectos de ejemplo, del más sencillo al más grande: los de `ejemplos/app/`, puestos al día por
+ * `scripts/ejemplos-app.ts` (datos de la obra, emplazamiento con viento y sismo del programa, peso
+ * propio calculado, zunchos) desde la skill, `ejemplos/` y los tres de A2, que no se tocan. El nombre
+ * accesible de cada tarjeta empieza por su título.
  */
 export const EJEMPLOS: Record<string, { titulo: string; detalle: string; etiqueta?: string; cargar: () => Promise<string> }> = {
-  ejemplo: { titulo: "Pórtico de dos plantas con losa", detalle: "El ejemplo sencillo: 4 pilares, vigas y losas macizas.", etiqueta: "Para empezar", cargar: () => import("../../.claude/skills/fem/ejemplo.json?raw").then((m) => m.default) },
-  vivienda: { titulo: "Vivienda unifamiliar", detalle: "Una planta, dos cubiertas reticulares y pérgola; 23 pilares. Modelada por el agente desde los planos.", etiqueta: "Proyecto real", cargar: () => import("../../ejemplos/vivienda/proyecto.json?raw").then((m) => m.default) },
-  muestrario: { titulo: "Muestrario", detalle: "Sótano con empuje, núcleo, porche con apoyo lineal, reticular y unidireccional, con combinaciones.", cargar: () => import("../../ejemplos/muestrario/proyecto.json?raw").then((m) => m.default) },
-  nucleo: { titulo: "Retícula con núcleo de muros", detalle: "16 pilares, vigas y losa maciza alrededor de un núcleo.", cargar: () => import("../../validacion/a2/agente/nucleo/proyecto.json?raw").then((m) => m.default) },
+  ejemplo: { titulo: "Pórtico de dos plantas con losa", detalle: "El ejemplo sencillo: 4 pilares, vigas, losas macizas y nieve en la cubierta. Viento y sismo de Málaga.", etiqueta: "Para empezar", cargar: () => import("../../ejemplos/app/ejemplo.json?raw").then((m) => m.default) },
+  vivienda: { titulo: "Vivienda unifamiliar", detalle: "Una planta, dos cubiertas reticulares y pérgola; 23 pilares. Modelada por el agente desde los planos. Viento y sismo de Alhaurín el Grande.", etiqueta: "Proyecto real", cargar: () => import("../../ejemplos/app/vivienda.json?raw").then((m) => m.default) },
+  muestrario: { titulo: "Muestrario", detalle: "Sótano con empuje, núcleo, porche con apoyo lineal, reticular y unidireccional. Viento y sismo de Granada.", cargar: () => import("../../ejemplos/app/muestrario.json?raw").then((m) => m.default) },
+  nucleo: { titulo: "Retícula con núcleo de muros", detalle: "12 pilares, vigas y losa maciza alrededor de un núcleo. Viento y sismo de Murcia.", cargar: () => import("../../ejemplos/app/nucleo.json?raw").then((m) => m.default) },
   // Sin el nombre del programa del caso de validación: los textos de la app no nombran software comercial
-  "1022": { titulo: "Pórtico de acero de 7 plantas", detalle: "Caso de validación 1-022: pilares y vigas de acero, sin losas.", cargar: () => import("../../validacion/a2/agente/1022/proyecto.json?raw").then((m) => m.default) },
-  edificio: { titulo: "Edificio de 7 plantas", detalle: "80 pilares por planta, vigas y losas macizas. Tarda más en calcular.", etiqueta: "Grande", cargar: () => import("../../validacion/a2/agente/edificio/proyecto.json?raw").then((m) => m.default) },
+  "1022": { titulo: "Estructura de acero de 7 plantas", detalle: "Dos pórticos de acero con vigas entre ellos y diagonales, sin losas. Viento y sismo de Almería.", cargar: () => import("../../ejemplos/app/1022.json?raw").then((m) => m.default) },
+  edificio: { titulo: "Edificio de 7 plantas", detalle: "80 pilares por planta, vigas y losas macizas. Viento y sismo de Sevilla. Tarda más en calcular.", etiqueta: "Grande", cargar: () => import("../../ejemplos/app/edificio.json?raw").then((m) => m.default) },
 };
 /** El orden de la lista: `Object.entries` pondría «1022» delante (las claves numéricas van primero). */
 const ORDEN_EJEMPLOS = ["ejemplo", "vivienda", "muestrario", "nucleo", "1022", "edificio"] as const;
