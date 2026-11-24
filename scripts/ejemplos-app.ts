@@ -185,6 +185,11 @@ const EJEMPLOS: Record<string, { de: string; poner: (p: J) => void }> = {
     poner: (p) => {
       const m = p.modelo;
       sinCasos(m, ["Vx", "Vy"]);
+      // El hueco de la escalera, el recuadro entero entre los ejes 24–30 y 15–20 (era de 4,8 × 4,2 m a
+      // 40–60 cm de las vigas: los zunchos de sus bordes dejaban tiras de 15 cm de losa contra las vigas
+      // de los ejes 24 y 30, y la viga secundaria del eje 27 lo cruzaba por el aire)
+      for (const l of m.losas) l.huecos = [[[24, 15], [30, 15], [30, 20], [24, 20]]];
+      m.vigas = m.vigas.filter((v: J) => !v.id.startsWith("VS-x27-y15-"));
       // Los pilares, dimensionados para las plantas bajas (los de 30 × 50 y 40 × 40 en toda la altura
       // salían con ν de hasta 1,4): 60 × 60 en los tramos de N1 y N2 y 50 × 50 en los de N3 y N4
       m.secciones.push({ id: "P50x50", material: "HA-30", forma: "rectangular", b: 0.5, h: 0.5 }, { id: "P60x60", material: "HA-30", forma: "rectangular", b: 0.6, h: 0.6 });
