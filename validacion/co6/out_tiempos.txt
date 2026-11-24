@@ -1,0 +1,67 @@
+validacion/co6/tiempos.ts · ejemplos/app/edificio.json (7 plantas, 80 pilares por planta, viento, sismo, imperfección y segundo orden)
+Node 24 (el motor de Chrome), 2026-11-24. Lo que hace el espacio Comprobación al entrar con la obra sin armado, pedido a pedido.
+La huella es la de la contestación (sin `comprobadas`, que dice cuántas partes se comprobaron en ese pedido).
+
+── Antes (commit e680ab1 con lo de Diagramas sin subir; la máquina, cargada por otras sesiones)
+abrir                                          |    6.07 s |   227 MiB | 18a5bc7218580769
+calcular                                       |   25.16 s |   225 MiB | 9158c6bc67ed78cb
+tabla de pilares, sin armado                   |    2.46 s |   326 MiB | 262aa93ed2fd8889
+armar pilares                                  |  155.74 s |   327 MiB | d039f088999f0f2f
+armar vigas                                    |   97.12 s |   664 MiB | f525ffd7371d7cb1
+armar losas                                    |  306.98 s |  1980 MiB | 9b8c126dda946615
+armar punzonamiento                            |    3.32 s |  2008 MiB | 7ffe9c794565008f
+armado propuesto: 6022e3fe453d84e2
+tabla de pilares, con lo propuesto             |   34.18 s |  2001 MiB | 8da7c7d0da0188af
+tabla de vigas, con lo propuesto               |   63.65 s |  2030 MiB | e1f8c1d1be798918
+tabla de losas, con lo propuesto               |   10.83 s |  2031 MiB | 8c99b3770ec75a33
+tabla de punzonamiento, con lo propuesto       |    1.03 s |  2039 MiB | 4fd10dc0fa6762af
+total sin abrir ni calcular: 675.3 s
+
+── Después (los mismos pedidos)
+abrir                                          |    5.02 s |   227 MiB | 18a5bc7218580769
+calcular                                       |   18.64 s |   226 MiB | 9158c6bc67ed78cb
+tabla de pilares, sin armado                   |    1.89 s |   387 MiB | 262aa93ed2fd8889
+armar pilares                                  |   70.23 s |   398 MiB | d039f088999f0f2f
+armar vigas                                    |   59.39 s |   774 MiB | f525ffd7371d7cb1
+armar losas                                    |  173.86 s |  2126 MiB | 8f0133d096cb3204
+armar punzonamiento                            |    2.81 s |  2175 MiB | 7ffe9c794565008f
+armado propuesto: 6022e3fe453d84e2
+tabla de pilares, con lo propuesto             |    0.01 s |  2175 MiB | 8da7c7d0da0188af (0 comprobadas)
+tabla de vigas, con lo propuesto               |    0.02 s |  2175 MiB | e1f8c1d1be798918 (0 comprobadas)
+tabla de losas, con lo propuesto               |    0.00 s |  2174 MiB | 95605d6eb2fcf30d (0 comprobadas)
+tabla de punzonamiento, con lo propuesto       |    0.29 s |  2174 MiB | 4fd10dc0fa6762af (0 comprobadas)
+total sin abrir ni calcular: 308.5 s
+
+Las huellas de las losas (la contestación de «armar losas» y su tabla) cambian entre las dos pasadas porque
+entre medias entró el commit 644a799 de otra sesión (los avisos de esquina entrante de las franjas, que van
+en esas contestaciones); el armado propuesto es el mismo. Sobre ese mismo commit, con y sin los cambios
+(`--tipos losas,punzonamiento`; las dos pasadas a la vez):
+
+── 644a799, sin los cambios
+tabla de pilares, sin armado                   |    1.88 s |   326 MiB | 262aa93ed2fd8889 (560 comprobadas)
+armar losas                                    |  139.54 s |  1642 MiB | 68f866ddd3ea3822
+armar punzonamiento                            |    2.17 s |  1670 MiB | ec678e269b9c989b
+armado propuesto: 25fd8d8480ed5633
+tabla de losas, con lo propuesto               |    9.50 s |  1672 MiB | 95605d6eb2fcf30d (7 comprobadas)
+tabla de punzonamiento, con lo propuesto       |    0.97 s |  1679 MiB | 4fd10dc0fa6762af (560 comprobadas)
+
+── 644a799, con los cambios
+tabla de pilares, sin armado                   |    1.86 s |   387 MiB | 262aa93ed2fd8889 (560 comprobadas)
+armar losas                                    |  140.59 s |  1739 MiB | 68f866ddd3ea3822
+armar punzonamiento                            |    2.52 s |  1788 MiB | ec678e269b9c989b
+armado propuesto: 25fd8d8480ed5633
+tabla de losas, con lo propuesto               |    0.00 s |  1788 MiB | 95605d6eb2fcf30d (0 comprobadas)
+tabla de punzonamiento, con lo propuesto       |    0.32 s |  1788 MiB | 4fd10dc0fa6762af (0 comprobadas)
+
+Lo que queda: las demandas de las losas (los cortes de sus franjas con los 21 modos: 15–35 s por losa, y
+~1 GB de montón tras la primera) y las de las vigas (~60 s), que son del motor de cortes y de diagramas.
+
+── En Chrome (la app, `?ejemplo=edificio`, 1600 × 900; el reloj, desde el clic en Comprobación)
+  0,2–2,1 s   la tabla de pilares sin armado, avisando pilar a pilar
+  3,1 s       empieza la propuesta: «Proponiendo el armado · 1 de 4: pilares · armado de la tabla · n de 80»
+ 31 s         reglas de obra de los pilares (561 ajustes)
+~60 s         pilares acabados: su tabla (560 tramos) sale en 0,6 s mientras sigue con las vigas
+107 s         vigas acabadas (1 428 vanos)
+124–200 s     losas, ~16 s cada una
+203 s         punzonamiento y fin: 560 tramos, 1 428 vanos, 7 losas y 440 uniones, escritos en un paso
+Después, cambiar de pestaña: vigas 0,48 s · losas 0,06 s · punzonamiento 0,41 s · pilares 0,14 s.

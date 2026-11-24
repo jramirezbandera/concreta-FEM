@@ -1,10 +1,13 @@
 /**
  * Worker de sesión del visor (V1, docs/fem3d/visor.md §3.1). Carga el núcleo WASM, guarda la sesión
  * (`src/visor/atender.ts`) y contesta los pedidos de uno en uno, en el orden en que llegan: un pedido
- * asíncrono (los resultados guardados) no deja que otro vea la sesión a medias.
+ * asíncrono (los resultados guardados) no deja que otro vea la sesión a medias. Las tareas largas
+ * (proponer el armado, comprobar un tipo entero) van por turnos y avisando de por dónde van
+ * (`src/visor/cola.ts`).
  */
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
-import { Atendedor, transferibles, type PesoAparte } from "../../../src/visor/atender.ts";
+import { Atendedor, type PesoAparte } from "../../../src/visor/atender.ts";
+import { Cola } from "../../../src/visor/cola.ts";
 import { infoNavegador, type NavegadorParcial } from "../../../src/worker/limites.ts";
 import type { PedidoPeso, RespuestaPeso } from "./pesoPropio.worker.ts";
 import type { MensajeAlWorker, MensajeDelWorker } from "../../../src/visor/protocolo.ts";
@@ -51,47 +54,55 @@ function pesoAparte(): PesoAparte | undefined {
       w.postMessage({ modelo, opciones } satisfies PedidoPeso);
     });
 }
-let cola: Promise<void> = Promise.resolve();
+let cola: Cola | null = null;
 
 /**
- * Sólo los pedidos que devuelven arrays recién hechos van por Transferable (los de la sesión se
- * quedan en ella). Las escenas preparadas se hacen en cada pedido; la sesión guarda las de A4.
+ * Cede el hilo sin esperar: un mensaje a uno mismo (un `setTimeout(0)` anidado espera 4 ms, la décima
+ * parte de un turno de `cola.ts`). Los mensajes de la interfaz que ya esperaban entran antes.
  */
-const TRANSFERIR = new Set(["geometria", "deformada", "escena", "alzado", "elegir", "alambrico", "losas", "pilares", "paquete"]);
+const canal = new MessageChannel();
+let alCeder: (() => void) | null = null;
+canal.port1.onmessage = () => {
+  const f = alCeder;
+  alCeder = null;
+  f?.();
+};
+const ceder = () =>
+  new Promise<void>((r) => {
+    alCeder = r;
+    canal.port2.postMessage(0);
+  });
 
-async function procesar(m: MensajeAlWorker): Promise<void> {
+async function iniciar(wasm: ArrayBuffer): Promise<void> {
   const t0 = performance.now();
-  if ("tipo" in m) {
-    try {
-      const motor = await sha256Bytes(new Uint8Array(m.wasm));
-      await iniciarNucleo(m.wasm);
-      const aparte = pesoAparte();
-      atendedor = new Atendedor(motor, aparte ? { pesoAparte: aparte } : {});
-      ambito.postMessage({ tipo: "listo", motor, ms: performance.now() - t0 });
-    } catch (e) {
-      ambito.postMessage({ tipo: "fallo", mensaje: `No se pudo cargar el núcleo de cálculo: ${String(e)}` });
-    }
-    return;
-  }
-  const at = atendedor;
-  if (!at) {
-    ambito.postMessage({ id: m.id, huella: null, ok: false, diagnosticos: [{ codigo: "visor/sin-nucleo", severidad: "error", mensaje: "El núcleo de cálculo no está cargado." }], ms: 0 });
-    return;
-  }
   try {
-    // R-25: las fases del cálculo, según terminan (el hilo principal las recibe mientras el worker sigue)
-    const r = await at.atender(m.pedido, m.pedido.tipo === "calcular" ? (fase, ms) => ambito.postMessage({ tipo: "progreso", id: m.id, fase, ms }) : undefined);
-    const ms = performance.now() - t0;
-    if (r.ok) ambito.postMessage({ id: m.id, huella: at.huella, ok: true, valor: r.valor, ms }, TRANSFERIR.has(m.pedido.tipo) ? transferibles(r.valor) : []);
-    else ambito.postMessage({ id: m.id, huella: at.huella, ok: false, diagnosticos: r.diagnosticos, ms });
-    // Con resultados nuevos, lo que se puede adelantar va detrás de los pedidos que ya esperan
-    if (r.ok && (m.pedido.tipo === "calcular" || m.pedido.tipo === "guardados")) setTimeout(() => (cola = cola.then(() => at.ocioso())), 0);
+    const motor = await sha256Bytes(new Uint8Array(wasm));
+    await iniciarNucleo(wasm);
+    const aparte = pesoAparte();
+    atendedor = new Atendedor(motor, aparte ? { pesoAparte: aparte } : {});
+    cola = new Cola(atendedor, { enviar: (m, transferir) => ambito.postMessage(m, transferir ?? []), ceder });
+    ambito.postMessage({ tipo: "listo", motor, ms: performance.now() - t0 });
   } catch (e) {
-    // El motor nunca lanza por un dato del modelo (E6); lo que llegue aquí es un fallo del visor
-    ambito.postMessage({ id: m.id, huella: at.huella, ok: false, diagnosticos: [{ codigo: "visor/error-interno", severidad: "error", mensaje: `Error interno del visor: ${e instanceof Error ? e.message : String(e)}` }], ms: performance.now() - t0 });
+    ambito.postMessage({ tipo: "fallo", mensaje: `No se pudo cargar el núcleo de cálculo: ${String(e)}` });
   }
 }
 
+/** El núcleo se carga antes que nada: los pedidos que lleguen mientras tanto esperan a que esté. */
+let listo: Promise<void> = Promise.resolve();
+
 ambito.onmessage = (e) => {
-  cola = cola.then(() => procesar(e.data));
+  const m = e.data;
+  if ("tipo" in m && m.tipo === "iniciar") {
+    listo = iniciar(m.wasm);
+    return;
+  }
+  void listo.then(() => {
+    if (!cola) {
+      if (!("tipo" in m)) ambito.postMessage({ id: m.id, huella: null, ok: false, diagnosticos: [{ codigo: "visor/sin-nucleo", severidad: "error", mensaje: "El núcleo de cálculo no está cargado." }], ms: 0 });
+      return;
+    }
+    // Las tareas largas (proponer el armado, comprobar un tipo entero) van por turnos: `cola.ts`
+    if ("tipo" in m) cola.cancelar(m.id);
+    else cola.recibir(m);
+  });
 };

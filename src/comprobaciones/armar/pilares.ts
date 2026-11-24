@@ -117,9 +117,18 @@ export function proponerTramo(t: DemandasTramo, datos?: DatosArmado, betaUno = t
   };
   for (let i = 0; i < tabla.length; i++) {
     const a = tabla[i]!;
-    let vale = probar(a) ? a : null;
-    if (!vale && ultima && soloCortante(ultima)) for (const cercos of cercosMasFuertes(a.cercos)) if (probar({ ...a, cercos })) { vale = { ...a, cercos }; break; }
-    if (vale) return { armado: vale, comprobacion: comprobarTramo(t, armadoPilar(vale, datos), betaUno), posicion: i, probados };
+    let vale: ArmadoTramoPilar | null = a;
+    // La comprobación del que vale es la entera: sin ninguna fila que falle, `hastaFallo` no corta nada
+    let c = probar(a);
+    if (!c && ultima && soloCortante(ultima))
+      for (const cercos of cercosMasFuertes(a.cercos)) {
+        c = probar({ ...a, cercos });
+        if (c) {
+          vale = { ...a, cercos };
+          break;
+        }
+      }
+    if (c) return { armado: vale, comprobacion: c, posicion: i, probados };
   }
   const falla = (ultima as ComprobacionTramo | null)?.filas.find((f) => f.estado === "fail");
   return { armado: null, comprobacion: ultima, posicion: -1, probados, motivo: `ningún armado de la tabla cumple${falla ? ` (con el mayor falla «${falla.descripcion}», ${falla.comb})` : ""}: la sección no basta` };
@@ -178,7 +187,7 @@ export function aflojarCentro(t: DemandasTramo, a: ArmadoTramoPilar, datos?: Dat
     const x: ArmadoTramoPilar = { ...a, cercos: { diametro: a.cercos.diametro, separacion }, cercosPie: a.cercos, cercosCabeza: a.cercos };
     // Primero, lo único que cambia: el cortante del centro; con él bien, la comprobación entera
     if (fallaCortanteCentro(t, armadoPilar(x, datos))) continue;
-    const c = comprobarTramo(t, armadoPilar(x, datos), betaUno);
+    const c = comprobarTramo(t, armadoPilar(x, datos), betaUno, true);
     if (sinFallos(c)) return { armado: x, comprobacion: c };
   }
   return null;
@@ -199,7 +208,8 @@ export function subirTramo(t: DemandasTramo, actual: ArmadoTramoPilar, minimo: A
   for (let i = 0; i < tabla.length; i++) {
     const a = { ...tabla[i]!, cercos: cercos(tabla[i]!.cercos) };
     if (!domina(a, minimo) || !domina(a, actual)) continue;
-    const c = comprobarTramo(t, armadoPilar(a, datos), betaUno);
+    // (hasta el primer fallo: el que no falla sale entero)
+    const c = comprobarTramo(t, armadoPilar(a, datos), betaUno, true);
     if (sinFallos(c)) return { armado: a, comprobacion: c, posicion: i };
   }
   return null;

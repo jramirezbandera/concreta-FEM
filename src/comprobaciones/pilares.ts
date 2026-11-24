@@ -11,6 +11,7 @@ import { areaDe, armadoPilar, barrasDe, DATOS_ARMADO, textoArmado, type ArmadoTr
 import { aflojarCentro, diametroDe, domina, proponerTramo, subirTramo } from "./armar/pilares.ts";
 import { comprobarTramo, type ComprobacionTramo, type FilaPilar, type Pendiente } from "./comprobar/pilares.ts";
 import { demandasPilar, type DemandasTramo } from "./demandas/pilares.ts";
+import { agotar, type Paso } from "./pasos.ts";
 
 /** El armado de los pilares del proyecto: por pilar y por la planta de la cabeza de cada tramo. */
 export type ArmadoPilares = Record<string, Record<string, ArmadoTramoPilar>>;
@@ -136,6 +137,13 @@ interface Contexto {
  */
 export const AGRUPAR_AREA = 0.8;
 
+/** Cada pilar por su id (el primero, si se repite). */
+function indicePilares(pilares: readonly PilarComprobado[]): Map<string, PilarComprobado> {
+  const r = new Map<string, PilarComprobado>();
+  for (const p of pilares) if (!r.has(p.pilar)) r.set(p.pilar, p);
+  return r;
+}
+
 /**
  * Las reglas de obra de lo propuesto (CO1-e), que sólo suben armado y se comprueban siempre:
  *  - continuidad en altura: un tramo no lleva menos barras, de menor diámetro ni cercos más débiles
@@ -144,9 +152,12 @@ export const AGRUPAR_AREA = 0.8;
  *    del área del mayor del grupo), con el del mayor.
  * Se repiten hasta que nada cambia (cada pasada sólo sube, y la tabla se acaba).
  */
-function reglasObra(pilares: PilarComprobado[], contexto: Contexto[], datos: DatosArmado | undefined): void {
+function* reglasObra(pilares: PilarComprobado[], contexto: Contexto[], datos: DatosArmado | undefined): Generator<Paso, void> {
   const de = new Map<TramoComprobado, Contexto>();
-  for (const c of contexto) de.set(pilares.find((p) => p.pilar === c.pilar)!.tramos[c.k]!, c);
+  const porId = indicePilares(pilares);
+  for (const c of contexto) de.set(porId.get(c.pilar)!.tramos[c.k]!, c);
+  // No se sabe cuántas subidas habrá: se avisa con las hechas (el total, las mismas)
+  let subidas = 0;
   const subir = (x: TramoComprobado, minimo: ArmadoTramoPilar, porque: "continuidad" | "agrupado"): boolean => {
     const c = de.get(x)!;
     const s = subirTramo(c.t, x.armado!, minimo, datos, c.betaUno);
@@ -164,7 +175,10 @@ function reglasObra(pilares: PilarComprobado[], contexto: Contexto[], datos: Dat
       for (const x of p.tramos) {
         if (x.origen !== "propuesto" || !x.armado) continue;
         const encima = p.tramos.find((y) => y.plantaBase === x.planta && y.armado);
-        if (encima && !domina(x.armado, encima.armado!) && !!x.armado.anillo === !!encima.armado!.anillo && subir(x, encima.armado!, "continuidad")) cambio = true;
+        if (encima && !domina(x.armado, encima.armado!) && !!x.armado.anillo === !!encima.armado!.anillo) {
+          if (subir(x, encima.armado!, "continuidad")) cambio = true;
+          yield { fase: "reglas de obra", hecho: ++subidas, total: subidas, pieza: p.pilar };
+        }
       }
     // Agrupar, por planta y sección
     const grupos = new Map<string, TramoComprobado[]>();
@@ -183,7 +197,10 @@ function reglasObra(pilares: PilarComprobado[], contexto: Contexto[], datos: Dat
           // Sólo lo que el mayor ya cubre en barras y diámetro (si no, subir a él sería otro armado)
           if (areaDe(x.armado!) < AGRUPAR_AREA * areaDe(lider.armado!) || barrasDe(x.armado!) > barrasDe(lider.armado!) || diametroDe(x.armado!) > diametroDe(lider.armado!)) continue;
           pendientes.splice(i, 1);
-          if (!domina(x.armado!, lider.armado!) && subir(x, lider.armado!, "agrupado")) cambio = true;
+          if (!domina(x.armado!, lider.armado!)) {
+            if (subir(x, lider.armado!, "agrupado")) cambio = true;
+            yield { fase: "reglas de obra", hecho: ++subidas, total: subidas };
+          }
         }
       }
     }
@@ -192,6 +209,11 @@ function reglasObra(pilares: PilarComprobado[], contexto: Contexto[], datos: Dat
 }
 
 export function comprobarPilares(q: Consultas, armado: ArmadoPilares | undefined, datos: DatosArmado | undefined, op: OpcionesPilares = {}): Respuesta<ComprobacionPilares> {
+  return agotar(pasosPilares(q, armado, datos, op));
+}
+
+/** `comprobarPilares`, avisando tras cada pilar (`pasos.ts`). */
+export function* pasosPilares(q: Consultas, armado: ArmadoPilares | undefined, datos: DatosArmado | undefined, op: OpcionesPilares = {}): Generator<Paso, Respuesta<ComprobacionPilares>> {
   const todos = (q.fisico.pilares ?? []).map((p) => p.id);
   const ids = op.ids?.length ? op.ids : todos;
   const diagnosticos: Diagnostico[] = [];
@@ -230,12 +252,18 @@ export function comprobarPilares(q: Consultas, armado: ArmadoPilares | undefined
     });
     resumen.pilares++;
     pilares.push({ pilar: id, cumple: false, combinaciones: d.valor.combinaciones, tramos });
+    yield { fase: op.proponer ? "armado de la tabla" : "comprobación", hecho: pilares.length, total: ids.length, pieza: id };
   }
-  if (op.proponer && op.reglasObra !== false) reglasObra(pilares, contexto, datos);
+  if (op.proponer && op.reglasObra !== false) yield* reglasObra(pilares, contexto, datos);
   // CO1-f: lo propuesto, con el centro de cada tramo más abierto si sigue cumpliendo
-  if (op.proponer && op.zonasCercos !== false)
-    for (const c of contexto) {
-      const x = pilares.find((p) => p.pilar === c.pilar)!.tramos[c.k]!;
+  if (op.proponer && op.zonasCercos !== false) {
+    const porId = indicePilares(pilares);
+    let hechos = 0;
+    for (let i = 0; i < contexto.length; i++) {
+      const c = contexto[i]!;
+      // (un aviso por pilar: al acabar su último tramo)
+      if (i > 0 && contexto[i - 1]!.pilar !== c.pilar) yield { fase: "cercos del centro", hecho: ++hechos, total: pilares.length, pieza: contexto[i - 1]!.pilar };
+      const x = porId.get(c.pilar)!.tramos[c.k]!;
       if (x.origen !== "propuesto" || !x.armado) continue;
       const s = aflojarCentro(c.t, x.armado, datos, c.betaUno);
       if (!s) continue;
@@ -243,6 +271,7 @@ export function comprobarPilares(q: Consultas, armado: ArmadoPilares | undefined
       for (const k of Object.keys(x) as (keyof TramoComprobado)[]) delete x[k];
       Object.assign(x, nuevo);
     }
+  }
   for (const p of pilares) {
     p.cumple = p.tramos.every((t) => t.cumple);
     for (const t of p.tramos) {

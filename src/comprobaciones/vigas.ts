@@ -11,6 +11,7 @@ import { armadoViga, DATOS_ARMADO, textoArmadoViga, type ArmadoVanoViga, type Da
 import { proponerVano } from "./armar/vigas.ts";
 import { comprobarVano, type ComprobacionVano, type FilaViga, type PendienteViga } from "./comprobar/vigas.ts";
 import { demandasViga, type ZonaViga } from "./demandas/vigas.ts";
+import { agotar, type Paso } from "./pasos.ts";
 
 /** El armado de las vigas del proyecto: por viga, el de cada vano en su orden (null, el que no lo tiene). */
 export type ArmadoVigas = Record<string, (ArmadoVanoViga | null)[]>;
@@ -104,6 +105,11 @@ function manda(c: ComprobacionVano): FilaViga | undefined {
 }
 
 export function comprobarVigas(q: Consultas, armado: ArmadoVigas | undefined, datos: DatosArmado | undefined, op: OpcionesVigas = {}): Respuesta<ComprobacionVigas> {
+  return agotar(pasosVigas(q, armado, datos, op));
+}
+
+/** `comprobarVigas`, avisando tras cada viga (`pasos.ts`). */
+export function* pasosVigas(q: Consultas, armado: ArmadoVigas | undefined, datos: DatosArmado | undefined, op: OpcionesVigas = {}): Generator<Paso, Respuesta<ComprobacionVigas>> {
   const todas = (q.fisico.vigas ?? []).map((v) => v.id);
   const ids = op.ids?.length ? op.ids : todas;
   const diagnosticos: Diagnostico[] = [];
@@ -160,6 +166,7 @@ export function comprobarVigas(q: Consultas, armado: ArmadoVigas | undefined, da
     }
     resumen.vigas++;
     vigas.push({ viga: id, seccion: d.valor.seccion.id, cumple: vanos.every((v) => v.cumple), combinaciones: d.valor.combinaciones, vanos });
+    yield { fase: op.proponer ? "armado de las tablas" : "comprobación", hecho: vigas.length, total: ids.length, pieza: id };
   }
   // Lo que no está escrito en la obra y decide un veredicto: se dice, como el recubrimiento de los pilares (CO1-d)
   const porDefecto = [

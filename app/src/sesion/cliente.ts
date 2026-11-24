@@ -5,6 +5,7 @@
  * su sesión y se rechaza si no es la que este cliente abrió (criterio 3 de V1).
  */
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
+import type { ProgresoTarea } from "../../../src/visor/comprobaciones.ts";
 import type { MensajeAlWorker, MensajeDelWorker, Pedido, Respuestas, TipoPedido } from "../../../src/visor/protocolo.ts";
 import urlNucleo from "../../../src/nucleo/pkg/nucleo_bg.wasm?url";
 
@@ -16,6 +17,21 @@ export class ErrorObsoleto extends Error {
     super("respuesta de otra versión del proyecto");
     this.name = "ErrorObsoleto";
   }
+}
+
+/**
+ * Una tarea larga del worker en marcha (`src/visor/cola.ts`: proponer el armado, comprobar un tipo
+ * entero): el pedido, por dónde va y desde cuándo. La interfaz las enseña con su avance.
+ */
+export interface TareaEnMarcha {
+  id: number;
+  pedido: Pedido;
+  avance: ProgresoTarea;
+  /** Cuándo llegó su primer aviso y cuándo empezó la fase en la que está (`performance.now()`): para estimar lo que le queda. */
+  desde: number;
+  desdeFase: number;
+  /** Lo hecho al empezar a contar la fase (un aviso puede llegar con la fase ya empezada). */
+  hechoFase: number;
 }
 
 let wasm: Promise<ArrayBuffer> | null = null;
@@ -38,7 +54,10 @@ function bytesNucleo(): Promise<ArrayBuffer> {
 export class ClienteSesion {
   private readonly worker: Worker;
   private siguiente = 1;
-  private readonly pendientes = new Map<number, { resolver: (r: Respuesta<TipoPedido>) => void; rechazar: (e: Error) => void; tipo: TipoPedido; alProgreso?: (fase: string, ms: number) => void }>();
+  private readonly pendientes = new Map<number, { resolver: (r: Respuesta<TipoPedido>) => void; rechazar: (e: Error) => void; tipo: TipoPedido; pedido: Pedido; alProgreso?: (fase: string, ms: number) => void; alAvance?: (a: ProgresoTarea) => void }>();
+  /** Las tareas en marcha, por su pedido; `oyentes`, quien las mira (`useTareas`). */
+  private enMarcha: readonly TareaEnMarcha[] = [];
+  private readonly oyentes = new Set<() => void>();
   private listo: Promise<string>;
   private cerrado = false;
   /** La huella que abrió este cliente (null hasta abrir). */
@@ -57,7 +76,12 @@ export class ClienteSesion {
       const m = e.data;
       if ("tipo" in m) {
         if (m.tipo === "progreso") {
-          this.pendientes.get(m.id)?.alProgreso?.(m.fase, m.ms);
+          const p = this.pendientes.get(m.id);
+          if (!p) return;
+          if (m.avance) {
+            this.anotarAvance(m.id, p.pedido, m.avance);
+            p.alAvance?.(m.avance);
+          } else p.alProgreso?.(m.fase, m.ms);
           return;
         }
         if (m.tipo === "listo") {
@@ -69,6 +93,7 @@ export class ClienteSesion {
       const p = this.pendientes.get(m.id);
       if (!p) return;
       this.pendientes.delete(m.id);
+      this.quitarTarea(m.id);
       // La respuesta de «abrir» fija la huella; las demás tienen que traer esa misma
       if (p.tipo === "abrir") this.huella = m.huella;
       else if (m.huella !== this.huella) {
@@ -98,15 +123,51 @@ export class ClienteSesion {
     return this.listo;
   }
 
-  /** `alProgreso` (R-25): las fases del cálculo según terminan, en `calcular`. */
-  async pedir<K extends TipoPedido>(pedido: Extract<Pedido, { tipo: K }>, opciones: { alProgreso?: (fase: string, ms: number) => void } = {}): Promise<Respuesta<K>> {
+  /**
+   * `alProgreso` (R-25): las fases del cálculo según terminan, en `calcular`. `alAvance`: por dónde va
+   * una tarea larga (una propuesta de armado: pieza a pieza, y el armado parcial al acabar cada tipo).
+   * `senal`: al abortarla, la tarea se cancela en el worker y el pedido contesta con `visor/cancelado`.
+   */
+  async pedir<K extends TipoPedido>(pedido: Extract<Pedido, { tipo: K }>, opciones: { alProgreso?: (fase: string, ms: number) => void; alAvance?: (a: ProgresoTarea) => void; senal?: AbortSignal } = {}): Promise<Respuesta<K>> {
     await this.listo;
     if (this.cerrado) throw new ErrorObsoleto();
     const id = this.siguiente++;
     return new Promise<Respuesta<K>>((resolver, rechazar) => {
-      this.pendientes.set(id, { resolver: resolver as (r: Respuesta<TipoPedido>) => void, rechazar, tipo: pedido.tipo, ...(opciones.alProgreso ? { alProgreso: opciones.alProgreso } : {}) });
+      this.pendientes.set(id, { resolver: resolver as (r: Respuesta<TipoPedido>) => void, rechazar, tipo: pedido.tipo, pedido, ...(opciones.alProgreso ? { alProgreso: opciones.alProgreso } : {}), ...(opciones.alAvance ? { alAvance: opciones.alAvance } : {}) });
       this.enviar({ id, pedido });
+      opciones.senal?.addEventListener("abort", () => this.pendientes.has(id) && this.enviar({ tipo: "cancelar", id }), { once: true });
     });
+  }
+
+  /** Cancela una tarea en marcha (la de `tareas()`): su pedido contesta con `visor/cancelado`. */
+  cancelar(id: number): void {
+    if (this.pendientes.has(id)) this.enviar({ tipo: "cancelar", id });
+  }
+
+  /** Las tareas largas en marcha, con su avance (la misma lista mientras no cambia). */
+  tareas(): readonly TareaEnMarcha[] {
+    return this.enMarcha;
+  }
+
+  /** Avisa cuando cambian las tareas en marcha o su avance; devuelve cómo dejar de escuchar. */
+  alCambiarTareas(f: () => void): () => void {
+    this.oyentes.add(f);
+    return () => this.oyentes.delete(f);
+  }
+
+  private anotarAvance(id: number, pedido: Pedido, avance: ProgresoTarea): void {
+    const ahora = performance.now();
+    const previa = this.enMarcha.find((t) => t.id === id);
+    const mismaFase = previa && previa.avance.fase === avance.fase && previa.avance.tipo === avance.tipo && avance.hecho >= previa.hechoFase;
+    const nueva: TareaEnMarcha = { id, pedido, avance, desde: previa?.desde ?? ahora, desdeFase: mismaFase ? previa.desdeFase : ahora, hechoFase: mismaFase ? previa.hechoFase : avance.hecho };
+    this.enMarcha = previa ? this.enMarcha.map((t) => (t.id === id ? nueva : t)) : [...this.enMarcha, nueva];
+    for (const f of this.oyentes) f();
+  }
+
+  private quitarTarea(id: number): void {
+    if (!this.enMarcha.some((t) => t.id === id)) return;
+    this.enMarcha = this.enMarcha.filter((t) => t.id !== id);
+    for (const f of this.oyentes) f();
   }
 
   cerrar(): void {
@@ -114,5 +175,9 @@ export class ClienteSesion {
     this.worker.terminate();
     for (const p of this.pendientes.values()) p.rechazar(new ErrorObsoleto());
     this.pendientes.clear();
+    if (this.enMarcha.length) {
+      this.enMarcha = [];
+      for (const f of this.oyentes) f();
+    }
   }
 }

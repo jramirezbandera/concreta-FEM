@@ -12,7 +12,8 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { DATOS_ARMADO, textoPunzonamiento, type ArmadoForjado, type ArmaduraPunzonamiento, type DatosArmado } from "./armado.ts";
 import { proponerPunzonamiento } from "./armar/punzonamiento.ts";
 import { armadoPunzonamiento, comprobarPunzonamiento, flexion, type CasoPunzonamiento, type CaraPunzonamiento, type ComprobacionPunzonamiento, type FilaPunzonamiento } from "./comprobar/punzonamiento.ts";
-import { demandasPunzonamiento, type DemandaPunzonamiento } from "./demandas/punzonamiento.ts";
+import { demandasPunzonamiento, type DemandaPunzonamiento, type DemandasPunzonamiento } from "./demandas/punzonamiento.ts";
+import { agotar, type Paso } from "./pasos.ts";
 
 /** La armadura de punzonamiento del proyecto: por pilar y por la planta de la losa. */
 export type ArmadoPunzonamientos = Record<string, Record<string, ArmaduraPunzonamiento>>;
@@ -110,7 +111,44 @@ function manda(c: ComprobacionPunzonamiento): FilaPunzonamiento | undefined {
 }
 
 export function comprobarPunzonamientos(q: Consultas, forjados: Record<string, ArmadoForjado> | undefined, armaduras: ArmadoPunzonamientos | undefined, datos: DatosArmado | undefined, op: OpcionesPunzonamiento = {}): Respuesta<ComprobacionPunzonamientos> {
-  const d = demandasPunzonamiento(q, op.ids);
+  return agotar(pasosPunzonamientos(q, forjados, armaduras, datos, op));
+}
+
+/** Las demandas de punzonamiento de un pilar ya hechas, por consultas (no dependen del armado). */
+const GUARDADAS = new WeakMap<Consultas, Map<string, Respuesta<DemandasPunzonamiento>>>();
+
+/**
+ * `demandasPunzonamiento(q, ids)`, pilar a pilar y avisando tras cada uno: las mismas demandas, en el
+ * mismo orden (el de los pilares del modelo). Lo que tarda es lo que la losa pasa a cada pilar.
+ */
+function* demandasPorPilar(q: Consultas, ids: readonly string[] | undefined): Generator<Paso, Respuesta<DemandasPunzonamiento>> {
+  const todos = (q.fisico.pilares ?? []).map((p) => p.id);
+  const elegidos = ids?.length ? new Set(ids) : null;
+  const lista = elegidos ? todos.filter((id) => elegidos.has(id)) : todos;
+  // Sin pilares, o con alguno que no existe: como de una vez (el mismo error)
+  if (!lista.length || (ids ?? []).some((id) => !todos.includes(id))) return demandasPunzonamiento(q, ids);
+  let m = GUARDADAS.get(q);
+  if (!m) GUARDADAS.set(q, (m = new Map()));
+  let junto: Respuesta<DemandasPunzonamiento> | undefined;
+  for (let i = 0; i < lista.length; i++) {
+    const id = lista[i]!;
+    let r = m.get(id);
+    if (!r) m.set(id, (r = demandasPunzonamiento(q, [id])));
+    if (!r.valido) return r;
+    // Los avisos son los de las combinaciones: los mismos en todos
+    if (!junto) junto = { valido: true, valor: { demandas: [], sinUnion: [], combinaciones: r.valor.combinaciones }, diagnosticos: [...r.diagnosticos] };
+    if (junto.valido) {
+      junto.valor.demandas.push(...r.valor.demandas);
+      junto.valor.sinUnion.push(...r.valor.sinUnion);
+    }
+    yield { fase: "lo que la losa pasa a cada pilar", hecho: i + 1, total: lista.length, pieza: id };
+  }
+  return junto!;
+}
+
+/** `comprobarPunzonamientos`, avisando tras cada pilar (`pasos.ts`). */
+export function* pasosPunzonamientos(q: Consultas, forjados: Record<string, ArmadoForjado> | undefined, armaduras: ArmadoPunzonamientos | undefined, datos: DatosArmado | undefined, op: OpcionesPunzonamiento = {}): Generator<Paso, Respuesta<ComprobacionPunzonamientos>> {
+  const d = yield* demandasPorPilar(q, op.ids);
   if (!d.valido) return d;
   const diagnosticos: Diagnostico[] = [...d.diagnosticos];
   const pilares: PunzonamientoComprobado[] = [];

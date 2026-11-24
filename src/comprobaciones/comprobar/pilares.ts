@@ -273,6 +273,27 @@ export function fallaCortanteCentro(t: DemandasTramo, a: ArmadoPilar): boolean {
   return false;
 }
 
+/**
+ * Lo de un extremo del tramo (la base o la cabeza) con el armado de su sección: la peor de cada fila
+ * entre sus demandas, en el orden en que salieron. Se guarda la última de cada extremo para no
+ * repetirla cuando el tramo se vuelve a comprobar con la misma sección en ese extremo: al abrir los
+ * cercos del centro (CO1-f) cambia sólo la sección central, y las llamadas al módulo de los dos
+ * extremos, que son casi todas, eran las mismas.
+ *
+ * Sólo se guarda un extremo entero, con todas sus demandas de flexocompresión admitidas por el módulo
+ * (sin tracción ni pendientes: ésos van por el camino de siempre). Juntar la peor de cada extremo en
+ * el orden base, centro, cabeza da lo mismo que recorrer sus demandas seguidas: la peor de cada fila
+ * es un máximo en el que, a igualdad, se queda la primera.
+ */
+interface Parcial {
+  clave: string;
+  filas: FilaPilar[];
+  llamadas: number;
+}
+const PARCIALES = new WeakMap<DemandasTramo, Partial<Record<Extremo, Parcial>>>();
+/** Lo que de un armado ve una sección (`entradaModulo`, `filasCortante`). */
+const claveSeccion = (a: ArmadoPilar) => JSON.stringify([a.esquinas ?? null, a.caraB ?? null, a.caraH ?? null, a.anillo ?? null, a.cercos, a.recubrimiento, a.fyk, a.phiEf ?? null]);
+
 /** `hastaFallo`: lo deja en la primera fila que falla (para probar armados de una tabla). */
 export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true, hastaFallo = false): ComprobacionTramo {
   const filas = new Map<string, FilaPilar>();
@@ -284,26 +305,32 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
     else pendientes.set(motivo, { motivo, demandas: 1, ...(d ? { comb: d.comb } : {}), ...(extremo ? { extremo } : {}) });
   };
   /** Se queda con la peor de cada fila. `siFalta`: sólo si esa fila no ha salido de ninguna demanda. */
+  /** Las filas del extremo que se recorre, para guardarlas (`Parcial`); null si no se guardan. */
+  let propias: Map<string, FilaPilar> | null = null;
+  const esPeor = (previa: FilaPilar | undefined, estado: CheckStatus, u: number) => !previa || gravedad(estado) > gravedad(previa.estado) || (gravedad(estado) === gravedad(previa.estado) && u > previa.aprovechamiento);
   const anotar = (lista: CheckRow[], d: Demanda, extremo: Extremo, siFalta = false) => {
     for (const fila of lista) {
       const u = aprovechamientoDe(fila);
       const previa = filas.get(fila.id);
       if (previa && siFalta) continue;
-      const peor = !previa || gravedad(fila.status) > gravedad(previa.estado) || (gravedad(fila.status) === gravedad(previa.estado) && u > previa.aprovechamiento);
+      const peor = esPeor(previa, fila.status, u);
+      const peorPropia = propias !== null && esPeor(propias.get(fila.id), fila.status, u);
       if (fila.status === "fail") falla = true;
-      if (peor)
-        filas.set(fila.id, {
-          id: fila.id,
-          descripcion: fila.description,
-          articulo: fila.article,
-          aprovechamiento: u,
-          estado: fila.status,
-          ...(informativa(fila) ? { informativa: true as const } : {}),
-          comb: d.comb,
-          extremo,
-          ...(d.pesimos ? { pesimos: true as const } : {}),
-          fila,
-        });
+      if (!peor && !peorPropia) continue;
+      const nueva: FilaPilar = {
+        id: fila.id,
+        descripcion: fila.description,
+        articulo: fila.article,
+        aprovechamiento: u,
+        estado: fila.status,
+        ...(informativa(fila) ? { informativa: true as const } : {}),
+        comb: d.comb,
+        extremo,
+        ...(d.pesimos ? { pesimos: true as const } : {}),
+        fila,
+      };
+      if (peor) filas.set(fila.id, nueva);
+      if (peorPropia) propias!.set(fila.id, nueva);
     }
   };
   if (!betaUno) pendiente("β = 1 no vale: el segundo orden global está desactivado y la estructura es traslacional");
@@ -329,6 +356,21 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
   recorrido: for (const [extremo, ext] of [["base", t.base], ...(t.centro ? [["centro", t.centro] as const] : []), ["cabeza", t.cabeza]] as const) {
     // La sección, con los cercos de su zona
     const a: ArmadoPilar = { ...total, cercos: cercosEnPilar(total, extremo) };
+    // Un extremo ya comprobado con esta misma sección: sus filas, como si se recorrieran sus demandas
+    const guardable = extremo !== "centro" && !("motivo" in geo) && ext.demandas.length > 0;
+    const clave = guardable ? claveSeccion(a) : "";
+    const previo = guardable ? PARCIALES.get(t)?.[extremo] : undefined;
+    if (previo && previo.clave === clave && !(hastaFallo && (falla || previo.filas.some((f) => f.estado === "fail")))) {
+      for (const f of previo.filas) {
+        if (f.estado === "fail") falla = true;
+        if (esPeor(filas.get(f.id), f.estado, f.aprovechamiento)) filas.set(f.id, f);
+      }
+      llamadas += previo.llamadas;
+      continue;
+    }
+    propias = guardable ? new Map() : null;
+    const antes = llamadas;
+    let entero = guardable;
     for (const d of ext.demandas) {
       if (hastaFallo && falla) break recorrido;
       if ("motivo" in geo) {
@@ -337,6 +379,7 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
       }
       const e = entradaPilar(t, d);
       if (e.tipo === "pendiente") {
+        entero = false;
         pendiente(e.motivo, d, extremo);
         continue;
       }
@@ -344,6 +387,7 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
       if (geo.sectionType === "rectangular") anotar(filasCortante(geo, a, N, Vy, Vz), d, extremo);
       else anotar(filasCortanteCircular(geo, a, N, Vy, Vz), d, extremo);
       if (e.tipo === "traccion") {
+        entero = false;
         env ??= envolventes({ ...geo, L: t.longitudLibre, beta: 1 }, a);
         if ("error" in env) {
           pendiente(`el módulo no admite la entrada: ${env.error}`, d, extremo);
@@ -357,6 +401,7 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
       const r = calcRCColumn(entradaModulo(e.entrada, a));
       llamadas++;
       if (!r.valid) {
+        entero = false;
         pendiente(`el módulo no admite la entrada: ${r.error ?? "sin motivo"}`, d, extremo);
         continue;
       }
@@ -364,6 +409,13 @@ export function comprobarTramo(t: DemandasTramo, a: ArmadoPilar, betaUno = true,
       // La zona densificada (§9.5.3(4)) es la de los extremos: en el centro esa fila no cuenta
       anotar(extremo === "centro" ? r.checks.filter((f) => f.id !== "stirrup-densification") : r.checks, d, extremo);
     }
+    // (si se cortó en un fallo, `break recorrido` no llega aquí: sólo se guarda un extremo entero)
+    if (entero && propias) {
+      const guardados = PARCIALES.get(t) ?? {};
+      guardados[extremo] = { clave, filas: [...propias.values()], llamadas: llamadas - antes };
+      PARCIALES.set(t, guardados);
+    }
+    propias = null;
   }
   // Un pilar que sólo tracciona: las reglas de armado, de la llamada con la compresión mínima
   if (traccionada && env && !("error" in env))

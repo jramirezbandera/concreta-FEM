@@ -70,8 +70,24 @@ export interface DemandasPilar {
   tramos: DemandasTramo[];
 }
 
+/**
+ * Las demandas de ELU ya hechas, por consultas (unos resultados) y pilar: no dependen del armado, y
+ * comprobar, proponer y volver a comprobar las pedían cada vez (en el edificio de 7 plantas con el
+ * sismo, 2,5 s por pasada). Quien las recibe no las cambia.
+ */
+const GUARDADAS = new WeakMap<Consultas, Map<string, Respuesta<DemandasPilar>>>();
+
 /** Las demandas de un pilar en las combinaciones de unas situaciones (por defecto, las de ELU). */
 export function demandasPilar(q: Consultas, id: string, situaciones: readonly Situacion[] = SITUACIONES_ELU): Respuesta<DemandasPilar> {
+  if (situaciones !== SITUACIONES_ELU) return calcularDemandasPilar(q, id, situaciones);
+  let m = GUARDADAS.get(q);
+  if (!m) GUARDADAS.set(q, (m = new Map()));
+  let r = m.get(id);
+  if (!r) m.set(id, (r = calcularDemandasPilar(q, id, situaciones)));
+  return r;
+}
+
+function calcularDemandasPilar(q: Consultas, id: string, situaciones: readonly Situacion[]): Respuesta<DemandasPilar> {
   const tr = q.pilar(id);
   if (!tr.valido) return tr;
   const cj = conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: [...situaciones] });

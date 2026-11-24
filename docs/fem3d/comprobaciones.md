@@ -1005,6 +1005,43 @@ Con los ejemplos de la app al día (viento, sismo e imperfección del programa),
 
 **Validación:** `src/motor/recientes.test.ts` (la clase; los diagramas con un tope de una o dos barras, pedidos caso a caso por todo el modelo, bit a bit con los guardados; sin el sismo, las franjas de otra planta sueltan lo de la anterior y lo rehecho da los mismos bits), `comprobar/zapatas.test.ts` (lo del terreno guardado para otra parrilla da lo mismo que llamar al módulo, con menos llamadas), `sismoEspectral.test.ts` (los casos del cálculo también se sueltan al cambiar de planta) y las baterías del motor, las comprobaciones, el agente y el visor.
 
+### 8.23. Comprobación en un edificio grande: avance, turnos y lo que se repetía (2026-11-24)
+
+De la prueba de uso con el edificio de 7 plantas con el sismo: al entrar en Comprobación, proponer el armado tardaba minutos sin decir nada, y mientras tanto no se podía ni cambiar de pestaña (Pilares, Vigas, Losas): todo esperaba detrás.
+
+**Por qué.** El worker contestaba los pedidos de uno en uno, y la propuesta de toda la obra era un solo pedido: nada más se atendía hasta que acababa. Y se repetía trabajo: las demandas de cada pieza (que no dependen del armado) se rehacían en la tabla sin armado, al proponer y otra vez en la tabla con lo propuesto.
+
+**Medido** (`validacion/co6/tiempos.ts`, `out_tiempos.txt`; Node, el edificio de `ejemplos/app/`): la tabla sin armado, 2,5 s; proponer, 156 s los pilares, 97 s las vigas, 307 s las losas y 3 s el punzonamiento; y las tablas con lo propuesto, 34 + 64 + 11 + 1 s. En total, 675 s.
+
+**Lo que cambia, sin tocar un número** (las mismas huellas de las contestaciones, antes y después):
+
+- **Las demandas de cada pieza se guardan** por consultas (`demandas/pilares.ts`, `vigas.ts`, `losas.ts`; las de punzonamiento, por pilar, en `punzonamiento.ts`). No dependen del armado ni de los datos de armado de la obra.
+- **Los pilares, sin comprobar dos veces lo mismo** (de 156 a 70 s):
+  - el armado de la tabla que vale ya está comprobado entero (sin ninguna fila que falle, `hastaFallo` no corta nada): no se repite al final (`proponerTramo`);
+  - `subirTramo` y `aflojarCentro` cortan en el primer fallo del candidato que no vale;
+  - **lo de cada extremo del tramo se guarda** (`comprobar/pilares.ts`, `Parcial`): la peor de cada fila entre las demandas de la base o de la cabeza con el armado de su sección. Al abrir los cercos del centro (CO1-f) cambia sólo la sección central, y las llamadas al módulo de los dos extremos (casi todas) eran las mismas. Sólo un extremo entero, sin tracción ni pendientes; juntar la peor de cada extremo en el orden base, centro, cabeza da lo de recorrer las demandas seguidas (un máximo en el que, a igualdad, se queda la primera).
+- **Lo propuesto queda comprobado:** al acabar cada tipo, la propuesta lo comprueba con su armado (`pasosArmar`) y lo deja en la caché por pieza: sus tablas y sus plantas salen al momento (de 34 + 64 + 11 + 1 s a 0,3 s). La clave de la caché ya no depende del orden de las claves del armado (el editor lo ordena al escribirlo).
+- **Total:** de 675 a 308 s en Node. De esa bajada son de estos cambios la de los pilares y la de las tablas; la de las losas es carga de la máquina en la primera pasada (sobre el mismo commit tardan lo mismo con y sin ellos, ~140 s), y la de las vigas no se ha aislado. En Chrome, la propuesta entera, 3 min 23 s (`out_tiempos.txt`).
+
+**Las tareas del worker, por turnos** (`src/visor/cola.ts`, `Atendedor.tarea`):
+
+- Las comprobaciones de conjunto son **generadores** que avisan tras cada pieza (`src/comprobaciones/pasos.ts`: `pasosPilares`, `pasosVigas`, `pasosLosas`, `pasosPunzonamientos`; las demandas de una losa, franja a franja, `pasosDemandasLosa`). `comprobarPilares` y las demás son el mismo generador llevado hasta el final: la CLI y los tests no cambian.
+- Los pedidos que comprueban un tipo entero o proponen su armado (`comprobaciones`, `comprobacion`, la planta de `comprobacion`, `punzonamiento-3d` y `armar`) son **tareas**. La cola atiende primero los pedidos de los que se contestan de una vez; si no hay, avanza un turno (40 ms) la tarea **más reciente** (lo último que ha pedido la interfaz pasa delante de la propuesta), avisa de por dónde va (`progreso` con `avance`) y cede el hilo.
+- Dos tareas que piden lo mismo (la tabla y la planta de un tipo) avanzan la misma puesta al día (`Atendedor.puestas`), y una que se deja a medias sigue donde iba.
+- Una tarea se **cancela** (`cancelar`): contesta `visor/cancelado` en su siguiente turno. Si el proyecto o sus resultados cambian a mitad, `visor/obsoleto`.
+- La propuesta da el armado **tipo a tipo** (`parcial`, al acabar cada uno), ya comprobado.
+
+**En la app:**
+
+- **El avance, siempre a la vista:** en el pie de la app (esté donde esté el usuario) y, más grande, sobre la tabla: qué se hace («Proponiendo el armado · 2 de 4: vigas»), la fase, «120 de 560 vigas», la pieza, lo que queda más o menos (de lo que han tardado las piezas ya hechas de esa fase) y «Cancelar» (`app/src/componentes/AvanceTareas.tsx`; las tareas son del cliente de la sesión, `ClienteSesion.tareas`).
+- **Lo ya propuesto se ve mientras sigue con lo demás:** la pantalla comprueba y dibuja con el armado parcial; la pestaña de un tipo que aún se está proponiendo lo dice y enseña la planta del modelo, sin pedir nada. Al final se escribe en el proyecto en un solo paso de deshacer, como antes. Cancelada a medias, se quedan los tipos acabados.
+
+**Un fallo que destapó:** lo propuesto reutiliza las entradas de las tablas (la armadura inferior de un vano y la superior de un apoyo, el mismo objeto «3Ø12»). Con las fichas de la caché llevando ese armado, escribir una armadura en el formulario cambiaba la otra (`structuredClone` conserva los objetos compartidos). Lo que queda en la caché va con una copia sin objetos compartidos, y `armadoParcial` y `armadoDeBorrador` copian por JSON.
+
+**Validación:** `src/visor/cola.test.ts` (por turnos da lo de una vez; un pedido que llega a mitad pasa delante; lo propuesto queda comprobado y sus tablas son las de una sesión nueva; cancelar; dos tareas que comparten; proyecto cambiado a mitad), las pruebas de CO1–CO4 y sus referencias congeladas (idénticas), `validacion/co6/tiempos.ts` (las huellas de cada contestación) y, a mano en la app, el edificio.
+
+**Lo que queda (CO6-12):** el tiempo es ya casi todo demandas: las de las losas (los cortes de sus franjas con los 21 modos, 15–35 s por losa, y ~1 GB de montón tras la primera) y las de las vigas (~60 s); son del motor de cortes y de diagramas. Las reglas de obra de los pilares son 561 subidas, cada una con su comprobación entera (~20 s en Chrome). Proponer los pilares y las vigas es una función pura de sus demandas: se podría repartir entre varios workers. La tabla de un tipo sin armado sigue calculando sus demandas (2 s los pilares; las vigas y las losas, lo que tarden), aunque la pantalla no la pide mientras se propone. Y dentro de una losa las franjas salen por tandas (los cortes se hacen por grupos de rectas): entre dos tandas pasan de 6 a 9 s sin turno, que es lo más que espera hoy un pedido.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

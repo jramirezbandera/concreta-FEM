@@ -35,6 +35,7 @@ import type { Material, Vec2 } from "../../compilador/fisico.ts";
 import { PASO_ESTACIONES, type Franja } from "../../compilador/franjas.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
 import type { ArmaduraForjado } from "../armado.ts";
+import { agotar, type Paso } from "../pasos.ts";
 import { SITUACIONES_ELU } from "./pilares.ts";
 
 /** Distancia a la cara de un pilar, en cantos de la losa, hasta la que el cortante es del punzonamiento (el perímetro crítico, a 2·d). */
@@ -143,8 +144,29 @@ function pilaresDePlanta(q: Consultas, planta: string): { id: string; p: Vec2; r
   return r;
 }
 
+/** Las demandas ya hechas, por consultas y losa (como las de los pilares: no dependen del armado). */
+const GUARDADAS = new WeakMap<Consultas, Map<string, Respuesta<DemandasLosa>>>();
+
 /** Las demandas de una losa (maciza o reticular). */
 export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> {
+  return agotar(pasosDemandasLosa(q, id));
+}
+
+/**
+ * `demandasLosa`, avisando tras cada franja (`../pasos.ts`): los esfuerzos de las franjas de una losa
+ * de un edificio grande son decenas de segundos (con el sismo, los cortes de cada modo), y de una vez
+ * no se podía decir por dónde iba ni atender otra cosa entre medias. Si se deja a medias no se guarda
+ * nada de la losa aquí; los cortes ya hechos de sus franjas los guardan las consultas.
+ */
+export function* pasosDemandasLosa(q: Consultas, id: string): Generator<Paso, Respuesta<DemandasLosa>> {
+  let m = GUARDADAS.get(q);
+  if (!m) GUARDADAS.set(q, (m = new Map()));
+  let r = m.get(id);
+  if (!r) m.set(id, (r = yield* calcularDemandasLosa(q, id)));
+  return r;
+}
+
+function* calcularDemandasLosa(q: Consultas, id: string): Generator<Paso, Respuesta<DemandasLosa>> {
   const losa = q.fisico.losas?.find((l) => l.id === id);
   if (!losa) return error("consulta/no-existe", `La losa «${id}» no existe en el modelo (se comprueban las losas macizas y reticulares).`, [id]);
   const material = q.fisico.materiales.find((m) => m.id === losa.material);
@@ -169,11 +191,14 @@ export function demandasLosa(q: Consultas, id: string): Respuesta<DemandasLosa> 
   const pilaresPlanta = pilaresDePlanta(q, losa.planta);
   const radio = CANTOS_PUNZONAMIENTO * losa.espesor;
   const astillas: string[] = [];
+  let hechas = 0;
   for (const k of [1, 2] as const) {
     const franjas = fs.valor.filter((f) => f.direccion === k);
     const estaciones: EstacionLosa[] = [];
     let sinValor = 0;
     for (const f of franjas) {
+      if (hechas > 0) yield { fase: "esfuerzos de las franjas", hecho: hechas, total: fs.valor.length, pieza: id, unidad: "franjas" };
+      hechas++;
       const g = q.franja(f.id);
       if (!g.valido) return g;
       anotar(g.diagnosticos);

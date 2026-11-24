@@ -16,14 +16,15 @@
  */
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { DATOS_ARMADO, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraPunzonamiento, type DatosArmado } from "../comprobaciones/armado.ts";
-import { armadoPropuestoLosas, comprobarLosas } from "../comprobaciones/losas.ts";
-import { armadoPropuesto, comprobarPilares } from "../comprobaciones/pilares.ts";
+import { armadoPropuestoLosas, pasosLosas } from "../comprobaciones/losas.ts";
+import { agotar, type Paso } from "../comprobaciones/pasos.ts";
+import { armadoPropuesto, pasosPilares } from "../comprobaciones/pilares.ts";
 import { solapesPilar } from "../comprobaciones/armar/pilares.ts";
 import { SITUACIONES_ELU } from "../comprobaciones/demandas/pilares.ts";
 import { datosViga, filasPilarQ, type Esfuerzo } from "./datos.ts";
 import type { Extremo, TramoEnvolvente } from "../agente/consultas.ts";
-import { armadoPropuestoPunzonamiento, comprobarPunzonamientos } from "../comprobaciones/punzonamiento.ts";
-import { armadoPropuestoVigas, comprobarVigas } from "../comprobaciones/vigas.ts";
+import { armadoPropuestoPunzonamiento, pasosPunzonamientos } from "../comprobaciones/punzonamiento.ts";
+import { armadoPropuestoVigas, pasosVigas } from "../comprobaciones/vigas.ts";
 import type { DatosDespiece } from "../comprobaciones/despieceVigas.ts";
 import { datosDespiece, porticoDe, type Portico } from "../comprobaciones/porticos.ts";
 import type { Consultas } from "../compilador/consultas.ts";
@@ -176,7 +177,17 @@ function cacheDe(q: Consultas): Record<TipoComprobacion, Cache> {
   return c;
 }
 
-const texto = (x: unknown) => JSON.stringify(x ?? null);
+/** En texto y con las claves en orden: el armado que vuelve del proyecto es el mismo aunque el editor lo ordene de otra forma. */
+const texto = (x: unknown): string =>
+  JSON.stringify(x ?? null, (_k, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.keys(v)
+            .sort()
+            .map((k) => [k, (v as Record<string, unknown>)[k]]),
+        )
+      : v,
+  );
 
 /** Los objetos del modelo que tienen comprobaciones de un tipo, en su orden. */
 function piezasDe(q: Consultas, tipo: TipoComprobacion): string[] {
@@ -244,13 +255,13 @@ function fckDe(q: Consultas, seccion: string): number | undefined {
 
 const NOMBRE_ARMADURA: Record<string, string> = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf": "Y inferior", "y-sup": "Y superior" };
 
-/** Comprueba las piezas `ids` de un tipo con el armado dado y da sus fichas, por pieza. */
-function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[], a: ArmadoProyecto | undefined, datos: DatosArmado | undefined): Resultado<{ fichas: Map<string, FichaComprobacion[]>; diagnosticos: Diagnostico[] }> {
+/** Comprueba las piezas `ids` de un tipo con el armado dado y da sus fichas, por pieza. Por pasos: avisa tras cada pieza (`pasos.ts`). */
+function* pasosComprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[], a: ArmadoProyecto | undefined, datos: DatosArmado | undefined): Generator<Paso, Resultado<{ fichas: Map<string, FichaComprobacion[]>; diagnosticos: Diagnostico[] }>> {
   const fichas = new Map<string, FichaComprobacion[]>(ids.map((id) => [id, []]));
   const recubrimiento = datos?.recubrimiento ?? DATOS_ARMADO.recubrimiento;
   const a_ = (id: string, f: Omit<FichaComprobacion, "recubrimiento">) => (fichas.get(id) ?? fichas.set(id, []).get(id)!).push({ ...f, recubrimiento });
   if (tipo === "pilares") {
-    const r = comprobarPilares(q, a?.pilares, datos, { ids, filas: true });
+    const r = yield* pasosPilares(q, a?.pilares, datos, { ids, filas: true });
     if (!r.valido) return r;
     const circulares = new Set(q.fisico.secciones.filter((x) => "forma" in x && x.forma === "circular").map((x) => x.id));
     for (const p of r.valor.pilares)
@@ -278,7 +289,7 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
     return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
   }
   if (tipo === "vigas") {
-    const r = comprobarVigas(q, a?.vigas, datos, { ids, filas: true });
+    const r = yield* pasosVigas(q, a?.vigas, datos, { ids, filas: true });
     if (!r.valido) return r;
     for (const g of r.valor.vigas)
       for (const v of g.vanos) {
@@ -310,7 +321,7 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
     return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
   }
   if (tipo === "losas") {
-    const r = comprobarLosas(q, a?.forjados, datos, { ids, filas: true });
+    const r = yield* pasosLosas(q, a?.forjados, datos, { ids, filas: true });
     if (!r.valido) return r;
     const lugar = (f: { franja?: string; armadura?: string; armado: string }) => [f.franja, f.armadura ? NOMBRE_ARMADURA[f.armadura] : undefined, f.armado].filter(Boolean).join(" · ");
     for (const l of r.valor.losas) {
@@ -338,7 +349,7 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
     }
     return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
   }
-  const r = comprobarPunzonamientos(q, a?.forjados, a?.punzonamiento, datos, { ids, filas: true });
+  const r = yield* pasosPunzonamientos(q, a?.forjados, a?.punzonamiento, datos, { ids, filas: true });
   if (!r.valido) return r;
   for (const p of r.valor.pilares) {
     const filas = (p.filas ?? []).map((f) => filaComun(f, `cara ${f.cara}`));
@@ -398,19 +409,50 @@ function comprobar(q: Consultas, tipo: TipoComprobacion, ids: readonly string[],
   return { valido: true, valor: { fichas, diagnosticos: r.diagnosticos } };
 }
 
+type AlDia = Resultado<{ fichas: FichaComprobacion[]; diagnosticos: Diagnostico[]; comprobadas: number }>;
+
 /** Lo comprobado de un tipo con el armado dado, de la caché donde vale: las fichas de todas sus piezas, en el orden del modelo. */
-export function alDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): Resultado<{ fichas: FichaComprobacion[]; diagnosticos: Diagnostico[]; comprobadas: number }> {
+export function alDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): AlDia {
+  return agotar(pasosAlDia(s, tipo, armado));
+}
+
+/**
+ * Lo que identifica una puesta al día: el tipo, el armado del que depende y los datos de armado de la
+ * obra. Dos pedidos con la misma clave (la tabla y la planta de un tipo) comparten el trabajo
+ * (`Atendedor`).
+ */
+export function claveAlDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): string {
+  const suyo = tipo === "pilares" ? armado?.pilares : tipo === "vigas" ? armado?.vigas : tipo === "losas" ? armado?.forjados : [armado?.punzonamiento, armado?.forjados];
+  return `${tipo}|${texto(suyo)}|${JSON.stringify(s.datosArmado ?? null)}`;
+}
+
+/** Las piezas de un tipo que habría que comprobar con ese armado (las demás están en la caché). */
+export function faltanAlDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): number {
+  const q = s.q;
+  if (!q) return 0;
+  const cache = cacheDe(q)[tipo];
+  const obra = JSON.stringify(s.datosArmado ?? null);
+  return piezasDe(q, tipo).filter((id) => cache.piezas.get(id)?.con !== `${armadoDe(tipo, id, armado)}|${obra}`).length;
+}
+
+/**
+ * `alDia`, por pasos: avisa tras cada pieza que comprueba. Los datos de armado de la obra son los de
+ * la sesión al empezar; lo comprobado entra en la caché al acabar (si se deja a medias, quedan las
+ * demandas de las piezas ya hechas, que es lo que más tarda).
+ */
+export function* pasosAlDia(s: Sesion, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined): Generator<Paso, AlDia> {
   const q = s.q;
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const cache = cacheDe(q)[tipo];
   const ids = piezasDe(q, tipo);
   // Lo comprobado vale para su armado y para los datos de armado de la obra (cambian sin recalcular)
-  const obra = JSON.stringify(s.datosArmado ?? null);
+  const datos = s.datosArmado;
+  const obra = JSON.stringify(datos ?? null);
   const con = (id: string) => `${armadoDe(tipo, id, armado)}|${obra}`;
   const faltan = ids.filter((id) => cache.piezas.get(id)?.con !== con(id));
   let comprobadas = 0;
   if (faltan.length) {
-    const r = comprobar(q, tipo, faltan, armado, s.datosArmado);
+    const r = yield* pasosComprobar(q, tipo, faltan, armado, datos);
     if (!r.valido) return r;
     for (const id of faltan) {
       const fichas = r.valor.fichas.get(id) ?? [];
@@ -597,12 +639,41 @@ export interface DatosArmar {
   diagnosticos: Diagnostico[];
 }
 
+/** Por dónde va una tarea larga del worker (una propuesta de armado, una tabla de comprobaciones): lo que se le dice a la app. */
+export interface ProgresoTarea extends Paso {
+  /** Qué se arma o se comprueba. */
+  tipo: TipoComprobacion;
+  /** En una propuesta de varios tipos: por cuál va (desde 1) y cuántos son. */
+  parte?: number;
+  partes?: number;
+  /** Al acabar un tipo de una propuesta: el armado del proyecto con lo propuesto hasta ahí (ya comprobado: sus tablas salen al momento). */
+  parcial?: ArmadoProyecto;
+}
+
+/** Los pasos de una comprobación, con su tipo. */
+export function* deTipo<T>(g: Generator<Paso, T>, tipo: TipoComprobacion, parte?: number, partes?: number, fase?: string): Generator<ProgresoTarea, T> {
+  for (;;) {
+    const r = g.next();
+    if (r.done) return r.value;
+    yield { ...r.value, ...(fase ? { fase } : {}), tipo, ...(parte !== undefined ? { parte, partes: partes! } : {}) };
+  }
+}
+
 /**
  * El armado que proponen las tablas (pedido `armar`), como `fem armar`: los pilares con sus reglas de
  * obra, las vigas, las losas y, con el armado de las losas que queda (el propuesto), el punzonamiento.
  * No escribe nada: la app lo aplica con la operación `armado`.
  */
 export function datosArmar(s: Sesion, p: PedidoArmar): Resultado<DatosArmar> {
+  return agotar(pasosArmar(s, p));
+}
+
+/**
+ * `datosArmar`, por pasos: avisa tras cada pieza y, al acabar cada tipo, da el armado con lo propuesto
+ * hasta ahí (`parcial`), ya comprobado (su tabla y su planta quedan en la caché: con ese armado salen
+ * al momento).
+ */
+export function* pasosArmar(s: Sesion, p: PedidoArmar): Generator<ProgresoTarea, Resultado<DatosArmar>> {
   const q = s.q;
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const datos = s.datosArmado;
@@ -624,41 +695,50 @@ export function datosArmar(s: Sesion, p: PedidoArmar): Resultado<DatosArmar> {
     resumen[tipo] = { partes: partes.length, propuestas: mias.length - sin.length, sinPropuesta: sin.length, ...(conservadas ? { conservadas } : {}) };
     for (const x of sin) sinPropuesta.push({ tipo, clave: x.clave, motivo: x.pendientes[0] ?? "sin propuesta" });
   };
-  if (con.has("pilares")) {
-    const ids = de("pilares");
-    if (ids.length) {
-      const r = comprobarPilares(q, previo?.pilares, datos, { ids, proponer: true, ...solo });
+  // Los tipos que se arman, en su orden (el punzonamiento, con el armado de las losas ya propuesto)
+  const orden = TIPOS_COMPROBACION.filter((t) => con.has(t) && de(t).length > 0);
+  const partes = orden.length;
+  /** Los bloques vacíos no se escriben. */
+  const limpio = (a: ArmadoProyecto): ArmadoProyecto => {
+    const r = { ...a };
+    for (const k of ["pilares", "vigas", "forjados", "punzonamiento"] as const) if (r[k] && !Object.keys(r[k]!).length) delete r[k];
+    return r;
+  };
+  /**
+   * Acabado un tipo: lo propuesto se comprueba (queda en la caché) y se da el armado hasta ahí. Con una
+   * copia sin objetos compartidos: lo propuesto reutiliza las entradas de las tablas (la armadura
+   * inferior y la superior de un apoyo, el mismo objeto «3Ø12»), y las fichas que quedan en la caché
+   * llevan su armado: en el formulario, escribir en una armadura cambiaría la otra.
+   */
+  function* hecho(tipo: TipoComprobacion, parte: number): Generator<ProgresoTarea, void> {
+    const copia = JSON.parse(JSON.stringify(limpio(armado))) as ArmadoProyecto;
+    yield* deTipo(pasosAlDia(s, tipo, copia), tipo, parte, partes, "comprobación de lo propuesto");
+    yield { tipo, fase: "hecho", hecho: 1, total: 1, parte, partes, parcial: copia };
+  }
+  for (let k = 0; k < orden.length; k++) {
+    const tipo = orden[k]!;
+    const ids = de(tipo);
+    if (tipo === "pilares") {
+      const r = yield* deTipo(pasosPilares(q, previo?.pilares, datos, { ids, proponer: true, ...solo }), tipo, k + 1, partes);
       if (!r.valido) return r;
       armado.pilares = armadoPropuesto(r.valor, previo?.pilares);
       diagnosticos.push(...r.diagnosticos);
       anotar("pilares", r.valor.pilares.flatMap((x) => x.tramos.map((t) => ({ clave: `${x.pilar}/${t.planta}`, origen: t.origen, pendientes: t.pendientes.map((y) => y.motivo) }))));
-    }
-  }
-  if (con.has("vigas")) {
-    const ids = de("vigas");
-    if (ids.length) {
-      const r = comprobarVigas(q, previo?.vigas, datos, { ids, proponer: true, ...solo });
+    } else if (tipo === "vigas") {
+      const r = yield* deTipo(pasosVigas(q, previo?.vigas, datos, { ids, proponer: true, ...solo }), tipo, k + 1, partes);
       if (!r.valido) return r;
       armado.vigas = armadoPropuestoVigas(r.valor, previo?.vigas);
       diagnosticos.push(...r.diagnosticos);
       anotar("vigas", r.valor.vigas.flatMap((x) => x.vanos.map((v) => ({ clave: `${x.viga}/${v.vano}`, origen: v.origen, pendientes: v.pendientes.map((y) => y.motivo) }))));
-    }
-  }
-  if (con.has("losas")) {
-    const ids = de("losas");
-    if (ids.length) {
-      const r = comprobarLosas(q, previo?.forjados, datos, { ids, proponer: true, ...solo, ...(previo ? { bases: previo } : {}) });
+    } else if (tipo === "losas") {
+      const r = yield* deTipo(pasosLosas(q, previo?.forjados, datos, { ids, proponer: true, ...solo, ...(previo ? { bases: previo } : {}) }), tipo, k + 1, partes);
       if (!r.valido) return r;
       armado.forjados = armadoPropuestoLosas(r.valor, previo?.forjados);
       diagnosticos.push(...r.diagnosticos);
       anotar("losas", r.valor.losas.map((l) => ({ clave: l.losa, origen: l.origen, pendientes: l.pendientes.map((y) => y.motivo) })));
-    }
-  }
-  if (con.has("punzonamiento")) {
-    const ids = de("punzonamiento");
-    if (ids.length) {
+    } else {
       // Con el armado de las losas que queda: el que se acaba de proponer o el del proyecto
-      const r = comprobarPunzonamientos(q, armado.forjados, previo?.punzonamiento, datos, { ids, proponer: true });
+      const r = yield* deTipo(pasosPunzonamientos(q, armado.forjados, previo?.punzonamiento, datos, { ids, proponer: true }), tipo, k + 1, partes);
       if (!r.valido) return r;
       // CO6-b: con «sólo lo que falta», la armadura escrita se conserva (lo propuesto parte de la de antes)
       const escrita = (x: { pilar: string; planta: string }) => !!previo?.punzonamiento?.[x.pilar]?.[x.planta];
@@ -666,16 +746,15 @@ export function datosArmar(s: Sesion, p: PedidoArmar): Resultado<DatosArmar> {
       armado.punzonamiento = armadoPropuestoPunzonamiento({ ...r.valor, pilares: nuevas }, previo?.punzonamiento);
       diagnosticos.push(...r.diagnosticos);
       const conservadas = r.valor.pilares.length - nuevas.length;
-      const partes = nuevas.map((x) => ({ clave: `${x.pilar}/${x.planta}`, origen: x.origen, pendientes: x.pendientes.map((y) => y.motivo), sin: !x.cumple && x.origen !== "sin-armado" }));
-      const sin = partes.filter((x) => x.sin || x.origen === "sin-armado");
-      resumen.punzonamiento = { partes: r.valor.pilares.length, propuestas: partes.filter((x) => x.origen === "propuesto").length, sinPropuesta: sin.length, ...(conservadas ? { conservadas } : {}) };
+      const uniones = nuevas.map((x) => ({ clave: `${x.pilar}/${x.planta}`, origen: x.origen, pendientes: x.pendientes.map((y) => y.motivo), sin: !x.cumple && x.origen !== "sin-armado" }));
+      const sin = uniones.filter((x) => x.sin || x.origen === "sin-armado");
+      resumen.punzonamiento = { partes: r.valor.pilares.length, propuestas: uniones.filter((x) => x.origen === "propuesto").length, sinPropuesta: sin.length, ...(conservadas ? { conservadas } : {}) };
       for (const x of sin) sinPropuesta.push({ tipo: "punzonamiento", clave: x.clave, motivo: x.pendientes[0] ?? "sin propuesta" });
     }
+    yield* hecho(tipo, k + 1);
   }
-  // Los bloques vacíos no se escriben
-  for (const k of ["pilares", "vigas", "forjados", "punzonamiento"] as const) if (armado[k] && !Object.keys(armado[k]!).length) delete armado[k];
   const vistos = new Set<string>();
-  return { valido: true, valor: { armado, resumen, sinPropuesta, diagnosticos: diagnosticos.filter((d) => d.codigo !== "comprobacion/sin-armado" && !vistos.has(`${d.codigo}|${d.mensaje}`) && !!vistos.add(`${d.codigo}|${d.mensaje}`)) } };
+  return { valido: true, valor: { armado: limpio(armado), resumen, sinPropuesta, diagnosticos: diagnosticos.filter((d) => d.codigo !== "comprobacion/sin-armado" && !vistos.has(`${d.codigo}|${d.mensaje}`) && !!vistos.add(`${d.codigo}|${d.mensaje}`)) } };
 }
 
 // ─── En planta, por colores (CO6-d) ─────────────────────────────────────────────────────────────

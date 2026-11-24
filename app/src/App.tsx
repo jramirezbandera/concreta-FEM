@@ -18,6 +18,7 @@ import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
 import { MenuFlotante, ejeVecino } from "./armazon/Disposicion.tsx";
 import { Paleta, type Orden } from "./armazon/Paleta.tsx";
+import { AvanceTareas } from "./componentes/AvanceTareas.tsx";
 import { DialogoVersiones } from "./armazon/Versiones.tsx";
 import { GestorAbierto } from "./editor/Gestores.tsx";
 import { DialogoAlinear, DialogoVigasBorde } from "./editor/Dialogos.tsx";
@@ -681,6 +682,8 @@ export function App() {
             {/* R-24: lo que no cabe, entero en el título */}
             <span className="min-w-0 shrink truncate" title={pie || undefined}>{pie}</span>
             <span className="min-w-0 flex-1 truncate" title={resultados || undefined}>{resultados}</span>
+            {/* Lo que el worker lleva entre manos (proponer el armado, comprobar un tipo entero), esté donde esté el usuario */}
+            <AvanceTareas cliente={proyecto.cliente} />
             <span className="shrink-0">kN · m</span>
             {e?.estadisticas && (
               <span className="shrink-0 whitespace-nowrap">

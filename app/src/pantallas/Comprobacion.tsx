@@ -37,6 +37,7 @@ import { Chip, Disposicion, Herramienta, Segmentado, Separador } from "../armazo
 import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcAbacos, IcComprobacion, IcLosas, IcPilares, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { AvanceTarea, useTareas } from "../componentes/AvanceTareas.tsx";
 import { AvisoDesactualizado, Cabecera, Fila, filaElegible, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, plural, textoApp } from "../fmt.ts";
@@ -864,24 +865,38 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     error: string | null;
     /** La hizo el programa al entrar (§8.14). */
     solo?: boolean;
+    /** Lo que pasó sin ser un error (una propuesta cancelada a medias). */
+    aviso?: string;
   } | null>(null);
+  /**
+   * Una propuesta de la obra o de un tipo entero en marcha: los tipos que arma, los que ya ha acabado y
+   * el armado con lo propuesto hasta ahí (ya comprobado en el worker). Mientras dura, lo acabado se ve
+   * con ese armado, y lo que falta no se pide (se está proponiendo): se escribe en el proyecto al final,
+   * en un solo paso de deshacer.
+   */
+  const [enCurso, setEnCurso] = useState<{ tipos: readonly TipoComprobacion[]; hechos: readonly TipoComprobacion[]; armado: ArmadoProyecto | null } | null>(null);
+  const tareas = useTareas(proyecto.cliente);
   /** CO6-b: «Todo» con partes que ya tienen armado espera a que se confirme. */
   const [sustituir, setSustituir] = useState<number | null>(null);
   /** Lo que ha hecho «Proponer» en la pieza del banco (§8.16): también si no cambia nada, y por qué. */
   const [avisoPieza, setAvisoPieza] = useState<{ clave: string; texto: string } | null>(null);
   const ed = proyecto.edicion;
   const entero = ed?.proyecto.armado;
-  const armado = useMemo(() => armadoDe(tipo, entero), [tipo, entero?.pilares, entero?.vigas, entero?.forjados, entero?.punzonamiento]); // eslint-disable-line react-hooks/exhaustive-deps -- sólo los bloques del tipo
+  // El armado con el que se comprueba y se dibuja: con una propuesta en marcha, lo propuesto hasta ahora
+  const vigente = enCurso?.armado ?? entero;
+  const armado = useMemo(() => armadoDe(tipo, vigente), [tipo, vigente?.pilares, vigente?.vigas, vigente?.forjados, vigente?.punzonamiento]); // eslint-disable-line react-hooks/exhaustive-deps -- sólo los bloques del tipo
   const activo = !proyecto.desactualizado;
+  /** El tipo que se mira se está proponiendo y aún no ha acabado: su tabla y su planta esperan (no se comprueba con el armado de antes). */
+  const proponiendose = !!enCurso && enCurso.tipos.includes(tipo) && !enCurso.hechos.includes(tipo);
   // Los datos de armado de la obra (acero, recubrimiento, la mínima reducida…), como el armado: en cada pedido
   const claveDatos = JSON.stringify(ed?.proyecto.obra?.armado ?? {});
   const datosObra = useMemo(() => JSON.parse(claveDatos) as DatosArmado, [claveDatos]);
-  const r = usePedido(proyecto.cliente, activo ? { tipo: "comprobaciones", de: tipo, ...(armado ? { armado } : {}), datos: datosObra } : null);
+  const r = usePedido(proyecto.cliente, activo && !proponiendose ? { tipo: "comprobaciones", de: tipo, ...(armado ? { armado } : {}), datos: datosObra } : null);
   const d = r.datos && r.datos.tipo === tipo ? r.datos : null;
   const elegida = d?.partes.find((p) => p.clave === clave) ?? null;
   const f = usePedido(
     proyecto.cliente,
-    activo && elegida
+    activo && elegida && !proponiendose
       ? {
           tipo: "comprobacion",
           de: tipo,
@@ -941,7 +956,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   // §8.12: los refuerzos y los cercos de las losas, con el ratón en la planta
   const losasModelo = ed?.proyecto.modelo.losas;
   const hayReticular = !!losasModelo?.some((l) => l.reticular);
-  const editable = tipo === "losas" && dibujo === "armado" && !!ed && activo;
+  const editable = tipo === "losas" && dibujo === "armado" && !!ed && activo && !enCurso;
   const er = editor.current;
   const escribirLosa = (losa: string, a: ArmadoForjado, etiqueta: string): boolean => {
     if (!ed) return false;
@@ -1024,19 +1039,39 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     if (!proyecto.cliente || !ed || ocupado) return;
     setOcupado(true);
     setPropuesta(null);
+    // Lo de un tipo entero (o de la obra) va saliendo tipo a tipo: lo acabado se ve mientras sigue con lo demás
+    const porTipos = !o.ids;
+    const hechos: TipoComprobacion[] = [];
+    let parcial: ArmadoProyecto | null = null;
+    if (porTipos) setEnCurso({ tipos, hechos: [], armado: null });
     try {
-      const x = await proyecto.cliente.pedir({
-        tipo: "armar",
-        tipos,
-        ...(entero ? { armado: entero } : {}),
-        datos: datosObra,
-        ...o,
-      });
-      if (!x.ok)
-        return setPropuesta({
-          datos: null,
-          error: x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" "),
-        });
+      const x = await proyecto.cliente.pedir(
+        {
+          tipo: "armar",
+          tipos,
+          ...(entero ? { armado: entero } : {}),
+          datos: datosObra,
+          ...o,
+        },
+        {
+          alAvance: (a) => {
+            if (!a.parcial || !porTipos) return;
+            parcial = a.parcial;
+            hechos.push(a.tipo);
+            setEnCurso({ tipos, hechos: [...hechos], armado: a.parcial });
+          },
+        },
+      );
+      if (!x.ok) {
+        // Cancelada a medias: los tipos acabados se quedan (ya están comprobados); el que iba a medias, no
+        const cancelada = x.diagnosticos.some((y) => y.codigo === "visor/cancelado");
+        const acabados = hechos.map((t) => TIPOS.find((y) => y.id === t)!.nombre.toLowerCase());
+        if (cancelada && parcial && acabados.length && JSON.stringify(parcial) !== JSON.stringify(entero ?? {})) {
+          const ap = ed.editar({ op: "armado", armado: parcial }, etiqueta);
+          return setPropuesta({ datos: null, error: ap.ok ? null : "La propuesta se canceló y lo ya propuesto no se pudo escribir en el proyecto.", ...(ap.ok ? { aviso: `Propuesta cancelada: se queda lo ya propuesto (${acabados.join(", ")}). Se deshace con Ctrl+Z.` } : {}) });
+        }
+        return setPropuesta(cancelada ? { datos: null, error: null, aviso: "Propuesta cancelada: no se ha cambiado nada." } : { datos: null, error: x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" ") });
+      }
       const datos = x.valor as DatosArmar;
       if (solo && JSON.stringify(datos.armado ?? {}) === JSON.stringify(entero ?? {})) return;
       const ap = ed.editar({ op: "armado", armado: datos.armado }, etiqueta);
@@ -1060,6 +1095,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       });
     } finally {
       setOcupado(false);
+      setEnCurso(null);
     }
   };
 
@@ -1117,6 +1153,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
 
   const [uno, varios] = PARTE[tipo];
   const nombreTipo = TIPOS.find((t) => t.id === tipo)!.nombre.toLowerCase();
+  const tareaArmar = tareas.find((t) => t.pedido.tipo === "armar");
+  const tareaTabla = [...tareas].reverse().find((t) => t.pedido.tipo !== "armar");
   const proponerFalta = () => void proponer([tipo], { soloSinArmado: true }, tipo === "punzonamiento" ? "Armado propuesto: punzonamiento sin armadura escrita" : `Armado propuesto: ${varios} sin armado`);
   const proponerTodo = () => void proponer([tipo], {}, `Armado propuesto: ${nombreTipo}`);
   /** CO6-b: «Todo» pregunta antes de sustituir el armado que ya tengan (escrito a mano o propuesto antes). */
@@ -1198,16 +1236,26 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       >
         Toda la obra
       </button>
-      <span className="text-[12px] text-text-secondary" style={{ visibility: ocupado ? "visible" : "hidden" }}>
+      <span className="text-[12px] text-text-secondary" style={{ visibility: ocupado && !tareaArmar ? "visible" : "hidden" }}>
         Proponiendo…
       </span>
     </div>
+  );
+
+  // Lo que el worker lleva entre manos: la propuesta (si la hay) y lo último que se le ha pedido comprobar
+  const avances = proyecto.cliente && (tareaArmar || tareaTabla) && (
+    <>
+      {tareaArmar && <AvanceTarea grande tarea={tareaArmar} cliente={proyecto.cliente} />}
+      {tareaTabla && <AvanceTarea grande tarea={tareaTabla} cliente={proyecto.cliente} />}
+    </>
   );
 
   const resumenPropuesta = propuesta && (
     <div className="nota" data-propuesta>
       {propuesta.error ? (
         <span className="text-state-fail">{propuesta.error}</span>
+      ) : propuesta.aviso ? (
+        <span>{propuesta.aviso}</span>
       ) : (
         <>
           {propuesta.solo && <strong className="mr-2 font-medium text-text-primary">Armado propuesto por el programa en lo que no lo tenía.</strong>}
@@ -1245,7 +1293,10 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   ) : r.diagnosticos ? (
     <p className="nota text-state-fail">{r.diagnosticos.map((x) => textoApp(x.mensaje)).join(" ")}</p>
   ) : !d ? (
-    <p className="nota">Comprobando…</p>
+    <>
+      {avances}
+      <p className="nota">{proponiendose ? `El armado de ${tipo === "punzonamiento" ? "punzonamiento" : `${tipo === "pilares" ? "los" : "las"} ${nombreTipo}`} se está proponiendo: su tabla sale en cuanto acabe. Lo ya propuesto se puede ir viendo en las otras pestañas.` : avances ? "Comprobando: en un edificio grande, la primera vez tarda." : "Comprobando…"}</p>
+    </>
   ) : (
     <Seccion
       titulo={TIPOS.find((t) => t.id === tipo)!.nombre}
@@ -1259,6 +1310,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       }
     >
       {barraProponer}
+      {avances}
+      {proponiendose && <p className="nota">El armado de esta pestaña se está proponiendo: la tabla es la de antes, y se pone al día en cuanto acabe.</p>}
       {resumenPropuesta}
       {d.partes.length === 0 ? (
         <p className="nota">{tipo === "punzonamiento" ? "Ninguna losa pasa carga a un pilar por su huella (los pilares van dentro del ancho de sus vigas, o no hay losas)." : `No hay ${varios} que comprobar.`}</p>
@@ -1442,14 +1495,20 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           <ZonaVistas
             fuentes={{
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
-              ...(tipo === "losas" && dibujo === "armado" ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
-              ...(tipo === "punzonamiento" ? { tresD: () => <Punzonamiento3D armado={armado} datos={datosObra} /> } : {}),
-              planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} /> : null),
+              ...(tipo === "losas" && dibujo === "armado" && !proponiendose ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
+              ...(tipo === "punzonamiento" && !proponiendose ? { tresD: () => <Punzonamiento3D armado={armado} datos={datosObra} /> } : {}),
+              // (mientras se propone el armado de lo que se mira, la planta del modelo: la de su armado sale al acabar)
+              planta: (v) => (!v.planta ? null : proponiendose ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} /> : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} />),
               cabeceraPlanta: () => (
                 <>
                   <Chip acento>
                     {dibujo === "armado" ? "Armado" : "Aprovechamiento"} · {TIPOS.find((t) => t.id === tipo)!.nombre.toLowerCase()}
                   </Chip>
+                  {proponiendose && (
+                    <Chip>
+                      <span data-proponiendose>proponiendo su armado…</span>
+                    </Chip>
+                  )}
                   {editable && (avisoPlanta || anadir !== "") && (
                     <Chip>
                       <span data-aviso-planta className={avisoPlanta ? "text-state-fail" : undefined}>

@@ -109,8 +109,20 @@ export interface DemandasViga {
 
 const error = (codigo: string, mensaje: string, ids: string[]): { valido: false; diagnosticos: Diagnostico[] } => ({ valido: false, diagnosticos: [{ codigo, severidad: "error", mensaje, ids }] });
 
+/** Las demandas ya hechas, por consultas y viga (como las de los pilares: no dependen del armado). */
+const GUARDADAS = new WeakMap<Consultas, Map<string, Respuesta<DemandasViga>>>();
+
 /** Las demandas de una viga (por defecto, con las situaciones de ELU; la fisuración y la flecha, con las de ELS). */
 export function demandasViga(q: Consultas, id: string, situaciones: readonly Situacion[] = SITUACIONES_ELU): Respuesta<DemandasViga> {
+  if (situaciones !== SITUACIONES_ELU) return calcularDemandasViga(q, id, situaciones);
+  let m = GUARDADAS.get(q);
+  if (!m) GUARDADAS.set(q, (m = new Map()));
+  let r = m.get(id);
+  if (!r) m.set(id, (r = calcularDemandasViga(q, id, situaciones)));
+  return r;
+}
+
+function calcularDemandasViga(q: Consultas, id: string, situaciones: readonly Situacion[]): Respuesta<DemandasViga> {
   const viga = q.fisico.vigas?.find((v) => v.id === id);
   if (!viga) return error("consulta/no-existe", `La viga «${id}» no existe en el modelo.`, [id]);
   const v = q.viga(id);

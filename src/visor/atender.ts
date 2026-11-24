@@ -4,7 +4,11 @@
  *
  * Puro: el núcleo WASM ya iniciado por quien lo crea.
  */
-import { datosArmar, datosComprobacion, datosComprobaciones, datosPortico, esfuerzosPortico, esfuerzosTramoPilar } from "./comprobaciones.ts";
+import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
+import type { DatosArmado as DatosArmadoObra } from "../comprobaciones/armado.ts";
+import { agotar } from "../comprobaciones/pasos.ts";
+import type { Consultas } from "../compilador/consultas.ts";
+import { claveAlDia, datosComprobacion, datosComprobaciones, datosPortico, esfuerzosPortico, esfuerzosTramoPilar, faltanAlDia, pasosAlDia, pasosArmar, type ProgresoTarea, type TipoComprobacion } from "./comprobaciones.ts";
 import type { OpcionesCompilacion, ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
@@ -25,6 +29,8 @@ export type Contestacion = { ok: true; valor: unknown } | { ok: false; diagnosti
 export type PesoAparte = (modelo: ModeloFisico, opciones: OpcionesCompilacion | undefined) => Promise<Map<string, number> | null>;
 
 const sin = (mensaje: string): Contestacion => ({ ok: false, diagnosticos: [{ codigo: "visor/sin-proyecto", severidad: "error", mensaje }] });
+/** Lo que contesta una tarea cuando el proyecto o sus resultados cambiaron mientras trabajaba. */
+const OBSOLETA: Contestacion = { ok: false, diagnosticos: [{ codigo: "visor/obsoleto", severidad: "error", mensaje: "El proyecto o sus resultados han cambiado mientras se comprobaba: vuelva a pedirlo." }] };
 const de = <T>(r: Resultado<T>): Contestacion => (r.valido ? { ok: true, valor: r.valor } : { ok: false, diagnosticos: r.diagnosticos });
 const bien = <K extends keyof Respuestas>(_k: K, valor: Respuestas[K]): Contestacion => ({ ok: true, valor });
 
@@ -56,8 +62,103 @@ export class Atendedor {
     }
   }
 
+  /**
+   * Las puestas al día de las comprobaciones que están a medias, por su clave (`claveAlDia`): dos
+   * tareas que piden lo mismo (la tabla y la planta de un tipo) avanzan la misma, y una que se deja a
+   * medias sigue donde iba si se vuelve a pedir.
+   */
+  private puestas = new Map<string, { q: Consultas; g: ReturnType<typeof pasosAlDia>; fin?: Contestacion | null; comprobadas: number }>();
+
+  /**
+   * Los pedidos que son **tareas** (`cola.ts`): los que comprueban todas las piezas de un tipo o
+   * proponen su armado, que en un edificio grande tardan minutos. Dan un generador que avisa tras cada
+   * pieza y acaba con la contestación; los demás pedidos, null (`atender`).
+   */
+  tarea(p: Pedido): Generator<ProgresoTarea, Contestacion> | null {
+    const s = this.sesion;
+    if (!s) return null;
+    switch (p.tipo) {
+      case "comprobaciones":
+        return this.conAlDia(s, p.datos, p.de, p.armado, (comprobadas) => {
+          // (las partes que se han comprobado para este pedido: las de la puesta al día)
+          const r = datosComprobaciones(s, p.de, p.armado);
+          return de(r.valido ? { ...r, valor: { ...r.valor, comprobadas: r.valor.comprobadas + comprobadas } } : r);
+        });
+      case "comprobacion":
+        return this.conAlDia(s, p.datos, p.de, p.armado, () => de(datosComprobacion(s, p.de, p.clave, p.armado)));
+      case "punzonamiento-3d":
+        return this.conAlDia(s, p.datos, "punzonamiento", p.armado, () => de(punzonamiento3D(s, p.armado)));
+      case "escena": {
+        const v = p.vista;
+        if (v.vista !== "comprobacion") return null;
+        return this.conAlDia(s, v.datos, v.de, v.armado, () => {
+          const r = s.escena(p.planta, v);
+          return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
+        });
+      }
+      case "armar":
+        return this.armar(s, p);
+      default:
+        return null;
+    }
+  }
+
+  /** La sesión o sus resultados han cambiado desde que empezó la tarea: lo que llevaba no vale. */
+  private obsoleta(s: Sesion, q: Consultas | null): boolean {
+    return this.sesion !== s || s.q !== q;
+  }
+
+  /** Una tarea que necesita lo comprobado de un tipo con un armado: lo pone al día por pasos y contesta con `fin`. */
+  private *conAlDia(s: Sesion, datos: DatosArmadoObra | undefined, tipo: TipoComprobacion, armado: ArmadoProyecto | undefined, fin: (comprobadas: number) => Contestacion): Generator<ProgresoTarea, Contestacion> {
+    if (datos !== undefined) s.datosArmado = datos;
+    const q = s.q;
+    let comprobadas = 0;
+    if (q && faltanAlDia(s, tipo, armado) > 0) {
+      const clave = claveAlDia(s, tipo, armado);
+      let x = this.puestas.get(clave);
+      if (!x || x.q !== q) {
+        // (las que se quedaron a medias con otro armado no se acumulan)
+        if (this.puestas.size >= 6) this.puestas.delete(this.puestas.keys().next().value!);
+        this.puestas.set(clave, (x = { q, g: pasosAlDia(s, tipo, armado), comprobadas: 0 }));
+      }
+      while (x.fin === undefined) {
+        const r = x.g.next();
+        if (r.done) {
+          x.fin = r.value.valido ? null : { ok: false, diagnosticos: r.value.diagnosticos };
+          if (r.value.valido) x.comprobadas = r.value.valor.comprobadas;
+          if (this.puestas.get(clave) === x) this.puestas.delete(clave);
+          break;
+        }
+        yield { ...r.value, tipo };
+        if (this.obsoleta(s, q)) return OBSOLETA;
+      }
+      if (x.fin) return x.fin;
+      comprobadas = x.comprobadas;
+      // Otro pedido pudo traer otros datos de la obra entre dos turnos: se contesta con los de éste
+      if (datos !== undefined) s.datosArmado = datos;
+    }
+    return fin(comprobadas);
+  }
+
+  /** La propuesta de armado, por pasos. */
+  private *armar(s: Sesion, p: Extract<Pedido, { tipo: "armar" }>): Generator<ProgresoTarea, Contestacion> {
+    if (p.datos !== undefined) s.datosArmado = p.datos;
+    const q = s.q;
+    const g = pasosArmar(s, p);
+    for (;;) {
+      const r = g.next();
+      if (r.done) return de(r.value);
+      yield r.value;
+      if (this.obsoleta(s, q)) return OBSOLETA;
+      if (p.datos !== undefined) s.datosArmado = p.datos;
+    }
+  }
+
   /** `alProgreso`: las fases del cálculo según terminan (sólo en `calcular`; R-25). */
   async atender(p: Pedido, alProgreso?: (fase: string, ms: number) => void): Promise<Contestacion> {
+    // Una tarea, de una vez (los tests y la CLI; el worker las lleva por turnos, `cola.ts`)
+    const tarea = p.tipo === "abrir" ? null : this.tarea(p);
+    if (tarea) return agotar(tarea);
     if (p.tipo === "abrir") {
       const a = Sesion.abrir(p.texto, this.motor, { diferir: !!p.diferir });
       if (!a.valido) {
@@ -92,7 +193,6 @@ export class Atendedor {
       case "estado":
         return bien("estado", s.estado());
       case "escena": {
-        if (p.vista.vista === "comprobacion" && p.vista.datos !== undefined) s.datosArmado = p.vista.datos;
         const r = s.escena(p.planta, p.vista);
         return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
@@ -131,9 +231,6 @@ export class Atendedor {
       case "armado-losas-3d":
         if (p.datos !== undefined) s.datosArmado = p.datos;
         return de({ valido: true as const, valor: armadoLosas3D(s.proyecto.modelo, s.origen3D, p.armado, s.datosArmado, { planta: p.planta, ...(p.cara ? { cara: p.cara } : {}), ...(p.base ? { base: true } : {}) }) });
-      case "punzonamiento-3d":
-        if (p.datos !== undefined) s.datosArmado = p.datos;
-        return de(punzonamiento3D(s, p.armado));
       case "valor-armado":
         return de(s.valorArmado(p));
       case "franja":
@@ -188,13 +285,7 @@ export class Atendedor {
       // SO: el segundo orden global
       case "segundo-orden":
         return bien("segundo-orden", s.segundoOrdenDatos());
-      // CO6: las comprobaciones con el armado en barras
-      case "comprobaciones":
-        if (p.datos !== undefined) s.datosArmado = p.datos;
-        return de(datosComprobaciones(s, p.de, p.armado));
-      case "comprobacion":
-        if (p.datos !== undefined) s.datosArmado = p.datos;
-        return de(datosComprobacion(s, p.de, p.clave, p.armado));
+      // CO6: las comprobaciones con el armado en barras (la tabla, la ficha y la propuesta son tareas: `tarea`)
       case "portico":
         if (p.datos !== undefined) s.datosArmado = p.datos;
         return de(datosPortico(s, p.viga));
@@ -202,9 +293,12 @@ export class Atendedor {
         return de(esfuerzosPortico(s, p.viga));
       case "esfuerzos-pilar":
         return de(esfuerzosTramoPilar(s, p.pilar, p.planta));
+      case "comprobaciones":
+      case "comprobacion":
+      case "punzonamiento-3d":
       case "armar":
-        if (p.datos !== undefined) s.datosArmado = p.datos;
-        return de(datosArmar(s, p));
+        // (son tareas: no llegan aquí)
+        return sin("No hay resultados de esta huella.");
     }
   }
 }

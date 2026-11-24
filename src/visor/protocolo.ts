@@ -24,7 +24,7 @@ import type { DatosArmado as DatosArmadoObra } from "../comprobaciones/armado.ts
 import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { CaraDibujada } from "./armadoPlanta.ts";
-import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, PedidoArmar, TipoComprobacion } from "./comprobaciones.ts";
+import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, PedidoArmar, ProgresoTarea, TipoComprobacion } from "./comprobaciones.ts";
 import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
@@ -159,7 +159,11 @@ export interface Respuestas {
 
 export type TipoPedido = Pedido["tipo"];
 
-export type MensajeAlWorker = { tipo: "iniciar"; wasm: ArrayBuffer } | { id: number; pedido: Pedido };
+export type MensajeAlWorker =
+  | { tipo: "iniciar"; wasm: ArrayBuffer }
+  | { id: number; pedido: Pedido }
+  /** Cancela una tarea en marcha (`cola.ts`): el pedido `id` contesta con `visor/cancelado`. */
+  | { tipo: "cancelar"; id: number };
 
 export type MensajeDelWorker =
   /** El núcleo está cargado; `motor`, su sha256. */
@@ -173,4 +177,11 @@ export type MensajeDelWorker =
    * numeracion, cargas, patron, ensamblado, solucion.analisis, solucion.factorizacion…), con su
    * duración. Llega mientras el worker calcula; cancelar sigue siendo cerrar el worker.
    */
-  | { tipo: "progreso"; id: number; fase: string; ms: number };
+  | {
+      tipo: "progreso";
+      id: number;
+      fase: string;
+      ms: number;
+      /** De una tarea (`cola.ts`: una propuesta de armado, una tabla de comprobaciones): por dónde va, pieza a pieza. */
+      avance?: ProgresoTarea;
+    };

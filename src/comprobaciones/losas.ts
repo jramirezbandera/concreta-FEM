@@ -11,7 +11,8 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { ARMADURAS_FORJADO, DATOS_ARMADO, textoArmadoForjado, textoBarrasForjado, type ArmadoForjado, type ArmaduraForjado, type DatosArmado } from "./armado.ts";
 import { proponerLosa } from "./armar/losas.ts";
 import { armadoLosa, comprobarLosa, type ComprobacionLosa, type FilaLosa } from "./comprobar/losas.ts";
-import { demandasLosa, type SeccionLosa } from "./demandas/losas.ts";
+import { pasosDemandasLosa, type demandasLosa, type SeccionLosa } from "./demandas/losas.ts";
+import { agotar, type Paso } from "./pasos.ts";
 
 /** El armado de las losas del proyecto, por su id. */
 export type ArmadoLosas = Record<string, ArmadoForjado>;
@@ -108,6 +109,11 @@ function manda(c: ComprobacionLosa): FilaLosa | undefined {
 }
 
 export function comprobarLosas(q: Consultas, armado: ArmadoLosas | undefined, datos: DatosArmado | undefined, op: OpcionesLosas = {}): Respuesta<ComprobacionLosas> {
+  return agotar(pasosLosas(q, armado, datos, op));
+}
+
+/** `comprobarLosas`, avisando al empezar cada losa (las demandas de sus franjas es lo que más tarda) y al acabarla (`pasos.ts`). */
+export function* pasosLosas(q: Consultas, armado: ArmadoLosas | undefined, datos: DatosArmado | undefined, op: OpcionesLosas = {}): Generator<Paso, Respuesta<ComprobacionLosas>> {
   const todas = (q.fisico.losas ?? []).map((l) => l.id);
   const ids = op.ids?.length ? op.ids : todas;
   const diagnosticos: Diagnostico[] = [];
@@ -115,8 +121,21 @@ export function comprobarLosas(q: Consultas, armado: ArmadoLosas | undefined, da
   const losas: LosaComprobada[] = [];
   const resumen = { losas: 0, cumplen: 0, noCumplen: 0, sinArmado: 0, llamadas: 0 };
   let conPilares = false;
-  for (const id of ids) {
-    const d = demandasLosa(q, id);
+  const fase = op.proponer ? "armado de las tablas" : "comprobación";
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]!;
+    if (i > 0) yield { fase, hecho: i, total: ids.length, pieza: ids[i - 1]! };
+    // Las demandas (los esfuerzos de sus franjas), franja a franja: es lo que tarda
+    const pasos = pasosDemandasLosa(q, id);
+    let d: ReturnType<typeof demandasLosa>;
+    for (;;) {
+      const r = pasos.next();
+      if (r.done) {
+        d = r.value;
+        break;
+      }
+      yield ids.length > 1 ? { ...r.value, pieza: `${id} (losa ${i + 1} de ${ids.length})` } : r.value;
+    }
     if (!d.valido) return d;
     for (const x of d.diagnosticos) {
       const clave = `${x.codigo}|${x.mensaje}`;

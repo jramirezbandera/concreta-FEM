@@ -173,7 +173,8 @@ export function borradorArmado(armado: unknown, grupos: readonly GrupoArmado[]):
  * grupo opcional entero vacío no está; en los demás, lo que falta es un error.
  */
 export function armadoDeBorrador(previo: unknown, grupos: readonly GrupoArmado[], borrador: Readonly<Record<string, string>>): { ok: true; armado: Record<string, unknown> } | { ok: false; error: string } {
-  const a = structuredClone((previo ?? {}) as Record<string, unknown>);
+  // (por JSON, como `armadoParcial`: sin objetos compartidos entre dos armaduras)
+  const a = JSON.parse(JSON.stringify(previo ?? {})) as Record<string, unknown>;
   for (const g of grupos) {
     const textos = g.campos.map((c) => (borrador[c.ruta] ?? "").trim());
     if (g.opcional && textos.every((t) => t === "")) {
@@ -200,7 +201,8 @@ export function armadoDeBorrador(previo: unknown, grupos: readonly GrupoArmado[]
  * o falta, no está (no es un dato del proyecto: no se valida ni se guarda).
  */
 export function armadoParcial(previo: unknown, grupos: readonly GrupoArmado[], borrador: Readonly<Record<string, string>>): Record<string, unknown> {
-  const a = structuredClone((previo ?? {}) as Record<string, unknown>);
+  // (por JSON: `structuredClone` conserva los objetos compartidos, y dos armaduras que fueran el mismo objeto se pisarían al escribir)
+  const a = JSON.parse(JSON.stringify(previo ?? {})) as Record<string, unknown>;
   for (const g of grupos) {
     const textos = g.campos.map((c) => (borrador[c.ruta] ?? "").trim());
     if (g.ruta && textos.every((t) => t === "")) {
