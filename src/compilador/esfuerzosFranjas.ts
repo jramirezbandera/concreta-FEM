@@ -100,7 +100,8 @@
  * Junto a una esquina entrante de la losa (las de sus huecos y las cóncavas de su contorno) el momento
  * es singular: las estaciones que pasan a menos de máx(h, b/2) de una (b, el ancho nominal) dependen
  * de la malla y, pegadas a ella, no convergen. La franja lleva el aviso `franja/esquina-entrante` con
- * esos tramos (§12).
+ * esos tramos (§12). No cuentan las que caen en la huella de un pilar o en el ancho de una viga (no en
+ * su tira de borde): la losa no llega a ellas (§16).
  *
  * Wood–Armer (H34, C5-c a): por combinación, con los momentos medios. Una franja de la dirección 1
  * da la armadura de esa dirección (m*x en sus ejes) y una de la 2, la de la suya.
@@ -119,6 +120,8 @@ import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
 import { alineada, anchoNominal, carasFranjas, COSENO_APOYO_PILAR, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, tramosRectaLosa, type Franja } from "./franjas.ts";
 import type { Mapeo } from "./mapeo.ts";
+import { distanciaAHuella } from "./geometria2d.ts";
+import { nudoEnHuella } from "./poligonos.ts";
 import type { Contexto, LosaCompilada } from "./validar.ts";
 
 /** Distancia mínima a una cara o a un apoyo de la recta de campos de sus my y mxy, m (y la de antes de LV2-h). */
@@ -1164,8 +1167,17 @@ export class EsfuerzosFranjas {
       });
     }
 
-    // Esquinas entrantes de la losa, en (s, t), y el radio en el que sus estaciones no valen
-    const esquinas = esquinasEntrantes(l.region).map((q) => ({ ...q, s: q.p[0] * d[0] + q.p[1] * d[1], t: q.p[0] * n[0] + q.p[1] * n[1] }));
+    // Esquinas entrantes de la losa, en (s, t), y el radio en el que sus estaciones no valen. Sin las
+    // que caen en la huella de un pilar o en el ancho de una viga, o en su borde: la losa no llega a
+    // ellas, acaba en la cara, y junto al hueco queda una esquina de 90° entre un borde libre y una cara
+    // apoyada, que no es singular (`validacion/esquinas/apoyadas.ts`: junto a un pilar las estaciones
+    // convergen igual con el hueco que sin él). Una tira de borde (TB) sí cuenta: no apoya la losa, que
+    // sigue a su lado, y en su extremo el borde pasa de libre a pegado a la tira (§12: no converge)
+    const eps = this.ctx.op.epsGeom;
+    const tapada = (p: Vec2) => [...huellas.values()].some((h) => distanciaAHuella(p, h.huella) <= 10 * eps) || anchosL.some((a) => !a.tira && nudoEnHuella(p, a.poligono, eps));
+    const esquinas = esquinasEntrantes(l.region)
+      .filter((q) => !tapada(q.p))
+      .map((q) => ({ ...q, s: q.p[0] * d[0] + q.p[1] * d[1], t: q.p[0] * n[0] + q.p[1] * n[1] }));
     const radio = Math.max(this.ctx.op.tamanoMalla, bNominal / 2);
     fr.forEach((f, i) => {
       const e = est[i]!.sort((a, b) => a.s - b.s || a.lado - b.lado);

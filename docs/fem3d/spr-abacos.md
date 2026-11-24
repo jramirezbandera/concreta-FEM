@@ -348,3 +348,27 @@ El cortante transversal (v13, v23) no parte ninguna: Q sale de las derivadas de 
   La sobreestimación sistemática del edificio baja y las dos medias absolutas también; en el edificio aparecen tres envolventes más entre −5 y −6,3 % (L-N2:Y44, Y45 y X37) y las peores (−9,7 % en L-N2:X13, una inferior; +25 % en L-N2:X19) son las mismas de antes y no dependen de las regiones.
 
 **Pendiente:** el momento de membrana de una losa con diafragma rígido es ruido (I4-1) y la partición de membrana no se ve en la app; si algún día importa, los mapas de F11…F12 van por ella.
+
+## 16. Las esquinas que caen en un pilar o en una viga (2026-11-24)
+
+**De dónde viene:** en el edificio de siete plantas de los ejemplos de la app, con el hueco de la escalera dibujado de eje a eje, las cuatro esquinas del hueco caen en pilares y las 56 franjas que pasan junto a ellas llevaban `franja/esquina-entrante`. El aviso miraba sólo la geometría del hueco. Pero la losa no llega a una esquina en la huella de un pilar o en el ancho de una viga: acaba en la cara, y lo que queda junto al hueco es una esquina de 90° entre un borde libre y una cara apoyada.
+
+**Qué se midió** (`validacion/esquinas/apoyadas.ts`, `out_apoyadas.txt`): el edificio objetivo de losas de 3 × 3 vanos y una planta, con el hueco en el vano central en cuatro posiciones. Error de la envolvente de ELU frente a h = 0,1 (ε_snap 0,01), estaciones a menos de 0,75 m:
+
+| Esquina | h = 0,75, \|media\| | h = 0,15, \|media\| / peor |
+|---|---|---|
+| En un pilar (de eje a eje) | 7–15 % | 1–6 % / 16 % |
+| Sin hueco, junto a los mismos pilares | 6–11 % | 1–5 % / 11 % |
+| En el cruce de dos vigas sin pilar | 6–12 % | 1–4 % / 11 % |
+| En el ancho de una viga, con el otro borde libre | 2–19 % | 0,4–1,3 % / 6 % |
+| Libre, a 0,85 m de las vigas (control) | 10–15 % | 1–2 % / 6 % |
+
+- **Junto a un pilar, lo que no converge es la esquina del pilar, no el hueco:** su estación de cara da 52,8 / 54,8 / 69,5 / 69,3 / 62,6 kN·m/m sin el hueco y 50,0 / 51,7 / 70,2 / 69,2 / 61,9 con él (h = 0,75 … 0,1).
+- **En el cruce y en el ancho de una viga** las estaciones convergen como el resto de la losa.
+- **En esta losa maciza con vigas, el control tampoco sale peor que el resto** (≈ 10 % con h = 0,75, como lejos del hueco); el −40…+100 % y la falta de convergencia de §12 eran del reticular, con la esquina libre.
+
+**El cambio** (`esfuerzosFranjas.ts`): no cuentan las esquinas a ≤ 10·ε_geom de la huella de un pilar o del ancho de una viga. **Una tira de borde (TB) sí cuenta:** no apoya la losa, que sigue a su lado, y en su extremo el borde pasa de libre a pegado a la tira; es la esquina de §12 (el hueco del trozo reticular, a 25 cm de la cara de la viga), que no converge. No cambia ninguna estación ni ningún valor.
+
+- Edificio de los ejemplos: de 56 avisos a ninguno, con el mismo armado propuesto en las siete losas.
+- Referencias congeladas de F, C5, LC, CO3 y CO4: idénticas.
+- Test: `esquinaEntrante.test.ts` (de eje a eje, por el eje de la secundaria y en el ancho de una viga, sin aviso; la esquina libre, con él).
