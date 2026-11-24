@@ -34,6 +34,10 @@ import { arranqueDeFuerzas, DiagramaBarra, diagramaDeCargas, ferBarra, type Carg
 import { Diagnosticos } from "./diagnosticos.ts";
 import { geometria, TOL_GEOMETRICA, type Geometria } from "./geometria.ts";
 import type { BarraAnalitica, CargaBarra, ModeloAnalitico, ResultadoCaso } from "./modelo.ts";
+import { Recientes } from "./recientes.ts";
+
+/** Las barras de las que `DiagramasBarras` guarda sus cargas convertidas: las últimas pedidas. */
+export const BARRAS_CON_CARGAS = 4096;
 
 export interface BarraPreparada {
   indice: number;
@@ -475,14 +479,20 @@ export function esfuerzosDeExtremo(f: Float64Array, cargas: CargasDeBarra | unde
 export class DiagramasBarras {
   /** undefined: sin preparar; null: no es una barra del modelo. */
   private readonly barras: (BarraPreparada | null | undefined)[] = [];
-  /** Por caso, las cargas de cada barra (en el orden del caso) y, cuando se piden, convertidas (null: sin cargas). */
+  /** Por caso, las cargas de cada barra (en el orden del caso). */
   private readonly cargasDe: Map<number, CargaBarra[]>[];
-  private readonly cargas: Map<number, CargasDeBarra | null>[];
+  /**
+   * Convertidas, de las últimas barras pedidas, por caso (null: sin cargas): las de las demás se
+   * vuelven a convertir con las mismas cuentas. Todas no caben: en el edificio de 7 plantas con el
+   * viento, el sismo y la imperfección eran 372 000 y 358 MB.
+   */
+  private readonly cargas: Recientes<number, (CargasDeBarra | null | undefined)[]>;
   private readonly geo: Geometria;
   readonly modelo: ModeloAnalitico;
 
-  constructor(modelo: ModeloAnalitico) {
+  constructor(modelo: ModeloAnalitico, opciones: { barrasConCargas?: number } = {}) {
     this.modelo = modelo;
+    this.cargas = new Recientes(opciones.barrasConCargas ?? BARRAS_CON_CARGAS);
     this.geo = geometria(modelo);
     this.cargasDe = modelo.casos.map((caso) => {
       const m = new Map<number, CargaBarra[]>();
@@ -493,7 +503,6 @@ export class DiagramasBarras {
       }
       return m;
     });
-    this.cargas = modelo.casos.map(() => new Map());
   }
 
   // Los diagramas suponen un modelo ya calculado y válido: un error aquí es un mal uso
@@ -517,8 +526,9 @@ export class DiagramasBarras {
 
   /** Las cargas de la barra `b` en el caso `k`, convertidas y con sus FER; undefined si no tiene. */
   private cargasDeBarra(b: number, k: number): CargasDeBarra | undefined {
-    const m = this.cargas[k]!;
-    let x = m.get(b);
+    let m = this.cargas.get(b);
+    if (!m) this.cargas.set(b, (m = []));
+    let x = m[k];
     if (x === undefined) {
       const l = this.cargasDe[k]!.get(b);
       if (!l) x = null;
@@ -529,7 +539,7 @@ export class DiagramasBarras {
         x = cargasDeBarrasDelCaso(this.modelo.casos[k]!.id, l, solo, this.modelo, this.geo, diag).porBarra.get(b) ?? null;
         this.comprobar(diag);
       }
-      m.set(b, x);
+      m[k] = x;
     }
     return x ?? undefined;
   }

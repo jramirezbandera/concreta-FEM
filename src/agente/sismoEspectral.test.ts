@@ -925,7 +925,7 @@ describe("VS4: los campos de los modos se combinan por planta y se sueltan al ca
     return x.valor;
   };
 
-  it("los casos efímeros son los de los modos, y los mapas y las franjas sólo guardan lo de la planta en la que se trabaja", () => {
+  it("los casos efímeros son los de los modos, y los mapas y las franjas sólo guardan lo de la planta en la que se trabaja (los casos del cálculo, también)", () => {
     // (unas Consultas nuevas: nada guardado)
     const q2 = new Consultas(f, c, r.casos, {}, r.modal);
     const ns = c.modelo.casos.length;
@@ -957,11 +957,14 @@ describe("VS4: los campos de los modos se combinan por planta y se sueltan al ca
     expect(n1).toBeGreaterThanOrEqual(1);
     expect(q2.campos.tieneEvaluador(modos[0]!)).toBe(true);
     expect(q2.campos.evaluadorCompartido(estatico)).toBe(evEstatico);
-    // Un mapa de otra planta: lo de los modos se suelta; los estáticos siguen
+    // Un mapa de otra planta: lo de los modos se suelta, y lo de los casos del cálculo también (no
+    // entre medias, como los de los modos, sino al cambiar de planta: guardarlo de todas no cabía)
+    expect(ef.soltadosPorPlanta).toBe(0);
     valoresCampo(rr, abajo, "m11", F);
     expect(ef.soltados).toBe(n1 + 1);
+    expect(ef.soltadosPorPlanta).toBe(1);
     for (const u of modos) expect(q2.campos.tieneEvaluador(u)).toBe(false);
-    expect(q2.campos.evaluadorCompartido(estatico)).toBe(evEstatico);
+    expect(q2.campos.evaluadorCompartido(estatico)).not.toBe(evEstatico);
     // Las franjas de la planta de arriba en la otra dirección: se cambia de planta (y lo de los modos
     // se vuelve a evaluar: los mismos valores, abajo)
     const otra = frArriba.valor.find((x) => x.direccion !== frArriba.valor[0]!.direccion)!;

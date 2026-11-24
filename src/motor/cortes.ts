@@ -399,7 +399,12 @@ export class Cortes {
   soltarCasos(casos: readonly ResultadoCaso[], cuales: readonly number[]): void {
     const g = this.guardados.get(casos);
     if (!g || !cuales.length) return;
-    for (const m of [g.laminas, g.barras]) for (const v of m.values()) for (const k of cuales) v[k] = undefined;
+    for (const m of [g.laminas, g.barras])
+      for (const [e, v] of m) {
+        for (const k of cuales) v[k] = undefined;
+        // Sin ningún caso guardado, fuera (al cambiar de planta se sueltan todos)
+        if (v.every((x) => x === undefined)) m.delete(e);
+      }
     g.huecos = true;
   }
 

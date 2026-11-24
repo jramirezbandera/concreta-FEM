@@ -19,11 +19,15 @@
  * diagrama (son un objeto por barra y por caso: con 21 modos, el edificio objetivo no cabía en
  * memoria): `extremos` da sus esfuerzos de extremo, con los pares de la losa, y `diagrama` lo hace
  * cada vez que se pide.
+ *
+ * Lo de cada barra (sus diagramas y sus saltos) se guarda sólo de las últimas que se han pedido
+ * (`BARRAS_GUARDADAS`): lo de las demás se rehace con las mismas cuentas, los mismos bits.
  */
 import { DiagramasBarras } from "../motor/barras.ts";
 import type { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { FuerzasNodales } from "../motor/fuerzasNodales.ts";
 import type { ModeloAnalitico, ResultadoCaso } from "../motor/modelo.ts";
+import { Recientes } from "../motor/recientes.ts";
 import type { Mapeo } from "./mapeo.ts";
 
 export interface TramoFlexible {
@@ -35,11 +39,27 @@ export interface TramoFlexible {
   tramo: number;
 }
 
+/**
+ * Las barras cuyos diagramas y saltos se guardan: las últimas que se han pedido. Los de las demás se
+ * rehacen cuando se vuelven a pedir, con las mismas cuentas (los mismos bits). Quien los lee va pieza
+ * a pieza (cada barra, con todos sus casos y combinaciones seguidos), así que no se rehacen casi
+ * nunca; y guardarlos todos no cabe: en el edificio de 7 plantas con el viento, el sismo y la
+ * imperfección (22 573 barras y 17 casos), proponer las vigas dejaba 700 000 diagramas y 3,1 GB, y
+ * la pestaña se cerraba.
+ */
+export const BARRAS_GUARDADAS = 1024;
+
+interface DiagramasGuardados {
+  /** Por caso: con los pares de la losa repartidos (`diagrama`) y el del motor (`crudo`). */
+  d: (DiagramaBarra | undefined)[];
+  c: (DiagramaBarra | undefined)[];
+}
+
 export class EsfuerzosPiezas {
   /** Los diagramas de las barras del modelo (también los usan los cortes de las bandas, `Consultas.cortes`). */
   readonly diagramas: DiagramasBarras;
-  private readonly cache = new Map<string, DiagramaBarra>();
-  private readonly crudos = new Map<string, DiagramaBarra>();
+  /** Los diagramas de las últimas barras pedidas. */
+  private readonly guardadas: Recientes<number, DiagramasGuardados>;
   readonly modelo: ModeloAnalitico;
   readonly mapeo: Mapeo;
   readonly casos: readonly ResultadoCaso[];
@@ -47,8 +67,8 @@ export class EsfuerzosPiezas {
   /** Reparte los pares de la losa en vigas y viguetas (por defecto, sí). */
   readonly suavizado: boolean;
   private fuerzasC: FuerzasNodales | null = null;
-  /** Por barra: la parte de la losa de los saltos de [T, My] en sus nudos i y j, por caso. */
-  private readonly saltos = new Map<number, Float64Array[] | null>();
+  /** Por barra (las últimas pedidas): la parte de la losa de los saltos de [T, My] en sus nudos i y j, por caso. */
+  private readonly saltos: Recientes<number, Float64Array[] | null>;
   private readonly gLaminas = new Map<number, Float64Array[]>();
   private preparado = false;
   private laminasNudo: { ptr: Uint32Array; idx: Uint32Array } = { ptr: new Uint32Array(1), idx: new Uint32Array(0) };
@@ -67,12 +87,17 @@ export class EsfuerzosPiezas {
    * `casos`: los de un cálculo válido del `modelo`, en su orden. `ligeros`: el índice del primer caso
    * ligero (cabecera): los de los modos, sin cargas en las barras.
    */
-  constructor(modelo: ModeloAnalitico, mapeo: Mapeo, casos: readonly ResultadoCaso[], opciones: { suavizado?: boolean; ligeros?: number } = {}) {
+  /** `barrasGuardadas` y `barrasConCargas`: cuántas barras se guardan (para las pruebas; por defecto, `BARRAS_GUARDADAS` y `BARRAS_CON_CARGAS`). */
+  constructor(modelo: ModeloAnalitico, mapeo: Mapeo, casos: readonly ResultadoCaso[], opciones: { suavizado?: boolean; ligeros?: number; barrasGuardadas?: number; barrasConCargas?: number } = {}) {
     this.modelo = modelo;
     this.mapeo = mapeo;
     this.casos = casos;
-    this.diagramas = new DiagramasBarras(modelo);
+    this.diagramas = new DiagramasBarras(modelo, opciones.barrasConCargas !== undefined ? { barrasConCargas: opciones.barrasConCargas } : {});
     this.suavizado = opciones.suavizado ?? true;
+    const n = opciones.barrasGuardadas ?? BARRAS_GUARDADAS;
+    this.guardadas = new Recientes(n);
+    // Los saltos de una barra piden los diagramas de las vecinas: más, para que no se pisen
+    this.saltos = new Recientes(4 * n);
     this.ligeros = opciones.ligeros ?? casos.length;
     for (let k = this.ligeros; k < casos.length; k++) if (modelo.casos[k]?.barras?.length) throw new Error(`EsfuerzosPiezas: el caso ${modelo.casos[k]!.id} lleva cargas en las barras y no puede ser ligero`);
   }
@@ -88,14 +113,14 @@ export class EsfuerzosPiezas {
   /** Diagrama de la barra `b` en el caso `k` (con los pares de la losa repartidos si `suavizado`). */
   diagrama(b: number, k: number): DiagramaBarra {
     const ligero = k >= this.ligeros;
-    const clave = `${b}/${k}`;
-    let d = ligero ? undefined : this.cache.get(clave);
+    const g = ligero ? undefined : this.guardada(b);
+    let d = g?.d[k];
     if (!d) {
       d = this.crudo(b, k);
       const j = this.suavizado ? this.saltosLosa(b)?.[k] : undefined;
       // −J_i/2·(1 − x/L) + J_j/2·x/L: la mitad de cada salto a cada lado de su nudo
       if (j && j.some((v) => v !== 0)) d = d.conPares([-j[0]! / 2, -j[1]! / 2, 0], [(j[0]! + j[2]!) / (2 * d.L), (j[1]! + j[3]!) / (2 * d.L), 0]);
-      if (!ligero) this.cache.set(clave, d);
+      if (g) g.d[k] = d;
     }
     return d;
   }
@@ -103,10 +128,17 @@ export class EsfuerzosPiezas {
   /** El diagrama del motor, sin repartir nada. */
   private crudo(b: number, k: number): DiagramaBarra {
     if (k >= this.ligeros) return this.diagramas.diagrama(b, k, this.casos[k]!);
-    const clave = `${b}/${k}`;
-    let d = this.crudos.get(clave);
-    if (!d) this.crudos.set(clave, (d = this.diagramas.diagrama(b, k, this.casos[k]!)));
+    const g = this.guardada(b);
+    let d = g.c[k];
+    if (!d) g.c[k] = d = this.diagramas.diagrama(b, k, this.casos[k]!);
     return d;
+  }
+
+  /** Lo guardado de la barra b, que pasa a ser la más reciente; la más antigua sale si sobran. */
+  private guardada(b: number): DiagramasGuardados {
+    let g = this.guardadas.get(b);
+    if (!g) this.guardadas.set(b, (g = { d: [], c: [] }));
+    return g;
   }
 
   /**

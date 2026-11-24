@@ -296,6 +296,38 @@ export function centradorasDe(D: DemandasZapata, z: Zapata, o: Orientacion, otro
 const reducidas = new WeakMap<object, Map<string, { geo: CargaZapata[]; elu: CargaZapata[] }>>();
 
 /**
+ * Lo que el módulo da al terreno (la presión, la excentricidad, el vuelco y el deslizamiento) no
+ * depende de las parrillas: sale de las dimensiones, el pilar, las cargas y el terreno. Al proponer,
+ * las zapatas que sólo cambian de parrilla repiten esas llamadas (más de la mitad de las de una
+ * comprobación entera); aquí se guardan por pilar, con la entrada sin las parrillas, sólo de lo que
+ * se toma de ellas. Sólo cuando las parrillas no pueden hacer que el módulo la rechace (sus
+ * diámetros y separaciones, y el canto útil), así que da lo mismo que llamarlo.
+ */
+interface Terreno {
+  checks: CheckRow[];
+  qb: number;
+  sigma_max: number;
+  sigma_min: number;
+  distributionType: IsolatedFootingResult["distributionType"];
+  loaded_area_fraction: number;
+}
+const terrenos = new WeakMap<DemandasZapata, Map<string, Map<string, Terreno>>>();
+const PARRILLAS = new Set(["phi_x", "s_x", "phi_y", "s_y", "supLleva", "phi_sup_x", "s_sup_x", "phi_sup_y", "s_sup_y"]);
+/** Lo que cambia de una llamada del terreno a otra con la misma zapata: la terna y la tensión admisible. */
+const VARIAN = new Set(["sigma_adm", "N", "Mx", "My", "H"]);
+const texto = (v: unknown) => (typeof v === "number" && Object.is(v, -0) ? "-0" : String(v));
+/** La zapata, sin sus parrillas: todo lo de la entrada salvo lo que cambia de una terna a otra. */
+const claveZapata = (inp: IsolatedFootingInputs): string => {
+  let k = "";
+  for (const [c, v] of Object.entries(inp)) if (!PARRILLAS.has(c) && !VARIAN.has(c)) k += `${c}=${texto(v)};`;
+  return k;
+};
+const claveTerna = (inp: IsolatedFootingInputs): string => `${texto(inp.sigma_adm)}|${texto(inp.N)}|${texto(inp.Mx)}|${texto(inp.My)}|${texto(inp.H)}`;
+/** Las parrillas no hacen que el módulo la rechace (`calcIsolatedFooting`: sus diámetros, separaciones y cantos útiles). */
+const parrillasValidas = (inp: IsolatedFootingInputs): boolean =>
+  inp.phi_x > 0 && inp.phi_y > 0 && inp.s_x > 0 && inp.s_y > 0 && (!inp.supLleva || (inp.phi_sup_x > 0 && inp.phi_sup_y > 0 && inp.s_sup_x > 0 && inp.s_sup_y > 0)) && inp.h * 1000 - inp.cover - inp.phi_x / 2 > 0 && inp.h * 1000 - inp.cover - inp.phi_x - inp.phi_y / 2 > 0;
+
+/**
  * Las ternas que cuentan para una zapata: sin las que son la imagen especular de otra. El módulo es
  * simétrico respecto a los ejes de una zapata centrada (sólo cuentan |Mx| y |My|) y, en una de
  * medianera, respecto al perpendicular al lindero (sólo cuenta |Mx| del módulo): dos ternas que sólo
@@ -382,18 +414,35 @@ export function comprobarZapata(D: DemandasZapata, z: ZapataCompleta, d: DatosZa
     }
     return r;
   };
+  let porZapata = terrenos.get(D);
+  if (!porZapata) terrenos.set(D, (porZapata = new Map()));
+  const validas = parrillasValidas(e0);
+  const kz = validas ? claveZapata(e0) : "";
+  let guardados = validas ? porZapata.get(kz) : undefined;
+  if (validas && !guardados) porZapata.set(kz, (guardados = new Map()));
+  /** La llamada del terreno, o la que ya se hizo con la misma entrada salvo las parrillas. */
+  const delTerreno = (inp: IsolatedFootingInputs, comb: string, quiere: (id: string) => boolean): Terreno | null => {
+    const k = validas ? claveTerna(inp) : "";
+    const hit = validas ? guardados!.get(k) : undefined;
+    if (hit) return hit;
+    const r = llamar(inp, comb);
+    if (!r) return null;
+    const x: Terreno = { checks: r.checks.filter((f) => quiere(f.id)), qb: r.qb, sigma_max: r.sigma_max, sigma_min: r.sigma_min, distributionType: r.distributionType, loaded_area_fraction: r.loaded_area_fraction };
+    if (validas) guardados!.set(k, x);
+    return x;
+  };
   const terreno = (c: CargaZapata, i: number) => {
     const m = cargaModulo(c, o);
     if (!(m.N > N_MINIMO)) return void (tira = !tira || m.N < tira.N ? { N: m.N, comb: c.comb } : tira);
     if (d.tensionAdmisible === undefined) return void pendiente("sin la tensión admisible del terreno (obra.terreno.tensionAdmisible), la presión, el vuelco y el deslizamiento no se comprueban");
     const sigma = c.situacion === "GEO-SIS" ? (d.tensionAdmisibleSismo ?? d.tensionAdmisible) : d.tensionAdmisible;
     const inp = { ...e0, sigma_adm: sigma, N: m.N, Mx: m.Mx, My: m.My, H: 0 };
-    const r = llamar(inp, c.comb);
+    const r = delTerreno(inp, c.comb, (id) => FILAS_TERRENO.has(id));
     if (!r) return;
     tomar(r.checks, (id) => FILAS_TERRENO.has(id), c.comb, { grupo: "geo", i });
     if (!presion || r.qb > presion.qb) presion = { qb: r.qb, sigmaMax: r.sigma_max, sigmaMin: r.sigma_min, distribucion: r.distributionType, fraccionApoyada: r.loaded_area_fraction, tensionAdmisible: sigma, comb: c.comb };
     if (parado || !(m.H > 0)) return;
-    const rd = llamar({ ...inp, H: m.H }, c.comb);
+    const rd = delTerreno({ ...inp, H: m.H }, c.comb, (id) => id === FILA_DESLIZAMIENTO);
     if (rd) tomar(rd.checks, (id) => id === FILA_DESLIZAMIENTO, c.comb, { grupo: "geo", i });
   };
   const armado = (c: CargaZapata, i: number) => {

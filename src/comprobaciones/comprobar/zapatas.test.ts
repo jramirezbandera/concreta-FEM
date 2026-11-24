@@ -183,6 +183,28 @@ describe("CO5: comprobar una zapata con el módulo de zapatas", () => {
     }
   });
 
+  it("lo del terreno, guardado para otra parrilla de la misma zapata: da lo mismo que llamar al módulo", () => {
+    // Al proponer se prueban zapatas que sólo cambian de parrilla: lo del terreno (presión, vuelco y
+    // deslizamiento) no depende de ella y no se vuelve a pedir al módulo
+    const otra: ZapataCompleta = { ...ZAPATA, inferior: { x: { diametro: 20, separacion: 150 }, y: { diametro: 16, separacion: 200 } }, superior: { x: { diametro: 12, separacion: 250 }, y: { diametro: 12, separacion: 250 } } };
+    for (const linderos of [[], ["+y"], ["-x", "-y"]] as Lindero[][]) {
+      const z = (x: ZapataCompleta): ZapataCompleta => ({ ...x, ...(linderos.length ? { linderos } : {}) });
+      const D = sintetica(GEO, ELU);
+      const a = comprobarZapata(D, z(ZAPATA), DATOS);
+      const b = comprobarZapata(D, z(otra), DATOS);
+      const nueva = comprobarZapata(sintetica(GEO, ELU), z(otra), DATOS);
+      const { llamadas: lb, ...sb } = b;
+      const { llamadas: ln, ...sn } = nueva;
+      expect(sb, linderos.join(" ")).toEqual(sn);
+      // Las del terreno (3 + 3 con H) ya estaban: sólo las del armado
+      expect(a.llamadas).toBe(9);
+      expect(ln).toBe(9);
+      expect(lb).toBe(3);
+      // Otro canto ya no es la misma zapata
+      expect(comprobarZapata(D, z({ ...otra, h: 0.65 }), DATOS).llamadas).toBe(9);
+    }
+  });
+
   it("el pilar que tira de la zapata: el arranque, pendiente; lo demás se comprueba", () => {
     const c = comprobarZapata(sintetica([...GEO, carga("GEO-4", "GEO", -30, 0, 0)], [...ELU, carga("ELU-4", "ELU-PT", -45, 0, 0)]), ZAPATA, DATOS);
     expect(c.cumple).toBe(false);

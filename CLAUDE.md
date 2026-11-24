@@ -1148,8 +1148,13 @@
   - **De cada uno:** Málaga (pórtico, con nieve en la cubierta), Alhaurín el Grande (vivienda, con el casetón de hormigón en vez de «perdido» con 4,5), Granada (muestrario), Murcia (núcleo: la planta baja de 3 m sobre la rasante, sin los cuatro pilares de las esquinas del muro, con CM y nieve), Almería (el pórtico de acero de 1-022, que solo era un mecanismo según Y: dos pórticos a 6 m con vigas según Y y diagonales en los de los extremos, acero S275, con cargas de gravedad) y Sevilla (edificio, con pilares de 60 × 60 y 50 × 50 en las cuatro plantas bajas: los de antes salían con ν de hasta 1,4).
   - **Comprobado:** los seis validan, calculan (equilibrio, viento, sismo, imperfección y segundo orden) y se revisan con la CLI; en la app, los seis calculan, y el pórtico, la vivienda, el muestrario y el núcleo proponen su armado y se comprueban. Prueba: `src/agente/ejemplosApp.test.ts`.
   - **Visto al ponerles el sismo:**
-    - el edificio grande en Comprobación tumbaba la pestaña del navegador al proponer el armado de toda la obra, y en la CLI las zapatas no terminaban en 5 min y `fem armar` entero pasó de 17 GB.;
+    - el edificio grande en Comprobación tumbaba la pestaña del navegador al proponer el armado de toda la obra, y en la CLI las zapatas no terminaban en 5 min y `fem armar` entero pasó de 17 GB. **Arreglado el mismo día** (abajo);
     - el acero no se comprueba: las piezas de acero salen «sin armado».
+- **2026-11-24: proponer el armado del edificio de 7 plantas con el sismo** (`comprobaciones.md` §8.22). Lo propuesto y lo comprobado, los mismos bytes (6 zapatas, 100 vigas y 2 losas comparadas con el código de antes).
+  - **La memoria** (en Node, el motor de Chrome, tras liberar): proponer las vigas dejaba 4 GB y las losas 3,5 GB (el worker de Chrome no pasa de ~4 GB).
+    - `EsfuerzosPiezas` y `DiagramasBarras` guardan los diagramas, los saltos de la losa y las cargas convertidas sólo de las últimas barras pedidas (`Recientes`, `src/motor/recientes.ts`); lo demás se rehace con las mismas cuentas. Las vigas, de 4 GB a 577 MB, en el mismo tiempo.
+    - `CasosEfimeros` suelta al cambiar de planta también los evaluadores SPR de los casos del cálculo (antes, sólo los de los modos), y existe también sin el sismo. Cambia lo que retiene la app al pasar de planta en planta; lo combinado por planta se sigue guardando.
+  - **Las zapatas:** sin la comprobación entera repetida tras una que no falla y con lo del terreno guardado por zapata (no depende de las parrillas), de ~10 s a ~2,5 s por zapata en el edificio.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

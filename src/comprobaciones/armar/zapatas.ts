@@ -91,13 +91,11 @@ export function proponerZapata(D: DemandasZapata, previa: Zapata | undefined, d:
   const impide = (x: ComprobacionZapata) => x.pendientes.filter((p) => !p.arranque);
   for (let vuelta = 0; ; vuelta++) {
     if (impide(c).length) return { zapata: null, comprobacion: c, probados, motivo: impide(c).map((p) => p.motivo).join("; ") };
-    const fallan = c.filas.filter((f) => f.estado === "fail");
-    if (!fallan.length) {
-      // Sin cortar: comprobada entera
-      c = probar(e, false);
-      if (!impide(c).length && !c.filas.some((f) => f.estado === "fail") && c.filas.length) break;
-      if (impide(c).length) continue;
-      if (!c.filas.some((f) => f.estado === "fail")) return { zapata: null, comprobacion: c, probados, motivo: "no hay combinaciones con las que comprobarla" };
+    // Si no falla nada, la comprobación que corta en la primera fila que falla ya es la entera: no
+    // ha cortado (con `parar` sólo cambia lo que pasa a partir de una fila que falla)
+    if (!c.filas.some((f) => f.estado === "fail")) {
+      if (c.filas.length) break;
+      return { zapata: null, comprobacion: c, probados, motivo: "no hay combinaciones con las que comprobarla" };
     }
     const g = PRIORIDAD.find((x) => c.filas.some((f) => f.estado === "fail" && f.grupo === x))!;
     const k = CLAVES[g];
@@ -111,14 +109,12 @@ export function proponerZapata(D: DemandasZapata, previa: Zapata | undefined, d:
     for (const k of ["lado", "canto", "ix", "iy", "sx", "sy"] as const) {
       if (e[k] <= minimo[k]) continue;
       const f = { ...e, [k]: e[k] - 1 };
+      // Sin ninguna fila que falle, la que corta es la entera (arriba)
       const x = probar(f, true);
       if (!impide(x).length && !x.filas.some((r) => r.estado === "fail")) {
-        const entera = probar(f, false);
-        if (!impide(entera).length && !entera.filas.some((r) => r.estado === "fail")) {
-          Object.assign(e, f);
-          c = entera;
-          cambia = true;
-        }
+        Object.assign(e, f);
+        c = x;
+        cambia = true;
       }
     }
   }

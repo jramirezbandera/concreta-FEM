@@ -334,7 +334,7 @@ export class Consultas {
   private franjasC?: EsfuerzosFranjas;
   private camposC?: CamposLaminas;
   private cortesC?: Cortes;
-  private efimerosC?: CasosEfimeros | null;
+  private efimerosC?: CasosEfimeros;
   private murosC?: EsfuerzosMuros;
   private punzC?: IndicePunzonamiento;
   private readonly transmitidos = new Map<string, TransmitidoPilar | null>();
@@ -816,14 +816,11 @@ export class Consultas {
   /**
    * VS4: los casos de los modos como casos base efímeros de `campos` y `cortes`: lo que guardan de
    * ellos se suelta al cambiar de planta (sólo hace falta su combinación, los casos del sismo, y ésa
-   * es por planta). null sin modos.
+   * es por planta). Lo de los casos del cálculo también se suelta al cambiar de planta (también sin
+   * modos): con todos los casos del programa, guardarlo de todas las plantas no cabía.
    */
-  get efimeros(): CasosEfimeros | null {
-    if (this.efimerosC === undefined) {
-      const modos = this.sup.basesEspectrales;
-      this.efimerosC = modos.length ? new CasosEfimeros(this.campos, () => this.cortesC ?? null, this.casos, modos) : null;
-    }
-    return this.efimerosC;
+  get efimeros(): CasosEfimeros {
+    return (this.efimerosC ??= new CasosEfimeros(this.campos, () => this.cortesC ?? null, this.casos, this.sup.basesEspectrales));
   }
 
   /** Estaciones de una banda con sus esfuerzos por caso (C5.2). */

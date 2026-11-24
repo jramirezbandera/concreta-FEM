@@ -10,6 +10,13 @@
  * sólo hace falta su combinación en cada punto (los casos del sismo), y ésa es por planta: lo de los
  * modos de una planta se guarda mientras se trabaja en ella (el mapa de M, el de V, las franjas de
  * las dos direcciones) y se suelta al pasar a otra. Lo que se vuelve a calcular da los mismos valores.
+ *
+ * Los casos del cálculo también se sueltan al cambiar de planta (2026-11-24), aunque no se sueltan
+ * entre medias como los modos (`soltar`). Con el viento, el sismo y la imperfección del programa son
+ * 17 en el edificio de 7 plantas, y su evaluador SPR guarda de cada planta en la que se ha trabajado
+ * unos 450 MB: proponer el armado de sus 7 losas dejaba 3,5 GB y la pestaña se cerraba. Lo que se
+ * combina por planta (los mapas, las estaciones de las franjas) ya queda guardado aparte, así que
+ * volver a una planta casi nunca los rehace.
  */
 import type { CamposLaminas } from "./campos.ts";
 import type { Cortes } from "./cortes.ts";
@@ -21,6 +28,8 @@ export class CasosEfimeros {
   private readonly casos: readonly ResultadoCaso[];
   /** Los índices de los casos efímeros (los modos). */
   readonly cuales: readonly number[];
+  /** Los de los casos que se sueltan sólo al cambiar de planta (los del cálculo). */
+  readonly porPlanta: readonly number[];
   /** La unidad de trabajo actual (null al empezar): la planta, normalmente. */
   private unidad: string | null = null;
   /** Veces que se ha soltado (para las pruebas). */
@@ -29,13 +38,16 @@ export class CasosEfimeros {
   /**
    * @param casos los casos base de las consultas; `cuales`, los índices de los efímeros (los modos).
    * `campos` y `cortes`, los que comparten las consultas (los que guardan); `cortes`, los que ya
-   * existan al soltar (null si no hay: no se crean para eso).
+   * existan al soltar (null si no hay: no se crean para eso). `porPlanta`, los que se sueltan sólo al
+   * cambiar de planta (por defecto, todos los demás).
    */
-  constructor(campos: CamposLaminas, cortes: () => Cortes | null, casos: readonly ResultadoCaso[], cuales: readonly number[]) {
+  constructor(campos: CamposLaminas, cortes: () => Cortes | null, casos: readonly ResultadoCaso[], cuales: readonly number[], porPlanta?: readonly number[]) {
     this.campos = campos;
     this.cortes = cortes;
     this.casos = casos;
     this.cuales = cuales;
+    const efimero = new Set(cuales);
+    this.porPlanta = porPlanta ?? casos.map((_, k) => k).filter((k) => !efimero.has(k));
   }
 
   /** ¿Es efímero el caso base k? */
@@ -45,14 +57,21 @@ export class CasosEfimeros {
 
   /**
    * Se va a trabajar en `unidad` (la planta de un mapa o de unas franjas; un muro): si es otra que la
-   * de antes, suelta lo guardado de los casos efímeros. Lo que comparte una unidad (los mapas de M y
-   * de V de una planta, sus franjas en las dos direcciones) se calcula una vez.
+   * de antes, suelta lo guardado de los casos efímeros y de los de `porPlanta`. Lo que comparte una
+   * unidad (los mapas de M y de V de una planta, sus franjas en las dos direcciones) se calcula una vez.
    */
   trabajarEn(unidad: string): void {
     if (this.unidad === unidad) return;
-    if (this.unidad !== null) this.soltar();
+    if (this.unidad !== null) {
+      this.soltar();
+      for (const k of this.porPlanta) this.campos.soltarEvaluador(this.casos[k]!.u);
+      this.cortes()?.soltarCasos(this.casos, this.porPlanta);
+      this.soltadosPorPlanta++;
+    }
     this.unidad = unidad;
   }
+  /** Veces que se han soltado los de `porPlanta` (para las pruebas). */
+  soltadosPorPlanta = 0;
 
   /** Suelta lo guardado de los casos efímeros, estén donde estén. */
   soltar(): void {

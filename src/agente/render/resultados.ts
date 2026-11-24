@@ -145,16 +145,9 @@ export class ResultadosRender {
     return (this.camposC ??= this.q.compilado === this.c.modelo ? this.q.campos : new CamposLaminas(this.c.modelo));
   }
 
-  /** VS4: los casos de los modos, cuyos campos se sueltan al cambiar de planta (los de las consultas, si los campos son los suyos). */
-  private get efimeros(): CasosEfimeros | null {
-    if (this.efimerosC === undefined) {
-      if (this.q.compilado === this.c.modelo) this.efimerosC = this.q.efimeros;
-      else {
-        const modos = this.q.sup.basesEspectrales;
-        this.efimerosC = modos.length ? new CasosEfimeros(this.campos, () => null, this.q.casos, modos) : null;
-      }
-    }
-    return this.efimerosC;
+  /** VS4: los casos cuyos campos se sueltan al cambiar de planta (los de las consultas, si los campos son los suyos). */
+  private get efimeros(): CasosEfimeros {
+    return (this.efimerosC ??= this.q.compilado === this.c.modelo ? this.q.efimeros : new CasosEfimeros(this.campos, () => null, this.q.casos, this.q.sup.basesEspectrales));
   }
 
   get ep(): EsfuerzosPiezas {
