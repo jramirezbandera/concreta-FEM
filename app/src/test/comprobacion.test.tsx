@@ -404,7 +404,7 @@ describe("CO6 · DOM: Comprobación", () => {
     // El torsor y el axil del vano elegido, con su combinación, y sus curvas entre las de «Esfuerzos»
     await waitFor(() => expect(document.querySelector("[data-esfuerzos-vano]")?.textContent).toMatch(/Torsor: .*Axil: /), { timeout: 60_000 });
     expect(document.querySelectorAll("[data-esfuerzos-vano] tr[data-extremo]").length).toBe(4);
-    expect(within(screen.getByRole("group", { name: "Esfuerzos bajo el despiece" })).getAllByRole("checkbox").length).toBe(4);
+    expect(within(screen.getByRole("group", { name: "Esfuerzos bajo el despiece" })).getAllByRole("checkbox").length).toBe(5);
     expect(raiz.getAttribute("data-despiece-portico")).toBe(dp.portico.id);
     expect([...raiz.querySelectorAll("[data-barra] .dp-rotulo")].map((x) => x.textContent)).toEqual(d.barras.map((b) => `${b.n}Ø${b.diametro} L=${fmt(b.largo, 2)}`));
     expect(raiz.querySelector("[data-tabla-despiece]")!.querySelectorAll("tbody tr")).toHaveLength(d.medicion.length);
@@ -412,6 +412,9 @@ describe("CO6 · DOM: Comprobación", () => {
     // §8.14: bajo el despiece, la envolvente de momentos de ELU del pórtico; la de cortantes, al marcarla
     await waitFor(() => expect(document.querySelector('[data-despiece-portico] [data-esfuerzo="My"]')).toBeTruthy(), { timeout: 60_000 });
     expect(reg.pedidos.some((p) => p.tipo === "esfuerzos-portico" && p.viga === parte.pieza)).toBe(true);
+    // §8.24: con ella, el área capaz del armado; si el pórtico entero cumple, la envolvente no pasa de ella
+    expect(document.querySelector('[data-despiece-portico] [data-capaz="My"] path')).toBeTruthy();
+    if (dp.portico.vanos.every((v) => t.partes.find((p) => p.clave === v.clave)?.cumple)) expect(document.querySelectorAll('[data-despiece-portico] [data-esfuerzo="My"] [data-capaz-fuera]')).toHaveLength(0);
     expect(document.querySelector('[data-despiece-portico] [data-esfuerzo="Vz"]')).toBeNull();
     fireEvent.click(within(screen.getByRole("group", { name: "Esfuerzos bajo el despiece" })).getByLabelText("V"));
     expect(document.querySelector('[data-despiece-portico] [data-esfuerzo="Vz"]')).toBeTruthy();

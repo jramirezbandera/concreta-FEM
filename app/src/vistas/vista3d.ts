@@ -302,6 +302,11 @@ export class Vista3D extends Vista {
   proyeccion: Proyeccion = "perspectiva";
   modo: Modo3D = "alambrico";
   eventos: Eventos3D = {};
+  /**
+   * Con tipos, un clic o una ventana sólo eligen las piezas de esos tipos (Comprobación: los pilares en
+   * su pestaña, también los que tapa una losa); ni las cargas. Lo de los diagramas, siempre.
+   */
+  tiposElegibles: ReadonlySet<string> | null = null;
   private origen: [number, number, number] | null = null;
   private alamb: Alambrico | null = null;
   private lineas: LineSegments2 | null = null;
@@ -1497,11 +1502,11 @@ export class Vista3D extends Vista {
 
   /** El objeto del sólido que se ve bajo un píxel: el triángulo visible más cercano que corta su rayo dentro de la caja. */
   objetoSolidoEn(x: number, y: number): string | null {
-    return this.solidoEn(x, y)?.id ?? null;
+    return this.solidoEn(x, y, this.tiposElegibles)?.id ?? null;
   }
 
-  /** Lo mismo, con la distancia (m) del corte al origen del rayo. */
-  private solidoEn(x: number, y: number): { id: string; t: number } | null {
+  /** Lo mismo, con la distancia (m) del corte al origen del rayo; con `tipos`, sólo las piezas de esos tipos (las demás no tapan). */
+  private solidoEn(x: number, y: number, tipos: ReadonlySet<string> | null = null): { id: string; t: number } | null {
     const so = this.sol;
     const r = so && this.malla ? this.rayo(x, y, so.origen) : null;
     if (!so || !this.malla || !r) return null;
@@ -1528,6 +1533,7 @@ export class Vista3D extends Vista {
       if (v < 0 || u + v > 1) continue;
       const t = (e2[0]! * qv[0]! + e2[1]! * qv[1]! + e2[2]! * qv[2]!) * inv;
       if (!(t > 0 && t < tMin)) continue;
+      if (tipos && !tipos.has(so.objetos[so.objeto[iv / 3]!]!.tipo)) continue;
       if (!this.enCaja(O[0]! + t * D[0]! + so.origen[0], O[1]! + t * D[1]! + so.origen[1], O[2]! + t * D[2]! + so.origen[2])) continue;
       [mejor, tMin] = [iv / 3, t];
     }
@@ -1541,7 +1547,7 @@ export class Vista3D extends Vista {
   cargaEn(x: number, y: number): string | null {
     const c = this.carg;
     const v = this.cargVis;
-    const r = c ? this.rayo(x, y, c.origen) : null;
+    const r = c && !this.tiposElegibles ? this.rayo(x, y, c.origen) : null;
     if (!c || !v || !r) return null;
     const [O, D] = r;
     const solido = this.modoPintado === "solido" ? this.solidoEn(x, y) : null;
@@ -1587,7 +1593,9 @@ export class Vista3D extends Vista {
     if (!a || !p || !o) return null;
     let mejor = -1;
     let [dm, zm] = [Infinity, Infinity];
+    const tipos = this.tiposElegibles;
     for (const i of this.segVis) {
+      if (tipos && !tipos.has(a.objetos[a.objeto[i]!]!.tipo)) continue;
       const [x0, y0, z0, x1, y1, z1] = [p[6 * i]!, p[6 * i + 1]!, p[6 * i + 2]!, p[6 * i + 3]!, p[6 * i + 4]!, p[6 * i + 5]!];
       if (Number.isNaN(x0) || Number.isNaN(x1)) continue;
       const [dx, dy] = [x1 - x0, y1 - y0];
@@ -1652,11 +1660,12 @@ export class Vista3D extends Vista {
       const v = evaluar(x0, y0, x1, y1, !Number.isNaN(x0) && !Number.isNaN(x1));
       estado.set(k, modo === "dentro" ? (estado.get(k) ?? true) && v : (estado.get(k) ?? false) || v);
     }
-    const ids = [...estado].filter(([, v]) => v).map(([k]) => a.objetos[k]!.id);
+    const tipos = this.tiposElegibles;
+    const ids = [...estado].filter(([k, v]) => v && (!tipos || tipos.has(a.objetos[k]!.tipo))).map(([k]) => a.objetos[k]!.id);
     // Las cargas, por sus flechas y contornos
     const cg = this.carg;
     const cv = this.cargVis;
-    if (cg && cv) {
+    if (cg && cv && !tipos) {
       const ec = new Map<number, boolean>();
       const S = cv.segmentos;
       const o = cg.origen;

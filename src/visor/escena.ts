@@ -244,12 +244,13 @@ export interface Eleccion {
  * rectas de los niveles pasan por todo, así que van detrás de todo. Un eje de replanteo sólo se
  * elige por su burbuja, entera (su recta no: al elegir un forjado o un pilar se cogía el eje).
  * A la misma medida, una carga gana a la pieza que tiene debajo (la de superficie en todo un forjado,
- * la lineal por el eje de una viga). `radio` es el de `RADIO_CLIC` px.
+ * la lineal por el eje de una viga). `radio` es el de `RADIO_CLIC` px. Con `admite`, sólo lo que admite,
+ * y un polígono también desde fuera, con su contorno a menos de `radio`.
  */
-export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
+export function objetoEn(e: Escena, q: Vec2, radio: number, admite?: (objeto: string) => boolean): string | null {
   let mejor: { objeto: string; prioridad: number; medida: number; carga: boolean } | null = null;
   const proponer = (objeto: string | undefined, prioridad: number, medida: number, estilo: string) => {
-    if (!objeto) return;
+    if (!objeto || (admite && !admite(objeto))) return;
     const carga = estilo.startsWith("carga-");
     const empate = !!mejor && prioridad === mejor.prioridad && Math.abs(medida - mejor.medida) <= 1e-9 * Math.max(1, medida);
     if (!mejor || prioridad > mejor.prioridad || (empate ? carga && !mejor.carga : prioridad === mejor.prioridad && medida < mejor.medida)) mejor = { objeto, prioridad, medida, carga };
@@ -272,6 +273,13 @@ export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
         break;
       case "poligono":
         if (dentroAnillos(q, p.anillos)) proponer(p.objeto, 1, areaAbs(p.anillos[0]!), p.estilo);
+        else if (admite && p.objeto !== undefined && admite(p.objeto)) {
+          // Con un filtro (Comprobación: sólo los pilares), lo que se quiere es pequeño: un clic junto a
+          // su contorno (a menos del radio) también lo coge, detrás de lo que lo contiene
+          let d = Infinity;
+          for (const r of p.anillos) for (let i = 0; i < r.length; i++) d = Math.min(d, distanciaSegmento(q, r[i]!, r[(i + 1) % r.length]!));
+          if (d <= radio) proponer(p.objeto, 0.5, d, p.estilo);
+        }
         break;
       default:
         break;
@@ -280,9 +288,9 @@ export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
   return mejor ? (mejor as { objeto: string }).objeto : null;
 }
 
-/** El objeto bajo un punto, ya resaltado (null si no hay ninguno). */
-export function elegir(e: Escena, q: Vec2, radio: number): Eleccion | null {
-  const o = objetoEn(e, q, radio);
+/** El objeto bajo un punto, ya resaltado (null si no hay ninguno). Con `admite`, sólo los que admite. */
+export function elegir(e: Escena, q: Vec2, radio: number, admite?: (objeto: string) => boolean): Eleccion | null {
+  const o = objetoEn(e, q, radio, admite);
   return o ? resaltar(e, [o]) : null;
 }
 
@@ -337,7 +345,7 @@ function segmentoToca(a: Vec2, b: Vec2, c: Caja): boolean {
  * izquierda a derecha, como CYPECAD y AutoCAD); con «toca», los que tienen algo dentro o la cortan
  * (de derecha a izquierda). En el orden de la escena. Los ejes de replanteo, por sus burbujas.
  */
-export function elegirVentana(e: Escena, c: Caja, modo: "dentro" | "toca"): string[] {
+export function elegirVentana(e: Escena, c: Caja, modo: "dentro" | "toca", admite?: (objeto: string) => boolean): string[] {
   const en = (q: Vec2) => q[0] >= c[0] && q[0] <= c[2] && q[1] >= c[1] && q[1] <= c[3];
   const estado = new Map<string, boolean>();
   const orden: string[] = [];
@@ -353,6 +361,7 @@ export function elegirVentana(e: Escena, c: Caja, modo: "dentro" | "toca"): stri
   ];
   for (const p of e.primitivas) {
     if (!("objeto" in p) || p.objeto === undefined || p.tipo === "texto") continue;
+    if (admite && !admite(p.objeto)) continue;
     if (p.tipo === "linea" && p.estilo === "eje") continue;
     if (p.tipo === "marca" || p.tipo === "flecha") {
       marcar(p.objeto, en(p.p));

@@ -45,6 +45,7 @@ import { alambrico } from "./alambrico.ts";
 import { solido, type Solido } from "./solido.ts";
 import { diagramas3D, type Diagramas3D, type Esfuerzo3D, type PiezasDiagrama } from "./diagramas3d.ts";
 import { elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
+import type { TipoElegible } from "./protocolo.ts";
 import { isovalores3D, valorEnLamina, type Isovalores3D, type SuperficiesMapa } from "./isovalores3d.ts";
 import { pilares3D, type MagnitudPilares, type Pilares3D } from "./pilares3d.ts";
 import { reacciones3D, type Reacciones3D } from "./reacciones3d.ts";
@@ -882,17 +883,36 @@ export class Sesion {
   }
 
   /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */
-  elegir(fu: FuenteEscena, punto: readonly [number, number] | null, radio: number, objetos?: readonly string[]): Eleccion | null {
+  elegir(fu: FuenteEscena, punto: readonly [number, number] | null, radio: number, objetos?: readonly string[], elegibles?: readonly TipoElegible[]): Eleccion | null {
     const e = this.escenaDe(fu);
     if (!e.valido) return null;
     if (objetos !== undefined) return objetos.length ? resaltar(e.valor, objetos) : null;
-    return punto ? elegir(e.valor, punto, radio) : null;
+    return punto ? elegir(e.valor, punto, radio, this.admite(elegibles)) : null;
   }
 
   /** Los objetos de una ventana de una escena (`elegirVentana`). */
-  ventana(fu: FuenteEscena, caja: [number, number, number, number], modo: "dentro" | "toca"): string[] {
+  ventana(fu: FuenteEscena, caja: [number, number, number, number], modo: "dentro" | "toca", elegibles?: readonly TipoElegible[]): string[] {
     const e = this.escenaDe(fu);
-    return e.valido ? elegirVentana(e.valor, caja, modo) : [];
+    return e.valido ? elegirVentana(e.valor, caja, modo, this.admite(elegibles)) : [];
+  }
+
+  /** Los objetos del proyecto de unos tipos (`TipoElegible`), como predicado; sin tipos, todos. */
+  private admite(elegibles: readonly TipoElegible[] | undefined): ((objeto: string) => boolean) | undefined {
+    if (!elegibles?.length) return undefined;
+    const m = this.proyecto.modelo;
+    const ids = new Set<string>();
+    const losas = new Set<string>();
+    for (const t of elegibles) {
+      if (t === "pilar") for (const x of m.pilares ?? []) ids.add(x.id);
+      else if (t === "viga") for (const x of m.vigas ?? []) ids.add(x.id);
+      else for (const x of m.losas ?? []) losas.add(x.id);
+    }
+    return (o) => {
+      if (ids.has(o) || losas.has(o)) return true;
+      // Un refuerzo o una zona de cercos de una losa: «<losa>/R<n>», «<losa>/C<n>»
+      const k = o.lastIndexOf("/");
+      return k > 0 && losas.has(o.slice(0, k)) && /^[RC]\d+$/.test(o.slice(k + 1));
+    };
   }
 }
 

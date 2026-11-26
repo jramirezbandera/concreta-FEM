@@ -33,14 +33,15 @@ import { armadoDeBorrador, armadoParcial, borradorArmado, DIAMETROS_BARRA, eleme
 import { conElemento, conZona } from "../../../src/editor/refuerzosPlanta.ts";
 import type { CaraDibujada } from "../../../src/visor/armadoPlanta.ts";
 import type { DatosArmar, DatosEsfuerzosArmado, FichaComprobacion, FilaModulo, ParteComprobada, TipoComprobacion } from "../../../src/visor/comprobaciones.ts";
+import type { TipoElegible } from "../../../src/visor/protocolo.ts";
 import { Chip, Disposicion, Herramienta, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcAbacos, IcComprobacion, IcLosas, IcPilares, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { AvanceTarea, useTareas } from "../componentes/AvanceTareas.tsx";
-import { AvisoDesactualizado, Cabecera, Fila, filaElegible, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { Proceso, useProceso } from "../componentes/Proceso.tsx";
 import { registroProceso } from "../sesion/registroProceso.ts";
+import { AvisoDesactualizado, Cabecera, Fila, filaElegible, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, plural, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -150,6 +151,12 @@ const enFoco = () => {
   return a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement || a instanceof HTMLSelectElement || (a instanceof HTMLElement && a.isContentEditable);
 };
 
+/**
+ * Lo que se elige en las vistas en cada pestaña: sólo lo que comprueba (pinchando un pilar se cogía la
+ * viga o la losa). En el 3D, también lo que tapa otra pieza; en el punzonamiento, el pilar de la unión.
+ */
+const ELEGIBLES: Record<TipoComprobacion, TipoElegible[]> = { pilares: ["pilar"], vigas: ["viga"], losas: ["losa"], punzonamiento: ["pilar"] };
+
 const aprov = (x: number | null) => (x === null ? "—" : fmt(x, 2));
 
 /**
@@ -159,14 +166,14 @@ const aprov = (x: number | null) => (x === null ? "—" : fmt(x, 2));
 function Armado3DLosas({ armado, cara, datos, base, reticula }: { armado: ArmadoProyecto | undefined; cara: CaraDibujada; datos: DatosArmado; base: boolean; reticula: boolean }) {
   const { proyecto } = useVisor();
   const r = usePedido(proyecto.cliente, { tipo: "armado-losas-3d", planta: null, ...(armado ? { armado } : {}), ...(cara !== "todas" ? { cara } : {}), ...(base ? { base } : {}), datos });
-  return <Fuente3DModelo casetones={reticula} resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Armado de las losas", notas: r.datos.notas } : null, cargando: r.cargando }} />;
+  return <Fuente3DModelo casetones={reticula} elegibles={ELEGIBLES.losas} resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Armado de las losas", notas: r.datos.notas } : null, cargando: r.cargando }} />;
 }
 
 /** §8.21: el 3D de Comprobación con el punzonamiento a la vista: el perímetro crítico y los de cercos de cada unión, sobre su losa. */
 function Punzonamiento3D({ armado, datos }: { armado: ArmadoProyecto | undefined; datos: DatosArmado }) {
   const { proyecto } = useVisor();
   const r = usePedido(proyecto.cliente, { tipo: "punzonamiento-3d", ...(armado ? { armado } : {}), datos });
-  return <Fuente3DModelo resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Punzonamiento", notas: r.datos.notas } : null, cargando: r.cargando }} />;
+  return <Fuente3DModelo elegibles={ELEGIBLES.punzonamiento} resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Punzonamiento", notas: r.datos.notas } : null, cargando: r.cargando }} />;
 }
 
 function estadoDe(p: ParteComprobada): {
@@ -839,6 +846,10 @@ function Ficha({ tipo, ficha, cargando, editar }: { tipo: TipoComprobacion; fich
 /** Lo que ya se ha propuesto solo en esta sesión de la página: por cálculo (su huella) y tipo, una vez. */
 const PROPUESTO_SOLO = new Set<string>();
 const TODOS_LOS_TIPOS: readonly TipoComprobacion[] = ["pilares", "vigas", "losas", "punzonamiento"];
+/** Una propuesta que tarda más que esto abre sola la pestaña «Proceso» (una corta no hace parpadear el panel), ms. */
+const ESPERA_PROCESO = 1200;
+/** Las piezas sin propuesta que se listan una a una en el registro del proceso. */
+const MAX_SIN_PROPUESTA = 300;
 
 export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer solo lo que no tiene armado (por defecto, sí). */ automatico?: boolean }) {
   const { proyecto, setElegidos, elegidos, setPlanta } = useVisor();
@@ -846,12 +857,11 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     props: true,
     dock: true,
     pestana: "tabla",
-/** Una propuesta que tarda más que esto abre sola la pestaña «Proceso» (una corta no hace parpadear el panel), ms. */
-const ESPERA_PROCESO = 1200;
-/** Las piezas sin propuesta que se listan una a una en el registro del proceso. */
-const MAX_SIN_PROPUESTA = 300;
     alto: 440,
   });
+  const panVivo = useRef(pan);
+  panVivo.current = pan;
+  const proceso = useProceso();
   const [tipo, setTipo] = useState<TipoComprobacion>("pilares");
   const [clave, setClave] = useState<string | null>(null);
   const [peores, setPeores] = useState(false);
@@ -859,9 +869,6 @@ const MAX_SIN_PROPUESTA = 300;
   const [cara, setCara] = useState<CaraDibujada>("todas");
   /** Los casetones de los reticulares, de fondo del armado de las losas. */
   const [reticula, setReticula] = useState(true);
-  const panVivo = useRef(pan);
-  panVivo.current = pan;
-  const proceso = useProceso();
   const [base, setBase] = useState(false);
   const [anadir, setAnadir] = useState<string>("");
   const [anadirEn, setAnadirEn] = useState<"nervios" | "abacos">("nervios");
@@ -1053,13 +1060,6 @@ const MAX_SIN_PROPUESTA = 300;
     const hechos: TipoComprobacion[] = [];
     let parcial: ArmadoProyecto | null = null;
     if (porTipos) setEnCurso({ tipos, hechos: [], armado: null });
-    try {
-      const x = await proyecto.cliente.pedir(
-        {
-          tipo: "armar",
-          tipos,
-          ...(entero ? { armado: entero } : {}),
-          datos: datosObra,
     // El registro del proceso (pestaña «Proceso»). Si tarda, la pestaña se abre sola; al acabar, vuelve la de antes
     const reg = porTipos ? registroProceso : null;
     const nombres = (ts: readonly TipoComprobacion[]) => ts.map((t) => TIPOS.find((y) => y.id === t)!.nombre.toLowerCase()).join(", ");
@@ -1073,10 +1073,18 @@ const MAX_SIN_PROPUESTA = 300;
           pv.abrirPestana("proceso");
         }, ESPERA_PROCESO)
       : undefined;
+    try {
+      const x = await proyecto.cliente.pedir(
+        {
+          tipo: "armar",
+          tipos,
+          ...(entero ? { armado: entero } : {}),
+          datos: datosObra,
           ...o,
         },
         {
           alAvance: (a) => {
+            reg?.avance(a);
             if (!a.parcial || !porTipos) return;
             parcial = a.parcial;
             hechos.push(a.tipo);
@@ -1084,15 +1092,17 @@ const MAX_SIN_PROPUESTA = 300;
           },
         },
       );
-            reg?.avance(a);
       if (!x.ok) {
         // Cancelada a medias: los tipos acabados se quedan (ya están comprobados); el que iba a medias, no
         const cancelada = x.diagnosticos.some((y) => y.codigo === "visor/cancelado");
         const acabados = hechos.map((t) => TIPOS.find((y) => y.id === t)!.nombre.toLowerCase());
         if (cancelada && parcial && acabados.length && JSON.stringify(parcial) !== JSON.stringify(entero ?? {})) {
           const ap = ed.editar({ op: "armado", armado: parcial }, etiqueta);
+          reg?.acabar("aviso", ap.ok ? `Cancelada: se queda lo ya propuesto (${acabados.join(", ")}).` : "Cancelada, y lo ya propuesto no se pudo escribir en el proyecto.");
           return setPropuesta({ datos: null, error: ap.ok ? null : "La propuesta se canceló y lo ya propuesto no se pudo escribir en el proyecto.", ...(ap.ok ? { aviso: `Propuesta cancelada: se queda lo ya propuesto (${acabados.join(", ")}). Se deshace con Ctrl+Z.` } : {}) });
         }
+        if (cancelada) reg?.acabar("aviso", "Cancelada: no se ha cambiado nada.");
+        else reg?.acabar("error", x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" "));
         return setPropuesta(cancelada ? { datos: null, error: null, aviso: "Propuesta cancelada: no se ha cambiado nada." } : { datos: null, error: x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" ") });
       }
       const datos = x.valor as DatosArmar;
@@ -1104,18 +1114,15 @@ const MAX_SIN_PROPUESTA = 300;
       }
       if (solo && JSON.stringify(datos.armado ?? {}) === JSON.stringify(entero ?? {})) return void reg?.acabar("fin", "Lo propuesto es lo que ya había: no se ha cambiado nada.");
       const ap = ed.editar({ op: "armado", armado: datos.armado }, etiqueta);
-          reg?.acabar("aviso", ap.ok ? `Cancelada: se queda lo ya propuesto (${acabados.join(", ")}).` : "Cancelada, y lo ya propuesto no se pudo escribir en el proyecto.");
+      if (ap.ok) reg?.acabar("fin", "Armado propuesto y escrito en el proyecto; se deshace con Ctrl+Z.");
+      else reg?.acabar("error", "El armado propuesto no se pudo escribir en el proyecto.");
       setPropuesta(
         ap.ok
-        if (cancelada) reg?.acabar("aviso", "Cancelada: no se ha cambiado nada.");
-        else reg?.acabar("error", x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" "));
           ? { datos, error: null, ...(solo ? { solo } : {}) }
           : {
               datos: null,
               // Lo primero que no vale (un armado propuesto que el proyecto rechaza lo repite pieza a pieza)
               error: `El armado propuesto no se pudo escribir en el proyecto. ${ap.errores
-      if (ap.ok) reg?.acabar("fin", "Armado propuesto y escrito en el proyecto; se deshace con Ctrl+Z.");
-      else reg?.acabar("error", "El armado propuesto no se pudo escribir en el proyecto.");
                 .slice(0, 2)
                 .map((y) => textoApp(y.mensaje))
                 .join(" ")}${ap.errores.length > 2 ? ` (y ${ap.errores.length - 2} más)` : ""}`,
@@ -1127,22 +1134,22 @@ const MAX_SIN_PROPUESTA = 300;
         datos: null,
         error: "El proyecto cambió mientras se proponía el armado: vuelva a pedirlo.",
       });
+      reg?.acabar("error", "El proyecto cambió mientras se proponía el armado: hay que volver a pedirlo.");
     } finally {
       setOcupado(false);
       setEnCurso(null);
-    }
-  };
-
-  /**
-      reg?.acabar("error", "El proyecto cambió mientras se proponía el armado: hay que volver a pedirlo.");
-   * «Proponer» en el banco: el armado de las tablas para la pieza de la ficha, y en palabras lo que ha
-   * pasado. Si lo propuesto es lo que ya tenía, no se escribe nada (ni un paso de deshacer) y se dice
-   * por qué: en el punzonamiento, que la unión cumple sin armadura.
       clearTimeout(abrir);
       reg?.acabar("aviso", "Interrumpido.");
       // La pestaña que había antes de abrirse sola la del proceso, si se sigue en ella
       const pv = panVivo.current;
       if (pestanaAntes && pv.dock && pv.pestana === "proceso") pv.abrirPestana(pestanaAntes);
+    }
+  };
+
+  /**
+   * «Proponer» en el banco: el armado de las tablas para la pieza de la ficha, y en palabras lo que ha
+   * pasado. Si lo propuesto es lo que ya tenía, no se escribe nada (ni un paso de deshacer) y se dice
+   * por qué: en el punzonamiento, que la unión cumple sin armadura.
    */
   const proponerPieza = async (fc: FichaComprobacion) => {
     if (!proyecto.cliente || !ed || ocupado) return;
@@ -1537,8 +1544,9 @@ const MAX_SIN_PROPUESTA = 300;
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
               ...(tipo === "losas" && dibujo === "armado" && !proponiendose ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
               ...(tipo === "punzonamiento" && !proponiendose ? { tresD: () => <Punzonamiento3D armado={armado} datos={datosObra} /> } : {}),
+              ...((tipo === "pilares" || tipo === "vigas") || proponiendose ? { tresD: () => <Fuente3DModelo elegibles={ELEGIBLES[tipo]} /> } : {}),
               // (mientras se propone el armado de lo que se mira, la planta del modelo: la de su armado sale al acabar)
-              planta: (v) => (!v.planta ? null : proponiendose ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} /> : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} />),
+              planta: (v) => (!v.planta ? null : proponiendose ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} elegibles={ELEGIBLES[tipo]} /> : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} elegibles={ELEGIBLES[tipo]} />),
               cabeceraPlanta: () => (
                 <>
                   <Chip acento>
@@ -1571,6 +1579,7 @@ const MAX_SIN_PROPUESTA = 300;
             contenido: tabla,
           },
           { id: "armado", titulo: tipo === "vigas" ? "Armado · pórtico" : "Armado", contenido: banco },
+          { id: "proceso", titulo: "Proceso", insignia: proceso.enMarcha ? "…" : undefined, contenido: <Proceso cliente={proyecto.cliente} /> },
           {
             id: "avisos",
             titulo: "Avisos",
@@ -1579,7 +1588,6 @@ const MAX_SIN_PROPUESTA = 300;
           },
         ]}
       />
-          { id: "proceso", titulo: "Proceso", insignia: proceso.enMarcha ? "…" : undefined, contenido: <Proceso cliente={proyecto.cliente} /> },
     </>
   );
 }

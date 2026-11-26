@@ -1042,6 +1042,28 @@ De la prueba de uso con el edificio de 7 plantas con el sismo: al entrar en Comp
 
 **Lo que queda (CO6-12):** el tiempo es ya casi todo demandas: las de las losas (los cortes de sus franjas con los 21 modos, 15–35 s por losa, y ~1 GB de montón tras la primera) y las de las vigas (~60 s); son del motor de cortes y de diagramas. Las reglas de obra de los pilares son 561 subidas, cada una con su comprobación entera (~20 s en Chrome). Proponer los pilares y las vigas es una función pura de sus demandas: se podría repartir entre varios workers. La tabla de un tipo sin armado sigue calculando sus demandas (2 s los pilares; las vigas y las losas, lo que tarden), aunque la pantalla no la pide mientras se propone. Y dentro de una losa las franjas salen por tandas (los cortes se hacen por grupos de rectas): entre dos tandas pasan de 6 a 9 s sin turno, que es lo más que espera hoy un pedido.
 
+### 8.24 CO6: en cada pestaña sólo se elige lo suyo, y el área capaz de las vigas (2026-11-26)
+
+De la prueba de uso del usuario: en la pestaña Pilares, al pinchar un pilar en la planta o en el 3D se cogía sin querer la viga o la losa; y en el despiece de las vigas quería ver, con la envolvente de cada esfuerzo, lo que resiste la sección con el armado actual (el «área capaz» de CYPECAD), para ver que la solicitación nunca llega a lo resistido.
+
+**Sólo se elige lo de la pestaña:**
+
+- **En la planta**, los pedidos `elegir` y `ventana` llevan `elegibles` (`TipoElegible`: `"pilar"`, `"viga"` o `"losa"`; una losa admite también sus refuerzos y sus zonas de cercos, «L1/R3», «L1/C2»). La sesión lo traduce a los ids del proyecto (`Sesion.admite`) y `objetoEn`/`elegirVentana` sólo proponen esos objetos. Con el filtro, un polígono también se coge desde fuera, con su contorno a menos del radio del clic (a zoom de conjunto, un pilar de 30 cm son 3 px), detrás de lo que lo contiene.
+- **En el 3D**, `Vista3D.tiposElegibles` (por el tipo de cada objeto del sólido y del alámbrico): las demás piezas no se eligen ni tapan (un pilar se coge también detrás de una losa), y las cargas tampoco. Lo de los diagramas (refuerzos, perímetros de punzonamiento) se elige siempre.
+- **Qué en cada pestaña** (`ELEGIBLES` de `Comprobacion.tsx`): pilares, los pilares; vigas, las vigas; losas, las losas con sus refuerzos y cercos; punzonamiento, los pilares (su unión). Fuera de Comprobación no cambia nada.
+
+**El área capaz** (`src/comprobaciones/capacidadVigas.ts`, puro): lo que resiste cada sección a lo largo del pórtico con las barras del despiece que hay en ella, dibujado detrás de la envolvente de My, Vz y T (discontinua, con su relleno) y en la lectura del cursor («resiste −30 … 34»).
+
+- **My:** MRd con la tracción abajo y con la tracción arriba, con `solveAtULU` del módulo de vigas (el mismo que da el MRd de la fila «bending»); con varias barras en una cara, su área con el mayor diámetro (el canto útil, del lado seguro). Donde la sección tiene las barras de una zona del armado, da el MRd de la comprobación bit a bit.
+- **Vz:** VRd de los cercos de la sección con `calcRcShear` (política de viga), el menor de las dos caras traccionadas. Entre dos tramos de cercos, el escalón va a mitad del hueco.
+- **T:** min(TRd,s, TRd,max) de los cercos (CE A19 §6.3.2, por rama exterior), con la torsión sola: la interacción con el cortante es de la comprobación.
+- **Qué barras hay en cada x:** las del despiece, que cuentan enteras donde están ancladas y crecen lineal desde cada punta a lo largo de su `lb,rqd` (o de 0,7·lb con patilla, que ya cuenta lo que mide), como las coloca el despiece. Así se ven el decalaje y los anclajes, y que la corrida de un vano que entra en el de al lado ayuda en la cara del apoyo. Las de piel no cuentan (tampoco en la comprobación).
+- Sólo en los vanos (de cara a cara) de hormigón rectangular. Los puntos de la envolvente que pasan del área capaz se marcan en rojo y el título lo dice. La banda se hace más alta con el área capaz (176 px): lo resistido suele ser varias veces la envolvente. Sigue a lo que se escribe en el formulario, sin aplicarlo. La casilla «Área capaz» la quita.
+
+**Lo que no es la comprobación:** la comprobación mide cada zona con el armado de su vano; el área capaz, con las barras que hay de verdad (también las del vano de al lado que entran en éste). Las dos coinciden donde la sección tiene las barras de su zona; junto a las puntas, el área capaz es la que manda en obra. El área capaz no lleva el axil (la flexotracción) ni decala la envolvente.
+
+**Validación:** `src/comprobaciones/capacidadVigas.test.ts` (MRd y VRd bit a bit con `calcRCBeam` en el centro y en la zona del fin; la rampa de una barra entre lo de sin ella y con ella; el escalón de los cercos; TRd con la fórmula; sin armado, cero), `src/visor/comprobaciones.test.ts` (con `elegibles`, el clic y la ventana sólo dan objetos de ese tipo) y `app/src/test/comprobacion.test.tsx` (el área capaz de My dibujada y, con el pórtico cumpliendo, ningún punto fuera). A mano en la app con la vivienda: en Pilares, un clic en la losa o en una viga no elige nada, en la planta ni en el 3D; en Vigas, la envolvente de Z-CUB-S-1 dentro de su área capaz, y al bajar la corrida en el formulario, el área capaz baja.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

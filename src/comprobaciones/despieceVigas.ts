@@ -45,6 +45,8 @@ export interface DatosDespiece {
   recubrimiento: number;
   /** cot θ de las bielas del cortante, para el decalaje. */
   cotTheta: number;
+  /** El acero de las barras, MPa (para el área capaz, `capacidadVigas.ts`; sin él, B500). */
+  fyk?: number;
   /** El anclaje básico de cada vano (por su clave), m: por diámetro, [en buena adherencia, en la cara superior]. */
   anclajes: Readonly<Record<string, Readonly<Record<number, readonly [number, number]>>>>;
 }

@@ -364,6 +364,18 @@ describe("CO6: las comprobaciones en el worker", () => {
           const c: [number, number] = [0.75 * ((q0![0] + q3![0]) / 2) + 0.25 * ((q1![0] + q2![0]) / 2), 0.75 * ((q0![1] + q3![1]) / 2) + 0.25 * ((q1![1] + q2![1]) / 2)];
           const e = await pedir<{ objeto: string } | null>({ tipo: "elegir", fuente: { tipo: "planta", planta, vista }, punto: c, radio: 0.01 });
           expect(e?.objeto, `${de} ${planta}`).toBe(una.objeto);
+          // Sólo lo de la pestaña (elegibles): con su tipo, la misma; con otro, nunca ésa
+          const suyo = de === "vigas" ? "viga" : "pilar";
+          const otro = suyo === "viga" ? "pilar" : "viga";
+          const conSuyo = await pedir<{ objeto: string } | null>({ tipo: "elegir", fuente: { tipo: "planta", planta, vista }, punto: c, radio: 0.01, elegibles: [suyo] });
+          expect(conSuyo?.objeto, `${de} ${planta}`).toBe(una.objeto);
+          const conOtro = await pedir<{ objeto: string } | null>({ tipo: "elegir", fuente: { tipo: "planta", planta, vista }, punto: c, radio: 0.01, elegibles: [otro] });
+          const deOtro = new Set((otro === "viga" ? modelo.vigas : modelo.pilares)?.map((x) => x.id));
+          expect(conOtro === null || deOtro.has(conOtro.objeto), `${de} ${planta}: ${conOtro?.objeto}`).toBe(true);
+          // La ventana, igual: sólo objetos del tipo
+          const ventana = await pedir<string[]>({ tipo: "ventana", fuente: { tipo: "planta", planta, vista }, caja: [-1e4, -1e4, 1e4, 1e4], modo: "toca", elegibles: [suyo] });
+          const delSuyo = new Set((suyo === "viga" ? modelo.vigas : modelo.pilares)?.map((x) => x.id));
+          expect(ventana.length > 0 && ventana.every((id) => delSuyo.has(id)), `${de} ${planta}`).toBe(true);
         }
       }
     }

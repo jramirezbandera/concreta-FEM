@@ -26,6 +26,7 @@ import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import { sinEjes, type Eleccion, type EscenaPreparada } from "../../../src/visor/escena.ts";
 import { IcEjes } from "../armazon/iconos.tsx";
 import type { FuenteEscena, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
+import type { TipoElegible } from "../../../src/visor/protocolo.ts";
 import { Chip, Desplegable, SelectorEje, SelectorPlanta, useEstrecha } from "../armazon/Disposicion.tsx";
 import { Aviso, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { useDesplegado } from "../componentes/desplegado.ts";
@@ -739,13 +740,14 @@ export function Fuente2D({ escena: escenaEntera, resaltado = null, marcas, event
  * elige (Ctrl+clic añade o quita), una ventana elige lo que cae en ella y un doble clic en un eje
  * abre su alzado.
  */
-export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Eventos2D; resaltado: Eleccion | null } {
+export function useEleccionEscena(fuente: FuenteEscena | null, elegibles?: readonly TipoElegible[]): { eventos: Eventos2D; resaltado: Eleccion | null } {
   const { proyecto, elegidos, setElegidos } = useVisor();
   const { abrirAlzado } = useVistas();
   const ejes = proyecto.estado?.ejes;
   const ultimo = useRef(elegidos);
   ultimo.current = elegidos;
   const cliente = proyecto.cliente;
+  const soloClave = elegibles?.join(",") ?? "";
   const anadir = useCallback(
     (ids: string[], ctrl: boolean) => {
       const ya = ultimo.current;
@@ -761,7 +763,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
       clic: async (p, radio, ctrl, doble) => {
         if (!cliente || !fuente) return;
         // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
-        const r = await sinObsoleto(cliente.pedir({ tipo: "elegir", fuente, punto: p, radio }));
+        const r = await sinObsoleto(cliente.pedir({ tipo: "elegir", fuente, punto: p, radio, ...(soloClave ? { elegibles: soloClave.split(",") as TipoElegible[] } : {}) }));
         if (!r) return;
         const o = r.ok && r.valor ? (r.valor as Eleccion).objeto : null;
         if (doble && o && ejes?.some((x) => x.id === o)) return abrirAlzado(o);
@@ -770,7 +772,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
       },
       ventana: async (caja, modo, ctrl) => {
         if (!cliente || !fuente) return;
-        const r = await sinObsoleto(cliente.pedir({ tipo: "ventana", fuente, caja, modo }));
+        const r = await sinObsoleto(cliente.pedir({ tipo: "ventana", fuente, caja, modo, ...(soloClave ? { elegibles: soloClave.split(",") as TipoElegible[] } : {}) }));
         if (!r) return;
         if (!r.ok) return;
         let ids = r.valor as string[];
@@ -784,7 +786,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
         anadir(ids, ctrl);
       },
     }),
-    [cliente, fuente, ejes, abrirAlzado, anadir, setElegidos, proyecto.edicion],
+    [cliente, fuente, ejes, abrirAlzado, anadir, setElegidos, proyecto.edicion, soloClave],
   );
   const pedido = usePedido(cliente, fuente && elegidos.length ? { tipo: "elegir", fuente, punto: null, radio: 0, objetos: elegidos } : null);
   const resaltado = pedido.datos && elegidos.includes(pedido.datos.objeto) ? pedido.datos : null;
@@ -795,14 +797,14 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
  * Una escena del modelo (una planta en una vista, o un alzado), con elegir. Con `dibujando` (V2c, una
  * herramienta de dibujo activa) no se vela la planta mientras compila lo dibujado: se sigue dibujando.
  */
-export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantilla = null }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean; plantilla?: GeometriaPlantilla | null }) {
+export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantilla = null, elegibles }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean; plantilla?: GeometriaPlantilla | null; /** Sólo se eligen objetos de estos tipos (Comprobación: los de su pestaña). */ elegibles?: readonly TipoElegible[] }) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion;
   // La clave estable: el objeto cambia en cada render
   const clave = JSON.stringify(fuente);
   const fu = useMemo(() => (clave === "null" ? null : (JSON.parse(clave) as FuenteEscena)), [clave]);
   const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}) }) : null);
-  const { eventos, resaltado } = useEleccionEscena(fu);
+  const { eventos, resaltado } = useEleccionEscena(fu, elegibles);
   // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
   const resultados = fu?.tipo === "alzado" && !!fu.diagramas;
   // M-25: la planta del modelo o de las cargas sólo necesita el modelo físico (AL-4): tras editar
@@ -862,10 +864,12 @@ interface PropsFuente3D extends Resultados3D {
   /** Fuerza un modo (la deformada, sobre el analítico). */
   modo?: Modo3D;
   eventos?: Eventos3D;
+  /** Sólo se eligen las piezas de estos tipos (`Vista3D.tiposElegibles`). */
+  elegibles?: readonly string[];
 }
 
 /** Un 3D en la vista de la celda. */
-export function Fuente3D({ alambrico, solido = null, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, cargas = null, leyenda = null, alPasar, sonda = null }: PropsFuente3D) {
+export function Fuente3D({ alambrico, solido = null, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, cargas = null, leyenda = null, alPasar, sonda = null, elegibles }: PropsFuente3D) {
   const { vista, v, varias, i } = useCelda();
   const { poner } = useVistas();
   const x = vista instanceof Vista3D ? vista : null;
@@ -887,6 +891,13 @@ export function Fuente3D({ alambrico, solido = null, analitico = null, deformada
   useEffect(() => x?.ponerProyeccion(v.proyeccion), [x, v.proyeccion]);
   useEffect(() => x?.ponerPlantaActiva(v.planta), [x, v.planta]);
   useEffect(() => x?.ponerSonda(sonda), [x, sonda]);
+  const clavesElegibles = elegibles?.join(",") ?? "";
+  useEffect(() => {
+    if (x) x.tiposElegibles = clavesElegibles ? new Set(clavesElegibles.split(",")) : null;
+    return () => {
+      if (x) x.tiposElegibles = null;
+    };
+  }, [x, clavesElegibles]);
   useEffect(() => {
     if (x) x.eventos = { ...(eventos ?? {}), ...(alPasar ? { pasar: alPasar } : {}), caja: (c) => poner(i, { filtro: { ...filtro.current, caja: c } }) };
   });
@@ -900,7 +911,7 @@ export function Fuente3D({ alambrico, solido = null, analitico = null, deformada
 }
 
 /** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir; con resultados (I4) o con las cargas de un caso, encima. */
-export function Fuente3DModelo({ deformada, modo, resultados, cargas, casetones }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D; cargas?: { datos: Cargas3D | null; aviso?: ReactNode; cargando?: boolean }; /** false: el sólido de los reticulares, sin sus casetones. */ casetones?: boolean }) {
+export function Fuente3DModelo({ deformada, modo, resultados, cargas, casetones, elegibles }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D; cargas?: { datos: Cargas3D | null; aviso?: ReactNode; cargando?: boolean }; /** false: el sólido de los reticulares, sin sus casetones. */ casetones?: boolean; /** Sólo se eligen las piezas de estos tipos (Comprobación: las de su pestaña); lo de los diagramas, siempre. */ elegibles?: readonly string[] }) {
   const { proyecto, elegidos, setElegidos } = useVisor();
   const { v } = useCelda();
   const e = proyecto.estado!;
@@ -932,6 +943,7 @@ export function Fuente3DModelo({ deformada, modo, resultados, cargas, casetones 
       deformada={deformada}
       modo={modoEf}
       eventos={eventos}
+      {...(elegibles ? { elegibles } : {})}
       {...(cargas ? { cargas: cargas.datos, leyenda: cargas.datos, aviso: cargas.aviso } : {})}
       {...resultados}
       cargando={alamb.cargando || (quiereSolido && sol.cargando) || (quiereAnalitico && geo.cargando) || !!resultados?.cargando || !!cargas?.cargando}

@@ -245,7 +245,7 @@ export function datosDespiece(p: Portico, d?: DatosArmado): DatosDespiece {
     for (const o of DIAMETROS) t[o] = [computeAnchorage(o, fctm, fyd, "inf", v.geometria.h).lb_rqd / 1000, computeAnchorage(o, fctm, fyd, "sup", v.geometria.h).lb_rqd / 1000];
     anclajes[v.clave] = t;
   }
-  return { recubrimiento: d?.recubrimiento ?? DATOS_ARMADO.recubrimiento, cotTheta: COT_THETA_CORTANTE, anclajes };
+  return { recubrimiento: d?.recubrimiento ?? DATOS_ARMADO.recubrimiento, cotTheta: COT_THETA_CORTANTE, fyk: d?.fyk ?? DATOS_ARMADO.fyk, anclajes };
 }
 
 /** El pórtico de una viga; null si la viga no existe. */
