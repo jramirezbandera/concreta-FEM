@@ -3,8 +3,8 @@
  * herramientas, navegador, vista, propiedades y panel inferior. Cada espacio da el contenido de cada
  * hueco; la disposición sólo los coloca, los pliega y recuerda cómo se dejaron (`paneles.ts`).
  */
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { useDesplegado } from "../componentes/desplegado.ts";
 import { cota } from "../fmt.ts";
@@ -327,87 +327,114 @@ export interface Pestana {
   contenido: ReactNode;
 }
 
-/** Lo más bajo del panel inferior abierto, px; lo más alto deja a las vistas unos 300 px (lo de encima de ellas, las barras, son ~120). */
+/** Lo más bajo del panel inferior abierto, px. */
 const ALTO_DOCK_MIN = 120;
 /** C-20: lo que sube o baja el panel con cada flecha, px. */
 const PASO_DOCK = 20;
 
+/**
+ * El panel inferior. Su altura no tiene más tope que el alto del espacio (hasta debajo de la barra de
+ * herramientas): hasta dejar a las vistas unos 300 px, las encoge; a partir de ahí, la caja del panel
+ * sube por encima de ellas y de los paneles laterales, sin encogerlas más (`.dock` y `.dock-caja`, en
+ * `index.css`). Maximizado (`max`), las tapa del todo; la altura de antes se recuerda.
+ */
 function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
   const activa = pestanas.find((x) => x.id === p.pestana) ?? pestanas[0]!;
-  const arrastre = useRef<{ y: number; alto: number; ahora: number } | null>(null);
+  /** `base` − la y del cursor = la altura; `ahora`, la que lleva. */
+  const arrastre = useRef<{ base: number; ahora: number; movido: boolean } | null>(null);
   const seccion = useRef<HTMLElement>(null);
+  const caja = useRef<HTMLDivElement>(null);
   const idCuerpo = useId();
   const abierto = p.dock;
-  const maximo = () => Math.max(ALTO_DOCK_MIN, window.innerHeight - 420);
+  const maximizado = abierto && p.max;
+  /** Lo más alto: todo el espacio bajo la barra de herramientas (el bloque que contiene a las vistas y al panel). */
+  const maximo = () => Math.max(ALTO_DOCK_MIN, seccion.current?.parentElement?.clientHeight || window.innerHeight - 180);
   const limitar = (a: number) => Math.round(Math.max(ALTO_DOCK_MIN, Math.min(maximo(), a)));
   /** C-38: al soltar, la altura se guarda una vez (durante el arrastre sólo cambia el estilo). */
   const soltar = () => {
     const a = arrastre.current;
     arrastre.current = null;
-    if (a && a.ahora !== a.alto) p.poner({ alto: a.ahora });
+    if (a?.movido) p.poner({ alto: a.ahora, max: false });
   };
+  const alternarMax = () => p.poner({ dock: true, max: !maximizado });
   return (
-    <section ref={seccion} className="dock" aria-label="Panel inferior" style={abierto ? { height: p.alto } : undefined} data-abierto={abierto}>
-      {abierto && (
-        <div
-          className="dock-asa"
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="Cambiar la altura del panel inferior"
-          // C-20: con el foco, ↑ y ↓ la cambian de 20 en 20 px (Inicio y Fin, al mínimo y al máximo)
-          tabIndex={0}
-          aria-valuenow={p.alto}
-          aria-valuemin={ALTO_DOCK_MIN}
-          aria-valuemax={maximo()}
-          aria-valuetext={`${p.alto} px`}
-          onKeyDown={(e) => {
-            const d = e.key === "ArrowUp" ? PASO_DOCK : e.key === "ArrowDown" ? -PASO_DOCK : null;
-            const alto = d !== null ? limitar(p.alto + d) : e.key === "Home" ? ALTO_DOCK_MIN : e.key === "End" ? maximo() : null;
-            if (alto === null) return;
-            e.preventDefault();
-            if (alto !== p.alto) p.poner({ alto });
-          }}
-          onPointerDown={(e) => {
-            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-            arrastre.current = { y: e.clientY, alto: p.alto, ahora: p.alto };
-          }}
-          onPointerMove={(e) => {
-            const a = arrastre.current;
-            if (!a) return;
-            // C-38: sin `poner` (localStorage y repintar el espacio) en cada movimiento: sólo el alto de la sección
-            a.ahora = limitar(a.alto + a.y - e.clientY);
-            if (seccion.current) seccion.current.style.height = `${a.ahora}px`;
-          }}
-          onPointerUp={soltar}
-          onPointerCancel={soltar}
-          onLostPointerCapture={soltar}
-        />
-      )}
-      <Grupo rol="tablist" etiqueta="Pestañas del panel inferior" className="dock-tabs">
-        <button type="button" className="ib" style={{ width: 26, height: 26 }} onClick={() => p.poner({ dock: !abierto })} aria-label={abierto ? "Plegar el panel inferior" : "Abrir el panel inferior"} title={abierto ? "Plegar el panel inferior" : "Abrir el panel inferior"}>
-          {abierto ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </button>
-        {pestanas.map((x) => (
-          <button
-            key={x.id}
-            type="button"
-            role="tab"
-            aria-selected={abierto && x.id === activa.id}
-            aria-controls={abierto && x.id === activa.id ? idCuerpo : undefined}
-            data-on={abierto && x.id === activa.id}
-            className="dock-tab"
-            onClick={() => (abierto && x.id === activa.id ? p.poner({ dock: false }) : p.poner({ dock: true, pestana: x.id }))}
-          >
-            {x.titulo}
-            {x.insignia !== undefined && <span className="insignia">{x.insignia}</span>}
+    <section ref={seccion} className="dock" aria-label="Panel inferior" style={abierto ? ({ "--dock-alto": `${p.alto}px` } as CSSProperties) : undefined} data-abierto={abierto} data-max={maximizado}>
+      <div ref={caja} className="dock-caja">
+        {abierto && (
+          <div
+            className="dock-asa"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Cambiar la altura del panel inferior"
+            title="Arrastre para cambiar la altura: sin tope, por encima de las vistas · doble clic: maximizar o restaurar"
+            // C-20: con el foco, ↑ y ↓ la cambian de 20 en 20 px (Inicio y Fin, al mínimo y al máximo)
+            tabIndex={0}
+            aria-valuenow={p.alto}
+            aria-valuemin={ALTO_DOCK_MIN}
+            aria-valuemax={maximo()}
+            aria-valuetext={maximizado ? "maximizado" : `${p.alto} px`}
+            onKeyDown={(e) => {
+              const desde = maximizado ? maximo() : p.alto;
+              const d = e.key === "ArrowUp" ? PASO_DOCK : e.key === "ArrowDown" ? -PASO_DOCK : null;
+              const alto = d !== null ? limitar(desde + d) : e.key === "Home" ? ALTO_DOCK_MIN : e.key === "End" ? maximo() : null;
+              if (alto === null) return;
+              e.preventDefault();
+              if (alto !== p.alto || maximizado) p.poner({ alto, max: false });
+            }}
+            onDoubleClick={alternarMax}
+            onPointerDown={(e) => {
+              (e.target as HTMLElement).setPointerCapture(e.pointerId);
+              // (maximizado, o con un alto guardado mayor que el espacio: desde lo que mide ahora)
+              const alto = limitar(caja.current?.offsetHeight || p.alto);
+              arrastre.current = { base: e.clientY + alto, ahora: alto, movido: false };
+            }}
+            onPointerMove={(e) => {
+              const a = arrastre.current;
+              if (!a) return;
+              const alto = limitar(a.base - e.clientY);
+              if (alto === a.ahora) return;
+              a.ahora = alto;
+              a.movido = true;
+              // C-38: sin `poner` (localStorage y repintar el espacio) en cada movimiento: sólo el alto de la sección
+              if (!seccion.current) return;
+              seccion.current.dataset.max = "false";
+              seccion.current.style.setProperty("--dock-alto", `${alto}px`);
+            }}
+            onPointerUp={soltar}
+            onPointerCancel={soltar}
+            onLostPointerCapture={soltar}
+          />
+        )}
+        <Grupo rol="tablist" etiqueta="Pestañas del panel inferior" className="dock-tabs">
+          <button type="button" className="ib" style={{ width: 26, height: 26 }} onClick={() => p.poner({ dock: !abierto })} aria-label={abierto ? "Plegar el panel inferior" : "Abrir el panel inferior"} title={abierto ? "Plegar el panel inferior" : "Abrir el panel inferior"}>
+            {abierto ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
           </button>
-        ))}
-      </Grupo>
-      {abierto && (
-        <div id={idCuerpo} className="dock-cuerpo" role="tabpanel" aria-label={activa.titulo}>
-          {activa.contenido}
-        </div>
-      )}
+          {pestanas.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              role="tab"
+              aria-selected={abierto && x.id === activa.id}
+              aria-controls={abierto && x.id === activa.id ? idCuerpo : undefined}
+              data-on={abierto && x.id === activa.id}
+              className="dock-tab"
+              onClick={() => (abierto && x.id === activa.id ? p.poner({ dock: false }) : p.poner({ dock: true, pestana: x.id }))}
+            >
+              {x.titulo}
+              {x.insignia !== undefined && <span className="insignia">{x.insignia}</span>}
+            </button>
+          ))}
+          <span className="min-w-2 flex-1" />
+          <button type="button" className="ib dock-max" style={{ width: 26, height: 26 }} aria-pressed={maximizado} onClick={alternarMax} aria-label={maximizado ? "Restaurar el panel inferior" : "Maximizar el panel inferior"} title={maximizado ? "Restaurar el panel inferior a su altura" : "Maximizar el panel inferior: tapa las vistas"}>
+            {maximizado ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+        </Grupo>
+        {abierto && (
+          <div id={idCuerpo} className="dock-cuerpo" role="tabpanel" aria-label={activa.titulo}>
+            {activa.contenido}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -443,14 +470,17 @@ export function Disposicion({ paneles, herramientas, nav, vista, props, dock, et
       <div className="herramientas" role="toolbar" aria-label={etiquetaHerramientas}>
         {herramientas}
       </div>
-      <div className="flex min-h-0 flex-1">
-        {nav && <PanelLateral lado="izq" l={nav} abierto={navAbierto} onAbierto={(v) => paneles.poner(v && uno ? { nav: true, props: false } : { nav: v })} />}
-        <section className="vista" aria-label="Vista">
-          {vista}
-        </section>
-        {props && <PanelLateral lado="der" l={props} abierto={paneles.props} onAbierto={(v) => paneles.poner({ props: v })} />}
+      {/* (el bloque de las vistas y el panel inferior: la caja del panel, al subir más de la cuenta, se coloca respecto a él) */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1">
+          {nav && <PanelLateral lado="izq" l={nav} abierto={navAbierto} onAbierto={(v) => paneles.poner(v && uno ? { nav: true, props: false } : { nav: v })} />}
+          <section className="vista" aria-label="Vista">
+            {vista}
+          </section>
+          {props && <PanelLateral lado="der" l={props} abierto={paneles.props} onAbierto={(v) => paneles.poner({ props: v })} />}
+        </div>
+        {dock && dock.length > 0 && <Dock pestanas={dock} p={paneles} />}
       </div>
-      {dock && dock.length > 0 && <Dock pestanas={dock} p={paneles} />}
     </div>
   );
 }

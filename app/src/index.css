@@ -850,9 +850,19 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 /* Un ib-chip con texto (Todas, Ninguna, Elegir…; C-37) */
 .ib-chip.ib-texto { width: auto; padding: 0 6px; }
 
-.dock { position: relative; display: flex; flex-direction: column; flex-shrink: 0; border-top: 1px solid var(--color-border-main); background: var(--color-bg-primary); }
-/* Un alto guardado con la ventana más grande no deja las vistas sin sitio: unos 300 px para ellas */
-.dock[data-abierto="true"] { max-height: max(120px, calc(100vh - 420px)); }
+/*
+ * El panel inferior: `.dock` ocupa su sitio bajo las vistas y `.dock-caja` es lo que se ve. Abierto,
+ * `.dock` crece con la altura pedida hasta dejar a las vistas unos 300 px; la caja, anclada abajo, tiene
+ * la altura pedida entera: lo que pasa de ahí sube por encima de las vistas y de los paneles laterales
+ * (sin encogerlas más), hasta el alto del bloque que los contiene. Maximizado, lo llena.
+ */
+.dock { flex-shrink: 0; }
+.dock-caja { position: relative; display: flex; flex-direction: column; border-top: 1px solid var(--color-border-main); background: var(--color-bg-primary); }
+.dock[data-abierto="true"] { height: min(var(--dock-alto), max(120px, calc(100vh - 420px))); }
+.dock[data-abierto="true"] > .dock-caja { position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; height: var(--dock-alto); min-height: 120px; max-height: 100%; box-shadow: 0 -8px 18px -14px rgb(0 0 0 / 0.35); }
+.dock[data-abierto="true"][data-max="true"] > .dock-caja { height: 100%; border-top: 0; }
+.dock-max { flex-shrink: 0; }
+.dock-max[aria-pressed="true"] { color: var(--color-accent); }
 .dock-asa { position: absolute; top: -3px; left: 0; right: 0; z-index: 5; height: 6px; cursor: ns-resize; }
 /* C-20: el asa con el foco (↑ y ↓ cambian la altura) */
 .dock-asa:focus-visible { outline: none; background: var(--color-accent); }
@@ -1446,6 +1456,23 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .elemento-armado button:hover { text-decoration: underline; }
 .ca-aviso { display: block; margin-top: 2px; color: var(--color-state-warn-text, var(--color-state-warn)); }
 .cq-cota[data-activo] .cq-guia { stroke: var(--color-accent); }
+/* La pestaña «Proceso»: lo que se hace ahora y, debajo, el registro línea a línea con su tiempo */
+.proceso { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.proceso-cab { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 0; font-size: 13px; }
+.proceso-cab > span { font-size: 12px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.proceso-lineas { flex: 1; min-height: 60px; margin: 6px 14px 10px; padding: 6px 0; overflow: auto; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); font: 12px/1.5 var(--font-mono); list-style: none; }
+.proceso-lineas > li { display: flex; gap: 12px; padding: 1px 12px; color: var(--color-text-secondary); }
+.proceso-lineas > li > time { flex-shrink: 0; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+.proceso-lineas > li > span { min-width: 0; overflow-wrap: anywhere; }
+.proceso-lineas > li[data-clase="tipo"] { margin-top: 6px; font-weight: 600; color: var(--color-text-primary); }
+.proceso-lineas > li[data-clase="fase"] > span { padding-left: 14px; }
+.proceso-lineas > li[data-clase="dato"] > span { padding-left: 14px; }
+.proceso-lineas > li[data-clase="hecho"] > span { padding-left: 14px; color: var(--color-state-ok, var(--color-text-primary)); }
+.proceso-lineas > li[data-clase="inicio"], .proceso-lineas > li[data-clase="fin"] { color: var(--color-text-primary); }
+.proceso-lineas > li[data-clase="fin"] { margin-top: 6px; font-weight: 600; }
+.proceso-lineas > li[data-clase="aviso"] { color: var(--color-state-warn); }
+.proceso-lineas > li[data-clase="error"] { color: var(--color-state-fail); }
+.proceso-lineas > li[data-clase="ahora"] > span { padding-left: 14px; color: var(--color-accent); }
 
 /* Un botón que parece un enlace (ver los demás diagnósticos de un grupo) */
 .enlace { padding: 0; border: 0; background: none; font-family: var(--font-sans); color: var(--color-accent-text); cursor: pointer; }

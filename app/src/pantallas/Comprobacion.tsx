@@ -39,6 +39,8 @@ import { usePaneles } from "../armazon/paneles.ts";
 import { IcAbacos, IcComprobacion, IcLosas, IcPilares, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { AvanceTarea, useTareas } from "../componentes/AvanceTareas.tsx";
 import { AvisoDesactualizado, Cabecera, Fila, filaElegible, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { Proceso, useProceso } from "../componentes/Proceso.tsx";
+import { registroProceso } from "../sesion/registroProceso.ts";
 import { useVisor } from "../contexto.ts";
 import { fmt, plural, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -844,6 +846,10 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     props: true,
     dock: true,
     pestana: "tabla",
+/** Una propuesta que tarda más que esto abre sola la pestaña «Proceso» (una corta no hace parpadear el panel), ms. */
+const ESPERA_PROCESO = 1200;
+/** Las piezas sin propuesta que se listan una a una en el registro del proceso. */
+const MAX_SIN_PROPUESTA = 300;
     alto: 440,
   });
   const [tipo, setTipo] = useState<TipoComprobacion>("pilares");
@@ -853,6 +859,9 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   const [cara, setCara] = useState<CaraDibujada>("todas");
   /** Los casetones de los reticulares, de fondo del armado de las losas. */
   const [reticula, setReticula] = useState(true);
+  const panVivo = useRef(pan);
+  panVivo.current = pan;
+  const proceso = useProceso();
   const [base, setBase] = useState(false);
   const [anadir, setAnadir] = useState<string>("");
   const [anadirEn, setAnadirEn] = useState<"nervios" | "abacos">("nervios");
@@ -1051,6 +1060,19 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           tipos,
           ...(entero ? { armado: entero } : {}),
           datos: datosObra,
+    // El registro del proceso (pestaña «Proceso»). Si tarda, la pestaña se abre sola; al acabar, vuelve la de antes
+    const reg = porTipos ? registroProceso : null;
+    const nombres = (ts: readonly TipoComprobacion[]) => ts.map((t) => TIPOS.find((y) => y.id === t)!.nombre.toLowerCase()).join(", ");
+    reg?.empezar("Proponiendo el armado", `${etiqueta}${solo ? " (lo propone el programa al entrar en Comprobación)" : ""} · ${nombres(tipos)}`);
+    let pestanaAntes: string | null = null;
+    const abrir = reg
+      ? setTimeout(() => {
+          const pv = panVivo.current;
+          if (pv.dock && pv.pestana === "proceso") return;
+          pestanaAntes = pv.dock ? (pv.pestana ?? "tabla") : null;
+          pv.abrirPestana("proceso");
+        }, ESPERA_PROCESO)
+      : undefined;
           ...o,
         },
         {
@@ -1062,6 +1084,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           },
         },
       );
+            reg?.avance(a);
       if (!x.ok) {
         // Cancelada a medias: los tipos acabados se quedan (ya están comprobados); el que iba a medias, no
         const cancelada = x.diagnosticos.some((y) => y.codigo === "visor/cancelado");
@@ -1073,15 +1096,26 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
         return setPropuesta(cancelada ? { datos: null, error: null, aviso: "Propuesta cancelada: no se ha cambiado nada." } : { datos: null, error: x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" ") });
       }
       const datos = x.valor as DatosArmar;
-      if (solo && JSON.stringify(datos.armado ?? {}) === JSON.stringify(entero ?? {})) return;
+      if (reg) {
+        for (const [t, r] of Object.entries(datos.resumen) as [TipoComprobacion, NonNullable<DatosArmar["resumen"][TipoComprobacion]>][])
+          reg.anotar("dato", `${TIPOS.find((y) => y.id === t)!.nombre}: ${r.propuestas} de ${r.partes} con ${t === "punzonamiento" ? "armadura propuesta" : "propuesta"}${r.sinPropuesta ? `, ${r.sinPropuesta} sin ella` : ""}${r.conservadas ? `, ${r.conservadas} con ${t === "punzonamiento" ? "la suya" : "el suyo"}` : ""}.`);
+        for (const y of datos.sinPropuesta.slice(0, MAX_SIN_PROPUESTA)) reg.anotar("aviso", `Sin propuesta · ${y.clave}: ${textoApp(y.motivo)}`);
+        if (datos.sinPropuesta.length > MAX_SIN_PROPUESTA) reg.anotar("aviso", `… y ${datos.sinPropuesta.length - MAX_SIN_PROPUESTA} más sin propuesta.`);
+      }
+      if (solo && JSON.stringify(datos.armado ?? {}) === JSON.stringify(entero ?? {})) return void reg?.acabar("fin", "Lo propuesto es lo que ya había: no se ha cambiado nada.");
       const ap = ed.editar({ op: "armado", armado: datos.armado }, etiqueta);
+          reg?.acabar("aviso", ap.ok ? `Cancelada: se queda lo ya propuesto (${acabados.join(", ")}).` : "Cancelada, y lo ya propuesto no se pudo escribir en el proyecto.");
       setPropuesta(
         ap.ok
+        if (cancelada) reg?.acabar("aviso", "Cancelada: no se ha cambiado nada.");
+        else reg?.acabar("error", x.diagnosticos.map((y) => textoApp(y.mensaje)).join(" "));
           ? { datos, error: null, ...(solo ? { solo } : {}) }
           : {
               datos: null,
               // Lo primero que no vale (un armado propuesto que el proyecto rechaza lo repite pieza a pieza)
               error: `El armado propuesto no se pudo escribir en el proyecto. ${ap.errores
+      if (ap.ok) reg?.acabar("fin", "Armado propuesto y escrito en el proyecto; se deshace con Ctrl+Z.");
+      else reg?.acabar("error", "El armado propuesto no se pudo escribir en el proyecto.");
                 .slice(0, 2)
                 .map((y) => textoApp(y.mensaje))
                 .join(" ")}${ap.errores.length > 2 ? ` (y ${ap.errores.length - 2} más)` : ""}`,
@@ -1100,9 +1134,15 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   };
 
   /**
+      reg?.acabar("error", "El proyecto cambió mientras se proponía el armado: hay que volver a pedirlo.");
    * «Proponer» en el banco: el armado de las tablas para la pieza de la ficha, y en palabras lo que ha
    * pasado. Si lo propuesto es lo que ya tenía, no se escribe nada (ni un paso de deshacer) y se dice
    * por qué: en el punzonamiento, que la unión cumple sin armadura.
+      clearTimeout(abrir);
+      reg?.acabar("aviso", "Interrumpido.");
+      // La pestaña que había antes de abrirse sola la del proceso, si se sigue en ella
+      const pv = panVivo.current;
+      if (pestanaAntes && pv.dock && pv.pestana === "proceso") pv.abrirPestana(pestanaAntes);
    */
   const proponerPieza = async (fc: FichaComprobacion) => {
     if (!proyecto.cliente || !ed || ocupado) return;
@@ -1539,6 +1579,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           },
         ]}
       />
+          { id: "proceso", titulo: "Proceso", insignia: proceso.enMarcha ? "…" : undefined, contenido: <Proceso cliente={proyecto.cliente} /> },
     </>
   );
 }

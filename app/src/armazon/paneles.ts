@@ -14,6 +14,8 @@ export interface EstadoPaneles {
   pestana: string | null;
   /** Altura del panel inferior abierto, px. */
   alto: number;
+  /** El panel inferior, maximizado: tapa las vistas (su altura se recuerda para restaurarlo). */
+  max: boolean;
 }
 
 export const ALTO_DOCK = 280;
@@ -79,6 +81,7 @@ export function usePaneles(clave: string, defecto: Partial<EstadoPaneles>): Pane
     dock: r?.dock ?? defecto.dock ?? false,
     pestana: r?.pestana ?? defecto.pestana ?? null,
     alto: r?.alto ?? defecto.alto ?? ALTO_DOCK,
+    max: r?.max ?? defecto.max ?? false,
   };
   a.vivos.set(clave, e);
   const { cambiar } = a;

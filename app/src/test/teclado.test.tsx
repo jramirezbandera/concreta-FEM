@@ -61,7 +61,7 @@ describe("C-18 · Grupo", () => {
 
 /** Unos paneles de mentira: `poner` cambia el estado y se cuenta. */
 function ConPaneles({ poner }: { poner: (c: Partial<Paneles>) => void }) {
-  const [e, setE] = useState({ nav: false, props: false, dock: true, pestana: "a" as string | null, alto: 280 });
+  const [e, setE] = useState({ nav: false, props: false, dock: true, pestana: "a" as string | null, alto: 280, max: false });
   const p: Paneles = {
     ...e,
     clave: "prueba",
@@ -106,7 +106,7 @@ describe("C-18, C-20 y C-38 · el panel inferior", () => {
     expect(asa.tabIndex).toBe(0);
     expect(asa.getAttribute("aria-valuenow")).toBe("280");
     fireEvent.keyDown(asa, { key: "ArrowUp" });
-    expect(poner).toHaveBeenLastCalledWith({ alto: 300 });
+    expect(poner).toHaveBeenLastCalledWith({ alto: 300, max: false });
     expect(asa.getAttribute("aria-valuenow")).toBe("300");
     fireEvent.keyDown(asa, { key: "ArrowDown" });
     fireEvent.keyDown(asa, { key: "ArrowDown" });
@@ -121,10 +121,38 @@ describe("C-18, C-20 y C-38 · el panel inferior", () => {
     fireEvent.pointerMove(asa, { clientY: 450, pointerId: 1 });
     fireEvent.pointerMove(asa, { clientY: 400, pointerId: 1 });
     expect(poner).not.toHaveBeenCalled();
-    expect(dock.style.height).toBe("220px");
+    expect(dock.style.getPropertyValue("--dock-alto")).toBe("220px");
     fireEvent.pointerUp(asa, { clientY: 400, pointerId: 1 });
     expect(poner).toHaveBeenCalledTimes(1);
-    expect(poner).toHaveBeenLastCalledWith({ alto: 220 });
+    expect(poner).toHaveBeenLastCalledWith({ alto: 220, max: false });
+  });
+
+  it("sin tope en lo que dejan las vistas, y se maximiza y se restaura", () => {
+    const poner = vi.fn();
+    const { container } = render(<ConPaneles poner={poner} />);
+    const asa = screen.getByRole("separator", { name: "Cambiar la altura del panel inferior" });
+    const dock = container.querySelector("section.dock") as HTMLElement;
+    // Arrastrado muy arriba: hasta todo el alto del espacio (antes, hasta dejar 300 px a las vistas)
+    asa.setPointerCapture = () => {};
+    fireEvent.pointerDown(asa, { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(asa, { clientY: -2000, pointerId: 1 });
+    fireEvent.pointerUp(asa, { clientY: -2000, pointerId: 1 });
+    const alto = Number(asa.getAttribute("aria-valuemax"));
+    expect(alto).toBeGreaterThan(window.innerHeight - 420);
+    expect(poner).toHaveBeenLastCalledWith({ alto, max: false });
+
+    const maximizar = screen.getByRole("button", { name: "Maximizar el panel inferior" });
+    fireEvent.click(maximizar);
+    expect(poner).toHaveBeenLastCalledWith({ dock: true, max: true });
+    expect(dock.dataset.max).toBe("true");
+    // La altura de antes se conserva: al restaurar, vuelve
+    fireEvent.click(screen.getByRole("button", { name: "Restaurar el panel inferior" }));
+    expect(poner).toHaveBeenLastCalledWith({ dock: true, max: false });
+    expect(dock.dataset.max).toBe("false");
+    expect(dock.style.getPropertyValue("--dock-alto")).toBe(`${alto}px`);
+    // Doble clic en el asa: lo mismo que el botón
+    fireEvent.doubleClick(asa);
+    expect(dock.dataset.max).toBe("true");
   });
 });
 
