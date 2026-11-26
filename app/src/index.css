@@ -852,14 +852,13 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 
 /*
  * El panel inferior: `.dock` ocupa su sitio bajo las vistas y `.dock-caja` es lo que se ve. Abierto,
- * `.dock` crece con la altura pedida hasta dejar a las vistas unos 300 px; la caja, anclada abajo, tiene
- * la altura pedida entera: lo que pasa de ahí sube por encima de las vistas y de los paneles laterales
- * (sin encogerlas más), hasta el alto del bloque que los contiene. Maximizado, lo llena.
+ * crece con la altura pedida hasta dejar a las vistas unos 300 px (el umbral, `umbralDock`); más, es
+ * maximizado: la caja, anclada abajo, llena el bloque de las vistas y los paneles laterales y los tapa.
  */
 .dock { flex-shrink: 0; }
 .dock-caja { position: relative; display: flex; flex-direction: column; border-top: 1px solid var(--color-border-main); background: var(--color-bg-primary); }
 .dock[data-abierto="true"] { height: min(var(--dock-alto), max(120px, calc(100vh - 420px))); }
-.dock[data-abierto="true"] > .dock-caja { position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; height: var(--dock-alto); min-height: 120px; max-height: 100%; box-shadow: 0 -8px 18px -14px rgb(0 0 0 / 0.35); }
+.dock[data-abierto="true"] > .dock-caja { position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; height: min(var(--dock-alto), max(120px, calc(100vh - 420px))); min-height: 120px; max-height: 100%; box-shadow: 0 -8px 18px -14px rgb(0 0 0 / 0.35); }
 .dock[data-abierto="true"][data-max="true"] > .dock-caja { height: 100%; border-top: 0; }
 .dock-max { flex-shrink: 0; }
 .dock-max[aria-pressed="true"] { color: var(--color-accent); }

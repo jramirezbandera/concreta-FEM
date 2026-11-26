@@ -331,12 +331,22 @@ export interface Pestana {
 const ALTO_DOCK_MIN = 120;
 /** C-20: lo que sube o baja el panel con cada flecha, px. */
 const PASO_DOCK = 20;
+/** Lo que hay que pasar del umbral para que el panel se maximice al soltarlo (que rozarlo no lo haga), px. */
+const MARGEN_MAX = 24;
 
 /**
- * El panel inferior. Su altura no tiene más tope que el alto del espacio (hasta debajo de la barra de
- * herramientas): hasta dejar a las vistas unos 300 px, las encoge; a partir de ahí, la caja del panel
- * sube por encima de ellas y de los paneles laterales, sin encogerlas más (`.dock` y `.dock-caja`, en
- * `index.css`). Maximizado (`max`), las tapa del todo; la altura de antes se recuerda.
+ * El umbral: lo más alto del panel sin maximizar, el que deja a las vistas unos 300 px (lo de encima de
+ * ellas, las barras, son ~120). Es el mismo cálculo que el de `.dock` en `index.css`.
+ */
+export function umbralDock(altoVentana: number): number {
+  return Math.max(ALTO_DOCK_MIN, altoVentana - 420);
+}
+
+/**
+ * El panel inferior. Hasta el umbral (`umbralDock`) encoge las vistas; arrastrado más arriba, se ve
+ * ya maximizado y al soltarlo se queda así (`max`): tapa las vistas y los paneles laterales hasta
+ * debajo de la barra de herramientas (`.dock` y `.dock-caja`, en `index.css`). Restaurado, vuelve a la
+ * altura de antes, que nunca pasa del umbral.
  */
 function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
   const activa = pestanas.find((x) => x.id === p.pestana) ?? pestanas[0]!;
@@ -350,11 +360,17 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
   /** Lo más alto: todo el espacio bajo la barra de herramientas (el bloque que contiene a las vistas y al panel). */
   const maximo = () => Math.max(ALTO_DOCK_MIN, seccion.current?.parentElement?.clientHeight || window.innerHeight - 180);
   const limitar = (a: number) => Math.round(Math.max(ALTO_DOCK_MIN, Math.min(maximo(), a)));
+  const umbral = () => umbralDock(window.innerHeight);
+  /** Pasado el umbral: maximizado (con la altura de antes, sin pasar del umbral, para restaurarlo). */
+  const pasa = (a: number) => a > umbral() + MARGEN_MAX;
+  const restaurado = () => Math.min(p.alto, umbral());
   /** C-38: al soltar, la altura se guarda una vez (durante el arrastre sólo cambia el estilo). */
   const soltar = () => {
     const a = arrastre.current;
     arrastre.current = null;
-    if (a?.movido) p.poner({ alto: a.ahora, max: false });
+    if (!a?.movido) return;
+    if (pasa(a.ahora)) p.poner({ alto: restaurado(), max: true });
+    else p.poner({ alto: Math.min(a.ahora, umbral()), max: false });
   };
   const alternarMax = () => p.poner({ dock: true, max: !maximizado });
   return (
@@ -366,25 +382,29 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
             role="separator"
             aria-orientation="horizontal"
             aria-label="Cambiar la altura del panel inferior"
-            title="Arrastre para cambiar la altura: sin tope, por encima de las vistas · doble clic: maximizar o restaurar"
+            title="Arrastre para cambiar la altura; más arriba de lo que dejan las vistas, se maximiza · doble clic: maximizar o restaurar"
             // C-20: con el foco, ↑ y ↓ la cambian de 20 en 20 px (Inicio y Fin, al mínimo y al máximo)
             tabIndex={0}
             aria-valuenow={p.alto}
             aria-valuemin={ALTO_DOCK_MIN}
-            aria-valuemax={maximo()}
+            aria-valuemax={umbral()}
             aria-valuetext={maximizado ? "maximizado" : `${p.alto} px`}
             onKeyDown={(e) => {
-              const desde = maximizado ? maximo() : p.alto;
+              // ↑ en el umbral, o Fin: maximizado; ↓ maximizado: restaurado, en el umbral
+              const u = umbral();
+              const desde = maximizado ? u + PASO_DOCK : Math.min(p.alto, u);
               const d = e.key === "ArrowUp" ? PASO_DOCK : e.key === "ArrowDown" ? -PASO_DOCK : null;
-              const alto = d !== null ? limitar(desde + d) : e.key === "Home" ? ALTO_DOCK_MIN : e.key === "End" ? maximo() : null;
+              const alto = d !== null ? Math.max(ALTO_DOCK_MIN, desde + d) : e.key === "Home" ? ALTO_DOCK_MIN : e.key === "End" ? Infinity : null;
               if (alto === null) return;
               e.preventDefault();
-              if (alto !== p.alto || maximizado) p.poner({ alto, max: false });
+              if (alto > u) {
+                if (!maximizado) p.poner({ alto: restaurado(), max: true });
+              } else if (alto !== p.alto || maximizado) p.poner({ alto: Math.round(alto), max: false });
             }}
             onDoubleClick={alternarMax}
             onPointerDown={(e) => {
               (e.target as HTMLElement).setPointerCapture(e.pointerId);
-              // (maximizado, o con un alto guardado mayor que el espacio: desde lo que mide ahora)
+              // (desde lo que mide ahora: maximizado, todo el espacio)
               const alto = limitar(caja.current?.offsetHeight || p.alto);
               arrastre.current = { base: e.clientY + alto, ahora: alto, movido: false };
             }}
@@ -395,10 +415,12 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
               if (alto === a.ahora) return;
               a.ahora = alto;
               a.movido = true;
-              // C-38: sin `poner` (localStorage y repintar el espacio) en cada movimiento: sólo el alto de la sección
+              // C-38: sin `poner` (localStorage y repintar el espacio) en cada movimiento: sólo el alto de la
+              // sección. Pasado el umbral, se ve ya maximizado: es lo que queda al soltar
               if (!seccion.current) return;
-              seccion.current.dataset.max = "false";
-              seccion.current.style.setProperty("--dock-alto", `${alto}px`);
+              const max = pasa(alto);
+              seccion.current.dataset.max = String(max);
+              if (!max) seccion.current.style.setProperty("--dock-alto", `${alto}px`);
             }}
             onPointerUp={soltar}
             onPointerCancel={soltar}

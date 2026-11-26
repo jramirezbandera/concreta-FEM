@@ -7,7 +7,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { Disposicion } from "../armazon/Disposicion.tsx";
+import { Disposicion, umbralDock } from "../armazon/Disposicion.tsx";
 import type { Paneles } from "../armazon/paneles.ts";
 import { Grupo } from "../componentes/Grupo.tsx";
 import { filaElegible } from "../componentes/comunes.tsx";
@@ -127,30 +127,42 @@ describe("C-18, C-20 y C-38 · el panel inferior", () => {
     expect(poner).toHaveBeenLastCalledWith({ alto: 220, max: false });
   });
 
-  it("sin tope en lo que dejan las vistas, y se maximiza y se restaura", () => {
+  it("arrastrado más allá del umbral se maximiza; el botón restaura a la altura de antes", () => {
     const poner = vi.fn();
     const { container } = render(<ConPaneles poner={poner} />);
     const asa = screen.getByRole("separator", { name: "Cambiar la altura del panel inferior" });
     const dock = container.querySelector("section.dock") as HTMLElement;
-    // Arrastrado muy arriba: hasta todo el alto del espacio (antes, hasta dejar 300 px a las vistas)
+    const umbral = umbralDock(window.innerHeight);
+    expect(Number(asa.getAttribute("aria-valuemax"))).toBe(umbral);
     asa.setPointerCapture = () => {};
+
+    // Un poco por encima del umbral (sin pasar el margen): se queda en el umbral, sin maximizar
+    fireEvent.pointerDown(asa, { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(asa, { clientY: 500 - (umbral - 280) - 10, pointerId: 1 });
+    expect(dock.dataset.max).toBe("false");
+    fireEvent.pointerUp(asa, { pointerId: 1 });
+    expect(poner).toHaveBeenLastCalledWith({ alto: umbral, max: false });
+
+    // Muy arriba: mientras se arrastra ya se ve maximizado, y al soltar se queda así con la altura de antes
     fireEvent.pointerDown(asa, { clientY: 500, pointerId: 1 });
     fireEvent.pointerMove(asa, { clientY: -2000, pointerId: 1 });
-    fireEvent.pointerUp(asa, { clientY: -2000, pointerId: 1 });
-    const alto = Number(asa.getAttribute("aria-valuemax"));
-    expect(alto).toBeGreaterThan(window.innerHeight - 420);
-    expect(poner).toHaveBeenLastCalledWith({ alto, max: false });
-
-    const maximizar = screen.getByRole("button", { name: "Maximizar el panel inferior" });
-    fireEvent.click(maximizar);
-    expect(poner).toHaveBeenLastCalledWith({ dock: true, max: true });
     expect(dock.dataset.max).toBe("true");
-    // La altura de antes se conserva: al restaurar, vuelve
+    fireEvent.pointerUp(asa, { pointerId: 1 });
+    expect(poner).toHaveBeenLastCalledWith({ alto: umbral, max: true });
+    expect(dock.dataset.max).toBe("true");
+
+    // El botón dice ahora «Restaurar» y vuelve a la altura de antes
     fireEvent.click(screen.getByRole("button", { name: "Restaurar el panel inferior" }));
     expect(poner).toHaveBeenLastCalledWith({ dock: true, max: false });
     expect(dock.dataset.max).toBe("false");
-    expect(dock.style.getPropertyValue("--dock-alto")).toBe(`${alto}px`);
-    // Doble clic en el asa: lo mismo que el botón
+    expect(dock.style.getPropertyValue("--dock-alto")).toBe(`${umbral}px`);
+    expect(screen.getByRole("button", { name: "Maximizar el panel inferior" })).toBeTruthy();
+
+    // Con el teclado: ↑ en el umbral maximiza y ↓ restaura; doble clic en el asa, como el botón
+    fireEvent.keyDown(asa, { key: "ArrowUp" });
+    expect(dock.dataset.max).toBe("true");
+    fireEvent.keyDown(asa, { key: "ArrowDown" });
+    expect(poner).toHaveBeenLastCalledWith({ alto: umbral, max: false });
     fireEvent.doubleClick(asa);
     expect(dock.dataset.max).toBe("true");
   });
