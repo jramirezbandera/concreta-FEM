@@ -860,6 +860,13 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .dock[data-abierto="true"] { height: min(var(--dock-alto), max(120px, calc(100vh - 420px))); }
 .dock[data-abierto="true"] > .dock-caja { position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; height: min(var(--dock-alto), max(120px, calc(100vh - 420px))); min-height: 120px; max-height: 100%; box-shadow: 0 -8px 18px -14px rgb(0 0 0 / 0.35); }
 .dock[data-abierto="true"][data-max="true"] > .dock-caja { height: 100%; border-top: 0; }
+/* Arrastrándolo, la caja sigue al cursor hasta arriba del todo; pasado el umbral, se suelta para maximizar */
+.dock[data-abierto="true"][data-arrastre="true"] > .dock-caja { height: var(--dock-alto); }
+.dock[data-pasa="true"] > .dock-caja { border-top: 2px solid var(--color-accent); }
+.dock[data-pasa="true"] > .dock-caja::before {
+  content: "Suelte para maximizar"; position: absolute; top: 10px; left: 50%; z-index: 6; transform: translateX(-50%);
+  padding: 3px 10px; border-radius: 6px; background: var(--color-accent); color: #fff; font: 500 12px var(--font-sans); pointer-events: none;
+}
 .dock-max { flex-shrink: 0; }
 .dock-max[aria-pressed="true"] { color: var(--color-accent); }
 .dock-asa { position: absolute; top: -3px; left: 0; right: 0; z-index: 5; height: 6px; cursor: ns-resize; }

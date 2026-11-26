@@ -34,7 +34,7 @@ import { conElemento, conZona } from "../../../src/editor/refuerzosPlanta.ts";
 import type { CaraDibujada } from "../../../src/visor/armadoPlanta.ts";
 import type { DatosArmar, DatosEsfuerzosArmado, FichaComprobacion, FilaModulo, ParteComprobada, TipoComprobacion } from "../../../src/visor/comprobaciones.ts";
 import type { TipoElegible } from "../../../src/visor/protocolo.ts";
-import { Chip, Disposicion, Herramienta, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { ALTO_DOCK_MINIMIZADO, altoMedioDock, Chip, Disposicion, Herramienta, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcAbacos, IcComprobacion, IcLosas, IcPilares, IcViga, type Icono } from "../armazon/iconos.tsx";
@@ -861,6 +861,13 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   });
   const panVivo = useRef(pan);
   panVivo.current = pan;
+  // Al entrar, el panel inferior a medio camino si se dejó plegado, minimizado o maximizado: así se ve
+  // que está y que se puede subir o plegar (lo plegado o lo maximizado pasa desapercibido)
+  useEffect(() => {
+    const pv = panVivo.current;
+    if (pv.dock && !pv.max && pv.alto > ALTO_DOCK_MINIMIZADO) return;
+    pv.poner({ dock: true, max: false, alto: altoMedioDock(window.innerHeight) });
+  }, []);
   const proceso = useProceso();
   const [tipo, setTipo] = useState<TipoComprobacion>("pilares");
   const [clave, setClave] = useState<string | null>(null);

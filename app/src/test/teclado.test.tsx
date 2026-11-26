@@ -143,11 +143,18 @@ describe("C-18, C-20 y C-38 · el panel inferior", () => {
     fireEvent.pointerUp(asa, { pointerId: 1 });
     expect(poner).toHaveBeenLastCalledWith({ alto: umbral, max: false });
 
-    // Muy arriba: mientras se arrastra ya se ve maximizado, y al soltar se queda así con la altura de antes
+    // Muy arriba: mientras se arrastra sigue al cursor (sin maximizar, con «Suelte para maximizar»), y
+    // sólo al soltar se queda maximizado, con la altura de antes para restaurar
     fireEvent.pointerDown(asa, { clientY: 500, pointerId: 1 });
     fireEvent.pointerMove(asa, { clientY: -2000, pointerId: 1 });
-    expect(dock.dataset.max).toBe("true");
+    expect(dock.dataset.max).toBe("false");
+    expect(dock.dataset.arrastre).toBe("true");
+    expect(dock.dataset.pasa).toBe("true");
+    expect(Number.parseFloat(dock.style.getPropertyValue("--dock-alto"))).toBeGreaterThan(umbral);
+    expect(poner).toHaveBeenLastCalledWith({ alto: umbral, max: false });
     fireEvent.pointerUp(asa, { pointerId: 1 });
+    expect(dock.dataset.arrastre).toBeUndefined();
+    expect(dock.dataset.pasa).toBeUndefined();
     expect(poner).toHaveBeenLastCalledWith({ alto: umbral, max: true });
     expect(dock.dataset.max).toBe("true");
 

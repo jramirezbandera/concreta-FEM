@@ -335,6 +335,17 @@ const PASO_DOCK = 20;
 const MARGEN_MAX = 24;
 
 /**
+ * Una altura a medio camino: la mitad del espacio bajo la barra de herramientas, sin pasar del umbral.
+ * Para abrir el panel de forma que se vea que está y que se puede subir o plegar.
+ */
+export function altoMedioDock(altoVentana: number): number {
+  return Math.round(Math.min(umbralDock(altoVentana), Math.max(ALTO_DOCK_MIN + 80, (altoVentana - 122) / 2)));
+}
+
+/** Lo que se tiene por «minimizado»: tan bajo que casi no se ve lo que hay dentro, px. */
+export const ALTO_DOCK_MINIMIZADO = ALTO_DOCK_MIN + 40;
+
+/**
  * El umbral: lo más alto del panel sin maximizar, el que deja a las vistas unos 300 px (lo de encima de
  * ellas, las barras, son ~120). Es el mismo cálculo que el de `.dock` en `index.css`.
  */
@@ -343,10 +354,11 @@ export function umbralDock(altoVentana: number): number {
 }
 
 /**
- * El panel inferior. Hasta el umbral (`umbralDock`) encoge las vistas; arrastrado más arriba, se ve
- * ya maximizado y al soltarlo se queda así (`max`): tapa las vistas y los paneles laterales hasta
- * debajo de la barra de herramientas (`.dock` y `.dock-caja`, en `index.css`). Restaurado, vuelve a la
- * altura de antes, que nunca pasa del umbral.
+ * El panel inferior. Hasta el umbral (`umbralDock`) encoge las vistas. Al arrastrarlo, sigue al cursor
+ * hasta arriba del todo (por encima del umbral, tapando las vistas, con «Suelte para maximizar»); al
+ * soltarlo más allá del umbral se queda maximizado (`max`): tapa las vistas y los paneles laterales
+ * hasta debajo de la barra de herramientas (`.dock` y `.dock-caja`, en `index.css`). Restaurado,
+ * vuelve a la altura de antes, que nunca pasa del umbral.
  */
 function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
   const activa = pestanas.find((x) => x.id === p.pestana) ?? pestanas[0]!;
@@ -368,9 +380,20 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
   const soltar = () => {
     const a = arrastre.current;
     arrastre.current = null;
+    const sec = seccion.current;
+    if (sec) {
+      delete sec.dataset.arrastre;
+      delete sec.dataset.pasa;
+    }
     if (!a?.movido) return;
-    if (pasa(a.ahora)) p.poner({ alto: restaurado(), max: true });
-    else p.poner({ alto: Math.min(a.ahora, umbral()), max: false });
+    const max = pasa(a.ahora);
+    const alto = max ? restaurado() : Math.min(a.ahora, umbral());
+    // (el estilo se dejó con la altura del cursor: si la guardada no cambia, React no lo rehace)
+    if (sec) {
+      sec.style.setProperty("--dock-alto", `${alto}px`);
+      sec.dataset.max = String(max);
+    }
+    p.poner({ alto, max });
   };
   const alternarMax = () => p.poner({ dock: true, max: !maximizado });
   return (
@@ -416,11 +439,14 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
               a.ahora = alto;
               a.movido = true;
               // C-38: sin `poner` (localStorage y repintar el espacio) en cada movimiento: sólo el alto de la
-              // sección. Pasado el umbral, se ve ya maximizado: es lo que queda al soltar
-              if (!seccion.current) return;
-              const max = pasa(alto);
-              seccion.current.dataset.max = String(max);
-              if (!max) seccion.current.style.setProperty("--dock-alto", `${alto}px`);
+              // sección. Sigue al cursor también más allá del umbral; maximizar es cosa de soltar
+              const sec = seccion.current;
+              if (!sec) return;
+              sec.dataset.max = "false";
+              sec.dataset.arrastre = "true";
+              if (pasa(alto)) sec.dataset.pasa = "true";
+              else delete sec.dataset.pasa;
+              sec.style.setProperty("--dock-alto", `${alto}px`);
             }}
             onPointerUp={soltar}
             onPointerCancel={soltar}
