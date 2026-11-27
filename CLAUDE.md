@@ -1204,7 +1204,11 @@
     - **no hay un juego único de componentes** (UI2-11 a UI2-20): ocho segmentados, cinco pestañas, seis disposiciones de campo, diez títulos de sección, doce tamaños de letra (UI-49 ha vuelto a abrirse), el `title` nativo como único tooltip (260) y Propiedades con siete anchos según el modo;
     - **paneles que parecen documentación** (UI2-21 a UI2-26): párrafos de cien palabras en Propiedades, etiquetas con el nombre del campo del fichero, un «?» por campo y mono para texto corriente.
   - **No mirado:** tooltips y listas nativas, estados al pasar el ratón y arrastres, Firefox y Safari, menos de 1366 px y el edificio grande.
-  - **Pendiente del usuario:** las decisiones UI2-a…UI2-f (§5). **Lo siguiente** (§6): los tokens de escala con su prueba y los componentes únicos.
+  - **Los cimientos, en parte, el mismo día** (§7.1 del informe):
+    - las escalas de letra (11, 12, 13, 15 y 18 px) y de radio (2, 4, 6, 8, 12 y píldora), con la prueba `src/pruebas/estilos.test.ts`, que falla con cualquier otro valor en las hojas de estilo o en los `.tsx` de `app/src` (lo dibujado en un SVG no entra);
+    - `app/src/componentes/Pistas.tsx`: el tooltip de la app para todo elemento con `title`, sin tocar ninguno (se lo quita mientras dura y se lo devuelve al salir); **un `title` sigue siendo la manera de dar una pista**, con la forma «Nombre: explicación (Atajo)»;
+    - el segmentado de la barra, como el de los paneles, con mono sólo si sus opciones son ids; el anillo de foco y el estado pulsado de `.btn`.
+  - **Pendiente del usuario:** las decisiones UI2-a…UI2-f (§5). **Lo siguiente** (§6): lo que queda del punto 2 (`Pestanas`, `Campo`, `Seccion`, `Insignia`, `Aviso` y `Vacio` únicos, y las escalas de alto y de espacio) y Propiedades. Los bancos de Chrome siguen sin pasarse.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

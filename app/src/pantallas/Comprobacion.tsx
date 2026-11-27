@@ -127,8 +127,8 @@ const RETICULA: { id: "si" | "no"; nombre: string; title: string }[] = [
   { id: "no", nombre: "No", title: "Sin los casetones, en la planta y en el 3D: sólo el armado" },
 ];
 const BASE: { id: "si" | "no"; nombre: string; title: string }[] = [
-  { id: "no", nombre: "No", title: "Sólo los refuerzos y los cercos: la armadura base es de toda la losa y va en la leyenda" },
   { id: "si", nombre: "Sí", title: "También la armadura base, barra a barra y más fina, en la planta y en el 3D: en un reticular, una línea por nervio" },
+  { id: "no", nombre: "No", title: "Sólo los refuerzos y los cercos: la armadura base es de toda la losa y va en la leyenda" },
 ];
 const CARAS: { id: CaraDibujada; nombre: string; title: string }[] = [
   { id: "todas", nombre: "Todo", title: "Los refuerzos de las dos caras (los inferiores en azul y los superiores en rojo) y los cercos de los nervios" },
@@ -211,7 +211,7 @@ function CamposGrupo({ g, borrador, onCambio }: { g: GrupoArmado; borrador: Read
       {g.campos.map((c) => {
         const nombre = `${g.titulo}: ${c.etiqueta}`;
         return (
-          <label key={c.ruta} className="flex items-center gap-1 text-[11.5px] text-text-secondary">
+          <label key={c.ruta} className="flex items-center gap-1 text-[12px] text-text-secondary">
             {c.etiqueta}
             {c.clase === "diametro" ? (
               <select className="sel" style={{ height: 24, width: 62 }} aria-label={nombre} value={borrador[c.ruta] ?? ""} onChange={(e) => onCambio(c.ruta, e.target.value)}>
@@ -391,7 +391,7 @@ function FormArmado({
         <div className="grupos-armado">
           {fijos.map((g) => (
             <div key={g.titulo} className="mt-1.5" onMouseEnter={() => onActivo(rutaGrupo(g))} onFocus={() => onActivo(rutaGrupo(g))}>
-              <div className="text-[11.5px] text-text-secondary">
+              <div className="text-[12px] text-text-secondary">
                 {g.titulo}
                 {g.opcional && <small className="ml-1 text-text-tertiary">(opcional)</small>}
               </div>
@@ -1273,7 +1273,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   // §8.16: el armado viene propuesto solo, así que volver a pedirlo no va en la barra: va encima de la tabla
   const barraProponer = (
     <div role="group" aria-label="Proponer armado" className="barra-proponer" data-barra-proponer>
-      <span className="text-[11.5px] text-text-secondary">Volver a proponer el armado:</span>
+      <span className="text-[12px] text-text-secondary">Volver a proponer el armado:</span>
       <button type="button" className="btn" style={{ height: 24 }} disabled={!ed || ocupado || !activo} onClick={proponerFalta} title={tipo === "punzonamiento" ? "La armadura de punzonamiento que haga falta en las uniones que no tienen una escrita" : `El armado de las tablas en los ${varios} que no tienen`}>
         Lo que falta
       </button>

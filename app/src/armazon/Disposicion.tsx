@@ -112,7 +112,8 @@ export function Hueco() {
 /** Elegir uno de varios valores cortos (magnitud, esfuerzo), en monoespaciada. */
 export function Segmentado<T extends string>({ opciones, valor, onCambio, etiqueta, deshabilitada }: { opciones: readonly { id: T; nombre: string; title?: string }[]; valor: T; onCambio: (v: T) => void; etiqueta: string; deshabilitada?: (id: T) => boolean }) {
   return (
-    <div className="herr-seg" role="group" aria-label={etiqueta}>
+    // Mono sólo si todas las opciones son ids («uz», «M11», «Fz»), no palabras (UI2-14)
+    <div className="herr-seg" role="group" aria-label={etiqueta} data-ids={opciones.every((o) => /^[A-Za-zσν]{1,2}\d{0,2}$/.test(o.nombre)) || undefined}>
       <span className="herr-seg-et">{etiqueta}</span>
       <div>
         {opciones.map((o) => (

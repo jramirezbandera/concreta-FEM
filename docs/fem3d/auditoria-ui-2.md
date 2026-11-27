@@ -257,3 +257,21 @@ El punto 1 de §6, lo roto a la vista. Sin commit todavía.
 - **Pruebas:** las de `app/` (177) y `src/pruebas/textos.test.ts`, con tres casos nuevos de UI2-7, en verde; `tsc` sin errores.
 - **Comprobado en el navegador** con la vivienda, a 1920 × 1080: la lista de casos, el menú «Vistas» (de 1652 a 1912), Propiedades de un pilar, la pista de Pilar con las burbujas a la vista, el perfil del maestro, Reacciones, y en Comprobación · Vigas la fila par elegida con su tinte, la cabecera fija y «MRd ≥ Md».
 - **Sin comprobar:** el encuadre de Armado en planta, la ficha de viento, el tema oscuro y 1366 px tras los cambios, y los bancos de Chrome, que pulsan en el lienzo y pueden notar los márgenes nuevos.
+
+### 7.1 Los cimientos (2026-11-27)
+
+El punto 2 de §6, en parte. Sin commit todavía.
+
+- **UI2-16, las escalas, con su prueba** (`src/pruebas/estilos.test.ts`):
+  - letra: 11, 12, 13, 15 y 18 px. Lo que se salía pasa al paso más cercano (11,5 → 12; 10,5, 10 y 9,5 → 11; 12,5 → 13; 14 y 16 → 15), en las hojas de estilo y en las clases de los `.tsx`;
+  - radios: 2, 4, 6, 8 y 12 px, y la píldora (3 → 4; 5 → 6; 7, 9 y 10 → 8; 15 → 999). Lo que flota (menús, leyenda, opciones) queda todo a 8;
+  - la prueba lee las hojas y los `.tsx` de `app/src` y falla con cualquier otro valor. No entra lo que se dibuja en un SVG (el despiece, «Situación», los croquis), que va con la escala de su dibujo.
+  - **Quedan** los altos de control, los rellenos y las separaciones, sin escala ni prueba.
+- **UI2-13, la pista** (`app/src/componentes/Pistas.tsx`, montada en `main.tsx`): el tooltip de la app, para todo elemento con `title`, sin tocar ninguno. Al entrar el ratón o el foco del teclado se le quita el `title` mientras dura (así el navegador no pinta el suyo) y se le devuelve al salir. «Nombre: explicación» sale con el nombre en negrita y la explicación debajo, y un atajo final entre paréntesis, como tecla. Tarda 450 ms la primera y nada las siguientes al recorrer una barra.
+  - **Quedan** los `title` que hacen de manual (24 de más de 110 caracteres): caben en el globo, pero su sitio es Propiedades.
+- **UI2-15 y UI2-14, los segmentados:** el de la barra (`.herr-seg`) es ya como el de los paneles (`.seg`): palabras en la letra de la interfaz, lo elegido en relieve y la misma transición. La monoespaciada, sólo si todas sus opciones son ids («uz», «M11», «Fz»). El de los gestores, al mismo alto. «Base» y «Retícula», las dos «Sí | No».
+- **UI2-18:** el anillo de foco de la app en los segmentados, las filas, la cabecera de la leyenda y los filtros; `.btn[aria-pressed="true"]` tiene estado («Animar», «Parar»).
+- **Pruebas:** las de `app/` (177), `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` sin errores.
+- **Comprobado en el navegador** con la vivienda, a 1920 × 1080: la pista de «Viga» y la de «Encuadrar» con su tecla F, el `title` devuelto al salir, y las barras de Resultados y de Comprobación · Losas con los segmentados nuevos; sin errores en la consola.
+- **Sin comprobar:** la pista con el teclado y en los diálogos, el tema oscuro, 1366 px y los bancos de Chrome.
+- **Lo que queda del punto 2:** `Pestanas`, `Campo`, `Seccion`, `Insignia`, `Aviso` y `Vacio` únicos (UI2-15, UI2-22), los segmentados sueltos (`.chip.seg-chip`, `.fichas`, `.filtro-lista`, `.pestanas-lista`) y las escalas de alto y de espacio.

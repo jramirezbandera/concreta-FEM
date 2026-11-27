@@ -282,10 +282,10 @@ body {
 .btn-cuadrado { width: 28px; padding: 0; }
 
 /* Segmentado: un carril tenue y lo elegido en relieve, como los espacios de la barra de arriba */
-.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--color-bg-elevated); }
+.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--color-bg-elevated); }
 .seg > button {
   display: inline-flex; align-items: center; gap: 5px;
-  height: 24px; padding: 0 9px; border: 0; border-radius: 5px;
+  height: 24px; padding: 0 9px; border: 0; border-radius: 6px;
   background: none; color: var(--color-text-secondary);
   font: 500 12px var(--font-sans); cursor: pointer; white-space: nowrap;
   transition: background-color .12s, color .12s;
@@ -370,7 +370,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .celda[data-tipo="3d"] .vista-cab { right: 132px; }
 .vista-barra {
   position: absolute; right: 10px; bottom: 10px; z-index: 15; display: flex; gap: 2px; padding: 3px;
-  border: 1px solid var(--color-border-main); border-radius: 10px;
+  border: 1px solid var(--color-border-main); border-radius: 8px;
   background: color-mix(in srgb, var(--color-bg-primary) 94%, transparent); box-shadow: var(--shadow-sm);
 }
 .vista-barra > .ib { width: 28px; height: 28px; }
@@ -386,7 +386,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .eng-barra .ib.eng-flecha[data-on="false"] { color: var(--color-text-tertiary); }
 .eng-menu {
   position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 16; width: 236px; padding: 6px 0 8px;
-  border: 1px solid var(--color-border-main); border-radius: 10px; background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: var(--color-bg-primary);
   box-shadow: var(--shadow-pop); font-size: 13px; color: var(--color-text-primary);
 }
 .eng-cab { display: flex; align-items: center; gap: 8px; padding: 6px 12px 3px; font: 600 11px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
@@ -403,7 +403,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 /* I3: las opciones de un 3D y los chips de sus filtros */
 .opciones-vista {
   position: absolute; right: 10px; bottom: 52px; z-index: 16; width: 240px; padding: 9px 11px 11px;
-  border: 1px solid var(--color-border-main); border-radius: 10px; background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: var(--color-bg-primary);
   box-shadow: var(--shadow-pop); font-size: 12px; color: var(--color-text-primary);
 }
 .opciones-vista fieldset { border: 0; margin: 8px 0 0; padding: 0; min-width: 0; }
@@ -412,7 +412,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .chip.chip-filtro { padding: 0 3px 0 10px; gap: 2px; font-size: 13px; }
 .leyenda-vista {
   position: absolute; right: 10px; top: 10px; z-index: 14; width: 196px; max-height: calc(100% - 64px); overflow-y: auto;
-  border: 1px solid var(--color-border-main); border-radius: 10px; background: color-mix(in srgb, var(--color-bg-primary) 94%, transparent); font-size: 11px;
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: color-mix(in srgb, var(--color-bg-primary) 94%, transparent); font-size: 11px;
   box-shadow: var(--shadow-sm); backdrop-filter: blur(6px);
 }
 /* En un 3D, la leyenda va bajo el ViewCube y sus ejes (vista3d.ts, CUBO): si no, lo tapa */
@@ -580,7 +580,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .fichas-plantas { display: flex; flex-wrap: wrap; gap: 6px; }
 .ficha {
   display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 10px;
-  border: 1px solid var(--color-border-main); border-radius: 15px; cursor: pointer;
+  border: 1px solid var(--color-border-main); border-radius: 999px; cursor: pointer;
   font: 500 12px var(--font-mono); color: var(--color-text-secondary);
   transition: border-color .12s, background-color .12s, color .12s;
 }
@@ -626,7 +626,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 /* La paleta como un campo de búsqueda discreto, en el centro de la barra (entre dos `flex-1`) */
 .btn-buscar {
   display: inline-flex; flex: 0 100 clamp(200px, 20vw, 320px); min-width: 132px; align-items: center; gap: 8px; height: 28px; margin-inline: 8px; padding: 0 8px 0 10px;
-  border: 1px solid var(--color-border-sub); border-radius: 7px; background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface);
   font: 12px var(--font-sans); color: var(--color-text-tertiary); cursor: pointer; white-space: nowrap;
 }
 .btn-buscar:hover { border-color: var(--color-border-main); color: var(--color-text-secondary); }
@@ -692,13 +692,22 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .herr-campo { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 6px; flex-shrink: 0; }
 .herr-campo > span, .herr-seg-et { font: 600 11px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
 .herr-seg { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 6px; flex-shrink: 0; }
-.herr-seg > div { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--color-bg-elevated); }
+.herr-seg > div { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--color-bg-elevated); }
 .herr-seg button {
-  height: 24px; padding: 0 9px; border: 0; border-radius: 5px; background: none;
-  font: 500 12px var(--font-mono); color: var(--color-text-secondary); cursor: pointer;
+  height: 24px; padding: 0 9px; border: 0; border-radius: 6px; background: none;
+  font: 500 12px var(--font-sans); color: var(--color-text-secondary); cursor: pointer; white-space: nowrap;
+  transition: background-color .12s, color .12s;
 }
-.herr-seg button[data-on="true"] { background: var(--color-bg-primary); color: var(--color-accent); box-shadow: 0 1px 2px rgb(16 24 40 / .14); }
-.herr-seg button:disabled { opacity: .4; cursor: default; }
+/* UI2-15: el segmentado de la barra, como el de los paneles (`.seg`): palabras en la letra de la
+   interfaz y lo elegido en relieve; la monoespaciada, sólo si sus opciones son ids («uz», «M11») */
+.herr-seg button:hover:not(:disabled) { color: var(--color-text-primary); }
+.herr-seg button[data-on="true"] { background: var(--color-bg-primary); color: var(--color-text-primary); box-shadow: 0 1px 2px rgb(16 24 40 / .12), 0 0 0 .5px rgb(16 24 40 / .06); }
+html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--color-border-main); }
+.herr-seg[data-ids="true"] button { font-family: var(--font-mono); }
+.herr-seg button:disabled { opacity: .45; cursor: default; }
+/* UI2-18: el foco del teclado, el mismo anillo en todos los segmentados y filas, y un botón pulsado */
+.seg > button:focus-visible, .chip.seg-chip > button:focus-visible, .ib-chip:focus-visible, .lista-fila:focus-visible, .leyenda-cab:focus-visible, .filtro-lista button:focus-visible, .pestanas-lista button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.btn[aria-pressed="true"] { background: var(--color-tint-accent); border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border-main)); color: var(--color-accent); }
 /* En un portátil (1366–1536 px) la barra no cabía y lo de la derecha (las disposiciones) quedaba
    cortado sin ninguna pista: más apretada y, si aun así no cabe, con su barra de desplazamiento */
 /* El tipo de la vista activa, sólo con iconos (también está en el chip de cada vista) */
@@ -829,7 +838,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .chip .mono { font-size: 12px; }
 .chip.seg-chip { padding: 0 3px; gap: 2px; }
 .chip.seg-chip > button {
-  height: 24px; padding: 0 9px; border: 0; border-radius: 5px; background: none;
+  height: 24px; padding: 0 9px; border: 0; border-radius: 6px; background: none;
   font: 500 13px var(--font-sans); color: var(--color-text-secondary); cursor: pointer;
 }
 .chip.seg-chip > button[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
@@ -845,10 +854,10 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .planta-sel-campo { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 0 0 0 7px; }
 .planta-sel-campo .sel-flecha { right: 2px; }
 .planta-sel-sep { width: 1px; height: 18px; margin: 0 3px 0 2px; background: var(--color-border-main); }
-.planta-sel-campo > i { width: 6px; height: 6px; border-radius: 3px; flex-shrink: 0; }
+.planta-sel-campo > i { width: 6px; height: 6px; border-radius: 4px; flex-shrink: 0; }
 .planta-sel-campo > i.f { background: var(--color-state-fail); }
 .planta-sel-campo > i.w { background: var(--color-state-warn); }
-.ib-chip { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 5px; background: none; color: var(--color-text-secondary); cursor: pointer; }
+.ib-chip { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--color-text-secondary); cursor: pointer; }
 .ib-chip:hover:not(:disabled) { background: var(--color-bg-elevated); color: var(--color-text-primary); }
 .ib-chip:disabled { opacity: .35; cursor: default; }
 /* Un ib-chip con texto (Todas, Ninguna, Elegir…; C-37) */
@@ -889,7 +898,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .dock-tab:hover { color: var(--color-text-primary); }
 .dock-tab[data-on="true"] { color: var(--color-text-primary); font-weight: 500; }
 .dock-tab[data-on="true"]::after { background: var(--color-accent); }
-.dock-tab .insignia { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 9px; background: var(--color-bg-elevated); font: 500 11px var(--font-mono); color: var(--color-text-tertiary); }
+.dock-tab .insignia { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 8px; background: var(--color-bg-elevated); font: 500 11px var(--font-mono); color: var(--color-text-tertiary); }
 .dock-cuerpo { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
 
 .barra-estado {
@@ -924,7 +933,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .arbol-fila.sub.caso .nombre { font: 11px var(--font-sans); color: var(--color-text-tertiary); }
 .arbol-fila.sub::before { content: ""; position: absolute; left: 15px; top: 0; bottom: 0; width: 1px; background: var(--color-border-sub); }
 .arbol-fila.sub[data-on="true"] { color: var(--color-accent); }
-.arbol-fila.sub[data-on="true"]::before { left: 14px; width: 2px; border-radius: 1px; background: var(--color-accent); }
+.arbol-fila.sub[data-on="true"]::before { left: 14px; width: 2px; border-radius: 2px; background: var(--color-accent); }
 .arbol-grupo + .arbol-grupo { margin-top: 1px; }
 .arbol-grupo[data-abierto="true"] { padding-bottom: 4px; }
 
@@ -940,7 +949,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .paleta input { width: 100%; height: 50px; padding: 0 16px 0 44px; border: 0; outline: 0; background: none; font: 15px var(--font-sans); color: var(--color-text-primary); }
 .paleta input::placeholder { color: var(--color-text-tertiary); }
 .paleta ul { max-height: 50vh; margin: 0; padding: 6px; overflow-y: auto; list-style: none; }
-.paleta li { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 7px; font-size: 13px; color: var(--color-text-primary); cursor: pointer; }
+.paleta li { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; font-size: 13px; color: var(--color-text-primary); cursor: pointer; }
 .paleta li[aria-selected="true"] { background: var(--color-tint-accent); }
 .paleta li[aria-selected="true"] .nombre { color: var(--color-accent); }
 .paleta li .grupo { width: 92px; flex-shrink: 0; font-size: 12px; color: var(--color-text-tertiary); }
@@ -982,7 +991,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
   .chip.sel select.sel-chip:open { color: var(--color-accent); }
   select.sel::picker(select), select.sel-chip::picker(select) {
     margin-block: 4px; padding: 5px; min-width: max(anchor-size(width), 160px); max-height: min(440px, 70vh); overflow-y: auto;
-    border: 1px solid var(--color-border-main); border-radius: 10px;
+    border: 1px solid var(--color-border-main); border-radius: 8px;
     background: var(--color-bg-primary); color: var(--color-text-primary);
     box-shadow: var(--shadow-pop);
     scrollbar-width: thin;
@@ -1128,8 +1137,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .gp-unidad { position: relative; display: block; }
 .gp-unidad::after { content: attr(data-unidad); position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 12px var(--font-mono); color: var(--color-text-tertiary); pointer-events: none; }
 .gp-unidad input { padding-right: 24px; }
-.gp-seg { height: 30px; align-items: center; }
-.gp-seg > button { height: 26px; padding: 0 12px; }
+.gp-seg { height: 28px; align-items: center; }
+.gp-seg > button { height: 24px; padding: 0 12px; }
 .gp-nuevas { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0 0 3px; list-style: none; }
 .gp-nuevas li { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 9px; border: 1px dashed color-mix(in srgb, var(--color-accent) 55%, transparent); border-radius: 999px; background: var(--color-tint-accent); font: 12px var(--font-mono); color: var(--color-text-secondary); }
 .gp-nuevas b { font-weight: 600; color: var(--color-accent); }
@@ -1206,6 +1215,11 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 }
 .globo-ayuda[data-arriba]::before { top: auto; bottom: -5px; border-width: 0 1px 1px 0; }
 @media (prefers-reduced-motion: reduce) { .globo-ayuda { animation: none; } }
+/* UI2-13: la pista de cualquier elemento con `title` (componentes/Pistas.tsx): el nombre con su atajo y, debajo, lo que explica */
+.globo-ayuda.pista { display: flex; flex-direction: column; gap: 2px; max-width: 300px; padding: 6px 10px; }
+.pista-nombre { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 500; }
+.pista-nombre kbd { flex-shrink: 0; padding: 0 5px; border: 1px solid var(--color-border-main); border-bottom-width: 2px; border-radius: 4px; background: var(--color-bg-surface); font: 11px/16px var(--font-mono); color: var(--color-text-secondary); }
+.pista-resto { color: var(--color-text-secondary); }
 .campo[data-activo] > span:first-child { color: var(--color-text-primary); }
 .campo input[data-falta], .campo select[data-falta] { border-style: dashed; border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border-main)); }
 .campo input[data-falta]::placeholder { color: var(--color-accent); opacity: .8; }
@@ -1432,8 +1446,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 /* La tabla de comprobaciones del banco: la que manda, marcada, y el aprovechamiento dibujado */
 .tb[data-ancha] tr[data-manda] td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
 .tb[data-ancha] td:last-child { white-space: nowrap; }
-.barra-aprov { display: inline-block; width: 54px; height: 6px; margin-right: 7px; border-radius: 3px; background: var(--color-border-sub); vertical-align: middle; overflow: hidden; }
-.barra-aprov i { display: block; height: 100%; border-radius: 3px; background: #16a34a; }
+.barra-aprov { display: inline-block; width: 54px; height: 6px; margin-right: 7px; border-radius: 4px; background: var(--color-border-sub); vertical-align: middle; overflow: hidden; }
+.barra-aprov i { display: block; height: 100%; border-radius: 4px; background: #16a34a; }
 .barra-aprov[data-estado="warn"] i { background: #d97706; }
 .barra-aprov[data-estado="fail"] i { background: #dc2626; }
 /* El armado de una losa: la base en una tabla y, debajo, los refuerzos y los cercos, una fila cada uno */
@@ -1461,25 +1475,25 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .pestanas-lista button[data-on] { border-bottom-color: var(--color-accent); color: var(--color-text-primary); }
 .titulo-lista { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
 .filtro-lista { display: inline-flex; gap: 2px; text-transform: none; letter-spacing: 0; font-weight: 400; }
-.filtro-lista button { padding: 1px 7px; border-radius: 10px; font-size: 11px; color: var(--color-text-secondary); }
+.filtro-lista button { padding: 1px 7px; border-radius: 8px; font-size: 11px; color: var(--color-text-secondary); }
 .filtro-lista button[data-on] { background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-text-primary); }
 .minima-reducida { margin: 8px 14px 4px; padding: 7px 10px; border: 1px solid var(--color-border-sub); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--color-text-primary); }
-.minima-reducida p { margin-top: 4px; font-size: 11.5px; color: var(--color-text-secondary); }
+.minima-reducida p { margin-top: 4px; font-size: 12px; color: var(--color-text-secondary); }
 /* §8.16: lo que ha hecho «Proponer», y las comprobaciones y las hipótesis de la pieza, bajo el armado */
 .aviso-proponer { margin: 2px 14px 4px; padding: 6px 10px; border-radius: 8px; background: var(--color-bg-elevated); color: var(--color-text-primary); }
-.hipotesis { margin: 2px 14px 8px; padding-left: 16px; list-style: disc; font-size: 11.5px; line-height: 1.45; color: var(--color-text-secondary); }
+.hipotesis { margin: 2px 14px 8px; padding-left: 16px; list-style: disc; font-size: 12px; line-height: 1.45; color: var(--color-text-secondary); }
 .hipotesis li + li { margin-top: 3px; }
 .barra-proponer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 14px 2px; }
 /* El avance de las tareas largas del worker (proponer el armado, comprobar un tipo entero): en el pie de la app y, más grande, donde la pantalla espera */
 .avance { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
 .avance-titulo { font-weight: 600; color: var(--color-text-primary); }
 .avance-detalle { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
-.avance-barra { position: relative; flex-shrink: 0; width: 120px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--color-text-secondary) 22%, transparent); overflow: hidden; }
-.avance-barra > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--color-accent); transition: width 0.15s linear; }
+.avance-barra { position: relative; flex-shrink: 0; width: 120px; height: 6px; border-radius: 4px; background: color-mix(in srgb, var(--color-text-secondary) 22%, transparent); overflow: hidden; }
+.avance-barra > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--color-accent); transition: width 0.15s linear; }
 .avance-barra > span[data-indeterminada] { width: 35%; animation: avance-va 1.2s ease-in-out infinite alternate; }
 @keyframes avance-va { from { left: 0; } to { left: 65%; } }
 .avance-pie { display: inline-flex; align-items: center; gap: 8px; min-width: 0; flex-shrink: 1; }
-.avance-grande { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 10px 14px; padding: 10px 12px; border: 1px solid var(--color-border-main); border-left: 4px solid var(--color-accent); border-radius: 8px; background: var(--color-bg-primary); font-size: 12.5px; white-space: normal; }
+.avance-grande { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 10px 14px; padding: 10px 12px; border: 1px solid var(--color-border-main); border-left: 4px solid var(--color-accent); border-radius: 8px; background: var(--color-bg-primary); font-size: 13px; white-space: normal; }
 .avance-grande .avance-barra { flex: 1 1 220px; width: auto; height: 8px; }
 .avance-grande .avance-detalle { flex-basis: 100%; white-space: normal; }
 /* La pestaña «Proceso»: lo que se hace ahora y, debajo, el registro línea a línea con su tiempo */
@@ -1500,7 +1514,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .proceso-lineas > li[data-clase="error"] { color: var(--color-state-fail); }
 .proceso-lineas > li[data-clase="ahora"] > span { padding-left: 14px; color: var(--color-accent); }
 .avance-vista { position: absolute; left: 50%; bottom: 18px; z-index: 6; transform: translateX(-50%); max-width: calc(100% - 32px); box-shadow: var(--shadow-pop); }
-.enlace-armado { font-size: 11.5px; color: var(--color-accent-text, var(--color-accent)); }
+.enlace-armado { font-size: 12px; color: var(--color-accent-text, var(--color-accent)); }
 .enlace-armado:hover { text-decoration: underline; }
 .elemento-armado[data-on] td { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
 .elemento-armado button:hover { text-decoration: underline; }
@@ -1520,10 +1534,10 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 }
 .confirma {
   width: 380px; max-width: 100%; padding: 18px 20px 16px;
-  border: 1px solid var(--color-border-main); border-radius: 10px; background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: var(--color-bg-primary);
   box-shadow: var(--shadow-dialogo); animation: caja-entra .16s cubic-bezier(.2, .8, .3, 1);
 }
-.confirma h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--color-text-primary); }
+.confirma h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--color-text-primary); }
 .confirma p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--color-text-secondary); }
 .confirma-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .ges-pregunta { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 6px 6px 6px 10px; border-radius: 6px; font-size: 12px; background: var(--color-tint-warn); color: var(--color-state-warn-text); }
