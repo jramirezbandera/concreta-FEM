@@ -1390,8 +1390,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
                   return (
                     <tr
                       key={p.clave}
+                      className="clic"
                       data-on={p.clave === clave}
-                      style={{ cursor: "pointer" }}
                       {...filaElegible(() => elegir(p), p.clave === clave)}
                       onDoubleClick={() => {
                         elegir(p);

@@ -128,7 +128,7 @@ const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados
 function Etiqueta({ c, estado, conUnidad, titulo }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean; titulo?: string }) {
   return (
     <span>
-      <span className="campo-nombre">
+      <span className="campo-nombre" title={titulo ?? c.titulo}>
         {titulo ?? c.titulo}
         {estado?.obligatorio && (
           <b className="campo-oblig" title="obligatorio">

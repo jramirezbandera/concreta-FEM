@@ -852,17 +852,24 @@ function TresDCargas({ caso, escala }: { caso: string; escala: number }) {
   return <Fuente3DModelo cargas={{ datos: r.datos, aviso, cargando: r.cargando }} />;
 }
 
+const NOMBRE_PROGRAMA = { viento: "Viento", imperfeccion: "Imperfección", sismo: "Sismo" } as const;
+
 function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => void }) {
   const { proyecto } = useVisor();
   const e = proyecto.estado!;
+  // UI2-1: los casos del usuario, uno por fila; los del programa (viento, imperfección, sismo), en
+  // grupos plegados: son muchos, no se editan y sus ids largos descuadraban la lista.
+  const propios = e.casos.filter((c) => !c.programa);
+  const grupos = (["viento", "imperfeccion", "sismo"] as const).map((p) => ({ programa: p, casos: e.casos.filter((c) => c.programa === p) })).filter((g) => g.casos.length);
+  const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(new Set());
   return (
     <>
       <Proyecto />
       <Situacion />
       <Seccion titulo="Casos" valor={e.casos.length}>
-        {e.casos.map((c) => (
+        {propios.map((c) => (
           <button key={c.id} type="button" className="arbol-fila" data-on={c.id === caso} onClick={() => setCaso(c.id)}>
-            <span className="mono">{c.id}</span>
+            <span className="mono id">{c.id}</span>
             <span className="truncate text-text-secondary">{c.nombre ?? ""}</span>
             {/* R-32: la acción en palabras («nieve»), no su código junto al id («N … S») */}
             <span className="n" title={c.accion ? `Acción ${c.accion} (${NOMBRE_ACCION[c.accion] ?? c.accion})${c.pesoPropio ? ", con el peso propio" : ""}` : "Sin acción: fuera de las combinaciones"}>
@@ -871,6 +878,37 @@ function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => vo
             </span>
           </button>
         ))}
+        {grupos.map((g) => {
+          const abierto = abiertos.has(g.programa) || g.casos.some((c) => c.id === caso);
+          return (
+            <div key={g.programa}>
+              <button
+                type="button"
+                className="arbol-fila"
+                aria-expanded={abierto}
+                onClick={() =>
+                  setAbiertos((s) => {
+                    const n = new Set(s);
+                    if (n.has(g.programa)) n.delete(g.programa);
+                    else n.add(g.programa);
+                    return n;
+                  })
+                }
+              >
+                <ChevronRight size={14} className="giro" aria-hidden="true" />
+                <span>{NOMBRE_PROGRAMA[g.programa]}</span>
+                <span className="n">del programa · {g.casos.length}</span>
+              </button>
+              {abierto &&
+                g.casos.map((c) => (
+                  <button key={c.id} type="button" className="arbol-fila sub caso" data-on={c.id === caso} title={c.nombre} onClick={() => setCaso(c.id)}>
+                    <span className="id">{c.id}</span>
+                    <span className="truncate nombre">{c.nombre ?? ""}</span>
+                  </button>
+                ))}
+            </div>
+          );
+        })}
       </Seccion>
       <Objetos tablas={["cargas"]} />
       <NavVistas />

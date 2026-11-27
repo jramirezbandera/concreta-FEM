@@ -40,7 +40,9 @@ export function Cabecera({ icono: I, tipo, titulo, mono, detalle, children }: { 
       )}
       <div className="min-w-0 flex-1">
         <div className="insp-tipo">{tipo}</div>
-        <div className={`insp-id truncate${mono ? " mono" : ""}`}>{titulo}</div>
+        <div className={`insp-id truncate${mono ? " mono" : ""}`} title={typeof titulo === "string" ? titulo : undefined}>
+          {titulo}
+        </div>
         {detalle && <div className="cab-detalle">{detalle}</div>}
       </div>
       {children}

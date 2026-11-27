@@ -388,7 +388,7 @@ function CeldaBase({ valor, heredado, etiqueta, activa, onCambio, deshabilitada 
     if (n !== valor) setError(onCambio(n));
   };
   return (
-    <td className={activa ? "bg-accent-subtle" : undefined}>
+    <td className={activa ? "bg-tint-accent" : undefined}>
       <input
         type="text"
         inputMode="decimal"

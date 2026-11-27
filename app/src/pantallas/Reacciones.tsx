@@ -65,7 +65,7 @@ function TablaPorCaso({ d, seleccion, onObjeto }: { d: ReaccionesCasos; seleccio
   const u = COMPONENTES.find((c) => c.id === comp)!.unidad;
   return (
     <Seccion titulo="Reacciones por caso" valor={`${plural(d.objetos.length, "objeto")} · ${plural(d.casos.length, "caso")}`}>
-      <div className="px-3.5 py-1.5">
+      <div className="flex px-3.5 py-1.5">
         <Segmentado etiqueta="Componente" opciones={COMPONENTES} valor={comp} onCambio={setComp} />
       </div>
       <table className="tb">
@@ -84,7 +84,7 @@ function TablaPorCaso({ d, seleccion, onObjeto }: { d: ReaccionesCasos; seleccio
             <tr key={o.id} className="clic" data-on={o.id === seleccion} {...filaElegible(() => onObjeto(o.id), o.id === seleccion)}>
               <td>
                 {o.id}
-                <small>
+                <small className="id">
                   {o.tipo} · {o.planta}
                 </small>
               </td>
@@ -345,7 +345,7 @@ export function ModoReacciones() {
               <span>{x.que}</span>
               <span className="v">
                 {fmt(x.valor, 1)} kN · {x.id}
-                <small>{x.comb}</small>
+                <small> · {x.comb}</small>
               </span>
             </div>
           ))}

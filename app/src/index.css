@@ -408,7 +408,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 }
 .opciones-vista fieldset { border: 0; margin: 8px 0 0; padding: 0; min-width: 0; }
 .opciones-vista legend { padding: 0; margin-bottom: 3px; font: 600 11px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
-.opciones-vista label { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: var(--color-text-secondary); }
+.opciones-vista label { display: flex; align-items: center; gap: 6px; padding: 2px 0; min-width: 0; color: var(--color-text-secondary); white-space: nowrap; }
 .chip.chip-filtro { padding: 0 3px 0 10px; gap: 2px; font-size: 13px; }
 .leyenda-vista {
   position: absolute; right: 10px; top: 10px; z-index: 14; width: 196px; max-height: calc(100% - 64px); overflow-y: auto;
@@ -492,7 +492,8 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
  * Formulario del inspector: etiqueta (con su unidad) e input en una línea. La ayuda de cada campo
  * sale en un globo al pasar el ratón por su «?» (`Ayuda.tsx`); un error, bajo el campo.
  */
-.campo { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 3px 14px; }
+/* UI2-6: 120 px de etiqueta: con el «*» y el «?» caben «ábacos en pilares» y «punto de paso» */
+.campo { display: grid; grid-template-columns: 120px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 3px 14px; }
 .campo > span { display: flex; align-items: baseline; gap: 5px; min-width: 0; font-size: 12px; color: var(--color-text-secondary); cursor: default; }
 .campo > span small { font: 11px var(--font-mono); color: var(--color-text-tertiary); white-space: nowrap; }
 .campo:focus-within > span { color: var(--color-text-primary); }
@@ -505,6 +506,8 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .campo input:hover:not(:read-only), .campo select:hover { border-color: var(--color-border-strong); }
 .campo input:focus:not(:read-only), .campo select:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-ring); }
 .campo select { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* UI2-5: un valor que no cabe acaba en «…» (mientras no se escribe en él) */
+.campo input:not(:focus) { text-overflow: ellipsis; }
 .campo input:read-only { border-color: transparent; background: var(--color-bg-surface); color: var(--color-text-secondary); }
 .campo input[data-error="true"], .campo select[data-error="true"], .dialogo input.sel[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
 .campo p { grid-column: 2; margin: 3px 0 2px; font-size: 11px; line-height: 1.4; color: var(--color-text-tertiary); }
@@ -618,10 +621,11 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .ib:disabled { opacity: .4; cursor: default; }
 
 .barra-sup { display: flex; align-items: center; gap: 8px; height: 44px; flex-shrink: 0; min-width: 0; padding: 0 10px 0 12px; border-bottom: 1px solid var(--color-border-main); background: var(--color-bg-primary); overflow: hidden; }
-.barra-sup .nombre-proyecto { min-width: 72px; }
+/* UI2-6: el nombre de la obra cede después que la paleta, que es la que tiene holgura */
+.barra-sup .nombre-proyecto { min-width: 72px; flex-shrink: 1; }
 /* La paleta como un campo de búsqueda discreto, en el centro de la barra (entre dos `flex-1`) */
 .btn-buscar {
-  display: inline-flex; flex-shrink: 0; align-items: center; gap: 8px; width: clamp(200px, 20vw, 320px); height: 28px; margin-inline: 8px; padding: 0 8px 0 10px;
+  display: inline-flex; flex: 0 100 clamp(200px, 20vw, 320px); min-width: 132px; align-items: center; gap: 8px; height: 28px; margin-inline: 8px; padding: 0 8px 0 10px;
   border: 1px solid var(--color-border-sub); border-radius: 7px; background: var(--color-bg-surface);
   font: 12px var(--font-sans); color: var(--color-text-tertiary); cursor: pointer; white-space: nowrap;
 }
@@ -641,7 +645,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
   .barra-sup .ancho-1100 { display: none; }
   .barra-sup .solo-1100 { display: inline-flex; }
   /* La paleta, sólo con la lupa */
-  .btn-buscar { width: 30px; justify-content: center; padding: 0; }
+  .btn-buscar { flex: 0 0 30px; min-width: 30px; justify-content: center; padding: 0; }
   .btn-buscar-texto, .btn-buscar-atajo { display: none; }
 }
 /* Un menú que cuelga de un botón (armazon/Disposicion.tsx, MenuFlotante) */
@@ -914,6 +918,10 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .arbol-fila .ico { flex-shrink: 0; color: var(--color-text-tertiary); }
 .arbol-fila.sub { height: 26px; padding-left: 37px; font: 12px var(--font-mono); color: var(--color-text-secondary); }
 .arbol-fila.sub:hover { color: var(--color-text-primary); }
+/* UI2-1: un id no se parte por su guion; los casos del programa, con el id entero y el nombre detrás */
+.arbol-fila .id { flex-shrink: 0; white-space: nowrap; }
+.arbol-fila.sub.caso { padding-left: 29px; }
+.arbol-fila.sub.caso .nombre { font: 11px var(--font-sans); color: var(--color-text-tertiary); }
 .arbol-fila.sub::before { content: ""; position: absolute; left: 15px; top: 0; bottom: 0; width: 1px; background: var(--color-border-sub); }
 .arbol-fila.sub[data-on="true"] { color: var(--color-accent); }
 .arbol-fila.sub[data-on="true"]::before { left: 14px; width: 2px; border-radius: 1px; background: var(--color-accent); }
@@ -958,6 +966,16 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
   }
   select.sel:open::picker-icon { rotate: 180deg; }
+  /*
+   * UI2-5: en un campo de Propiedades el texto elegido no empuja la flecha fuera ni se corta a ras:
+   * el texto se recorta en el borde del contenido y la flecha va de fondo, en su hueco.
+   */
+  .campo select.sel, .campo select, .acc-form select.sel {
+    padding-right: 26px; overflow: clip; overflow-clip-margin: content-box;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c8798' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; background-size: 12px 12px;
+  }
+  .campo select::picker-icon, .acc-form select.sel::picker-icon { display: none; }
   select.sel-chip::picker-icon { display: none; }
   /* Los de los chips: más específico que «.chip.sel .sel-chip», que les quita la apariencia */
   .chip.sel select.sel-chip { appearance: base-select; display: inline-flex; align-items: center; }
@@ -1448,7 +1466,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .minima-reducida { margin: 8px 14px 4px; padding: 7px 10px; border: 1px solid var(--color-border-sub); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--color-text-primary); }
 .minima-reducida p { margin-top: 4px; font-size: 11.5px; color: var(--color-text-secondary); }
 /* §8.16: lo que ha hecho «Proponer», y las comprobaciones y las hipótesis de la pieza, bajo el armado */
-.aviso-proponer { margin: 2px 14px 4px; padding: 6px 10px; border-radius: 8px; background: var(--color-bg-sub, rgba(127, 127, 127, 0.08)); color: var(--color-text-primary); }
+.aviso-proponer { margin: 2px 14px 4px; padding: 6px 10px; border-radius: 8px; background: var(--color-bg-elevated); color: var(--color-text-primary); }
 .hipotesis { margin: 2px 14px 8px; padding-left: 16px; list-style: disc; font-size: 11.5px; line-height: 1.45; color: var(--color-text-secondary); }
 .hipotesis li + li { margin-top: 3px; }
 .barra-proponer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 14px 2px; }
@@ -1542,7 +1560,12 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .tb-columnas:not([data-columnas="1"]) > .tb + .tb { position: relative; }
 .tb-columnas:not([data-columnas="1"]) > .tb + .tb::before { content: ""; position: absolute; left: -14px; top: 0; bottom: 0; border-left: 1px solid var(--color-border-sub); }
 .dock-cuerpo .tb tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--color-bg-surface) 70%, transparent); }
-.tb tbody tr:hover td { background: var(--color-bg-elevated); }
+/* UI2-3: el hover, sólo en las filas que se eligen; y lo elegido gana al cebreado y al hover */
+.dock-cuerpo .tb tbody tr.clic:hover td { background: var(--color-bg-elevated); }
+.tb tbody tr.max td, .tb tbody tr[data-on="true"] td, .dock-cuerpo .tb tbody tr[data-on="true"] td, .dock-cuerpo .tb tbody tr.max td,
+.dock-cuerpo .tb tbody tr[data-on="true"]:hover td { background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-primary)); }
+/* UI2-3: la cabecera de una tabla larga se queda al desplazar el panel */
+.dock-cuerpo .tb thead th { position: sticky; top: 0; z-index: 1; background: var(--color-bg-primary); box-shadow: inset 0 -1px 0 var(--color-border-sub); }
 /* D-17: un id no se parte por su guion («ELU-PT-» y «3» en dos líneas parecían dos) */
 .tb td small.id, .tb td .id, small.id { white-space: nowrap; }
 
@@ -1560,14 +1583,15 @@ select.sel { font-family: var(--font-sans); }
 
 /* VS4: la ficha «Viento y sismo» y su buscador de municipios */
 .dialogo.dialogo-ancho { width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
-.lista-candidatos { margin: 4px 0 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto; border: 1px solid var(--color-border-main); border-radius: 6px; background: var(--color-bg-elevated, var(--color-bg-main)); }
+.lista-candidatos { margin: 4px 0 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto; border: 1px solid var(--color-border-main); border-radius: 6px; background: var(--color-bg-elevated); }
 .lista-candidatos button { padding: 4px 8px; border: 0; border-radius: 4px; background: none; font: inherit; color: inherit; cursor: pointer; }
-.lista-candidatos button:hover, .lista-candidatos button[aria-selected="true"] { background: var(--color-bg-hover, rgba(0, 0, 0, 0.06)); }
+.lista-candidatos button:hover, .lista-candidatos button[aria-selected="true"] { background: var(--color-tint-accent); }
 /* El emplazamiento común, las filas con su «?» y los resúmenes en cifras (de la prueba de uso del 2026-11-07) */
 .acc-grupo { margin: 0; padding: 10px 14px 12px; border: 1px solid var(--color-border-main); border-radius: 8px; }
 .acc-grupo > legend { padding: 0 6px; font: 600 12px var(--font-sans); color: var(--color-text-secondary); }
 .acc-form { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); align-items: center; gap: 8px 16px; }
 .acc-form .sel { max-width: 100%; }
+.acc-form > * { min-width: 0; }
 .acc-etq { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .acc-elegido { display: flex; align-items: baseline; gap: 6px; margin: 0; padding: 5px 10px; border: 1px solid var(--color-border-main); border-radius: 6px; background: var(--color-tint-accent); }
 .acc-nota { margin: 0; }

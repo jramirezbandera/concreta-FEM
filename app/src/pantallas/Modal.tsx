@@ -143,7 +143,7 @@ export function ModoModal() {
             const vx = s?.direcciones[0]?.modos.find((y) => y.modo === x.modo);
             const vy = s?.direcciones[1]?.modos.find((y) => y.modo === x.modo);
             return (
-              <tr key={x.modo} data-on={x.modo === modo} onClick={() => setModo(x.modo)} style={{ cursor: "pointer" }}>
+              <tr key={x.modo} className="clic" data-on={x.modo === modo} onClick={() => setModo(x.modo)}>
                 <td>
                   {x.modo}
                   {s?.direcciones.some((d) => d.dominante.modo === x.modo) && <small>dominante según {s.direcciones.filter((d) => d.dominante.modo === x.modo).map((d) => d.eje).join(" e ")}</small>}
@@ -331,7 +331,7 @@ export function ModoModal() {
             </div>
           ))}
           {segundoOrden.datos?.problemas.map((d) => (
-            <p key={d.codigo} className={`nota ${d.severidad === "error" ? "text-state-bad" : d.severidad === "aviso" ? "text-state-warn" : ""}`}>
+            <p key={d.codigo} className={`nota ${d.severidad === "error" ? "text-state-fail" : d.severidad === "aviso" ? "text-state-warn" : ""}`}>
               {textoApp(d.mensaje)}
             </p>
           ))}

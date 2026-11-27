@@ -72,8 +72,28 @@ const ORDENES: [RegExp, string][] = [
  * las órdenes de la CLI, con «la tolerancia de unión» por ε_snap y con coma decimal. Para el agente
  * y en el informe esos códigos dicen de dónde sale cada hipótesis; al ingeniero en la app, no.
  */
+/**
+ * UI2-7: las descripciones de las comprobaciones que vienen sin tildes y con «>=» (las de los
+ * módulos copiados, que no se editan, y las que los imitan). Sólo palabras que sin tilde no existen.
+ */
+const SIN_TILDE: Readonly<Record<string, string>> = {
+  cuantia: "cuantía", flexion: "flexión", seccion: "sección", separacion: "separación", torsion: "torsión", compresion: "compresión",
+  traccion: "tracción", fisuracion: "fisuración", maxima: "máxima", maximo: "máximo", minima: "mínima", minimo: "mínimo",
+  geometrica: "geométrica", mecanica: "mecánica", diametro: "diámetro", limite: "límite", critico: "crítico", perimetro: "perímetro",
+};
+// Ni dentro de un código («torsion-separacion») ni de una ruta
+const RE_SIN_TILDE = new RegExp(`(?<![\\w/-])(${Object.keys(SIN_TILDE).join("|")})(?![\\w/-])`, "gi");
+const conTildes = (t: string): string =>
+  t
+    .replace(RE_SIN_TILDE, (w) => {
+      const c = SIN_TILDE[w.toLowerCase()]!;
+      return w[0] === w[0]!.toUpperCase() ? c[0]!.toUpperCase() + c.slice(1) : c;
+    })
+    .replace(/>=/g, "≥")
+    .replace(/<=/g, "≤");
+
 export function textoApp(t: string): string {
-  let r = t;
+  let r = conTildes(t);
   for (const [a, b] of ORDENES) r = r.replace(a, b);
   r = r.replace(/\s*\(([^()]*)\)/g, (todo, dentro: string) => {
     if (soloCodigos(dentro)) return "";

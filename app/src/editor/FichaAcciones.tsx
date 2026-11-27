@@ -507,7 +507,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
               </>
             )}
           </div>
-          {hechoCaso && <p className="nota acc-nota text-state-pass">{hechoCaso}</p>}
+          {hechoCaso && <p className="nota acc-nota text-state-ok">{hechoCaso}</p>}
           <p className="nota acc-nota">
             A mano, porque dependen de la cubierta: μ en faldones de más de 30° (μ = 1 hasta 30° y 0 desde 60°, art. 3.5.3), la distribución asimétrica (μ/2 donde la nieve es favorable), las acumulaciones junto a petos, limahoyas y cambios de nivel (art. 3.5.4) y, por encima de 1 000 m, el hielo en los voladizos.
           </p>
@@ -717,7 +717,7 @@ function ResumenSegundoOrden({ d, aplicado }: { d: DatosSegundoOrden | null; apl
             </tbody>
           </table>
           {d.problemas.map((p) => (
-            <p key={p.codigo} className={`mt-1 ${p.severidad === "error" ? "text-state-bad" : p.severidad === "aviso" ? "text-state-warn" : "text-text-secondary"}`}>
+            <p key={p.codigo} className={`mt-1 ${p.severidad === "error" ? "text-state-fail" : p.severidad === "aviso" ? "text-state-warn" : "text-text-secondary"}`}>
               {textoApp(p.mensaje)}
             </p>
           ))}

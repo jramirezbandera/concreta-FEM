@@ -94,6 +94,10 @@ describe("los textos de la app no nombran software comercial ni lo interno", () 
   it("textoApp quita lo interno de los textos del motor y del compilador", () => {
     expect(textoApp("Axil sin valor: está en un diafragma rígido (C1-d).")).toBe("Axil sin valor: está en un diafragma rígido.");
     expect(textoApp("Losas malladas (h = 0.75 m) (H52, C2-a, G-4).")).toBe("Losas malladas (h = 0,75 m).");
+    // UI2-7: las descripciones sin tildes de las comprobaciones; un código no se toca
+    expect(textoApp("Apoyo de inicio: Separacion maxima entre estribos")).toBe("Apoyo de inicio: Separación máxima entre estribos");
+    expect(textoApp("Armadura minima traccion; Momento resistente MRd >= Md; MEd <= MRd(N)")).toBe("Armadura mínima tracción; Momento resistente MRd ≥ Md; MEd ≤ MRd(N)");
+    expect(textoApp("la fila torsion-separacion")).toBe("la fila torsion-separacion");
     expect(textoApp("Los paños (F1, F2) no llevan franjas: sus viguetas, con «fem consultar pieza».")).toBe("Los paños (F1, F2) no llevan franjas: sus viguetas, en Resultados · Diagramas.");
     expect(textoApp("el cálculo une a ε_snap sus zonas (C2-b).")).toBe("el cálculo une a menos de la tolerancia de unión sus zonas.");
   });

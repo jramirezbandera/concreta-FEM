@@ -25,16 +25,21 @@ import { Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | null> }) {
   const pts = d.plantas.filter((p) => p.maestro && cotas.get(p.planta) !== null).map((p) => ({ z: cotas.get(p.planta)!, ux: p.maestro!.ux.v * 1000, uy: Math.abs(p.maestro!.uy.v * 1000) }));
   if (pts.length < 1) return <p className="nota">Sin diafragmas rígidos: no hay maestro por planta.</p>;
-  const [W, H, ml, mb] = [300, 200, 40, 24];
+  // UI2-2: márgenes para los rótulos (las cotas a la izquierda, los valores a los dos lados y arriba)
+  // y el perfil desde el arranque, que no se mueve: antes eran dos puntos sueltos arriba del todo.
+  const [W, H, ml, mr, mt, mb] = [300, 200, 46, 12, 18, 24];
+  const hueco = 38;
   const zs = pts.map((p) => p.z);
-  const [z0, z1] = [Math.min(0, ...zs), Math.max(...zs)];
+  const todas = [...cotas.values()].filter((z): z is number => z !== null);
+  const [z0, z1] = [Math.min(0, ...zs, ...todas), Math.max(...zs)];
   const umax = Math.max(1e-9, ...pts.flatMap((p) => [Math.abs(p.ux), p.uy]));
-  const X = (u: number) => ml + ((u + umax) / (2 * umax)) * (W - ml - 10);
-  const Y = (z: number) => H - mb - ((z - z0) / Math.max(1e-9, z1 - z0)) * (H - mb - 10);
-  const linea = (k: "ux" | "uy") => pts.map((p, i) => `${i ? "L" : "M"}${X(p[k]).toFixed(1)} ${Y(p.z).toFixed(1)}`).join("");
+  const X = (u: number) => ml + hueco + ((u + umax) / (2 * umax)) * (W - ml - mr - 2 * hueco);
+  const Y = (z: number) => H - mb - ((z - z0) / Math.max(1e-9, z1 - z0)) * (H - mb - mt);
+  const orden = [...pts].sort((a, b) => a.z - b.z);
+  const linea = (k: "ux" | "uy") => `M${X(0).toFixed(1)} ${Y(z0).toFixed(1)}` + orden.map((p) => `L${X(p[k]).toFixed(1)} ${Y(p.z).toFixed(1)}`).join("");
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Perfil del desplazamiento del maestro por planta">
-      <line x1={X(0)} x2={X(0)} y1={8} y2={H - mb} stroke="var(--color-border-main)" />
+      <line x1={X(0)} x2={X(0)} y1={mt - 8} y2={H - mb} stroke="var(--color-border-main)" />
       <path d={linea("ux")} fill="none" stroke="var(--color-accent)" strokeWidth={1.6} />
       <path d={linea("uy")} fill="none" stroke="var(--color-uy)" strokeWidth={1.6} strokeDasharray="5 3" />
       {pts.map((p, i) => (
@@ -50,7 +55,7 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
       {(() => {
         const a = pts.reduce((x, p) => (p.z > x.z ? p : x), pts[0]!);
         const r = (u: number, color: string, dy: number) => (
-          <text x={Math.min(W - 12, Math.max(ml + 2, X(u) + (u >= 0 ? 5 : -5)))} y={Y(a.z) + dy} fontSize={11} textAnchor={u >= 0 ? "start" : "end"} fontFamily="var(--font-mono)" fill={color} className="halo">
+          <text x={X(u) + (u >= 0 ? 5 : -5)} y={Y(a.z) + dy} fontSize={11} textAnchor={u >= 0 ? "start" : "end"} fontFamily="var(--font-mono)" fill={color} className="halo">
             {fmt(u, 2)}
           </text>
         );
@@ -64,10 +69,10 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
       <text x={X(0)} y={H - 6} fontSize={11} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         0
       </text>
-      <text x={X(umax)} y={H - 6} fontSize={11} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+      <text x={W - 2} y={H - 6} fontSize={11} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         {fmt(umax, 2)} mm
       </text>
-      <text x={X(-umax)} y={H - 6} fontSize={11} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+      <text x={X(-umax)} y={H - 6} fontSize={11} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         {fmt(-umax, 2)}
       </text>
     </svg>

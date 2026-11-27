@@ -147,8 +147,10 @@ export function ejePorDefecto(ejes: readonly { id: string; desde: Vec2; hasta: V
   return (otra ?? ejes[Math.min(k, ejes.length - 1)]!).id;
 }
 
-const MARGENES_PLANTA: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
-const MARGENES_ALZADO: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
+// UI2-9: lo dibujado no queda debajo de lo que flota: los chips de la vista arriba (hasta 46 px) y,
+// abajo, la barrita de herramientas y la pista de la herramienta activa (hasta 52 px).
+const MARGENES_PLANTA: Margenes = { izq: 24, arriba: 60, der: 24, abajo: 62 };
+const MARGENES_ALZADO: Margenes = { izq: 24, arriba: 60, der: 24, abajo: 62 };
 
 export function ZonaVistas({ fuentes = {} }: { fuentes?: FuentesVistas }) {
   const vistas = useVistas();
@@ -638,7 +640,7 @@ function OpcionesVista3D({ v, estado, onCambio, onCerrar, boton }: { v: EstadoVi
       </fieldset>
       <fieldset>
         <legend>Se ven</legend>
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-[auto_auto] justify-between gap-x-3">
           {TIPOS_FILTRO.map((t) => (
             <label key={t}>
               <input
@@ -976,8 +978,10 @@ export interface ContenidoLeyenda {
 export function textoCorto(t0: string): string {
   const t = textoApp(t0);
   if (/^[-−+]?\d/.test(t)) return t;
-  const k = t.search(/ \(|; |, |\. |: /);
-  return k > 0 ? t.slice(0, k) : t;
+  // UI2-10: «(Fx, Fy) (kN), la reacción…» es «(Fx, Fy)», no «(Fx»: un paréntesis inicial va entero
+  const desde = t.startsWith("(") ? t.indexOf(")") + 1 : 0;
+  const k = t.slice(desde).search(/ \(|; |, |\. |: /);
+  return k > 0 || (k === 0 && desde > 0) ? t.slice(0, desde + k) : t;
 }
 
 function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; abierta: boolean }) {

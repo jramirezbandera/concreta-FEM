@@ -3,7 +3,7 @@
  * herramientas, navegador, vista, propiedades y panel inferior. Cada espacio da el contenido de cada
  * hueco; la disposición sólo los coloca, los pliega y recuerda cómo se dejaron (`paneles.ts`).
  */
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { useDesplegado } from "../componentes/desplegado.ts";
@@ -38,10 +38,22 @@ export function MenuFlotante({ boton, etiqueta, children, clase = "" }: { boton:
   const menu = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   useDesplegado(abierto, () => setAbierto(false), [menu], ref);
-  useEffect(() => {
-    if (!abierto) return;
+  // UI2-4: con el menú ya en el árbol (oculto), se mide y se deja entero dentro de la ventana.
+  useLayoutEffect(() => {
+    if (!abierto) {
+      setPos(null);
+      return;
+    }
     const r = ref.current?.getBoundingClientRect();
-    if (r) setPos({ x: Math.max(8, Math.min(r.left, window.innerWidth - 240)), y: r.bottom + 4 });
+    const ancho = menu.current?.offsetWidth ?? 240;
+    const alto = menu.current?.offsetHeight ?? 0;
+    if (r) {
+      const debajo = r.bottom + 4;
+      setPos({
+        x: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)),
+        y: debajo + alto > window.innerHeight - 8 ? Math.max(8, r.top - 4 - alto) : debajo,
+      });
+    }
     const cerrar = () => setAbierto(false);
     window.addEventListener("resize", cerrar);
     return () => window.removeEventListener("resize", cerrar);
