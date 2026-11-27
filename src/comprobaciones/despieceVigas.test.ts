@@ -1,14 +1,15 @@
 /**
  * CO6 (`docs/fem3d/comprobaciones.md` §8.13): el despiece de las vigas de un pórtico. Sobre un
  * pórtico escrito a mano (dos vanos y un voladizo), cada regla con sus números: la inferior con su
- * anclaje y su patilla, la corrida que pasa o se corta a los 12 m, las barras de los apoyos (lo común
+ * anclaje y su patilla, la corrida que pasa sobre los apoyos y se empalma en el centro de un vano
+ * (CO6-h, §8.27) o, si cambia, sobre el apoyo con su solape, las barras de los apoyos (lo común
  * pasa, lo de más se ancla), los cercos contados y la medición. Y, con armados al azar, lo que no
  * puede fallar: en cada zona hay al menos el acero que dice su armado.
  */
 import { describe, expect, it } from "vitest";
 import type { ArmadoVanoViga } from "./armado.ts";
 import { alzadoVano } from "./dibujoArmado.ts";
-import { BARRA_MAXIMA, desarrolloCerco, despiecePortico, filasBarras, pesoBarra, type BarraDespiece, type DatosDespiece } from "./despieceVigas.ts";
+import { BARRA_MAXIMA, desarrolloCerco, despiecePortico, filasBarras, pesoBarra, SOLAPE, type BarraDespiece, type DatosDespiece } from "./despieceVigas.ts";
 import type { Portico, VanoPortico } from "./porticos.ts";
 
 const G = { b: 300, h: 500, fck: 25 };
@@ -60,21 +61,60 @@ describe("CO6: el despiece de las vigas de un pórtico", () => {
     expect(d.barras.map((b) => b.papel)).toEqual(["vano", "vano", "corrida", "corrida"]);
   });
 
-  it("la corrida pasa de un vano a otro si es la misma, hasta los 12 m; si no, se ancla más allá de la cara", () => {
+  it("la corrida pasa sobre los apoyos si es la misma; lo que pasa de 12 m se empalma en el centro de un vano, con el solape; si cambia, sobre el apoyo y con el solape (CO6-h)", () => {
     const a = base([2, 12], [2, 12]);
+    // Dos vanos: de una pieza (11,67 m con su anclaje y su patilla), sobre P2
+    const dos = despiecePortico(PORTICO, { "V1/0": a, "V1/1": a }, DATOS).barras.filter((b) => b.papel === "corrida");
+    expect(dos).toHaveLength(1);
+    tramo(dos[0]!, -0.17, 10.8 + 0.7, [0.15, 0]);
+    expect(dos[0]!.ejes).toEqual([0, 6, 11]);
+    // Con el voladizo son 12,79 m: se empalma en el centro del segundo vano (8,5), el más lejano al que
+    // llega la primera pieza; medio solape, 1,5·0,70/2 a 5 cm = 0,55. En el voladizo no se empalma
     const d = despiecePortico(PORTICO, { "V1/0": a, "V1/1": a, "V1/2": a }, DATOS);
     const sup = d.barras.filter((b) => b.papel === "corrida");
     expect(sup).toHaveLength(2);
-    // Los dos primeros vanos, una barra (11,67 m con su anclaje); con el voladizo pasaría de 12 m
-    tramo(sup[0]!, -0.17, 10.8 + 0.7, [0.15, 0]);
+    tramo(sup[0]!, -0.17, 8.5 + 0.55, [0.15, 0]);
+    tramo(sup[1]!, 8.5 - 0.55, 12.47);
     expect(sup[0]!.origen.map((o) => o.clave)).toEqual(["V1/0", "V1/1"]);
-    tramo(sup[1]!, 11.2 - 0.7, 12.47);
+    expect(sup[1]!.origen.map((o) => o.clave)).toEqual(["V1/1", "V1/2"]);
     expect(sup.every((b) => b.largo <= BARRA_MAXIMA)).toBe(true);
-    // Otra corrida en el segundo vano: cada una se ancla más allá de la cara de P2
+    expect(sup[0]!.x[1] - sup[1]!.x[0]).toBeGreaterThanOrEqual(SOLAPE * 0.7 - 1e-9);
+    // Ninguna acaba sobre un apoyo ni junto a él: las puntas del empalme, lejos de las caras de P2 y P3
+    for (const x of [sup[0]!.x[1], sup[1]!.x[0]]) expect(Math.min(Math.abs(x - 6.2), Math.abs(x - 10.8))).toBeGreaterThan(1.5);
+    // En el empalme, entre las dos hay siempre al menos una corrida entera anclada (cada una crece lineal desde su punta en 0,70)
+    for (let x = sup[1]!.x[0]; x <= sup[0]!.x[1] + 1e-9; x += 0.05) expect(Math.min(1, (sup[0]!.x[1] - x) / 0.7) + Math.min(1, (x - sup[1]!.x[0]) / 0.7)).toBeGreaterThanOrEqual(1 - 1e-9);
+    expect(d.avisos).toEqual([]);
+    // Otra corrida en el segundo vano: no queda más remedio que empalmar sobre P2 (eje en 6). Cada una se
+    // ancla 0,70 más allá de la cara de enfrente y, además, se cruzan el solape centrado en el eje (±0,55)
     const otra = despiecePortico(PORTICO, { "V1/0": a, "V1/1": base([2, 12], [3, 12]) }, DATOS).barras.filter((b) => b.papel === "corrida");
-    tramo(otra[0]!, -0.17, 5.8 + 0.7, [0.15, 0]);
-    tramo(otra[1]!, 6.2 - 0.7, 10.8 + 0.7);
+    tramo(otra[0]!, -0.17, 6 + 0.55, [0.15, 0]);
+    tramo(otra[1]!, 6 - 0.55, 10.8 + 0.7);
     expect(otra.map((b) => b.n)).toEqual([2, 3]);
+    // Con un apoyo estrecho manda el anclaje más allá de la cara, no el solape: P2 de 20 cm (caras en 5,9 y 6,1)
+    const estrecho: Portico = { ...PORTICO, apoyos: [PORTICO.apoyos[0]!, { objeto: "P2", tipo: "pilar", eje: 6, caras: [5.9, 6.1] }, PORTICO.apoyos[2]!], vanos: [vano("V1/0", 0.2, 5.9, [0, 1]), vano("V1/1", 6.1, 10.8, [1, 2])] };
+    const enEstrecho = despiecePortico(estrecho, { "V1/0": a, "V1/1": base([2, 12], [3, 12]) }, DATOS).barras.filter((b) => b.papel === "corrida");
+    cerca(enEstrecho[0]!.x[1], 5.9 + 0.7);
+    cerca(enEstrecho[1]!.x[0], 6.1 - 0.7);
+  });
+
+  it("un pórtico largo (cuatro vanos de 6 m): la corrida, en piezas de 12 m como mucho, empalmadas sólo en centros de vano", () => {
+    const pilar = (i: number) => ({ objeto: `P${i + 1}`, tipo: "pilar" as const, eje: 6 * i, caras: [6 * i - 0.2, 6 * i + 0.2] as [number, number] });
+    const largo: Portico = { ...PORTICO, apoyos: [0, 1, 2, 3, 4].map(pilar), vanos: [0, 1, 2, 3].map((i) => vano(`V1/${i}`, 6 * i + 0.2, 6 * i + 5.8, [i, i + 1])), x: [-0.2, 24.2], vigas: [{ id: "V1", invertida: false, x: [0, 24] }] };
+    const a = base([2, 12], [2, 12]);
+    const datos: DatosDespiece = { ...DATOS, anclajes: Object.fromEntries(largo.vanos.map((v) => [v.clave, LB])) };
+    const d = despiecePortico(largo, Object.fromEntries(largo.vanos.map((v) => [v.clave, a])), datos);
+    const sup = d.barras.filter((b) => b.papel === "corrida").sort((x, y) => x.x[0] - y.x[0]);
+    // 24,64 m con sus patillas: tres piezas; la primera llega al centro del segundo vano (9) y la segunda, al del tercero (15: hasta el del cuarto mediría 13,10 m)
+    expect(sup).toHaveLength(3);
+    tramo(sup[0]!, -0.17, 9 + 0.55, [0.15, 0]);
+    tramo(sup[1]!, 9 - 0.55, 15 + 0.55);
+    tramo(sup[2]!, 15 - 0.55, 24.17, [0, 0.15]);
+    expect(sup.every((b) => b.largo <= BARRA_MAXIMA)).toBe(true);
+    expect(d.avisos).toEqual([]);
+    // Sobre cada apoyo interior pasa una pieza entera: ninguna punta a menos de 2 m de un eje interior
+    for (const b of sup) for (const x of b.x) for (const eje of [6, 12, 18]) expect(Math.abs(x - eje)).toBeGreaterThan(2);
+    // La inferior no cambia: una por vano, anclada en sus apoyos
+    expect(d.barras.filter((b) => b.cara === "inferior")).toHaveLength(4);
   });
 
   it("las zonas de los apoyos: del mismo Ø, lo que tienen de más sobre la corrida; de otro, toda, y la corrida es el montaje del centro", () => {
@@ -89,8 +129,10 @@ describe("CO6: el despiece de las vigas de un pórtico", () => {
     );
     const corridas = d.barras.filter((b) => b.papel === "corrida");
     const apoyos = d.barras.filter((b) => b.papel === "apoyo");
-    // La del primer vano llega a P2 y se ancla; la del segundo empieza un anclaje antes del fin de la zona (6,2 + 4,6/4) y sigue por el voladizo
-    tramo(corridas[0]!, -0.17, 5.8 + 0.7, [0.15, 0]);
+    // Sobre P2 no pasa nada (a un lado Ø12 y al otro Ø16): se empalman sobre él, con el solape del mayor anclaje
+    // centrado en su eje (6 ± 1,5·0,95/2 a 5 cm = 0,75). La corrida del segundo vano empieza un anclaje antes
+    // del fin de la zona (6,2 + 4,6/4) y sigue por el voladizo
+    tramo(corridas[0]!, -0.17, 6 + 0.75, [0.15, 0]);
     tramo(corridas[1]!, 6.2 + 1.15 - 0.7, 12.47);
     expect(corridas[1]!.origen.map((o) => o.clave)).toEqual(["V1/1", "V1/2"]);
     // A la izquierda de P2, 4Ø12 − 2Ø12 = 2Ø12: la zona (5,6/4) más el decalaje (0,9·d·cot θ/2, d = 500 − 30 − 8 − 6) y el anclaje, a 5 cm
@@ -99,9 +141,11 @@ describe("CO6: el despiece de las vigas de un pórtico", () => {
       [4, 16, "superiorInicio"],
     ]);
     const de12 = Math.ceil((0.9 * 0.456 + 0.7) / 0.05 - 1e-9) * 0.05;
-    tramo(apoyos[0]!, 5.8 - 1.4 - de12, 5.8 + 0.7);
+    tramo(apoyos[0]!, 5.8 - 1.4 - de12, 6 + 0.75);
     const de16 = Math.ceil((0.9 * 0.454 + 0.95) / 0.05 - 1e-9) * 0.05;
-    tramo(apoyos[1]!, 6.2 - 0.95, 6.2 + 1.15 + de16);
+    tramo(apoyos[1]!, 6 - 0.75, 6.2 + 1.15 + de16);
+    // Se cruzan 1,50 m: no menos que el solape de las Ø16
+    expect(apoyos[0]!.x[1] - apoyos[1]!.x[0]).toBeGreaterThanOrEqual(SOLAPE * 0.95 - 1e-9);
     // Para acotarlas: el eje del apoyo que tienen dentro (el de P2, en x = 6)
     expect(apoyos.map((b) => b.ejes)).toEqual([[6], [6]]);
     expect(corridas[1]!.ejes).toEqual([11]);
@@ -129,8 +173,12 @@ describe("CO6: el despiece de las vigas de un pórtico", () => {
     // Las dos hacen falta en la zona del primer vano: no se unen aunque sean iguales
     const iguales = despiecePortico(PORTICO, { "V1/0": { ...base([3, 16], [2, 16]), superiorFin: { n: 6, diametro: 16 } }, "V1/1": { ...base([3, 16], [2, 16]), superiorInicio: { n: 4, diametro: 16 } } }, DATOS).barras.filter((b) => b.papel === "apoyo");
     expect(iguales.map((b) => b.n)).toEqual([2, 2]);
-    // La corrida, 2Ø16 en los dos vanos: de una pieza mediría 12,22 m con su patilla, así que son dos
-    expect(d.barras.filter((b) => b.papel === "corrida").map((b) => b.largo)).toEqual([7.22, 6.5]);
+    // La corrida, 2Ø16 en los dos vanos: de una pieza mediría 12,22 m con su patilla, así que son dos,
+    // empalmadas en el centro del segundo vano (8,5 ± 0,75: 1,5·0,95/2 a 5 cm)
+    const corridas = d.barras.filter((b) => b.papel === "corrida");
+    expect(corridas.map((b) => b.largo)).toEqual([9.72, 4]);
+    tramo(corridas[0]!, -0.17, 8.5 + 0.75, [0.3, 0]);
+    tramo(corridas[1]!, 8.5 - 0.75, 10.8 + 0.95);
   });
 
   it("una viga invertida: lo de su inicio queda a la derecha, con el campo del que sale", () => {

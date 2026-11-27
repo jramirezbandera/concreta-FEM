@@ -9,10 +9,19 @@
  * con ellas:
  *
  *  - **Inferior** (y la de piel): de cara a cara de los apoyos del vano, más su anclaje en cada uno.
- *  - **Superior corrida:** pasa de un vano al siguiente si los dos llevan la misma (n y Ø) y la barra
- *    no pasa de 12 m; si no, se ancla más allá de la cara del apoyo. Donde la zona de un apoyo lleva
+ *  - **Superior corrida** (CO6-h, decidida el 2026-11-26: §8.27): pasa de un vano al siguiente sobre
+ *    el apoyo si los dos llevan la misma (n y Ø). Si de una pieza pasa de 12 m, se empalma en el
+ *    centro de un vano (donde la cara superior no está traccionada, o lo está poco), nunca sobre un
+ *    apoyo: cada pieza llega lo más lejos que puede sin pasar de 12 m, y las dos se cruzan la
+ *    longitud de solape, `SOLAPE`·lb (todas las barras solapadas en la misma sección), centrada en
+ *    el centro del vano. En un voladizo no se empalma. Donde la corrida cambia de un vano a otro
+ *    (otro n u otro Ø) no queda más remedio que empalmar sobre el apoyo: cada una se ancla más
+ *    allá de la cara de enfrente y, además, las dos se cruzan al menos la longitud de solape (la
+ *    del mayor anclaje de las dos), centrada en el eje del apoyo. Lo mismo las de la zona de un
+ *    apoyo cuando a cada lado son de otro diámetro y nada pasa sobre él. Donde la zona de un apoyo lleva
  *    otro diámetro, la corrida es sólo el montaje del centro: empieza una longitud de anclaje antes
- *    del fin de esa zona (se solapa con la del apoyo).
+ *    del fin de esa zona (se cruza con la del apoyo esa longitud, el decalaje y el anclaje de
+ *    ella: más que la de solape).
  *  - **Superior de un apoyo:** lo que la zona (el cuarto de la luz junto al apoyo) tiene de más sobre
  *    la corrida, o toda la de la zona si es de otro diámetro. Cubre la zona y sigue el decalaje
  *    (z·cot θ / 2, con z = 0,9·d) más su anclaje. Sobre un apoyo con vano a los dos lados, lo común
@@ -37,6 +46,8 @@ export const BARRA_MAXIMA = 12;
 export const PATILLA_MINIMA = 10;
 /** Con patilla, el anclaje es esta parte del recto (CE A19 tabla 8.2, α1). */
 export const ANCLAJE_CON_PATILLA = 0.7;
+/** El solape de unas barras traccionadas que se solapan todas en la misma sección, sobre su anclaje (CE A19 §8.7.3, α6). */
+export const SOLAPE = 1.5;
 /** Dos barras de un apoyo iguales que se pisan o quedan a menos de esto son una, m. */
 export const UNION_BARRAS = 0.1;
 
@@ -218,13 +229,46 @@ export function despiecePortico(p: Portico, armados: Readonly<Record<string, Par
     }) as [boolean, boolean];
   });
 
-  let abierta: { barra: Suelta; i: number } | null = null;
+  /** Medio solape (a 5 cm) de unas barras de la cara superior con este anclaje, m. */
+  const medioSolape = (anclaje: number) => alModulo((SOLAPE * anclaje) / 2);
+  /**
+   * Los apoyos sobre los que la armadura superior se empalma: hay barras a los dos lados y ninguna
+   * pasa de un vano a otro (ni la corrida, que cambia o no llega, ni una de apoyo común a los dos:
+   * la de un lado es de otro diámetro). Allí toda la tracción pasa de las de un lado a las del otro,
+   * así que se cruzan al menos la longitud de solape, centrada en el eje: por apoyo, su eje y el
+   * medio solape, con el mayor anclaje de las que acaban en él. Donde algo pasa, lo que un lado tiene
+   * de más sólo se corta: basta su anclaje más allá de la cara.
+   */
+  const empalmes = new Map<number, { eje: number; medio: number }>();
+  for (let j = 0; j + 1 < vs.length; j++) {
+    const [x, y] = [vs[j]!, vs[j + 1]!];
+    const ap = x.v.apoyos[1];
+    if (ap === null || y.v.apoyos[0] !== ap) continue;
+    const [cx, cy] = [pasa[j]![1] ? x.a.superior : undefined, pasa[j + 1]![0] ? y.a.superior : undefined];
+    const [ex, ey] = [extras.find((e) => e.x === x && e.lado === 1), extras.find((e) => e.x === y && e.lado === 0)];
+    const pasaLaCorrida = !!cx && !!cy && cx.n === cy.n && cx.diametro === cy.diametro;
+    const pasaLaDeApoyo = !!ex && !!ey && ex.diametro === ey.diametro;
+    const anclajes = (v: VanoPortico, ds: (number | undefined)[]) => ds.filter((d): d is number => d !== undefined).map((d) => lb(v, d, "superior"));
+    const [lx, ly] = [anclajes(x.v, [cx?.diametro, ex?.diametro]), anclajes(y.v, [cy?.diametro, ey?.diametro])];
+    if (pasaLaCorrida || pasaLaDeApoyo || !lx.length || !ly.length) continue;
+    empalmes.set(ap, { eje: p.apoyos[ap]!.eje, medio: medioSolape(Math.max(...lx, ...ly)) });
+  }
+  /** La punta de una barra superior del vano `x` en el apoyo de su lado: su anclaje y, si allí se empalma, el solape. */
+  const anclarSuperior = (x: Vano, diametro: number, lado: 0 | 1): { x: number; patilla: number } => {
+    const a = anclar(x, diametro, "superior", lado);
+    const ap = x.v.apoyos[lado];
+    const e = ap === null ? undefined : empalmes.get(ap);
+    return e ? { x: lado ? Math.max(a.x, e.eje + e.medio) : Math.min(a.x, e.eje - e.medio), patilla: a.patilla } : a;
+  };
+  /** Las corridas, cada una de una pieza con los vanos por los que pasa: se parten después (12 m). */
+  const corridas: { barra: Suelta; vanos: number[] }[] = [];
+  let abierta: { barra: Suelta; i: number; vanos: number[] } | null = null;
   const cerrar = () => {
     if (!abierta) return;
-    const f = anclar(vs[abierta.i]!, abierta.barra.diametro, "superior", 1);
+    const f = anclarSuperior(vs[abierta.i]!, abierta.barra.diametro, 1);
     abierta.barra.x[1] = f.x;
     abierta.barra.patillas[1] = f.patilla;
-    sueltas.push(abierta.barra);
+    corridas.push({ barra: abierta.barra, vanos: abierta.vanos });
     abierta = null;
   };
   vs.forEach((x, i) => {
@@ -232,27 +276,56 @@ export function despiecePortico(p: Portico, armados: Readonly<Record<string, Par
     if (!c) return cerrar();
     const origen: OrigenBarra = { clave: x.v.clave, ruta: "superior" };
     const anclajeC = alModulo(lb(x.v, c.diametro, "superior"));
-    const ab: { barra: Suelta; i: number } | null = abierta;
-    // Sigue la del vano anterior si es la misma y, acabando en este vano, no pasa de una barra comercial
-    const cierre = pasa[i]![1] ? anclar(x, c.diametro, "superior", 1) : { x: x.v.hasta, patilla: 0 };
-    const sigue = !!ab && pasa[i]![0] && ab.i === i - 1 && x.v.apoyos[0] !== null && vs[i - 1]!.v.apoyos[1] === x.v.apoyos[0] && ab.barra.n === c.n && ab.barra.diametro === c.diametro && cierre.x + cierre.patilla - ab.barra.x[0] + ab.barra.patillas[0] <= BARRA_MAXIMA;
+    const ab: { barra: Suelta; i: number; vanos: number[] } | null = abierta;
+    // Sigue la del vano anterior, sobre el apoyo, si es la misma (lo que pase de 12 m se parte después, en el centro de un vano)
+    const sigue = !!ab && pasa[i]![0] && ab.i === i - 1 && x.v.apoyos[0] !== null && vs[i - 1]!.v.apoyos[1] === x.v.apoyos[0] && ab.barra.n === c.n && ab.barra.diametro === c.diametro;
     if (sigue) {
       ab!.barra.origen.push(origen);
       ab!.i = i;
+      ab!.vanos.push(i);
     } else {
       cerrar();
-      const ini = pasa[i]![0] ? anclar(x, c.diametro, "superior", 0) : { x: Math.max(x.v.desde + x.L / 4 - anclajeC, x.v.desde), patilla: 0 };
-      abierta = { barra: { cara: "superior", papel: "corrida", n: c.n, diametro: c.diametro, x: [ini.x, x.v.hasta], patillas: [ini.patilla, 0], origen: [origen] }, i };
+      const ini = pasa[i]![0] ? anclarSuperior(x, c.diametro, 0) : { x: Math.max(x.v.desde + x.L / 4 - anclajeC, x.v.desde), patilla: 0 };
+      abierta = { barra: { cara: "superior", papel: "corrida", n: c.n, diametro: c.diametro, x: [ini.x, x.v.hasta], patillas: [ini.patilla, 0], origen: [origen] }, i, vanos: [i] };
     }
     if (!pasa[i]![1]) {
       // Acaba en el centro: una longitud de anclaje más allá de donde empieza la zona del apoyo
       const b = abierta!.barra;
       b.x[1] = Math.min(x.v.hasta - x.L / 4 + anclajeC, x.v.hasta);
-      sueltas.push(b);
+      corridas.push({ barra: b, vanos: abierta!.vanos });
       abierta = null;
     }
   });
   cerrar();
+
+  // Una corrida de más de 12 m se empalma en el centro de un vano entre dos apoyos: cada pieza, hasta
+  // el centro más lejano al que llega sin pasar de una barra comercial
+  for (const c of corridas) {
+    const b = c.barra;
+    const pieza = (x0: number, x1: number, patillas: [number, number]): Suelta => {
+      const suyos = b.origen.filter((o) => {
+        const v = p.vanos.find((y) => y.clave === o.clave);
+        return !v || (v.hasta > x0 + 1e-9 && v.desde < x1 - 1e-9);
+      });
+      return { ...b, x: [x0, x1], patillas, origen: suyos.length ? suyos : b.origen };
+    };
+    const centros = c.vanos
+      .map((j) => vs[j]!)
+      .filter((x) => x.v.apoyos[0] !== null && x.v.apoyos[1] !== null)
+      .map((x) => ({ m: (x.v.desde + x.v.hasta) / 2, medio: medioSolape(lb(x.v, b.diametro, "superior")) }))
+      .filter((y) => y.m - y.medio > b.x[0] + 1e-9 && y.m + y.medio < b.x[1] - 1e-9);
+    let [ini, patilla] = [b.x[0], b.patillas[0]];
+    while (b.x[1] + b.patillas[1] - ini + patilla > BARRA_MAXIMA + 1e-9) {
+      const quedan = centros.filter((y) => y.m - y.medio > ini + 1e-9);
+      if (!quedan.length) break;
+      const caben = quedan.filter((y) => y.m + y.medio - ini + patilla <= BARRA_MAXIMA + 1e-9);
+      // Si ni el primero cabe (un vano de más de 12 m), hasta él: la barra se avisa
+      const corte = caben.length ? caben[caben.length - 1]! : quedan[0]!;
+      sueltas.push(pieza(ini, corte.m + corte.medio, [patilla, 0]));
+      [ini, patilla] = [corte.m - corte.medio, 0];
+    }
+    sueltas.push(pieza(ini, b.x[1], [patilla, b.patillas[1]]));
+  }
 
   // Hasta dónde llega hacia el centro del vano la barra de la zona de un apoyo
   const haciaElVano = (e: Extra): number => {
@@ -261,7 +334,7 @@ export function despiecePortico(p: Portico, armados: Readonly<Record<string, Par
     return e.lado ? Math.max(v.hasta - e.x.L / 4 - de, v.desde) : Math.min(v.desde + e.x.L / 4 + de, v.hasta);
   };
   const deApoyo = (e: Extra, n: number): Suelta => {
-    const a = anclar(e.x, e.diametro, "superior", e.lado);
+    const a = anclarSuperior(e.x, e.diametro, e.lado);
     const m = haciaElVano(e);
     return { cara: "superior", papel: "apoyo", n, diametro: e.diametro, x: e.lado ? [m, a.x] : [a.x, m], patillas: e.lado ? [0, a.patilla] : [a.patilla, 0], origen: [{ clave: e.x.v.clave, ruta: e.ruta }] };
   };
