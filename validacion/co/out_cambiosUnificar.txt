@@ -1,0 +1,27 @@
+== portico-viento: 18 vanos
+   resumen antes {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}; ahora {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}
+   cambia el armado propuesto en 6 vanos; si cumple, en 0
+   apoyos interiores con vanos armados a los dos lados: 8; con otra superior a cada lado, 0
+   F2-X0/1: inf 3Ø12 · sup 2Ø12 (inicio 5Ø12, fin 3Ø12) · cØ6/200 (inicio cØ8/300)  →  inf 3Ø12 · sup 2Ø12 (inicio 6Ø12, fin 3Ø12) · cØ6/200 (inicio cØ8/300)
+   F2-X1/1: inf 3Ø12 · sup 2Ø12 (inicio 5Ø12, fin 3Ø12) · cØ6/200 (inicio cØ8/300)  →  inf 3Ø12 · sup 2Ø12 (inicio 6Ø12, fin 3Ø12) · cØ6/200 (inicio cØ8/300)
+   F1-X0/1: inf 3Ø12 · sup 2Ø12 (inicio 5Ø12, fin 5Ø12) · cØ6/200 (fin cØ8/300)  →  inf 3Ø12 · sup 2Ø12 (inicio 4Ø16, fin 5Ø12) · cØ6/200 (inicio cØ8/300, fin cØ8/300)
+   F1-X0/2: inf 2Ø12 · sup 2Ø12 (inicio 3Ø12) · cØ6/200  →  inf 2Ø12 · sup 2Ø12 (inicio 5Ø12) · cØ6/200
+   F1-X1/1: inf 3Ø12 · sup 2Ø12 (inicio 5Ø12, fin 5Ø12) · cØ6/200 (fin cØ8/300)  →  inf 3Ø12 · sup 2Ø12 (inicio 4Ø16, fin 5Ø12) · cØ6/200 (inicio cØ8/300, fin cØ8/300)
+   F1-X1/2: inf 2Ø12 · sup 2Ø12 (inicio 3Ø12) · cØ6/200  →  inf 2Ø12 · sup 2Ø12 (inicio 5Ø12) · cØ6/200
+== portico-cargado-sismo: 18 vanos
+   resumen antes {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}; ahora {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}
+   cambia el armado propuesto en 8 vanos; si cumple, en 0
+   apoyos interiores con vanos armados a los dos lados: 8; con otra superior a cada lado, 0
+   F2-X0/1: inf 5Ø12 · sup 2Ø12 (inicio 3Ø25, fin 3Ø20) · cØ8/250 (inicio cØ6/75, fin cØ10/250)  →  inf 5Ø12 · sup 2Ø12 (inicio 4Ø25, fin 3Ø20) · cØ8/250 (inicio cØ6/75, fin cØ10/250)
+   F2-X0/2: inf 2Ø12 · sup 3Ø12 (inicio 4Ø12) · cØ6/200 (inicio cØ6/150)  →  inf 2Ø12 · sup 3Ø12 (inicio 3Ø20) · cØ6/200 (inicio cØ6/150)
+   F2-X1/1: inf 5Ø12 · sup 2Ø12 (inicio 3Ø25, fin 3Ø20) · cØ8/250 (inicio cØ6/75, fin cØ10/250)  →  inf 5Ø12 · sup 2Ø12 (inicio 4Ø25, fin 3Ø20) · cØ8/250 (inicio cØ6/75, fin cØ10/250)
+   F2-X1/2: inf 2Ø12 · sup 3Ø12 (inicio 4Ø12) · cØ6/200 (inicio cØ6/150)  →  inf 2Ø12 · sup 3Ø12 (inicio 3Ø20) · cØ6/200 (inicio cØ6/150)
+   F1-X0/1: inf 6Ø12 · sup 5Ø12 (inicio 3Ø25, fin 4Ø25) · cØ8/250 (inicio cØ8/150, fin cØ8/150)  →  inf 6Ø12 · sup 5Ø12 (inicio 4Ø25, fin 4Ø25) · cØ8/250 (inicio cØ8/150, fin cØ8/150)
+   F1-X0/2: inf 2Ø12 · sup 3Ø12 (inicio 4Ø12) · cØ6/200 (inicio cØ6/150)  →  inf 2Ø12 · sup 3Ø12 (inicio 4Ø25) · cØ6/200 (inicio cØ6/150)
+   F1-X1/1: inf 6Ø12 · sup 5Ø12 (inicio 3Ø25, fin 4Ø25) · cØ8/250 (inicio cØ8/150, fin cØ8/150)  →  inf 6Ø12 · sup 5Ø12 (inicio 4Ø25, fin 4Ø25) · cØ8/250 (inicio cØ8/150, fin cØ8/150)
+   F1-X1/2: inf 2Ø12 · sup 3Ø12 (inicio 4Ø12) · cØ6/200 (inicio cØ6/150)  →  inf 2Ø12 · sup 3Ø12 (inicio 4Ø25) · cØ6/200 (inicio cØ6/150)
+== vivienda: 30 vanos
+   resumen antes {"vigas":18,"vanos":30,"cumplen":30,"noCumplen":0,"sinArmado":0}; ahora {"vigas":18,"vanos":30,"cumplen":30,"noCumplen":0,"sinArmado":0}
+   cambia el armado propuesto en 1 vanos; si cumple, en 0
+   apoyos interiores con vanos armados a los dos lados: 13; con otra superior a cada lado, 0
+   Z-CUB-S-1/0: inf 2Ø12 · sup 2Ø12 · cØ6/150 (3R)  →  inf 2Ø12 · sup 2Ø12 (fin 3Ø12) · cØ6/150 (3R)

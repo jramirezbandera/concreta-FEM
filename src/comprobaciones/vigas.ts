@@ -8,10 +8,11 @@
 import type { Consultas, Respuesta } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { armadoViga, DATOS_ARMADO, textoArmadoViga, type ArmadoVanoViga, type DatosArmado } from "./armado.ts";
-import { proponerVano } from "./armar/vigas.ts";
+import { proponerVano, unificarApoyo, type LadoApoyo, type ZonasFijas } from "./armar/vigas.ts";
 import { comprobarVano, type ComprobacionVano, type FilaViga, type PendienteViga } from "./comprobar/vigas.ts";
-import { demandasViga, type ZonaViga } from "./demandas/vigas.ts";
+import { demandasViga, type DemandasVano, type DemandasViga, type ZonaViga } from "./demandas/vigas.ts";
 import { agotar, type Paso } from "./pasos.ts";
+import { porticosDe, type VanoPortico } from "./porticos.ts";
 
 /** El armado de las vigas del proyecto: por viga, el de cada vano en su orden (null, el que no lo tiene). */
 export type ArmadoVigas = Record<string, (ArmadoVanoViga | null)[]>;
@@ -116,6 +117,18 @@ export function* pasosVigas(q: Consultas, armado: ArmadoVigas | undefined, datos
   const vistos = new Set<string>();
   const vigas: VigaComprobada[] = [];
   const resumen = { vigas: 0, vanos: 0, cumplen: 0, noCumplen: 0, sinArmado: 0, llamadas: 0 };
+  /** Lo de cada vano con armado, antes de resumirlo: el propuesto puede subir al igualar los apoyos (CO2-k). */
+  interface Hecho {
+    base: Pick<VanoComprobado, "vano" | "desde" | "hasta" | "apoyos">;
+    d: DemandasViga;
+    v: DemandasVano;
+    origen: VanoComprobado["origen"];
+    a: ArmadoVanoViga;
+    c: ComprobacionVano | null;
+    extra: Partial<VanoComprobado>;
+  }
+  const hechos = new Map<string, Hecho>();
+  const porViga: { id: string; seccion: string; combinaciones: number; vanos: (VanoComprobado | Hecho)[] }[] = [];
   for (const id of ids) {
     const d = demandasViga(q, id);
     if (!d.valido) return d;
@@ -128,7 +141,7 @@ export function* pasosVigas(q: Consultas, armado: ArmadoVigas | undefined, datos
     const suyos = armado?.[id] ?? [];
     if (suyos.length > d.valor.vanos.length)
       diagnosticos.push({ codigo: "armado/vano", severidad: "aviso", mensaje: `El armado de la viga ${id} tiene ${suyos.length} vanos y la viga, ${d.valor.vanos.length}: los que sobran no se usan (los vanos van en su orden a lo largo de la viga, entre las caras de sus apoyos).`, ids: [id] });
-    const vanos: VanoComprobado[] = d.valor.vanos.map((v) => {
+    const vanos: (VanoComprobado | Hecho)[] = d.valor.vanos.map((v) => {
       const base = { vano: v.indice, desde: v.desde, hasta: v.hasta, apoyos: v.apoyos };
       const suyo = suyos[v.indice] ?? undefined;
       let a: ArmadoVanoViga | undefined = suyo;
@@ -144,18 +157,68 @@ export function* pasosVigas(q: Consultas, armado: ArmadoVigas | undefined, datos
         if (!p.armado) return { ...base, origen, cumple: false, aprovechamiento: null, pendientes: [{ motivo: p.motivo ?? "sin propuesta" }], ...extra };
       } else if (suyo) c = comprobarVano(d.valor, v, armadoViga(suyo, datos));
       else return { ...base, origen, cumple: false, aprovechamiento: null, pendientes: [{ motivo: "el vano no tiene armado en el proyecto" }] };
-      const m = c ? manda(c) : undefined;
       resumen.llamadas += c?.llamadas ?? 0;
+      const h: Hecho = { base, d: d.valor, v, origen, a: a!, c, extra };
+      hechos.set(`${id}/${v.indice}`, h);
+      return h;
+    });
+    porViga.push({ id, seccion: d.valor.seccion.id, combinaciones: d.valor.combinaciones, vanos });
+    yield { fase: op.proponer ? "armado de las tablas" : "comprobación", hecho: porViga.length, total: ids.length, pieza: id };
+  }
+
+  // CO2-k: la misma armadura superior a los dos lados de cada apoyo por el que la viga continúa, para
+  // que pase entera. Sólo sube lo que se propone ahora; lo del proyecto no se toca
+  if (op.proponer) {
+    /** Por vano, las zonas que ya se igualaron con el vecino: no se mueven al igualar la otra. */
+    const fijas = new Map<string, ZonasFijas>();
+    const zonaDe = (a: ArmadoVanoViga, campo: "superiorInicio" | "superiorFin") => a[campo] ?? a.superior;
+    for (const p of porticosDe(q)) {
+      const lado = (v: VanoPortico, l: 0 | 1): LadoApoyo | null => {
+        const campo = (v.invertida ? l === 0 : l === 1) ? "superiorFin" : "superiorInicio";
+        const h = hechos.get(v.clave);
+        if (h) return { armado: h.a, campo, ...(h.origen === "propuesto" ? { libre: { d: h.d, v: h.v, fijas: fijas.get(v.clave) ?? {} } } : {}) };
+        const suyo = armado?.[v.viga]?.[v.vano];
+        return suyo ? { armado: suyo, campo } : null;
+      };
+      for (let i = 0; i < p.apoyos.length; i++) {
+        const [vi, vd] = [p.vanos.find((v) => v.apoyos[1] === i), p.vanos.find((v) => v.apoyos[0] === i)];
+        if (!vi || !vd || !vi.geometria || !vd.geometria) continue;
+        const [li, ld] = [lado(vi, 1), lado(vd, 0)];
+        if (!li || !ld) continue;
+        const r = unificarApoyo(li, ld, datos);
+        [vi, vd].forEach((v, k) => {
+          const [u, h] = [r[k], hechos.get(v.clave)];
+          if (!u || !h) return;
+          resumen.llamadas += u.comprobacion.llamadas;
+          h.a = u.armado;
+          h.c = u.comprobacion;
+        });
+        // Si quedaron iguales, las dos zonas ya no se mueven
+        const [ai, ad] = [hechos.get(vi.clave)?.a ?? li.armado, hechos.get(vd.clave)?.a ?? ld.armado];
+        const [zi, zd] = [zonaDe(ai, li.campo), zonaDe(ad, ld.campo)];
+        if (zi.n === zd.n && zi.diametro === zd.diametro) {
+          fijas.set(vi.clave, { ...fijas.get(vi.clave), [li.campo]: zi });
+          fijas.set(vd.clave, { ...fijas.get(vd.clave), [ld.campo]: zd });
+        }
+      }
+    }
+  }
+
+  for (const g of porViga) {
+    const vanos: VanoComprobado[] = g.vanos.map((x) => {
+      if (!("d" in x)) return x;
+      const m = x.c ? manda(x.c) : undefined;
       return {
-        ...base,
-        origen,
-        ...(a ? { armado: a, texto: textoArmadoViga(a) } : {}),
-        cumple: c?.cumple ?? false,
+        ...x.base,
+        origen: x.origen,
+        armado: x.a,
+        texto: textoArmadoViga(x.a),
+        cumple: x.c?.cumple ?? false,
         aprovechamiento: m ? finito(m.aprovechamiento) : null,
         ...(m ? { manda: fila(m) } : {}),
-        pendientes: c?.pendientes ?? [],
-        ...(op.filas && c ? { filas: c.filas.map(fila) } : {}),
-        ...extra,
+        pendientes: x.c?.pendientes ?? [],
+        ...(op.filas && x.c ? { filas: x.c.filas.map(fila) } : {}),
+        ...x.extra,
       };
     });
     for (const v of vanos) {
@@ -165,8 +228,7 @@ export function* pasosVigas(q: Consultas, armado: ArmadoVigas | undefined, datos
       else resumen.noCumplen++;
     }
     resumen.vigas++;
-    vigas.push({ viga: id, seccion: d.valor.seccion.id, cumple: vanos.every((v) => v.cumple), combinaciones: d.valor.combinaciones, vanos });
-    yield { fase: op.proponer ? "armado de las tablas" : "comprobación", hecho: vigas.length, total: ids.length, pieza: id };
+    vigas.push({ viga: g.id, seccion: g.seccion, cumple: vanos.every((v) => v.cumple), combinaciones: g.combinaciones, vanos });
   }
   // Lo que no está escrito en la obra y decide un veredicto: se dice, como el recubrimiento de los pilares (CO1-d)
   const porDefecto = [

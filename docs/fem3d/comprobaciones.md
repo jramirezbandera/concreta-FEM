@@ -1064,6 +1064,101 @@ De la prueba de uso del usuario: en la pestaña Pilares, al pinchar un pilar en 
 
 **Validación:** `src/comprobaciones/capacidadVigas.test.ts` (MRd y VRd bit a bit con `calcRCBeam` en el centro y en la zona del fin; la rampa de una barra entre lo de sin ella y con ella; el escalón de los cercos; TRd con la fórmula; sin armado, cero), `src/visor/comprobaciones.test.ts` (con `elegibles`, el clic y la ventana sólo dan objetos de ese tipo) y `app/src/test/comprobacion.test.tsx` (el área capaz de My dibujada y, con el pórtico cumpliendo, ningún punto fuera). A mano en la app con la vivienda: en Pilares, un clic en la losa o en una viga no elige nada, en la planta ni en el 3D; en Vigas, la envolvente de Z-CUB-S-1 dentro de su área capaz, y al bajar la corrida en el formulario, el área capaz baja.
 
+### 8.25 La cara del apoyo de una viga que no pasa por el eje de su pilar (2026-11-26)
+
+De la prueba de uso del usuario con el ejemplo del núcleo: en el despiece de VX0 (30 × 50, enrasada a la cara de fuera de pilares de 50 × 50: su eje a 0,10 m del de ellos), el área capaz acababa a 0,35 m del eje del pilar y la envolvente seguía subiendo «sin cubrir».
+
+**El fallo (CO6-13, grave, del lado inseguro; venía de C5):** `Consultas.viga` medía la media anchura del apoyo a lo largo de la recta entre los nudos de la barra, no a lo largo de la viga. Con el eje de la viga fuera del nudo del pilar y un nudo de la malla cerca (la unión por las caras de LV los pone a 0,15–0,27 m), esa recta va inclinada 20–34° y un 50 × 50 daba 0,325–0,347 m de media anchura en vez de 0,25: la cara, hasta 9,7 cm dentro del vano. Todo lo que se lee «en la cara» (las zonas y los extremos de `vano`, la comprobación de las vigas, `fem consultar pieza`, las luces, el despiece y sus anclajes) iba con ella. Sin nudos intermedios (una viga suelta entre pilares) o con la viga por el eje de sus pilares, no pasaba.
+
+**El arreglo:** `direccionBarra` (`src/compilador/consultas.ts`) da la dirección del tramo flexible (de i' a j', con los offsets), que es la de la pieza dibujada. El cálculo no cambia; cambia dónde se leen sus resultados.
+
+**Medido en VX0 del núcleo** (apoyo P6-0, lado del vano 1; MRd con 3Ø12 = 64,8 kN·m):
+
+| Sección | x (m) | MEd (kN·m) | MEd/MRd |
+|---|---|---|---|
+| La «cara» de antes | 5,90 | −63,1 | 0,98 |
+| La cara del pilar | 6,00 | −70,1 | 1,08 |
+
+Con la cara en su sitio, `fem armar` propone 2Ø16 en esa zona (0,93) en vez de 3Ø12, y las inferiores llevan patilla de 15 cm en los pilares extremos (los 0,49 m de anclaje no caben rectos en 0,50 − 0,03; antes «cabían» en 0,65). En el ejemplo afectaba a 16 de 24 apoyos de viga en pilar; en la vivienda, el muestrario y el pórtico, a ninguno.
+
+**Validación:** `src/compilador/consultas.test.ts` (una viga a 0,10 m del eje de sus pilares, con brochales que le dan nudos a 0,5 m de cada uno: las caras, a ±0,2 a 1e-12; con el código de antes, −0,2255). Ninguna referencia congelada cambia: sus modelos no tienen vigas fuera del eje de sus pilares con nudos intermedios.
+
+### 8.26 El momento mínimo en la cara de los apoyos y lo de dentro del pilar en la gráfica (2026-11-26)
+
+De la misma prueba de uso: «¿no habría que comprobar el diagrama que queda dentro del pilar?». Dentro del nudo la sección no es la de la viga y la ley del modelo de barras (con la reacción concentrada en el eje) no es la real, así que la viga se comprueba en la cara (CE Anejo 19 §5.3.2.2(3)). Ese artículo pone dos condiciones, y la gráfica las enseña mal o no las enseña:
+
+**CO2-j: el momento en la cara, no menos que 0,65 veces el de empotramiento perfecto** (la nota del mismo apartado). Fila nueva `<zona>/sup-empotramiento` («Momento minimo en la cara del apoyo»), de la armadura superior de la zona de ese apoyo: 0,65·|M emp| ≤ MRd, con el MRd de la fila de la flexión de esa cara. Si falla, `fem armar` sube esa armadura, como con cualquier otra fila.
+
+- **El momento de empotramiento perfecto** (`src/comprobaciones/demandas/empotramiento.ts`, puro) sale de la ley de momentos del vano en cada combinación, sin mirar las cargas: la isostática es la ley menos la recta de sus momentos de extremo, y los de empotramiento, los que anulan los dos giros (MA = −(4A − 2B)/L, MB = −(4B − 2A)/L, con A = ∫M₀·(1 − ξ) y B = ∫M₀·ξ; cuadratura de Gauss de 3 puntos por tramo, exacta para la ley de una carga trapecial). Vale con cualquier carga, también con lo que la losa pasa a la viga nudo a nudo y con sus pares.
+- **Decisiones, de Claude y por confirmar por el usuario:**
+  - el vano, entre las caras de sus apoyos (la luz libre), que es donde se lee el momento que se compara; con la luz entre ejes saldría un (L/Ln)² más;
+  - sólo en los apoyos por los que la viga continúa (otro vano del mismo pórtico al otro lado, también un voladizo). En un apoyo extremo no: el momento allí es el que da la rigidez del pilar, y el artículo 9.2.1.2 ya pide su armadura mínima. En un voladizo tampoco: su momento es el de la estática;
+  - sólo con las combinaciones de ELU sin el sismo del programa (la ley de los modos combinados no es la de unas cargas); las de mayor carga vertical están entre ellas;
+  - viga de rigidez constante y sin deformación por cortante, como en un prontuario.
+- **Medido** (`validacion/co/medirEmpotramiento.ts`, `out_medirEmpotramiento.txt`): en el núcleo, la vivienda, el muestrario y el pórtico de las pruebas hay 90 caras con continuidad y el mínimo no manda en ninguna (0,65·M emp entre 0,24 y 0,90 del momento del modelo en la cara; medianas de 0,47 a 0,63). Es una red para vigas con poco empotramiento en el modelo.
+
+**La armadura de la cara tiene que atravesar el apoyo.** El despiece ya lo hace (las de apoyo pasan y las corridas se anclan más allá de la cara de enfrente); ahora se ve. `capacidadPortico` da además `MyApoyos`: el MRd de la sección de la viga dentro de cada apoyo, de cara a cara, con las barras que hay en cada x según lo ancladas que están. No es área capaz (no se compara con la envolvente ni marca puntos fuera).
+
+**La gráfica de las envolventes** (`DespiecePortico.tsx`):
+
+- una banda gris en el ancho de cada apoyo, que atenúa lo de dentro, con su ayuda y la nota del título («en gris, dentro de los apoyos: se comprueba en la cara»);
+- los picos rotulados son los de fuera de los apoyos y el valor en cada cara (en VX0, −70 en la cara en vez del −84 de dentro del pilar);
+- en la de momentos, la línea de puntos de `MyApoyos`;
+- la lectura del cursor dice «dentro de P6-0: se comprueba en la cara».
+
+**Lo que no se comprueba:** el nudo (bielas, cercos del pilar en el nudo). El empalme de las corridas sobre los apoyos, que estaba por decidir (CO6-h), en §8.27.
+
+**Validación:** `demandas/empotramiento.test.ts` (carga uniforme, puntual, triangular y un par concentrado frente a las fórmulas de prontuario a 1e-9, con la ley de cualquier sustentación), `demandas/vigas.test.ts` (en el pórtico de las pruebas, −w·L²/12 del vano entre caras a 1e-9; ninguno en los apoyos extremos ni en el voladizo; con el sismo, el mismo), `comprobar/vigas.test.ts` (la fila, con el MRd de la flexión de su cara, su grupo y su combinación), `capacidadVigas.test.ts` (`MyApoyos` casa con cada vano en su cara y no baja del menor de los dos) y `app/src/test/comprobacion.test.tsx`. A mano en la app con el núcleo: VX0 con su fila (0,56) y la gráfica.
+
+**La referencia congelada de CO2, regenerada a sabiendas** (`validacion/co/cambiosEmpotramiento.ts`, `out_cambiosEmpotramiento.txt`): en sus tres modelos (66 vanos) sólo se añaden las 49 filas nuevas, con aprovechamientos de 0,04 a 0,81, y ninguna manda en su vano. El armado propuesto, lo que cumple, lo pendiente y las filas que ya estaban no cambian (la mayor diferencia de aprovechamiento, 3e-16).
+
+### 8.27 CO6-h: las corridas superiores se empalman en el centro del vano (2026-11-26)
+
+**Decidido por el usuario** (opción C de las tres que se le dieron): la armadura superior corrida pasa entera sobre los apoyos y se empalma en el centro de un vano; sólo donde no queda más remedio se empalma sobre un apoyo, y entonces con la longitud de solape.
+
+**Lo que había:** como una barra no pasa de 12 m, en un pórtico largo cada vano llevaba su corrida, anclada una longitud de anclaje más allá de la cara del apoyo. Las dos se cruzaban encima del pilar 2·lb menos su ancho (0,90 m con Ø12 y un pilar de 50; menos con pilares más anchos): un empalme de todas las barras en la sección de mayor momento negativo y más corto que la longitud de solape (CE Anejo 19 §8.7.3: α6 = 1,5 con todas las barras solapadas en la misma sección).
+
+**La regla** (`despieceVigas.ts`, `SOLAPE` = 1,5):
+
+- **La corrida es continua** por todos los vanos seguidos que llevan la misma (n y Ø) y a cuyo apoyo llega. Si de una pieza pasa de 12 m, se parte en el centro de un vano entre dos apoyos: cada pieza llega al centro más lejano que alcanza sin pasar de una barra comercial, y las dos se cruzan `SOLAPE`·lb centrado en él (a 5 cm por cada lado). En un voladizo no se empalma (su cara superior está traccionada entera).
+- **Donde no pasa nada sobre un apoyo** (la corrida cambia de n o de Ø, o las barras de la zona son de otro diámetro a cada lado y no hay ninguna común), la tracción pasa de las de un lado a las del otro encima de él: cada barra se ancla más allá de la cara de enfrente, como antes, y además se cruzan al menos el solape del mayor anclaje de las que acaban allí, centrado en el eje del apoyo.
+- **Donde algo pasa** (la corrida o las barras comunes a los dos lados), lo que un lado tiene de más sólo se corta: su anclaje más allá de la cara, como antes.
+- La inferior no cambia: una por vano, anclada en sus apoyos (donde la cara inferior está comprimida).
+
+En el empalme, el área capaz no baja: con el solape de 1,5·lb, entre las dos piezas hay siempre al menos una corrida entera anclada.
+
+**Medido** (`validacion/co/medirPorticos.ts`): la vivienda no cambia (ninguna corrida pasaba de 12 m ni cambiaba sobre un apoyo); el pórtico de las pruebas, +0,3 % de acero en vigas; el núcleo, +1,1 % (1 075 → 1 087 kg) y de 4 a 2 barras de más de 12 m. En VX0 del núcleo, sobre P6-0 se cruzan ahora 1,40 m las 2Ø16 de un lado con las 3Ø12 del otro (antes, 1,15; el solape de las Ø16 son 1,39).
+
+**Lo que queda:**
+
+- las dos barras de más de 12 m del núcleo son inferiores de vanos de 12,5 y 18,5 m (vigas que cruzan otras sin apoyarse en ellas): siguen con su aviso, «se solapa en obra». Empalmar la inferior pide otra regla (junto a un apoyo, no en el centro);
+- VX0 se empalmaba sobre el pilar porque la propuesta armaba cada vano por su cuenta y a cada lado de P6-0 salía otro diámetro (2Ø16 y 3Ø12): resuelto en la propuesta, §8.28.
+
+**Validación:** `despieceVigas.test.ts` (dos vanos, de una pieza sobre el apoyo; con el voladizo, el empalme en el centro del segundo vano con sus números; cuatro vanos de 6 m, tres piezas de 12 m como mucho con las puntas a más de 2 m de los ejes; la corrida que cambia y las zonas de otro diámetro, con el solape centrado en el eje; un apoyo estrecho, donde manda el anclaje; 300 armados al azar con el acero de cada zona y ninguna barra de más de 12 m). A mano en la app con VX0 del núcleo.
+
+### 8.28 CO2-k: la misma armadura superior a los dos lados de cada apoyo (2026-11-27)
+
+**Decidido por el usuario**, tras §8.27: la propuesta armaba cada vano por su cuenta y a cada lado de un apoyo salía lo que pedía el suyo (en VX0 del núcleo, 2Ø16 a un lado de P6-0 y 3Ø12 al otro), así que nada pasaba entero y el despiece tenía que empalmar sobre el pilar. Lo normal en obra es la misma armadura a los dos lados.
+
+**La regla** (`unificarApoyo` en `armar/vigas.ts`, aplicada en `pasosVigas` con `proponer`):
+
+- Tras proponer cada vano, en cada apoyo interior de cada pórtico los dos lados toman la misma superior: la primera de la tabla, de menos a más acero desde la mayor de las dos, que cabe en los dos anchos y con la que los dos cumplen (hasta `INTENTOS_UNIFICAR` = 8 candidatas). Sólo sube acero.
+- Primero se prueba cambiar sólo esa barra. Si así falla alguna fila (con más diámetro baja el canto útil y el cortante puede pasar por poco: P3 del pórtico de las pruebas, de 0,996 a 1,00), el vano se vuelve a proponer con esa zona fijada (`proponerVano(…, { fijas })`), y sube lo que haga falta (allí, los cercos de esa zona).
+- Las zonas ya igualadas no se mueven al igualar el otro apoyo del mismo vano.
+- Un vano con el armado del proyecto (con «Proponer» sólo lo que falta) no se toca: el que se propone sube hasta su armadura si es mayor y le cabe; si es menor, se queda con la suya.
+- Si no hay forma (anchos distintos en los que no cabe la misma, o ninguna de las 8 cumple a los dos lados), el apoyo se queda como estaba y el despiece empalma sobre él con el solape de §8.27.
+
+**Medido:**
+
+- `validacion/co/medirVigas.ts` (edificio objetivo de losas, 1 246 apoyos interiores): con otra superior a cada lado, de 285 a 0; el acero de las vigas en el despiece, de 57 253 a 57 004 kg (−0,4 %: las barras de apoyo iguales pasan sobre el pilar en vez de anclarse cada una más allá de la cara de enfrente).
+- `validacion/co/cambiosUnificar.ts` (`out_cambiosUnificar.txt`, los tres modelos de la referencia de CO2): cambia el armado de 15 de 66 vanos (sólo sube la superior de un apoyo y, en dos, los cercos de esa zona); ninguno deja de cumplir; los 29 apoyos interiores quedan iguales.
+- `medirPorticos.ts`: vivienda +1,1 kg (+0,2 %), pórtico de las pruebas +1,6 % y −1,2 % con el sismo, núcleo +0,1 %.
+- En VX0 del núcleo, las 2Ø16 de P6-0 y P12-0 pasan enteras sobre los dos pilares (una barra de 11,95 m; el vano central lleva también 2Ø16 junto a sus apoyos).
+
+**La referencia congelada de CO2, regenerada a sabiendas** con el registro de `out_cambiosUnificar.txt`.
+
+**Validación:** `armar/vigas.test.ts` (con una zona fijada, la zona no se mueve y suben los cercos que pide el cortante, y nada baja de lo propuesto sin ella; al proponer los dos pórticos de las pruebas, los 8 apoyos interiores de cada uno con la misma superior a cada lado y no menos que la mayor de las propuestas sueltas; con un lado escrito en el proyecto, el otro sube hasta él si es mayor y si es menor no). A mano en la app con VX0 del núcleo.
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

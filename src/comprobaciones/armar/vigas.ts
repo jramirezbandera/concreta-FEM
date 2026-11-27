@@ -21,6 +21,9 @@
  *    transversal de 0,75·d del §9.2.2(8));
  *  - piel: de 0 a 5 barras Ø12 por cara lateral (sólo las pide la torsión de equilibrio).
  * La armadura superior de un apoyo no baja de la corrida, ni sus cercos de los del centro.
+ *
+ * Con `fijas`, la superior de la zona de un apoyo es la dada y no se mueve (la que se ha igualado con
+ * el vano del otro lado, CO2-k): se propone lo demás con ella.
  */
 import { armadoViga, ramasDe, type ArmadoVanoViga, type BarrasCara, type CercosViga, type DatosArmado } from "../armado.ts";
 import { comprobarVano, geometriaViga, type ComprobacionVano, type FilaViga, type GrupoArmado } from "../comprobar/vigas.ts";
@@ -110,7 +113,10 @@ export interface PropuestaVano {
 const falla = (c: ComprobacionVano): FilaViga | undefined => c.filas.find((f) => f.estado === "fail");
 const rechazada = (c: ComprobacionVano) => c.pendientes.find((p) => p.motivo.startsWith("el módulo no admite"));
 
-export function proponerVano(d: DemandasViga, v: DemandasVano, datos?: DatosArmado): PropuestaVano {
+/** La superior de la zona de un apoyo, fijada (CO2-k). */
+export type ZonasFijas = Partial<Record<"superiorInicio" | "superiorFin", BarrasCara>>;
+
+export function proponerVano(d: DemandasViga, v: DemandasVano, datos?: DatosArmado, op: { fijas?: ZonasFijas } = {}): PropuestaVano {
   const g = geometriaViga(d);
   if ("motivo" in g) return { armado: null, comprobacion: null, probados: 0, motivo: g.motivo };
   const rec = armadoViga({ inferior: { n: 2, diametro: 12 }, superior: { n: 2, diametro: 12 }, cercos: { diametro: 6, separacion: 300 } }, datos).recubrimiento;
@@ -119,6 +125,18 @@ export function proponerVano(d: DemandasViga, v: DemandasVano, datos?: DatosArma
   if (!barras.length) return { armado: null, comprobacion: null, probados: 0, motivo: `en el ancho de ${Math.round(g.b)} mm no caben dos barras con ese recubrimiento` };
   const limite: Record<Grupo, number> = { inferior: barras.length, superior: barras.length, superiorInicio: barras.length, superiorFin: barras.length, cercos: cercos.length, cercosInicio: cercos.length, cercosFin: cercos.length, piel: PIEL_MAXIMO + 1 };
   const p: PosicionesVano = { inferior: 0, superior: 0, superiorInicio: 0, superiorFin: 0, cercos: 0, cercosInicio: 0, cercosFin: 0, piel: 0 };
+  // Las zonas fijas: su posición en la tabla, que no se mueve
+  const fijas = new Set<Grupo>();
+  for (const campo of ["superiorInicio", "superiorFin"] as const) {
+    const T = op.fijas?.[campo];
+    if (!T) continue;
+    const k = barras.findIndex((b) => b.n === T.n && b.diametro === T.diametro);
+    if (k < 0) return { armado: null, comprobacion: null, probados: 0, motivo: `la superior fijada ${T.n}Ø${T.diametro} no cabe en el ancho` };
+    p[campo] = k;
+    fijas.add(campo);
+  }
+  /** La corrida no pasa de una zona fija (la zona sería menor que lo corrido). */
+  const topeSuperior = Math.min(barras.length, ...[...fijas].map((g) => p[g] + 1));
   let probados = 0;
   const probar = (x: PosicionesVano): ComprobacionVano => {
     probados++;
@@ -126,8 +144,8 @@ export function proponerVano(d: DemandasViga, v: DemandasVano, datos?: DatosArma
   };
   /** Lo de los apoyos no baja de lo corrido. */
   const ordenar = (x: PosicionesVano) => {
-    x.superiorInicio = Math.max(x.superiorInicio, x.superior);
-    x.superiorFin = Math.max(x.superiorFin, x.superior);
+    if (!fijas.has("superiorInicio")) x.superiorInicio = Math.max(x.superiorInicio, x.superior);
+    if (!fijas.has("superiorFin")) x.superiorFin = Math.max(x.superiorFin, x.superior);
     x.cercosInicio = Math.max(x.cercosInicio, x.cercos);
     x.cercosFin = Math.max(x.cercosFin, x.cercos);
   };
@@ -139,7 +157,8 @@ export function proponerVano(d: DemandasViga, v: DemandasVano, datos?: DatosArma
     const f = falla(c);
     if (!f) break;
     const grupo: GrupoArmado = f.grupo;
-    if (grupo === "seccion" || p[grupo] + 1 >= limite[grupo])
+    const tope = grupo === "seccion" ? 0 : fijas.has(grupo) ? p[grupo] + 1 : grupo === "superior" ? topeSuperior : limite[grupo];
+    if (grupo === "seccion" || p[grupo] + 1 >= tope)
       return { armado: null, comprobacion: c, probados, motivo: `ningún armado de las tablas cumple «${f.descripcion}»${f.comb ? ` (${f.comb})` : ""}: la sección no basta` };
     p[grupo]++;
     ordenar(p);
@@ -149,7 +168,7 @@ export function proponerVano(d: DemandasViga, v: DemandasVano, datos?: DatosArma
   for (let cambia = true; cambia; ) {
     cambia = false;
     for (const grupo of [...GRUPOS].reverse()) {
-      if (p[grupo] === 0) continue;
+      if (p[grupo] === 0 || fijas.has(grupo)) continue;
       if ((grupo === "superiorInicio" || grupo === "superiorFin") && p[grupo] <= p.superior) continue;
       if ((grupo === "cercosInicio" || grupo === "cercosFin") && p[grupo] <= p.cercos) continue;
       const x = { ...p, [grupo]: p[grupo] - 1 };
@@ -161,4 +180,82 @@ export function proponerVano(d: DemandasViga, v: DemandasVano, datos?: DatosArma
     }
   }
   return { armado: armadoDe(p, barras, cercos), comprobacion: c, posiciones: { ...p }, probados };
+}
+
+// ─── La misma armadura superior a los dos lados de un apoyo (CO2-k, §8.28) ─────────────────────────
+
+/** Un vano visto desde un apoyo: su armado y el campo de la superior de la zona de ese apoyo. */
+export interface LadoApoyo {
+  armado: ArmadoVanoViga;
+  campo: "superiorInicio" | "superiorFin";
+  /**
+   * Su armado se está proponiendo ahora (se puede cambiar): con qué se comprueba y la zona del otro
+   * apoyo, si ya se igualó con su vecino (no se mueve). Sin él, es el del proyecto y no se toca.
+   */
+  libre?: { d: DemandasViga; v: DemandasVano; fijas?: ZonasFijas };
+}
+
+export interface LadoUnificado {
+  armado: ArmadoVanoViga;
+  comprobacion: ComprobacionVano;
+}
+
+/** Cuántas armaduras de la tabla se prueban, de menos a más acero, antes de dejar el apoyo como está. */
+export const INTENTOS_UNIFICAR = 8;
+
+const iguales = (a: BarrasCara, b: BarrasCara) => a.n === b.n && a.diametro === b.diametro;
+const areaDe = (b: BarrasCara) => b.n * area(b.diametro);
+
+/**
+ * La armadura superior de un apoyo, la misma a sus dos lados: así pasa entera de un vano a otro en el
+ * despiece, en vez de empalmarse sobre el apoyo. Cada vano se propone por su cuenta (`proponerVano`)
+ * y a cada lado sale lo que pide el suyo; aquí los dos toman la mayor de las dos (la primera de la
+ * tabla, de menos a más acero desde ella, con la que los dos siguen cumpliendo). Sólo sube acero.
+ *
+ * Si uno de los dos lados no se está proponiendo (lleva el armado del proyecto), no se toca: el otro
+ * sube hasta la suya si es mayor y le cabe. Devuelve, por lado, su armado nuevo ya comprobado; null,
+ * el que no cambia (también si no hay forma de igualarlos: secciones de anchos distintos en las que
+ * no cabe la misma, o una regla que deja de cumplirse).
+ */
+export function unificarApoyo(izq: LadoApoyo, der: LadoApoyo, datos?: DatosArmado): [LadoUnificado | null, LadoUnificado | null] {
+  const zona = (x: LadoApoyo) => x.armado[x.campo] ?? x.armado.superior;
+  const [zi, zd] = [zona(izq), zona(der)];
+  if (iguales(zi, zd) || (!izq.libre && !der.libre)) return [null, null];
+  const tabla = (x: LadoApoyo): BarrasCara[] => {
+    const g = x.libre && geometriaViga(x.libre.d);
+    return g && !("motivo" in g) ? tablaBarras(g.b, armadoViga(x.armado, datos).recubrimiento) : [];
+  };
+  /**
+   * El armado de un lado con T en su zona y su comprobación; null si no se puede. Primero, sólo esa
+   * barra (sin el campo si es la corrida); si así falla alguna fila (con más diámetro baja el canto
+   * útil y el cortante puede pasar por poco), se vuelve a proponer el vano con T fija en esa zona.
+   */
+  const con = (x: LadoApoyo, T: BarrasCara): LadoUnificado | null => {
+    if (!x.libre) return null;
+    const { [x.campo]: _zona, ...resto } = x.armado;
+    const armado: ArmadoVanoViga = iguales(T, x.armado.superior) ? resto : { ...resto, [x.campo]: T };
+    const comprobacion = comprobarVano(x.libre.d, x.libre.v, armadoViga(armado, datos));
+    if (!falla(comprobacion) && !rechazada(comprobacion)) return { armado, comprobacion };
+    const p = proponerVano(x.libre.d, x.libre.v, datos, { fijas: { ...x.libre.fijas, [x.campo]: T } });
+    return p.armado && p.comprobacion && !falla(p.comprobacion) ? { armado: p.armado, comprobacion: p.comprobacion } : null;
+  };
+  const mayor = Math.max(areaDe(zi), areaDe(zd));
+  if (izq.libre && der.libre) {
+    const enDer = tabla(der);
+    const candidatas = tabla(izq).filter((T) => areaDe(T) >= mayor - 1e-9 && enDer.some((y) => iguales(y, T)));
+    for (const T of candidatas.slice(0, INTENTOS_UNIFICAR)) {
+      // Un lado que ya tiene T no cambia (null); otro que no puede tomarla deja el apoyo como está
+      const a = iguales(T, zi) ? null : con(izq, T);
+      if (!iguales(T, zi) && !a) continue;
+      const b = iguales(T, zd) ? null : con(der, T);
+      if (!iguales(T, zd) && !b) continue;
+      return [a, b];
+    }
+    return [null, null];
+  }
+  // Uno es del proyecto: el que se propone sube hasta la suya, si es mayor y le cabe
+  const [libre, T] = izq.libre ? [izq, zd] : [der, zi];
+  if (areaDe(T) <= areaDe(zona(libre)) + 1e-9 || !tabla(libre).some((y) => iguales(y, T))) return [null, null];
+  const r = con(libre, T);
+  return izq.libre ? [r, null] : [null, r];
 }

@@ -7,6 +7,10 @@
  *
  * El tiempo es sólo información (la fase no cambia el modelo: en ecuaciones, su coste es cero).
  */
+import { proponerVano } from "../../src/comprobaciones/armar/vigas.ts";
+import type { ArmadoVanoViga } from "../../src/comprobaciones/armado.ts";
+import { despiecePortico } from "../../src/comprobaciones/despieceVigas.ts";
+import { datosDespiece, porticosDe } from "../../src/comprobaciones/porticos.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compilar } from "../../src/compilador/compilar.ts";
@@ -75,6 +79,44 @@ di("La fila que manda en los que cumplen:");
 for (const [k, n] of cuenta(todos.filter((v) => v.cumple).map((v) => (v.manda?.id ?? "—").replace(/^(inicio|centro|fin)\//, "zona/")))) di(`  ${n}  ${k}`);
 di("");
 di("Probados por vano (armados comprobados hasta dar con el propuesto): " + (todos.reduce((n, v) => n + (v.probados ?? 0), 0) / Math.max(1, todos.length)).toFixed(1) + " de media");
+// CO2-k (§8.28): los apoyos con la misma superior a cada lado, y el acero de las vigas en el despiece,
+// frente a lo que sale proponiendo cada vano por su cuenta (sin igualar los apoyos)
+{
+  const igualado = new Map(todos.map((v) => [`${v.viga}/${v.vano}`, v.armado] as const));
+  const suelto = new Map<string, ArmadoVanoViga | undefined>();
+  for (const g of p.valor.vigas) {
+    const d = demandasViga(q, g.viga);
+    if (!d.valido) continue;
+    for (const v of d.valor.vanos) suelto.set(`${g.viga}/${v.indice}`, proponerVano(d.valor, v).armado ?? undefined);
+  }
+  const zona = (a: ArmadoVanoViga, campo: "superiorInicio" | "superiorFin") => a[campo] ?? a.superior;
+  const contar = (m: Map<string, ArmadoVanoViga | undefined>) => {
+    let [interiores, distintos, kg, empalmesSobreApoyo] = [0, 0, 0, 0];
+    for (const pr of porticosDe(q)) {
+      const armados = Object.fromEntries(pr.vanos.map((v) => [v.clave, m.get(v.clave)]));
+      const dp = despiecePortico(pr, armados, datosDespiece(pr));
+      kg += dp.acero.total;
+      pr.apoyos.forEach((ap, i) => {
+        const [vi, vd] = [pr.vanos.find((v) => v.apoyos[1] === i), pr.vanos.find((v) => v.apoyos[0] === i)];
+        const [ai, ad] = [vi && m.get(vi.clave), vd && m.get(vd.clave)];
+        if (!vi || !vd || !ai || !ad) return;
+        interiores++;
+        const [zi, zd] = [zona(ai, vi.invertida ? "superiorInicio" : "superiorFin"), zona(ad, vd.invertida ? "superiorFin" : "superiorInicio")];
+        if (zi.n !== zd.n || zi.diametro !== zd.diametro) distintos++;
+        // Sobre el apoyo no pasa ninguna barra superior entera: todas acaban entre sus caras más un anclaje
+        const pasa = dp.barras.some((b) => b.cara === "superior" && b.x[0] < ap.caras[0] - 1e-9 && b.x[1] > ap.caras[1] + 1e-9 && b.ejes.includes(ap.eje));
+        if (!pasa) empalmesSobreApoyo++;
+      });
+    }
+    return { interiores, distintos, kg, empalmesSobreApoyo };
+  };
+  const [x, y] = [contar(suelto), contar(igualado)];
+  di("");
+  di(`CO2-k, apoyos interiores con vanos armados a los dos lados: ${y.interiores}`);
+  di(`  con otra superior a cada lado: ${x.distintos} proponiendo cada vano por su cuenta; ${y.distintos} igualando los apoyos`);
+  di(`  sin ninguna barra superior que pase entera sobre el apoyo: ${x.empalmesSobreApoyo}; ${y.empalmesSobreApoyo}`);
+  di(`  acero de las vigas en el despiece: ${x.kg.toFixed(0)} kg; ${y.kg.toFixed(0)} kg (${(100 * (y.kg / x.kg - 1)).toFixed(1)} %)`);
+}
 di("");
 di("Los armados más repetidos, por sección:");
 for (const sec of [...new Set(todos.map((v) => v.seccion))]) {

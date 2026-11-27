@@ -1,28 +1,33 @@
 CO2: las vigas del edificio objetivo de losas (7 plantas), con viento
-demandas: 567 vigas, 1435 vanos, 28 combinaciones de ELU, 18.6 s (la primera vez: hace los diagramas)
-proponer: 15.9 s, 1435 vanos, 1435 cumplen, 0 no, 0 sin propuesta
+demandas: 567 vigas, 1435 vanos, 28 combinaciones de ELU, 18.2 s (la primera vez: hace los diagramas)
+proponer: 1.8 s, 1435 vanos, 1435 cumplen, 0 no, 0 sin propuesta
 
 Lo pendiente o sin propuesta, por motivo:
 
 La fila que manda en los que cumplen:
-  1009  zona/sup-bending
-  200  zona/shear
-  174  zona/inf-bending
-  41  zona/sup-cracking
+  983  zona/sup-bending
+  229  zona/shear
+  175  zona/inf-bending
+  37  zona/sup-cracking
   11  zona/inf-cracking
 
 Probados por vano (armados comprobados hasta dar con el propuesto): 11.4 de media
 
+CO2-k, apoyos interiores con vanos armados a los dos lados: 1246
+  con otra superior a cada lado: 285 proponiendo cada vano por su cuenta; 0 igualando los apoyos
+  sin ninguna barra superior que pase entera sobre el apoyo: 0; 0
+  acero de las vigas en el despiece: 57253 kg; 57004 kg (-0.4 %)
+
 Los armados más repetidos, por sección:
   v3060:
-    275  inf 3Ø12 · sup 2Ø12 (inicio 3Ø12, fin 3Ø12) · cØ6/200
-    119  inf 3Ø12 · sup 3Ø12 · cØ6/200
-    95  inf 3Ø12 · sup 2Ø12 (inicio 4Ø12, fin 4Ø12) · cØ6/200
-    84  inf 3Ø12 · sup 2Ø12 (inicio 2Ø16, fin 4Ø12) · cØ6/200
-    62  inf 3Ø12 · sup 2Ø12 (inicio 3Ø12, fin 2Ø16) · cØ6/200
-    40  inf 3Ø12 · sup 2Ø12 (inicio 2Ø16, fin 2Ø16) · cØ6/200
+    227  inf 3Ø12 · sup 2Ø12 (inicio 3Ø12, fin 3Ø12) · cØ6/200
+    133  inf 3Ø12 · sup 2Ø12 (inicio 4Ø12, fin 4Ø12) · cØ6/200
+    103  inf 3Ø12 · sup 3Ø12 · cØ6/200
+    48  inf 3Ø12 · sup 2Ø12 (inicio 2Ø16, fin 2Ø16) · cØ6/200
+    45  inf 3Ø12 · sup 2Ø12 (inicio 2Ø16, fin 3Ø12) · cØ6/200
+    41  inf 3Ø12 · sup 2Ø12 (inicio 3Ø12, fin 2Ø16) · cØ6/200
+    30  inf 3Ø12 · sup 2Ø12 (inicio 4Ø12, fin 2Ø16) · cØ6/200
     26  inf 3Ø12 · sup 2Ø12 (inicio 3Ø12, fin 4Ø12) · cØ6/200 (fin cØ6/150)
-    12  inf 3Ø12 · sup 2Ø12 (inicio 4Ø12, fin 5Ø12) · cØ6/200 (fin cØ8/300)
   v2540:
     441  inf 2Ø12 · sup 2Ø12 · cØ6/250
 

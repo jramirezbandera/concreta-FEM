@@ -139,7 +139,7 @@ describe("CO2: proponer el armado de un vano", () => {
       cpPositivo: e(25, [0, 0, 30, 7, 25, 0]),
       cpNegativo: e(-25, [0, 0, 30, 7, -25, 0]),
     });
-    const v: DemandasVano = { indice: 0, desde: 0, hasta: 5, apoyos: ["P1", "P2"], torsionEquilibrio: true, zonas: [zona("inicio"), zona("centro"), zona("fin")], flecha: null };
+    const v: DemandasVano = { indice: 0, desde: 0, hasta: 5, apoyos: ["P1", "P2"], torsionEquilibrio: true, zonas: [zona("inicio"), zona("centro"), zona("fin")], empotramiento: [null, null], flecha: null };
     const d: DemandasViga = { viga: "V", seccion: { id: "v", material: "H", forma: "rectangular", b: 0.3, h: 0.5 }, material: { id: "H", tipo: "hormigon", fck: 25 }, axilSinValor: true, situaciones: ["ELU-PT"], combinaciones: 1, vanos: [v] };
     const p = proponerVano(d, v);
     expect(p.armado).not.toBeNull();
@@ -150,6 +150,86 @@ describe("CO2: proponer el armado de un vano", () => {
     const sin = proponerVano({ ...d, vanos: [{ ...v, torsionEquilibrio: false }] }, { ...v, torsionEquilibrio: false });
     expect(sin.armado!.piel).toBeUndefined();
     expect(sin.posiciones!.cercos).toBeLessThan(p.posiciones!.cercos);
+  });
+});
+
+describe("CO2-k: la misma armadura superior a los dos lados de cada apoyo (§8.28)", () => {
+  const zona = (a: { superior: { n: number; diametro: number }; superiorInicio?: { n: number; diametro: number }; superiorFin?: { n: number; diametro: number } }, campo: "superiorInicio" | "superiorFin") => a[campo] ?? a.superior;
+  const igual = (a: { n: number; diametro: number }, b: { n: number; diametro: number }) => a.n === b.n && a.diametro === b.diametro;
+
+  it("con una zona fijada, se propone lo demás con ella: la zona no se mueve y, si con ella no basta lo de antes, sube otra armadura", () => {
+    // P3 del pórtico con viento: el vano 1 de F1-X0 pide 5Ø12 junto a P3 y el vano 0, 4Ø16. Con 4Ø16
+    // en el vano 1, el canto útil baja 2 mm y su cortante pasa de 1 con los cercos de antes
+    const q = consultas();
+    const d = demandas(q, "F1-X0");
+    const v = d.vanos[1]!;
+    const libre = proponerVano(d, v);
+    expect(libre.armado!.superiorInicio).toEqual({ n: 5, diametro: 12 });
+    const T = { n: 4, diametro: 16 };
+    const solo = comprobarVano(d, v, armadoViga({ ...libre.armado!, superiorInicio: T }));
+    expect(solo.filas.find((f) => f.estado === "fail")?.id).toBe("inicio/shear");
+    const fija = proponerVano(d, v, undefined, { fijas: { superiorInicio: T } });
+    expect(fija.armado!.superiorInicio).toEqual(T);
+    expect(fija.comprobacion!.cumple).toBe(true);
+    // Sube los cercos de esa zona (lo que pedía el cortante) y nada baja de lo de antes
+    const [cl, cf] = [libre.posiciones!, fija.posiciones!];
+    expect(cf.cercosInicio).toBeGreaterThan(cl.cercosInicio);
+    for (const g of ["inferior", "superior", "superiorFin", "cercos", "cercosFin", "piel"] as const) expect(cf[g], g).toBeGreaterThanOrEqual(cl[g]);
+    // Determinista, y una zona que no cabe en el ancho no da propuesta
+    expect(proponerVano(d, v, undefined, { fijas: { superiorInicio: T } })).toEqual(fija);
+    expect(proponerVano(d, v, undefined, { fijas: { superiorInicio: { n: 9, diametro: 25 } } }).armado).toBeNull();
+  });
+
+  it("al proponer un proyecto: en cada apoyo interior de cada pórtico, la misma superior a los dos lados, la mayor de las dos (o más); todo cumple", () => {
+    for (const variante of [{}, { cm: 40, q: 25, sismo: true }] as VariantePortico[]) {
+      const q = consultas(variante);
+      const prop = comprobarVigas(q, undefined, undefined, { proponer: true });
+      if (!prop.valido) throw new Error("no válido");
+      expect(prop.valor.resumen).toMatchObject({ vanos: 18, cumplen: 18, noCumplen: 0 });
+      const armado = new Map(prop.valor.vigas.flatMap((g) => g.vanos.map((v) => [`${g.viga}/${v.vano}`, v.armado!] as const)));
+      let apoyos = 0;
+      for (const g of prop.valor.vigas) {
+        const d = demandas(q, g.viga);
+        for (let i = 0; i + 1 < g.vanos.length; i++) {
+          const [a, b] = [armado.get(`${g.viga}/${i}`)!, armado.get(`${g.viga}/${i + 1}`)!];
+          // Entre el último vano y el voladizo también: los dos son de la viga y comparten apoyo
+          const [za, zb] = [zona(a, "superiorFin"), zona(b, "superiorInicio")];
+          expect(igual(za, zb), `${g.viga}: apoyo entre los vanos ${i} y ${i + 1}`).toBe(true);
+          // No menos que lo que pedía cada uno por su cuenta
+          const [pa, pb] = [proponerVano(d, d.vanos[i]!).armado!, proponerVano(d, d.vanos[i + 1]!).armado!];
+          expect(area(za)).toBeGreaterThanOrEqual(Math.max(area(zona(pa, "superiorFin")), area(zona(pb, "superiorInicio"))) - 1e-9);
+          apoyos++;
+        }
+      }
+      expect(apoyos).toBe(8);
+      // Guardado y comprobado, lo mismo
+      const con = comprobarVigas(q, armadoPropuestoVigas(prop.valor, undefined), undefined);
+      expect(con.valido && con.valor.resumen.cumplen).toBe(18);
+    }
+  });
+
+  it("con el vano de un lado escrito en el proyecto, no se toca: el que se propone sube hasta su armadura si es mayor; si es menor, se queda con la suya", () => {
+    const q = consultas();
+    const prop = comprobarVigas(q, undefined, undefined, { proponer: true });
+    if (!prop.valido) throw new Error("no válido");
+    const base = armadoPropuestoVigas(prop.valor, undefined)["F1-X0"]!;
+    const libre = proponerVano(demandas(q, "F1-X0"), demandas(q, "F1-X0").vanos[1]!).armado!;
+    // El vano 0 escrito con 5Ø16 junto a P3 (más que lo que pide el 1): el 1, propuesto, sube a 5Ø16
+    const mucho = { ...base[0]!, superiorFin: { n: 5, diametro: 16 } };
+    const r1 = comprobarVigas(q, { "F1-X0": [mucho, null, base[2]!] }, undefined, { ids: ["F1-X0"], proponer: true, soloSinArmado: true });
+    if (!r1.valido) throw new Error("no válido");
+    const [v0, v1] = r1.valor.vigas[0]!.vanos;
+    expect(v0!.origen).toBe("proyecto");
+    expect(v0!.armado).toEqual(mucho);
+    expect(v1!.origen).toBe("propuesto");
+    expect(zona(v1!.armado!, "superiorInicio")).toEqual({ n: 5, diametro: 16 });
+    expect(v1!.cumple).toBe(true);
+    // Escrito con 2Ø12 (la corrida, menos que lo que pide el 1): el 1 se queda con lo suyo
+    const poco = { ...base[0]!, superiorFin: undefined };
+    const r2 = comprobarVigas(q, { "F1-X0": [poco, null, base[2]!] }, undefined, { ids: ["F1-X0"], proponer: true, soloSinArmado: true });
+    if (!r2.valido) throw new Error("no válido");
+    expect(zona(r2.valor.vigas[0]!.vanos[1]!.armado!, "superiorInicio")).toEqual(zona(libre, "superiorInicio"));
+    expect(r2.valor.vigas[0]!.vanos[0]!.armado).toEqual(poco);
   });
 });
 
