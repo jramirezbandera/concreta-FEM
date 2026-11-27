@@ -670,7 +670,7 @@ export class CamposLaminas implements IntegradorCampos {
   private porLado: Map<string, number[]> | null = null;
   /** Índice espacial de las láminas, para los cortes (C5, criterio 8). */
   private indice: IndiceCajas | null = null;
-  /** Evaluadores de los cortes por desplazamientos: se reutilizan entre cortes con sus cachés. */
+  /** Evaluadores compartidos, por desplazamientos (`evaluadorCompartido`). */
   private readonly deCortes = new WeakMap<object, EvaluadorCampos>();
   /** Operadores de resultantes de las últimas láminas evaluadas (`_operador`). */
   private readonly operadores = new Map<number, Float64Array>();
@@ -769,8 +769,9 @@ export class CamposLaminas implements IntegradorCampos {
   }
 
   /**
-   * El evaluador de `u` que comparten los cortes y quien lo pida (los mapas de A4): lo que uno ya
-   * recuperó lo reutilizan los demás, con los mismos valores. Uno por objeto `u`.
+   * El evaluador de `u` que comparte quien lo pida: lo que uno ya recuperó lo reutilizan los demás,
+   * con los mismos valores. Uno por objeto `u`. Los cortes y los mapas ya no lo usan (2026-11-27):
+   * recuperan los campos de todos sus casos a la vez (`integrar` con su lote y `enNudosPorLotes`).
    */
   evaluadorCompartido(u: ArrayLike<number>): EvaluadorCampos {
     let ev = this.deCortes.get(u as object);
@@ -815,6 +816,305 @@ export class CamposLaminas implements IntegradorCampos {
     const ETA = [-1, -1, 1, 1];
     for (let a = 0; a < 4; a++) out.set(ev.en(l, XI[a]!, ETA[a]!), 8 * a);
     return out;
+  }
+
+  /**
+   * Lo de `EvaluadorCampos.enParte` en los 4 nudos de cada lámina de `laminas`, para varios
+   * desplazamientos a la vez (un mapa: las láminas de una planta con todos sus casos base). En
+   * `destinos[c]`, desde `32·i + 8·a + o` (la lámina i de la lista y su nudo a; o = 0 en membrana y 3
+   * en flexión), los valores de la partición en los ejes de la lámina: [Nx, Ny, Nxy] o
+   * [Mx, My, Mxy, Qx, Qy]. Las láminas que no están en ninguna región (rígidas) se dejan como estén.
+   *
+   * Las mismas cuentas, en el mismo orden, que un evaluador por caso (los mismos bits), pero por
+   * lotes: las muestras de cada lámina, los coeficientes de cada parche y el valor de cada plaza se
+   * hacen para todos los casos seguidos, en bloques planos, sin un array por lámina, parche, plaza y
+   * caso (crearlos y recogerlos era casi todo lo que costaba un mapa con los modos del sismo). No
+   * guarda nada: lo que dos lotes de láminas comparten (las coronas de su borde) se hace en los dos.
+   */
+  enNudosPorLotes(parte: "flexion" | "membrana", laminas: readonly number[], us: readonly ArrayLike<number>[], destinos: readonly Float64Array[]): void {
+    const C = us.length;
+    if (!C || !laminas.length) return;
+    const flexion = parte === "flexion";
+    const part = flexion ? this.flexion : this.membrana;
+    const nv = part.campo.nv;
+    const desde = part.campo.desde;
+    const plazas = part.plazas;
+    const cambio = part.cambio;
+    const lote = laminasPorLote(C);
+    const localPlaza = new Int32Array(part.nPlazas).fill(-1);
+    const localLamina = new Int32Array(this.modelo.laminas!.length).fill(-1);
+    // Las funciones de forma en los 4 nudos (las de `enParte` con ξ, η = ±1)
+    const NF = [funcionesForma(-1, -1), funcionesForma(1, -1), funcionesForma(1, 1), funcionesForma(-1, 1)];
+    const v = new Float64Array(nv);
+    const lp = new Int32Array(4);
+    for (let b0 = 0; b0 < laminas.length; b0 += lote) {
+      const b1 = Math.min(laminas.length, b0 + lote);
+      // Las plazas del lote (cada una, una vez)
+      const pls: number[] = [];
+      for (let i = b0; i < b1; i++) {
+        const k = laminas[i]!;
+        if (plazas[4 * k]! < 0) continue;
+        for (let a = 0; a < 4; a++) {
+          const p = plazas[4 * k + a]!;
+          if (localPlaza[p]! < 0) {
+            localPlaza[p] = pls.length;
+            pls.push(p);
+          }
+        }
+      }
+      if (!pls.length) continue;
+      const V = this.valoresPlazas(part, pls, us, localLamina);
+      // A los nudos de cada lámina, en sus ejes (`EvaluadorCampos.enParte`)
+      for (let i = b0; i < b1; i++) {
+        const k = laminas[i]!;
+        if (plazas[4 * k]! < 0) continue;
+        for (let a2 = 0; a2 < 4; a2++) lp[a2] = localPlaza[plazas[4 * k + a2]!]!;
+        const a11 = cambio[5 * k]!;
+        const a12 = cambio[5 * k + 1]!;
+        const a21 = cambio[5 * k + 2]!;
+        const a22 = cambio[5 * k + 3]!;
+        const s = flexion ? cambio[5 * k + 4]! : 1;
+        for (let c = 0; c < C; c++) {
+          const d = destinos[c]!;
+          for (let n = 0; n < 4; n++) {
+            const N = NF[n]!;
+            v.fill(0);
+            for (let a2 = 0; a2 < 4; a2++) {
+              const ov = (lp[a2]! * C + c) * nv;
+              const na = N[a2]!;
+              for (let q = 0; q < nv; q++) v[q]! += na * V[ov + q]!;
+            }
+            const b11 = a11 * v[0]! + a21 * v[2]!;
+            const b12 = a11 * v[2]! + a21 * v[1]!;
+            const b21 = a12 * v[0]! + a22 * v[2]!;
+            const b22 = a12 * v[2]! + a22 * v[1]!;
+            const od = 32 * i + 8 * n + desde;
+            d[od] = s * (b11 * a11 + b12 * a21);
+            d[od + 1] = s * (b21 * a12 + b22 * a22);
+            d[od + 2] = s * (b11 * a12 + b12 * a22);
+            if (flexion) {
+              d[od + 3] = s * (a11 * v[3]! + a21 * v[4]!);
+              d[od + 4] = s * (a12 * v[3]! + a22 * v[4]!);
+            }
+          }
+        }
+      }
+      for (const p of pls) localPlaza[p] = -1;
+    }
+  }
+
+  /**
+   * El valor de las plazas `pls` de una partición para cada uno de los desplazamientos `us`, en el
+   * triedro de su región: en (j·C + c)·nv, los nv de la plaza j con el caso c. Lo de
+   * `EvaluadorParticion.plaza` de un evaluador por caso, con las mismas cuentas y en el mismo orden
+   * (los mismos bits): las muestras de las láminas de sus parches, los coeficientes de cada parche y
+   * el valor de cada plaza, para todos los casos seguidos y en bloques planos que no se guardan.
+   * `localLamina`: memoria de trabajo, una por lámina del modelo, a −1 (se devuelve a −1).
+   */
+  private valoresPlazas(part: ParticionCampos, pls: readonly number[], us: readonly ArrayLike<number>[], localLamina: Int32Array): Float64Array {
+    const C = us.length;
+    const flexion = part === this.flexion;
+    const nv = part.campo.nv;
+    const desde = part.campo.desde;
+    const SZ = MUESTRAS_LAMINA * nv;
+    const lista = this.modelo.laminas!;
+    const cambio = part.cambio;
+    const ug = new Float64Array(24);
+    const ul = new Float64Array(24);
+    const r = new Float64Array(NV);
+    const v = new Float64Array(nv);
+    const dx = new Float64Array(NC);
+    const dy = new Float64Array(NC);
+    // 1. Los planes de las plazas y sus parches (cada uno, una vez)
+    const planes = pls.map((p) => part.plan(p));
+    const parches: Parche[] = [];
+    const indiceParche = new Map<Parche, number>();
+    const parchesDe = planes.map((pl) =>
+      Int32Array.from(pl.parches, (c) => {
+        let j = indiceParche.get(c);
+        if (j === undefined) {
+          j = parches.length;
+          indiceParche.set(c, j);
+          parches.push(c);
+        }
+        return j;
+      }),
+    );
+    // 2. Las láminas de sus muestras; de cada muestra, dónde empieza su lámina en S y su punto
+    const lams: number[] = [];
+    const deLamina: Int32Array[] = [];
+    const dePunto: Int32Array[] = [];
+    let nMax = 1;
+    for (const c of parches) {
+      const ns = c.muestras.length;
+      const ol = new Int32Array(ns);
+      const op = new Int32Array(ns);
+      for (let s = 0; s < ns; s++) {
+        const m = c.muestras[s]!;
+        const k = Math.floor(m / MUESTRAS_LAMINA);
+        let j = localLamina[k]!;
+        if (j < 0) {
+          j = lams.length;
+          localLamina[k] = j;
+          lams.push(k);
+        }
+        ol[s] = j * C * SZ;
+        op[s] = nv * (m % MUESTRAS_LAMINA);
+      }
+      deLamina.push(ol);
+      dePunto.push(op);
+      nMax = Math.max(nMax, c.base.n);
+    }
+    // 3. Muestras de cada lámina en cada caso (`EvaluadorCampos.muestrasDe`, sólo esta partición)
+    const S = new Float64Array(lams.length * C * SZ);
+    for (let j = 0; j < lams.length; j++) {
+      const k = lams[j]!;
+      const R = this.laminas[k]!.R;
+      const nudos = lista[k]!.nudos;
+      const OP = this._operador(k);
+      const a11 = cambio[5 * k]!;
+      const a12 = cambio[5 * k + 1]!;
+      const a21 = cambio[5 * k + 2]!;
+      const a22 = cambio[5 * k + 3]!;
+      const s3 = cambio[5 * k + 4]!;
+      const n0 = 6 * nudos[0]!;
+      const n1 = 6 * nudos[1]!;
+      const n2 = 6 * nudos[2]!;
+      const n3 = 6 * nudos[3]!;
+      for (let c = 0; c < C; c++) {
+        const u = us[c]!;
+        for (let q = 0; q < 6; q++) {
+          ug[q] = u[n0 + q]!;
+          ug[6 + q] = u[n1 + q]!;
+          ug[12 + q] = u[n2 + q]!;
+          ug[18 + q] = u[n3 + q]!;
+        }
+        for (let I = 0; I < 8; I++) {
+          for (let a = 0; a < 3; a++) {
+            let s = 0;
+            for (let e = 0; e < 3; e++) s += R[3 * a + e]! * ug[3 * I + e]!;
+            ul[3 * I + a] = s;
+          }
+        }
+        const o = (j * C + c) * SZ;
+        for (let g = 0; g < 4; g++) {
+          for (let f = desde; f < desde + nv; f++) {
+            let s = 0;
+            const oo = 192 * g + 24 * f;
+            for (let q = 0; q < 24; q++) s += OP[oo + q]! * ul[q]!;
+            r[f] = s;
+          }
+          if (flexion) {
+            girarTensor(S, o + nv * g, r[3]!, r[4]!, r[5]!, s3, a11, a12, a21, a22);
+            S[o + nv * g + 3] = s3 * (a11 * r[6]! + a12 * r[7]!);
+            S[o + nv * g + 4] = s3 * (a21 * r[6]! + a22 * r[7]!);
+          } else girarTensor(S, o + nv * g, r[0]!, r[1]!, r[2]!, 1, a11, a12, a21, a22);
+        }
+        for (let q = 0; q < nv; q++) S[o + nv * CENTROIDE + q] = 0.25 * (S[o + q]! + S[o + nv + q]! + S[o + 2 * nv + q]! + S[o + 3 * nv + q]!);
+      }
+    }
+    // 4. Coeficientes de cada parche en cada caso (`EvaluadorParticion.coeficientes`)
+    const NA = nMax * NC;
+    const A = new Float64Array(parches.length * C * NA);
+    const a = new Float64Array(NA);
+    for (let jp = 0; jp < parches.length; jp++) {
+      const pc = parches[jp]!;
+      const n = pc.base.n;
+      const ns = pc.muestras.length;
+      const P = pc.p;
+      const ol = deLamina[jp]!;
+      const op = dePunto[jp]!;
+      for (let c = 0; c < C; c++) {
+        for (let i = 0; i < n * NC; i++) a[i] = 0;
+        const oc = c * SZ;
+        for (let s = 0; s < ns; s++) {
+          const o = ol[s]! + oc + op[s]!;
+          for (let i = 0; i < n; i++) {
+            const pi = P[n * s + i]!;
+            for (let q = 0; q < NC; q++) a[NC * i + q]! += pi * S[o + q]!;
+          }
+        }
+        resolverCholesky(pc.L, n, a, NC);
+        const oa = (jp * C + c) * NA;
+        for (let i = 0; i < n * NC; i++) A[oa + i] = a[i]!;
+      }
+    }
+    // 5. El valor de cada plaza en cada caso (`EvaluadorParticion.plaza`)
+    const V = new Float64Array(pls.length * C * nv);
+    for (let jp = 0; jp < pls.length; jp++) {
+      const pl = planes[jp]!;
+      const pd = parchesDe[jp]!;
+      const np = pl.parches.length;
+      const w = 1 / np;
+      for (let c = 0; c < C; c++) {
+        v.fill(0);
+        dx.fill(0);
+        dy.fill(0);
+        for (let i = 0; i < np; i++) {
+          const n = pl.parches[i]!.base.n;
+          const oa = (pd[i]! * C + c) * NA;
+          const pv = pl.pv[i]!;
+          const px = pl.px[i]!;
+          const py = pl.py[i]!;
+          for (let j = 0; j < n; j++) {
+            for (let q = 0; q < NC; q++) {
+              const aq = A[oa + NC * j + q]!;
+              v[q]! += w * pv[j]! * aq;
+              dx[q]! += w * px[j]! * aq;
+              dy[q]! += w * py[j]! * aq;
+            }
+          }
+        }
+        if (nv > NC) {
+          if (pl.qDkmq) {
+            // Q de la DKMQ (el del único centroide)
+            const ol = deLamina[pd[0]!]!;
+            const ns = ol.length;
+            for (let s = 0; s < ns; s++) {
+              const o = ol[s]! + c * SZ + nv * CENTROIDE;
+              v[3]! += S[o + 3]! / ns;
+              v[4]! += S[o + 4]! / ns;
+            }
+          } else {
+            v[3] = -(dx[0]! + dy[2]!);
+            v[4] = -(dx[2]! + dy[1]!);
+          }
+        }
+        const ov = (jp * C + c) * nv;
+        for (let q = 0; q < nv; q++) V[ov + q] = v[q]!;
+      }
+    }
+    for (const k of lams) localLamina[k] = -1;
+    return V;
+  }
+
+  /** Los valores de las plazas que han pedido los cortes, para todos sus casos a la vez (`PlazasCasos`). */
+  private lote: { us: readonly ArrayLike<number>[]; flexion: PlazasCasos; membrana: PlazasCasos } | null = null;
+
+  /** El lote de los casos de un corte: el último, si son los mismos desplazamientos (los mismos objetos, en su orden). */
+  private loteDe(casos: readonly ResultadoCaso[]): { us: readonly ArrayLike<number>[]; flexion: PlazasCasos; membrana: PlazasCasos } {
+    let l = this.lote;
+    if (!l || l.us.length !== casos.length || l.us.some((u, c) => u !== casos[c]!.u)) {
+      const us = casos.map((c) => c.u);
+      const localLamina = new Int32Array(this.modelo.laminas!.length).fill(-1);
+      const hacer = (part: ParticionCampos) => new PlazasCasos(part, us.length, (pls) => this.valoresPlazas(part, pls, us, localLamina));
+      l = this.lote = { us, flexion: hacer(this.flexion), membrana: hacer(this.membrana) };
+    }
+    return l;
+  }
+
+  /**
+   * Suelta lo que los cortes guardan de sus casos (el valor de las plazas por las que han pasado): lo
+   * siguiente se vuelve a calcular, con los mismos valores. Quien trabaja por plantas lo suelta al
+   * cambiar de planta (`CasosEfimeros`).
+   */
+  soltarLote(): void {
+    this.lote = null;
+  }
+
+  /** Plazas (de flexión) guardadas en el lote de los cortes (para las pruebas de lo que se retiene). */
+  get plazasEnLote(): number {
+    return this.lote?.flexion.guardadas ?? 0;
   }
 
   /**
@@ -1156,11 +1456,14 @@ export class CamposLaminas implements IntegradorCampos {
       out[o + 1] = s * (b21 * tx + b22 * ty);
       out[o + 2] = s * (b11 * tx + b12 * ty);
     };
-    casos.forEach((r, kc) => {
-      // El evaluador de estos desplazamientos, con lo que ya calcularon los cortes anteriores (los
-      // mismos valores); cuenta las plazas degradadas que usa este corte
-      const ev = this.evaluadorCompartido(r.u);
-      ev.empezar();
+    // Los campos, del lote de estos casos: el valor de cada plaza por la que pasa el corte se hace para
+    // todos los casos a la vez (`valoresPlazas`) y lo comparten los cortes siguientes (los mismos
+    // valores que con un evaluador por caso). Las plazas degradadas que usa este corte son las mismas
+    // en todos los casos: se cuentan con el primero
+    const lote = this.loteDe(casos);
+    const usadas = new Set<number>();
+    const v = new Float64Array(8);
+    casos.forEach((_r, kc) => {
       const val = new Float64Array(8 * ns);
       const pts = m.puntos;
       // Sin crear arrays por punto (los cortes de las franjas piden cientos de miles): las mismas
@@ -1169,7 +1472,7 @@ export class CamposLaminas implements IntegradorCampos {
         const k = m.laminas[j]!;
         const R = this.flexion.triedro(k);
         const RM = this.membrana.triedro(k);
-        const v = ev.enRegiones(k, natural[2 * j]!, natural[2 * j + 1]!);
+        this.enRegionesLote(lote, kc, k, natural[2 * j]!, natural[2 * j + 1]!, v, kc === 0 ? usadas : null);
         const nx = marco[5 * j]!;
         const ny = marco[5 * j + 1]!;
         const tx = marco[5 * j + 2]!;
@@ -1211,13 +1514,13 @@ export class CamposLaminas implements IntegradorCampos {
       }
       // Fuerza de borde de Kirchhoff en los extremos libres: ±Mxy·n
       for (const e of extremos) {
-        const v = ev.enRegiones(e.k, e.nat[0], e.nat[1]);
+        this.enRegionesLote(lote, kc, e.k, e.nat[0], e.nat[1], v, kc === 0 ? usadas : null);
         const fk = e.w * e.s * mxyFranja(v, e.marco);
         agregar(6 * kc, e.P, e.n.map((c) => fk * c), [0, 0, 0], 1);
       }
       m.valores.push(val);
-      degradadas = Math.max(degradadas, ev.usadasDegradadas);
     });
+    degradadas = Math.max(degradadas, usadas.size);
     if (degradadas) {
       const ids = [...new Set(tramos.map((t) => this.modelo.laminas![t.k]!.id))];
       diag.aviso(
@@ -1227,6 +1530,31 @@ export class CamposLaminas implements IntegradorCampos {
       );
     }
     return { suma, muestras: m };
+  }
+
+  /**
+   * `EvaluadorCampos.enRegiones` del caso c del lote, en `out` (8): la interpolación bilineal de los
+   * valores de las plazas de la lámina k, con las mismas cuentas. `usadas`: donde se apuntan las
+   * plazas degradadas de flexión por las que pasa (las que cuenta `usadasDegradadas`).
+   */
+  private enRegionesLote(lote: { flexion: PlazasCasos; membrana: PlazasCasos }, c: number, k: number, xi: number, eta: number, out: Float64Array, usadas: Set<number> | null): void {
+    const N = funcionesForma(xi, eta);
+    const pf = this.flexion.plazas;
+    const pm = this.membrana.plazas;
+    const { flexion, membrana } = lote;
+    const C = flexion.C;
+    out.fill(0);
+    for (let a = 0; a < 4; a++) {
+      const p = pf[4 * k + a]!;
+      if (p < 0) throw new Error(`CamposLaminas: la lámina ${this.modelo.laminas![k]!.id} no está en ninguna región (es rígida)`);
+      const om = (membrana.sitio(pm[4 * k + a]!) * C + c) * 3;
+      const VM = membrana.V;
+      for (let q = 0; q < 3; q++) out[q]! += N[a]! * VM[om + q]!;
+      const of = (flexion.sitio(p) * C + c) * 5;
+      const VF = flexion.V;
+      for (let q = 0; q < 5; q++) out[3 + q]! += N[a]! * VF[of + q]!;
+      if (usadas && this.flexion.plan(p).degradado) usadas.add(p);
+    }
   }
 
   // Acceso para el evaluador
@@ -1251,6 +1579,77 @@ export class CamposLaminas implements IntegradorCampos {
 
 /** Operadores de resultantes que guarda CamposLaminas (6 KB cada uno). */
 const OPERADORES_GUARDADOS = 2048;
+
+/** Láminas por lote al recuperar los campos de C casos a la vez: lo que ocupan sus bloques de trabajo no depende de C (~50 MB). */
+function laminasPorLote(C: number): number {
+  return Math.max(256, Math.min(4096, Math.floor(80_000 / C)));
+}
+
+/**
+ * El valor de las plazas de una partición para C casos a la vez, a medida que se piden (los cortes
+ * por campos): en `V`, desde (sitio(p)·C + c)·nv, los nv de la plaza p con el caso c. La primera vez
+ * que se pide una plaza se hacen, para todos los casos, las de las láminas de su lote (las vecinas en
+ * el orden del modelo, que es el de sus coordenadas): un corte pasa por muchas seguidas, y hacerlas
+ * juntas comparte las muestras y los parches. Sólo se guarda el valor de las plazas (lo que guardaba
+ * un evaluador por caso, con las muestras de cada lámina y los coeficientes de cada parche, era
+ * varias veces más, y con los modos del sismo había que soltarlo a mitad de una planta).
+ */
+class PlazasCasos {
+  readonly C: number;
+  V: Float64Array;
+  private readonly part: ParticionCampos;
+  private readonly nv: number;
+  private readonly lote: number;
+  private readonly sitios: Int32Array;
+  private readonly hacer: (pls: readonly number[]) => Float64Array;
+  /** Plazas guardadas. */
+  guardadas = 0;
+
+  constructor(part: ParticionCampos, C: number, hacer: (pls: readonly number[]) => Float64Array) {
+    this.part = part;
+    this.C = C;
+    this.nv = part.campo.nv;
+    this.lote = laminasPorLote(C);
+    this.sitios = new Int32Array(part.nPlazas).fill(-1);
+    this.hacer = hacer;
+    this.V = new Float64Array(0);
+  }
+
+  /** Dónde está la plaza p en `V` (se hace, con las de su lote, si no estaba). */
+  sitio(p: number): number {
+    const s = this.sitios[p]!;
+    return s >= 0 ? s : this.llenar(p);
+  }
+
+  private llenar(p: number): number {
+    const { part, sitios, lote } = this;
+    // Las plazas sin hacer de las láminas del lote de su primera lámina
+    const k0 = Math.floor(part.laminaDePlaza(p)[0] / lote) * lote;
+    const k1 = Math.min(part.plazas.length / 4, k0 + lote);
+    const pls: number[] = [];
+    for (let k = k0; k < k1; k++) {
+      if (part.plazas[4 * k]! < 0) continue;
+      for (let a = 0; a < 4; a++) {
+        const q = part.plazas[4 * k + a]!;
+        if (sitios[q]! < 0) {
+          sitios[q] = this.guardadas + pls.length;
+          pls.push(q);
+        }
+      }
+    }
+    const nuevos = this.hacer(pls);
+    const n = this.C * this.nv;
+    const hasta = (this.guardadas + pls.length) * n;
+    if (hasta > this.V.length) {
+      const mayor = new Float64Array(Math.max(hasta, 2 * this.V.length));
+      mayor.set(this.V.subarray(0, this.guardadas * n));
+      this.V = mayor;
+    }
+    this.V.set(nuevos, this.guardadas * n);
+    this.guardadas += pls.length;
+    return sitios[p]!;
+  }
+}
 
 /** Los valores de una partición para unos desplazamientos: sus muestras por lámina, los coeficientes de sus parches y el valor de sus plazas. */
 class EvaluadorParticion {

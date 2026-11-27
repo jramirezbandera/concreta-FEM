@@ -65,6 +65,8 @@ export class CasosEfimeros {
     if (this.unidad !== null) {
       this.soltar();
       for (const k of this.porPlanta) this.campos.soltarEvaluador(this.casos[k]!.u);
+      // y el valor de las plazas que guardan los cortes, de todos los casos a la vez (`CamposLaminas.soltarLote`)
+      this.campos.soltarLote();
       this.cortes()?.soltarCasos(this.casos, this.porPlanta);
       this.soltadosPorPlanta++;
     }

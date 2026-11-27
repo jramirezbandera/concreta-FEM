@@ -107,7 +107,9 @@ describe("los campos de los casos del cálculo, sólo de la planta en la que se 
     // La primera franja de L deja los evaluadores de L; las de L2 los sueltan
     franja(q, "L", 1);
     const u = casos[0]!.u;
-    expect(q.campos.tieneEvaluador(u)).toBe(true);
+    // (los cortes ya no dejan un evaluador por caso: guardan el valor de las plazas de todos a la vez)
+    expect(q.campos.tieneEvaluador(u)).toBe(false);
+    expect(q.campos.plazasEnLote).toBeGreaterThan(0);
     franja(q, "L2", 1);
     expect(ef.soltadosPorPlanta).toBe(1);
     // Las de la otra dirección de L, con sus evaluadores rehechos: las de unas consultas que sólo han estado en L

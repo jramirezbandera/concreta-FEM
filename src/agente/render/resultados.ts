@@ -26,10 +26,11 @@ import type { ResultadoCompilacion } from "../../compilador/compilar.ts";
 import type { Consultas } from "../../compilador/consultas.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados.ts";
-import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
+import { CamposLaminas } from "../../motor/campos.ts";
 import { CasosEfimeros } from "../../motor/casosEfimeros.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
-import { esfuerzoProyectado, type DiagramaLeible } from "../../motor/diagramaCompuesto.ts";
+import { DiagramaCompuesto, esfuerzoProyectado, type EspectralBarra } from "../../motor/diagramaCompuesto.ts";
+import type { DiagramaBarra } from "../../elementos/cargasBarra.ts";
 import type { CasoEspectral, PartesCombinacion, Superposicion } from "../../motor/espectral.ts";
 import { area, cajaDe, numeroFijo, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
@@ -88,12 +89,6 @@ export const NOTA_MEMBRANA = "Fuerzas de membrana recuperadas por SPR (E5) en lo
 const ORDENADA = 0.035;
 /** Divisiones de cada tramo flexible que se añaden a sus estaciones para dibujar el diagrama. */
 const DIVISIONES = 12;
-/**
- * VS4: láminas por bloque al evaluar los campos de los modos de un mapa. Cada bloque lleva un
- * evaluador nuevo por modo que se suelta con él: lo retenido es el de un bloque y sus coronas, y lo
- * que se rehace son las coronas (con 2 048 láminas, unas 45 × 45, ≈ +20 % de las plazas de los modos).
- */
-const BLOQUE_MAPA = 2048;
 
 type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
 
@@ -230,33 +225,19 @@ ${planta}`;
 
   /**
    * Los 8 campos de la parte `p` en los 4 nudos de cada lámina de la planta, por caso base, en
-   * `destino(k)` (32 por lámina). Los casos estáticos, con sus evaluadores compartidos (lo recuperado
-   * lo reutilizan los cortes y los demás mapas); los de los modos, con un evaluador por bloque de
-   * láminas que se suelta con él (VS4): lo que guardan (las muestras, los parches y las plazas del
-   * bloque y de sus coronas) es el pico del mapa, y con 21 modos y la planta entera eran cientos de MB.
+   * `destino(k)` (32 por lámina), por lotes de láminas (`CamposLaminas.enNudosPorLotes`): no deja
+   * nada guardado en los evaluadores de los casos (lo que guardaban de los 21 modos de una planta
+   * entera eran cientos de MB, VS4; los cortes de las franjas hacen los suyos).
    */
   private evaluarParte(x: CamposPlanta, p: "flexion" | "membrana", destino: (k: number) => Float64Array, casos: readonly number[] = this.q.casos.map((_, k) => k)): void {
-    const XI = [-1, 1, 1, -1];
-    const ETA = [-1, -1, 1, 1];
-    const o = p === "flexion" ? 3 : 0;
-    const sup = this.q.sup;
-    const estaticos: [number, EvaluadorCampos][] = casos.filter((k) => !sup.baseEspectral[k]).map((k) => [k, this.campos.evaluadorCompartido(this.q.casos[k]!.u)]);
-    const modos = casos.filter((k) => sup.baseEspectral[k]);
-    const ls = x.laminas;
-    for (let b0 = 0; b0 < ls.length; b0 += BLOQUE_MAPA) {
-      const b1 = Math.min(ls.length, b0 + BLOQUE_MAPA);
-      const evs: [number, EvaluadorCampos][] = [...estaticos, ...modos.map((k): [number, EvaluadorCampos] => [k, this.campos.evaluador(this.q.casos[k]!.u, p)])];
-      // Lámina a lámina y, en cada una, todos los casos: el operador de resultantes de una lámina y de
-      // sus vecinas se calcula una vez, no una por caso (cada evaluador da lo mismo en otro orden)
-      for (let i = b0; i < b1; i++) {
-        if (!x.region[i]) continue;
-        const l = ls[i]!;
-        for (const [k, ev] of evs) {
-          const d = destino(k);
-          for (let a = 0; a < 4; a++) d.set(ev.enParte(l, XI[a]!, ETA[a]!, p), 32 * i + 8 * a + o);
-        }
-      }
-    }
+    // Por lotes de láminas con todos los casos seguidos (`CamposLaminas.enNudosPorLotes`): los mismos
+    // valores que un evaluador por caso, sin sus arrays por lámina, parche y plaza
+    this.campos.enNudosPorLotes(
+      p,
+      x.laminas,
+      casos.map((k) => this.q.casos[k]!.u),
+      casos.map((k) => destino(k)),
+    );
   }
 
   /**
@@ -874,23 +855,82 @@ export function envolventeTramo(r: ResultadosRender, t: TramoFlexible, conjunto:
   for (const dg of D) for (const x of dg.estaciones()) puntos.add(x);
   for (let i = 0; i <= DIVISIONES; i++) puntos.add((L * i) / DIVISIONES);
   const xs = [...puntos].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
-  // Con varias componentes ([c, k]…), su combinación lineal: en una combinación con casos del sismo, la de cada modo, combinada
-  const valor = typeof comp === "number" ? (dg: DiagramaLeible, x: number, lado: -1 | 1) => dg.esfuerzoEn(comp, x, lado) : (dg: DiagramaLeible, x: number, lado: -1 | 1) => esfuerzoProyectado(dg, x, lado, comp);
-  for (const x of xs)
-    for (const lado of [-1, 1] as const) {
-      if ((x === 0 && lado < 0) || (x === L && lado > 0)) continue;
-      // El mayor y el menor como `Math.max(...)` y `Math.min(...)` de los valores (un NaN los hace NaN)
-      let [max, min] = [-Infinity, Infinity];
-      for (const dg of D) {
-        const v = valor(dg, x, lado);
-        max = Math.max(max, v);
-        min = Math.min(min, v);
+  // El mayor y el menor en cada punto por sus dos lados (2·i: por la izquierda; 2·i + 1: por la derecha),
+  // como `Math.max(...)` y `Math.min(...)` de los valores de las combinaciones (un NaN los hace NaN)
+  const n = xs.length;
+  const max = new Float64Array(2 * n).fill(-Infinity);
+  const min = new Float64Array(2 * n).fill(Infinity);
+  if (typeof comp === "number") {
+    // Por tablas: las combinaciones de la situación sísmica comparten su parte estática y sus casos
+    // espectrales, y cada una es est + Σ factor·espectral en cada punto (`DiagramaCompuesto.esfuerzoEn`,
+    // con las mismas cuentas). Lo de cada parte se lee una vez por punto y no una por combinación:
+    // buscarlo por su x en cada lectura era casi todo lo que costaba recorrerlas
+    const tablas = new Map<DiagramaBarra | EspectralBarra, Float64Array>();
+    const deLineal = (d: DiagramaBarra): Float64Array => {
+      let v = tablas.get(d);
+      if (!v) {
+        v = new Float64Array(2 * n);
+        for (let i = 0; i < n; i++) {
+          v[2 * i] = d.esfuerzoEn(comp, xs[i]!, -1);
+          v[2 * i + 1] = d.esfuerzoEn(comp, xs[i]!, 1);
+        }
+        tablas.set(d, v);
       }
-      const e = { s: t.s0 + x, max, min };
-      const prev = curva[curva.length - 1];
-      if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
-      curva.push(e);
+      return v;
+    };
+    const deEspectral = (e: EspectralBarra): Float64Array => {
+      let v = tablas.get(e);
+      if (!v) {
+        v = new Float64Array(2 * n);
+        for (let i = 0; i < n; i++) {
+          v[2 * i] = e.esfuerzosEn(xs[i]!, -1)[comp]!;
+          v[2 * i + 1] = e.esfuerzosEn(xs[i]!, 1)[comp]!;
+        }
+        tablas.set(e, v);
+      }
+      return v;
+    };
+    for (const dg of D) {
+      if (dg instanceof DiagramaCompuesto) {
+        const est = deLineal(dg.lineal);
+        const fs = dg.partes.map((p) => p.factor);
+        const es = dg.partes.map((p) => deEspectral(p.espectral));
+        for (let i = 0; i < 2 * n; i++) {
+          let v = est[i]!;
+          for (let p = 0; p < es.length; p++) v += fs[p]! * es[p]![i]!;
+          max[i] = Math.max(max[i]!, v);
+          min[i] = Math.min(min[i]!, v);
+        }
+      } else {
+        for (let i = 0; i < n; i++) {
+          const x = xs[i]!;
+          const [a, b] = [dg.esfuerzoEn(comp, x, -1), dg.esfuerzoEn(comp, x, 1)];
+          max[2 * i] = Math.max(max[2 * i]!, a);
+          min[2 * i] = Math.min(min[2 * i]!, a);
+          max[2 * i + 1] = Math.max(max[2 * i + 1]!, b);
+          min[2 * i + 1] = Math.min(min[2 * i + 1]!, b);
+        }
+      }
     }
+  } else {
+    // Con varias componentes ([c, k]…), su combinación lineal: en una combinación con casos del sismo, la de cada modo, combinada
+    for (const dg of D)
+      for (let i = 0; i < 2 * n; i++) {
+        const x = xs[i >> 1]!;
+        if ((x === 0 && !(i & 1)) || (x === L && i & 1)) continue;
+        const v = esfuerzoProyectado(dg, x, i & 1 ? 1 : -1, comp);
+        max[i] = Math.max(max[i]!, v);
+        min[i] = Math.min(min[i]!, v);
+      }
+  }
+  for (let i = 0; i < 2 * n; i++) {
+    const x = xs[i >> 1]!;
+    if ((x === 0 && !(i & 1)) || (x === L && i & 1)) continue;
+    const e = { s: t.s0 + x, max: max[i]!, min: min[i]! };
+    const prev = curva[curva.length - 1];
+    if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
+    curva.push(e);
+  }
   return curva;
 }
 
@@ -1002,9 +1042,10 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: Es
       let mx: ExtremoVano | null = null;
       let mn: ExtremoVano | null = null;
       conjunto.factores.forEach((f, kc) => {
-        const e = q.vano(id, i, f);
-        if (!e.valido) return;
-        const [a, b] = esfuerzo === "My" ? [e.valor.maxMy, e.valor.minMy] : [e.valor.maxVz, e.valor.minVz];
+        // (los `maxMy`, `minMy`, `maxVz` y `minVz` de `q.vano`, sin lo demás del vano)
+        const e = q.extremosVano(id, i, f, comp);
+        if (!e) return;
+        const [a, b] = [e.max, e.min];
         if (!mx || a.valor > mx.v) mx = { v: a.valor, s: a.s, comb: conjunto.nombres[kc]! };
         if (!mn || b.valor < mn.v) mn = { v: b.valor, s: b.s, comb: conjunto.nombres[kc]! };
       });

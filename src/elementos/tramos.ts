@@ -125,7 +125,7 @@ export class Tramos {
     for (let k = 0; k < fs.length; k++) {
       const a = as[k]!;
       let g = fs[k]!;
-      if (g.cortes !== cortes && !mismosCortes(g.cortes, cortes)) g = g.refinar(cortes);
+      if (g.cortes !== cortes && !mismosCortes(g.cortes, cortes)) g = g.refinadaComo(cortes);
       const [gc, gs] = [g.c, g.saltos];
       for (let i = 0; i < c.length; i++) c[i]! += a * gc[i]!;
       for (let i = 0; i < s.length; i++) s[i]! += a * gs[i]!;
@@ -157,6 +157,18 @@ export class Tramos {
     const s = this.saltos.map((v) => a * v);
     return new Tramos(this.cortes, c, s, a * this.inicial + b0);
   }
+
+  /**
+   * `refinar(cortes)` con la última guardada (sus cortes pueden ser otro array con los mismos números:
+   * sólo para leer sus coeficientes y sus saltos). Las combinaciones de una barra refinan cada caso sin
+   * cargas (un solo tramo) a los cortes del que las tiene, una vez por combinación y por esfuerzo.
+   */
+  private refinadaComo(cortes: Float64Array): Tramos {
+    const hecha = this.refinada;
+    if (hecha && (hecha.cortes === cortes || mismosCortes(hecha.cortes, cortes))) return hecha;
+    return (this.refinada = this.refinar(cortes));
+  }
+  private refinada: Tramos | null = null;
 
   /** La misma función sobre cortes más finos (que contengan a los suyos). */
   refinar(cortes: Float64Array): Tramos {

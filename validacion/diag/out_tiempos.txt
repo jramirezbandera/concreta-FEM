@@ -1,0 +1,77 @@
+validacion/diag/repro.ts · ejemplos/app/edificio.json (7 plantas, 80 pilares por planta, viento, sismo, imperfección y segundo orden: 128 combinaciones por defecto)
+Node 24 (el motor de Chrome), 2026-11-27. Los pedidos de Resultados · Diagramas, Losas y Armado por el atendedor del worker.
+«antes»: un árbol de trabajo en 854b259; «despues»: con los mapas y los cortes por lotes de casos, la envolvente de los
+diagramas por tablas, los extremos de vano de un solo esfuerzo y el arreglo del segundo orden. La huella es la de la contestación.
+
+── Todos los pedidos, una pasada de cada uno (los diagramas de planta van detrás del 3D, que deja hechos los de cada caso)
+== antes
+abrir | 4.85 s (basura 0.36) | 18a5bc7218580769
+calcular | 17.59 s (basura 3.07) | 9158c6bc67ed78cb
+diagramas3d My, todas las plantas | 40.54 s (basura 7.35) | b3a821f36d5874cd
+escena vigas My N7 | 5.56 s (basura 1.65) | cb7d9d88da878037
+escena vigas My N6 | 5.39 s (basura 0.96) | e205e3e542d1b96e
+escena vigas Vz N7 | 7.33 s (basura 1.09) | 03438d2a0699e6e8
+piezas N7 | 0.00 s (basura 0.01) | b067fc7a6908e8aa
+losas m11 N7 | 3.63 s (basura 0.61) | a631d8fed1369b80
+armado x-inf N7 | 10.03 s (basura 1.22) | e581345e18f062a5
+armado y-sup N7 | 6.17 s (basura 0.57) | d99a88aaccbd00f2
+losas uz N7 | 0.20 s (basura 0.01) | 345fc3d382b04f26
+losas m11 N6 | 2.74 s (basura 0.40) | 68b0611311e6e8f3
+isovalores3d m11, todas | 21.53 s (basura 3.15) | 9c0d470581104977
+== despues
+abrir | 4.87 s (basura 0.00) | 18a5bc7218580769
+calcular | 15.35 s (basura 2.96) | 9158c6bc67ed78cb
+diagramas3d My, todas las plantas | 29.70 s (basura 6.58) | b3a821f36d5874cd
+escena vigas My N7 | 3.80 s (basura 1.67) | cb7d9d88da878037
+escena vigas My N6 | 3.73 s (basura 0.83) | e205e3e542d1b96e
+escena vigas Vz N7 | 4.74 s (basura 0.91) | 03438d2a0699e6e8
+piezas N7 | 0.00 s (basura 0.00) | b067fc7a6908e8aa
+losas m11 N7 | 2.15 s (basura 0.19) | a631d8fed1369b80
+armado x-inf N7 | 7.82 s (basura 0.67) | e581345e18f062a5
+armado y-sup N7 | 2.86 s (basura 0.17) | d99a88aaccbd00f2
+losas uz N7 | 0.19 s (basura 0.01) | 345fc3d382b04f26
+losas m11 N6 | 1.59 s (basura 0.11) | 68b0611311e6e8f3
+isovalores3d m11, todas | 11.32 s (basura 0.68) | 9c0d470581104977
+
+── Alternando, dos pasadas (--solo "escena vigas,losas m11,armado"; el «despues» de Armado, sin los cortes por lotes todavía:
+   las franjas tras el mapa tardaban 0,5 s más porque ya no compartían con él lo recuperado de los casos estáticos)
+== antes 1
+abrir | 4.83 s (basura 0.38) | 18a5bc7218580769
+calcular | 17.04 s (basura 2.64) | 9158c6bc67ed78cb
+escena vigas My N7 | 7.62 s (basura 1.09) | cb7d9d88da878037
+escena vigas My N6 | 7.43 s (basura 1.14) | e205e3e542d1b96e
+escena vigas Vz N7 | 7.30 s (basura 1.14) | 03438d2a0699e6e8
+losas m11 N7 | 3.35 s (basura 0.47) | a631d8fed1369b80
+armado x-inf N7 | 9.81 s (basura 1.17) | e581345e18f062a5
+armado y-sup N7 | 6.22 s (basura 0.69) | d99a88aaccbd00f2
+losas m11 N6 | 2.59 s (basura 0.47) | 68b0611311e6e8f3
+== despues 1
+abrir | 4.82 s (basura 0.00) | 18a5bc7218580769
+calcular | 14.47 s (basura 2.66) | 9158c6bc67ed78cb
+escena vigas My N7 | 4.87 s (basura 0.89) | cb7d9d88da878037
+escena vigas My N6 | 4.64 s (basura 0.88) | e205e3e542d1b96e
+escena vigas Vz N7 | 4.62 s (basura 0.91) | 03438d2a0699e6e8
+losas m11 N7 | 2.01 s (basura 0.19) | a631d8fed1369b80
+armado x-inf N7 | 10.39 s (basura 1.24) | e581345e18f062a5
+armado y-sup N7 | 5.96 s (basura 0.56) | d99a88aaccbd00f2
+losas m11 N6 | 1.46 s (basura 0.05) | 68b0611311e6e8f3
+== antes 2
+abrir | 4.88 s (basura 0.38) | 18a5bc7218580769
+calcular | 17.21 s (basura 2.91) | 9158c6bc67ed78cb
+escena vigas My N7 | 7.28 s (basura 1.03) | cb7d9d88da878037
+escena vigas My N6 | 7.01 s (basura 1.08) | e205e3e542d1b96e
+escena vigas Vz N7 | 6.97 s (basura 1.04) | 03438d2a0699e6e8
+losas m11 N7 | 3.12 s (basura 0.42) | a631d8fed1369b80
+armado x-inf N7 | 9.64 s (basura 1.18) | e581345e18f062a5
+armado y-sup N7 | 6.11 s (basura 0.54) | d99a88aaccbd00f2
+losas m11 N6 | 2.74 s (basura 0.55) | 68b0611311e6e8f3
+== despues 2
+abrir | 4.83 s (basura 0.40) | 18a5bc7218580769
+calcular | 14.09 s (basura 2.07) | 9158c6bc67ed78cb
+escena vigas My N7 | 4.88 s (basura 0.86) | cb7d9d88da878037
+escena vigas My N6 | 4.69 s (basura 0.88) | e205e3e542d1b96e
+escena vigas Vz N7 | 4.70 s (basura 0.90) | 03438d2a0699e6e8
+losas m11 N7 | 2.01 s (basura 0.20) | a631d8fed1369b80
+armado x-inf N7 | 10.17 s (basura 1.26) | e581345e18f062a5
+armado y-sup N7 | 5.90 s (basura 0.53) | d99a88aaccbd00f2
+losas m11 N6 | 1.47 s (basura 0.06) | 68b0611311e6e8f3

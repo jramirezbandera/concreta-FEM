@@ -54,7 +54,7 @@ import { huellaPilar } from "./geometria2d.ts";
 import type { Mapeo } from "./mapeo.ts";
 import { diafragmaDe } from "./piezas.ts";
 import { IndicePunzonamiento, losaEnHuella, N_TRANSMITIDO, transmitidoPilar, type TransmitidoPilar } from "./punzonamiento.ts";
-import { EsfuerzosPiezas } from "./resultados.ts";
+import { EsfuerzosPiezas, type TramoFlexible } from "./resultados.ts";
 import { amplificar, calcularSegundoOrden, coeficientes, diagnosticosSegundoOrden, maximos, opcionesSegundoOrden, type CoeficienteHipotesis, type MaximoHipotesis, type SegundoOrdenCalculado } from "./segundoOrden.ts";
 import { calcularSismo, sismoDelCalculo, tieneEspectro, type EspectroSismo, type SismoCalculado } from "./sismo.ts";
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
@@ -710,6 +710,53 @@ export class Consultas {
     const r = this.vanoZonas(id, i, factores);
     return r.valido ? { valido: true, valor: r.valor[0]!, diagnosticos: r.diagnosticos } : r;
   }
+
+  /**
+   * Lo de `vano` para un solo esfuerzo: el mayor y el menor de la componente `c` de [N, Vy, Vz, T, My, Mz]
+   * en el vano i de la viga con la combinación, y dónde están. Los mismos números y las mismas s que
+   * los `maxMy`, `minMy`, `maxVz`… de `vano` (las mismas estaciones, en el mismo orden), sin los otros
+   * cinco esfuerzos, ni sus partes, ni las secciones de los extremos; null donde `vano` no es válido.
+   * Para quien recorre todas las combinaciones de todos los vanos de una planta (los diagramas).
+   */
+  extremosVano(id: string, i: number, factores: ArrayLike<number>, c: number): { max: { s: number; valor: number }; min: { s: number; valor: number } } | null {
+    let vanos = this.vanosVistos.get(id);
+    if (vanos === undefined) {
+      const r = this.viga(id);
+      const tramos = r.valido ? this.piezas().tramos(id) : [];
+      vanos = r.valido
+        ? r.valor.vanos.map((v) => {
+            const ts = tramos.filter((t) => t.s1 > v.desde + 1e-9 && t.s0 < v.hasta - 1e-9);
+            return ts.length ? { desde: Math.max(v.desde, ts[0]!.s0), hasta: Math.min(v.hasta, ts[ts.length - 1]!.s1), ts } : null;
+          })
+        : null;
+      this.vanosVistos.set(id, vanos);
+    }
+    const v = vanos?.[i];
+    if (!v || this.sup.defecto(factores) !== null) return null;
+    const { desde, hasta } = v;
+    let [maxV, maxS, minV, minS] = [-Infinity, desde, Infinity, desde];
+    for (const t of v.ts) {
+      const [a, b] = [Math.max(desde, t.s0) - t.s0, Math.min(hasta, t.s1) - t.s0];
+      if (!(b > a)) continue;
+      const D = this.diagramaCombinado(t.barra, factores);
+      const ver = (x: number, lado: -1 | 1) => {
+        const e = D.esfuerzoEn(c, x, lado);
+        if (e > maxV) [maxV, maxS] = [e, t.s0 + x];
+        if (e < minV) [minV, minS] = [e, t.s0 + x];
+      };
+      // Como en `vanoZonas`: a por la derecha, b por la izquierda y las estaciones de dentro por los dos lados
+      ver(a, 1);
+      ver(b, -1);
+      for (const x of D.estaciones()) {
+        if (!(x > a && x < b)) continue;
+        ver(x, -1);
+        ver(x, 1);
+      }
+    }
+    return { max: { s: maxS, valor: maxV }, min: { s: minS, valor: minV } };
+  }
+  /** Por viga: de cada vano, sus extremos dentro de sus tramos flexibles y esos tramos (null si cae entero en zonas rígidas); null si no es una viga. */
+  private readonly vanosVistos = new Map<string, ({ desde: number; hasta: number; ts: TramoFlexible[] } | null)[] | null>();
 
   /**
    * Fase CO2: como `vano`, con el vano partido en zonas por unas fracciones de su longitud (crecientes,

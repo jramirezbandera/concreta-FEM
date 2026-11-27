@@ -292,7 +292,8 @@ export class DiagramaCompuesto implements DiagramaLeible {
   readonly L: number;
   /** La parte estática de la combinación. */
   readonly lineal: DiagramaBarra;
-  private readonly partes: readonly ParteEspectral[];
+  /** Sus casos espectrales con su factor (quien los lee no los cambia). */
+  readonly partes: readonly ParteEspectral[];
   private readonly evaluado: Evaluado;
   private estacionesC: number[] | null = null;
   private rejillaC: Rejilla | null = null;

@@ -389,6 +389,12 @@ describe("VS3, criterio 6: cada consulta combina los modos en su variable", () =
     v.valor.vanos.forEach((_, i) => {
       const [con, est] = [q.vano(viga, i, F), q.vano(viga, i, sin)];
       if (!con.valido || !est.valido) throw new Error("sin vano");
+      // `extremosVano` (lo que leen los diagramas de planta): los de `vano`, bit a bit, también con el sismo
+      for (const [f, e] of [[F, con.valor], [sin, est.valor]] as const)
+        for (const [comp, mayor, menor] of [[2, "maxVz", "minVz"], [3, "maxT", "minT"], [4, "maxMy", "minMy"]] as const) {
+          const x = q.extremosVano(viga, i, f, comp)!;
+          expect([x.max.valor, x.max.s, x.min.valor, x.min.s]).toEqual([e[mayor].valor, e[mayor].s, e[menor].valor, e[menor].s]);
+        }
       expect(con.valor.minMy.valor).toBeLessThanOrEqual(est.valor.minMy.valor + 1e-9);
       expect(con.valor.maxMy.valor).toBeGreaterThanOrEqual(Math.max(con.valor.inicio.esfuerzos[4]!, con.valor.fin.esfuerzos[4]!) - 1e-9);
     });
@@ -955,7 +961,9 @@ describe("VS4: los campos de los modos se combinan por planta y se sueltan al ca
     q2.franja(frArriba.valor[0]!.id);
     const n1 = ef.soltados;
     expect(n1).toBeGreaterThanOrEqual(1);
-    expect(q2.campos.tieneEvaluador(modos[0]!)).toBe(true);
+    // (los cortes guardan el valor de las plazas de todos los casos a la vez, no un evaluador por caso)
+    for (const u of modos) expect(q2.campos.tieneEvaluador(u)).toBe(false);
+    expect(q2.campos.plazasEnLote).toBeGreaterThan(0);
     expect(q2.campos.evaluadorCompartido(estatico)).toBe(evEstatico);
     // Un mapa de otra planta: lo de los modos se suelta, y lo de los casos del cálculo también (no
     // entre medias, como los de los modos, sino al cambiar de planta: guardarlo de todas no cabía)

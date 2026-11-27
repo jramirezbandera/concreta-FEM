@@ -3,7 +3,9 @@
  * sismo, imperfección y segundo orden: 128 combinaciones por defecto), por el atendedor del worker, en
  * Node (el motor de Chrome). Da el tiempo y el sha256 de cada contestación, o su error con la pila.
  *
- *   node --experimental-strip-types validacion/diag/repro.ts [proyecto.json] [--solo <pedido>]
+ *   node --experimental-strip-types validacion/diag/repro.ts [proyecto.json] [--solo <pedido>[,<pedido>…]]
+ *
+ * `--solo`: sólo los pedidos cuyo nombre empieza por alguno de los dados (abrir y calcular, siempre).
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -18,7 +20,7 @@ const RAIZ = join(import.meta.dirname, "..", "..");
 const WASM = readFileSync(join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm"));
 await iniciarNucleo(WASM);
 const args = process.argv.slice(2);
-const solo = args.includes("--solo") ? args[args.indexOf("--solo") + 1] : undefined;
+const solo = args.includes("--solo") ? args[args.indexOf("--solo") + 1]!.split(",") : undefined;
 const fichero = args.find((a) => a.endsWith(".json")) ?? join(RAIZ, "ejemplos", "app", "edificio.json");
 const texto = readFileSync(fichero, "utf8");
 const plantas: string[] = JSON.parse(texto).modelo.plantas.map((p: { id: string }) => p.id);
@@ -36,7 +38,7 @@ new PerformanceObserver((l) => {
   for (const e of l.getEntries()) basura += e.duration;
 }).observe({ entryTypes: ["gc"] });
 const pedir = async (nombre: string, p: Pedido) => {
-  if (solo && !nombre.startsWith(solo) && p.tipo !== "abrir" && p.tipo !== "calcular") return;
+  if (solo && !solo.some((s) => nombre.startsWith(s)) && p.tipo !== "abrir" && p.tipo !== "calcular") return;
   const t0 = performance.now();
   try {
     basura = 0;
@@ -58,6 +60,9 @@ await pedir(`escena vigas My ${siguiente}`, { tipo: "escena", planta: siguiente,
 await pedir(`escena vigas Vz ${alta}`, { tipo: "escena", planta: alta, vista: { vista: "vigas", esfuerzo: "Vz", combinaciones: D } } as Pedido);
 await pedir(`piezas ${alta}`, { tipo: "piezas", planta: alta });
 await pedir(`losas m11 ${alta}`, { tipo: "losas", planta: alta, campo: "m11", combinaciones: D } as Pedido);
+// Las franjas de armado de la planta, con su mapa de M ya hecho (lo que comparten) y en la otra dirección
+await pedir(`armado x-inf ${alta}`, { tipo: "armado", planta: alta, combinaciones: D, armadura: "x-inf" } as Pedido);
+await pedir(`armado y-sup ${alta}`, { tipo: "armado", planta: alta, combinaciones: D, armadura: "y-sup" } as Pedido);
 await pedir(`losas uz ${alta}`, { tipo: "losas", planta: alta, campo: "uz", combinaciones: D } as Pedido);
 await pedir(`losas m11 ${siguiente}`, { tipo: "losas", planta: siguiente, campo: "m11", combinaciones: D } as Pedido);
 await pedir("isovalores3d m11, todas", { tipo: "isovalores3d", campo: "m11", combinaciones: D, planta: null } as Pedido);

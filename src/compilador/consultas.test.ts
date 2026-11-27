@@ -193,6 +193,14 @@ describe("vigas por vanos (C5, criterio 5)", () => {
         const e = c.vano("V", i, factoresCaso(k, 2));
         if (!e.valido) throw new Error();
         expect(Array.from(e.valor.inicio.esfuerzos)).toEqual(ep.en("V", k, vano.desde, 1));
+        // `extremosVano`: los mismos extremos de cada esfuerzo, con su s, bit a bit
+        const claves = [[2, "maxVz", "minVz"], [3, "maxT", "minT"], [4, "maxMy", "minMy"]] as const;
+        for (const [comp, mayor, menor] of claves) {
+          const x = c.extremosVano("V", i, factoresCaso(k, 2), comp)!;
+          expect([x.max.valor, x.max.s, x.min.valor, x.min.s]).toEqual([e.valor[mayor].valor, e.valor[mayor].s, e.valor[menor].valor, e.valor[menor].s]);
+        }
+        expect(c.extremosVano("V", 99, factoresCaso(k, 2), 4)).toBeNull();
+        expect(c.extremosVano("no-hay", 0, factoresCaso(k, 2), 4)).toBeNull();
         expect(Array.from(e.valor.fin.esfuerzos)).toEqual(ep.en("V", k, vano.hasta, -1));
         let [mx, mn] = [-Infinity, Infinity];
         for (let j = 0; j <= 2000; j++) {

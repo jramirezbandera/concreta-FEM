@@ -187,13 +187,19 @@ export class DiagramaBarra {
     const Mz = MzL.afin(1, s0[5]!, -s0[1]!);
     const fy = flexibilidadCortante(s.G, s.Avy);
     const fz = flexibilidadCortante(s.G, s.Avz);
-    const ux = N.integral().afin(1 / (s.E * s.A), u0[0]!);
-    const rx = T.integral().afin(1 / (s.G * s.J), u0[3]!);
-    const ry = My.integral().afin(-1 / (s.E * s.Iy), u0[4]!);
-    const rz = Mz.integral().afin(1 / (s.E * s.Iz), u0[5]!);
-    const uz = Vz.afin(fz, 0).mas(ry, -1).integral().afin(1, u0[2]!);
-    const uy = Vy.afin(fy, 0).mas(rz, 1).integral().afin(1, u0[1]!);
-    return new DiagramaBarra(dc.L, dc.cortes, [N, Vy, Vz, T, My, Mz], [ux, uy, uz, rx, ry, rz]);
+    // Los desplazamientos, cuando se pidan (las mismas cuentas; `u0` no se cambia después): quien lee los
+    // esfuerzos de todas las barras de una planta en todos sus casos no los usa, y eran más de la mitad
+    // de lo que cuesta hacer el diagrama
+    const desplazamientos = (): Tramos[] => {
+      const ux = N.integral().afin(1 / (s.E * s.A), u0[0]!);
+      const rx = T.integral().afin(1 / (s.G * s.J), u0[3]!);
+      const ry = My.integral().afin(-1 / (s.E * s.Iy), u0[4]!);
+      const rz = Mz.integral().afin(1 / (s.E * s.Iz), u0[5]!);
+      const uz = Vz.afin(fz, 0).mas(ry, -1).integral().afin(1, u0[2]!);
+      const uy = Vy.afin(fy, 0).mas(rz, 1).integral().afin(1, u0[1]!);
+      return [ux, uy, uz, rx, ry, rz];
+    };
+    return new DiagramaBarra(dc.L, dc.cortes, [N, Vy, Vz, T, My, Mz], desplazamientos);
   }
 
   /** Esfuerzos en x, por la izquierda (−1) o por la derecha (+1) de un salto. */

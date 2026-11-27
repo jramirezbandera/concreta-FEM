@@ -118,3 +118,37 @@ describe("criterio 3 de E5: regiones", () => {
     expect(ev.degradadas).toBeGreaterThan(0);
   });
 });
+
+describe("por lotes de casos (los mapas)", () => {
+  it("`enNudosPorLotes` da en los nudos de cada lámina lo de `enParte` de un evaluador por caso, bit a bit, y no toca las láminas rígidas", () => {
+    // (con `laminasE3`, vanos reticulares con otro eje 1 y ábacos: varias regiones y otra partición de membrana)
+    for (const laminasE3 of [false, true]) {
+      const { modelo } = edificio({ ...BASE_E5, diafragma: true, plantas: 1, laminasE3 });
+      const [r] = casosValidos(calcular(modelo));
+      const campos = new CamposLaminas(modelo);
+      // Tres «casos»: el calculado y dos desplazamientos cualesquiera (el SPR es lineal en u, pero aquí se piden los bits)
+      const us = [r!.u, Float64Array.from(r!.u, (v, i) => 0.37 * v + 1e-4 * Math.sin(i)), Float64Array.from(r!.u, (v, i) => -2 * v + 1e-5 * Math.cos(3 * i))];
+      // Las láminas, en otro orden que el del modelo y con alguna repetida
+      const nl = modelo.laminas!.length;
+      const laminas = [...Array.from({ length: nl }, (_, i) => (7 * i + 3) % nl), 0, nl - 1];
+      const XI = [-1, 1, 1, -1];
+      const ETA = [-1, -1, 1, 1];
+      for (const parte of ["flexion", "membrana"] as const) {
+        const o = parte === "flexion" ? 3 : 0;
+        const destinos = us.map(() => new Float64Array(32 * laminas.length).fill(7));
+        campos.enNudosPorLotes(parte, laminas, us, destinos);
+        const esperado = us.map((u) => {
+          const ev = campos.evaluador(u);
+          const d = new Float64Array(32 * laminas.length).fill(7);
+          laminas.forEach((l, i) => {
+            if (campos.region(l) < 0) return;
+            for (let a = 0; a < 4; a++) d.set(ev.enParte(l, XI[a]!, ETA[a]!, parte), 32 * i + 8 * a + o);
+          });
+          return d;
+        });
+        expect(laminas.some((l) => campos.region(l) < 0)).toBe(true);
+        us.forEach((_, c) => expect(Buffer.from(destinos[c]!.buffer).equals(Buffer.from(esperado[c]!.buffer))).toBe(true));
+      }
+    }
+  });
+});

@@ -125,7 +125,10 @@ export function calcularSegundoOrden(casosLogicos: readonly CasoFisico[], modelo
   const porNivel = new Map<number, number[]>();
   modelo.nudos.forEach((n, i) => {
     const z = Math.round(n.z * 1e6) / 1e6;
-    porNivel.set(z, [...(porNivel.get(z) ?? []), i]);
+    // Sin copiar la lista en cada nudo: con decenas de miles por nivel era cuadrático (3,5 s en el edificio objetivo)
+    const lista = porNivel.get(z);
+    if (lista) lista.push(i);
+    else porNivel.set(z, [i]);
   });
   const niveles = [...porNivel.keys()].sort((a, b) => a - b);
   /** El nivel sin desplazamientos de la hipótesis de factores f en la dirección e (A2-4). */
