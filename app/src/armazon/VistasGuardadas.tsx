@@ -10,6 +10,7 @@ import type { VistaGuardada } from "../../../src/agente/proyecto.ts";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { useVistas } from "../vistas/estado.ts";
+import { Vacio } from "../componentes/Vacio.tsx";
 
 const TIPO: Record<VistaGuardada["tipo"], string> = { planta: "planta", alzado: "alzado", "3d": "3D" };
 
@@ -31,7 +32,7 @@ export function NavVistas() {
   return (
     <Seccion titulo="Vistas" valor={lista.length}>
       {/* M-23: vacía, una línea */}
-      {!lista.length && <p className="nota">Ninguna: se guardan desde la barra de cada vista.</p>}
+      {!lista.length && <Vacio titulo="Sin vistas guardadas">Se guardan desde la barra de cada vista.</Vacio>}
       {lista.map((g) =>
         renombrando === g.nombre ? (
           <div key={g.nombre} className="px-3.5 py-1">

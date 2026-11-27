@@ -275,3 +275,17 @@ El punto 2 de §6, en parte. Sin commit todavía.
 - **Comprobado en el navegador** con la vivienda, a 1920 × 1080: la pista de «Viga» y la de «Encuadrar» con su tecla F, el `title` devuelto al salir, y las barras de Resultados y de Comprobación · Losas con los segmentados nuevos; sin errores en la consola.
 - **Sin comprobar:** la pista con el teclado y en los diálogos, el tema oscuro, 1366 px y los bancos de Chrome.
 - **Lo que queda del punto 2:** `Pestanas`, `Campo`, `Seccion`, `Insignia`, `Aviso` y `Vacio` únicos (UI2-15, UI2-22), los segmentados sueltos (`.chip.seg-chip`, `.fichas`, `.filtro-lista`, `.pestanas-lista`) y las escalas de alto y de espacio.
+
+### 7.2 Estados, teclas, vacíos y pestañas (2026-11-27)
+
+Otra tanda del punto 2 de §6. Sin commit todavía.
+
+- **UI2-18, los estados:** la píldora (`.pill`) va en la letra de la interfaz y sus textos, con mayúscula inicial: «Calculado», «Sin calcular», «No compila», «Calculando · …» en la barra; «Error», «Aviso» y «Nota» en Diagnósticos; «Bien», «Avisos» y «No aplica» en Revisión. En las tablas de Comprobación el estado es la misma píldora que en Propiedades y en el banco.
+- **UI2-26 (en parte):** en esas tablas, «Armado» y «Manda» van a la izquierda, con su cabecera. **Queda** el ancho de la tabla.
+- **UI2-15, las teclas:** una sola (`.kbd`, `.dib-tecla`, el pie y los atajos de la paleta, la pista). Los rótulos en mayúsculas, con un solo espaciado; los títulos de grupo de Propiedades, a 12 px como los de los diálogos.
+- **UI2-22, los vacíos:** `app/src/componentes/Vacio.tsx` (lo que no hay y, más tenue, cómo se consigue; con un botón si el camino es un clic), en nueve sitios: las vistas guardadas, las plantillas, «Situación», Diagnósticos, los avisos de Comprobación, la viga sin elegir, lo elegido de una herramienta, el perfil sin diafragmas y las listas de los gestores. **Quedan** los demás párrafos `.nota` que hacen de vacío.
+- **UI2-15, las pestañas:** las de la ficha de acciones y las de «Refuerzos | Cercos» usan el `Grupo` de las del panel inferior (flechas, Inicio y Fin); las segundas, sin mayúsculas.
+- **Pruebas:** las de `app/` (177; dos puestas al día por los textos nuevos), `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` sin errores.
+- **Comprobado en el navegador** con la vivienda, a 1920 × 1080: «Calculado» y la tecla de la paleta en la barra, los vacíos del navegador y «Bien» en Revisión; sin errores en la consola.
+- **Sin comprobar en el navegador:** la tabla de Comprobación con su píldora y su texto a la izquierda, las pestañas con el teclado, el tema oscuro, 1366 px y los bancos de Chrome.
+- **Lo que queda del punto 2:** `Campo` y `Seccion` únicos (seis disposiciones de campo y los títulos en cajas con leyenda), los nueve avisos, los segmentados sueltos y las escalas de alto y de espacio.

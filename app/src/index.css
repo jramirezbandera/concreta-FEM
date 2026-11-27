@@ -237,6 +237,10 @@ body {
 }
 .fila > .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--color-text-primary); text-align: right; }
 
+/* UI2-22: un estado vacío (componentes/Vacio.tsx): lo que no hay y, más tenue, cómo se consigue */
+.vacio { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 8px 14px 12px; font-size: 12px; line-height: 1.4; }
+.vacio-titulo { font-weight: 500; color: var(--color-text-secondary); }
+.vacio-como { color: var(--color-text-tertiary); }
 .nota { margin: 8px 14px 10px; font-size: 12px; line-height: 1.45; color: var(--color-text-secondary); }
 
 .lista-fila {
@@ -311,7 +315,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 
 .pill {
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px;
-  font: 500 11px var(--font-mono); white-space: nowrap;
+  font: 500 12px var(--font-sans); white-space: nowrap;
 }
 .pill.ok { background: var(--color-tint-ok); color: var(--color-state-ok-text); }
 .pill.warn { background: var(--color-tint-warn); color: var(--color-state-warn-text); }
@@ -335,6 +339,9 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .tb td small { display: block; font-size: 11px; color: var(--color-text-tertiary); white-space: normal; }
 .tb tbody tr:last-child td { border-bottom: 0; }
 .tb td.txt { font-family: var(--font-sans); white-space: normal; }
+/* UI2-26: en las tablas de Comprobación el texto va a la izquierda (a la derecha, sólo los números) y el estado, en su píldora */
+[data-tabla-comprobacion] th.txt, [data-tabla-comprobacion] td.txt { text-align: left; }
+[data-tabla-comprobacion] td .pill { height: 20px; }
 /* Las etiquetas de una tabla con celdas de varias filas (las ternas de los pilares): a la izquierda, arriba */
 .tb td.et { text-align: left; vertical-align: top; padding-left: 14px; }
 .tb tr.grupo td { background: var(--color-bg-elevated); font-family: var(--font-sans); font-weight: 500; }
@@ -349,7 +356,11 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 /* Texto sobre el dibujo: halo del color del lienzo */
 .halo { paint-order: stroke; stroke: var(--color-bg-canvas); stroke-width: 3px; stroke-linejoin: round; }
 
-.kbd { font: 11px var(--font-mono); color: var(--color-text-muted); }
+/* UI2-15: una tecla se ve igual en todas partes (la paleta, las pistas, las herramientas, las notas) */
+.kbd, .dib-tecla, .paleta-pie kbd, .pista-nombre kbd {
+  display: inline-block; padding: 0 5px; border: 1px solid var(--color-border-main); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--color-bg-surface); font: 11px/16px var(--font-mono); color: var(--color-text-secondary); white-space: nowrap;
+}
 
 /* Lienzo: lo que dibuja ocupa su caja */
 .lienzo { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
@@ -443,7 +454,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
   position: sticky; top: 0; z-index: 2;
   padding: 5px 6px 3px; background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border-main); border-right: 1px solid var(--color-border-sub);
-  font: 600 11px var(--font-sans); letter-spacing: .04em; color: var(--color-text-muted);
+  font: 600 11px var(--font-sans); letter-spacing: .07em; color: var(--color-text-muted);
   text-align: left; white-space: nowrap; vertical-align: bottom;
 }
 .hoja th small { display: block; font: 400 11px var(--font-mono); letter-spacing: 0; }
@@ -772,7 +783,6 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .cab-icono { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: var(--color-tint-accent); color: var(--color-accent); }
 .dib-hecho { display: flex; align-items: center; gap: 7px; margin: 0; padding: 7px 14px; border-bottom: 1px solid var(--color-border-sub); background: var(--color-tint-ok); color: var(--color-state-ok); font-size: 12px; }
 .dib-hecho + section > .sec { border-top: 0; }
-.dib-tecla { display: inline-block; padding: 0 5px; border: 1px solid var(--color-border-main); border-bottom-width: 2px; border-radius: 4px; background: var(--color-bg-primary); font: 11px/16px var(--font-mono); color: var(--color-text-secondary); white-space: nowrap; }
 /* Los desplegables de texto (plantas con su cota), en la letra de la interfaz */
 .campo select[aria-label^="Planta"] { font-family: var(--font-sans); white-space: pre; }
 .campo > span.unidad, .campo > span.dib-unidad { position: relative; display: block; color: inherit; }
@@ -953,10 +963,10 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .paleta li[aria-selected="true"] { background: var(--color-tint-accent); }
 .paleta li[aria-selected="true"] .nombre { color: var(--color-accent); }
 .paleta li .grupo { width: 92px; flex-shrink: 0; font-size: 12px; color: var(--color-text-tertiary); }
-.paleta li .atajo { margin-left: auto; padding: 1px 6px; border: 1px solid var(--color-border-main); border-radius: 4px; background: var(--color-bg-surface); font: 11px var(--font-mono); color: var(--color-text-secondary); }
 .paleta .vacia { padding: 16px 18px; font-size: 13px; color: var(--color-text-secondary); }
 .paleta-pie { display: flex; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--color-border-sub); background: var(--color-bg-surface); font-size: 12px; color: var(--color-text-tertiary); }
-.paleta-pie kbd { padding: 0 5px; margin-right: 4px; border: 1px solid var(--color-border-main); border-radius: 4px; background: var(--color-bg-primary); font: 11px var(--font-mono); color: var(--color-text-secondary); }
+.paleta-pie kbd { margin-right: 4px; }
+.paleta li .atajo { margin-left: auto; padding: 0 5px; border: 1px solid var(--color-border-main); border-bottom-width: 2px; border-radius: 4px; background: var(--color-bg-surface); font: 11px/16px var(--font-mono); color: var(--color-text-secondary); }
 
 /*
  * Desplegables: la lista abierta con el estilo de la app, como un menú (select personalizable,
@@ -1116,7 +1126,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .gp-form { display: flex; flex-direction: column; gap: 4px; }
 .gp-sec { padding: 12px 0 14px; border-bottom: 1px solid var(--color-border-sub); }
 .gp-sec:last-of-type { border-bottom: 0; }
-.gp-sec h3 { margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.gp-sec h3 { margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
 .gp-fila { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
 .gp-campo { display: flex; flex-direction: column; gap: 4px; width: 130px; }
 .gp-campo.gp-corto { width: 80px; }
@@ -1176,7 +1186,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 
 /* Inspector: grupos, obligatorios, ayudas y croquis (prueba de uso del 2026-10-28) */
 .form-datos { padding: 2px 0 6px; }
-.campo-grupo { display: flex; align-items: center; gap: 8px; margin: 12px 14px 4px; font-size: 11px; font-weight: 600; color: var(--color-text-primary); }
+.campo-grupo { display: flex; align-items: center; gap: 8px; margin: 12px 14px 4px; font-size: 12px; font-weight: 600; color: var(--color-text-secondary); }
 .campo-grupo::after { content: ""; flex: 1; height: 1px; background: var(--color-border-sub); }
 .form-datos > .campo-grupo:first-child, .form-datos > .nota:first-child + .campo-grupo { margin-top: 6px; }
 /* El grupo plegado (opciones avanzadas): el título es el botón, con un triángulo que gira */
@@ -1218,7 +1228,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 /* UI2-13: la pista de cualquier elemento con `title` (componentes/Pistas.tsx): el nombre con su atajo y, debajo, lo que explica */
 .globo-ayuda.pista { display: flex; flex-direction: column; gap: 2px; max-width: 300px; padding: 6px 10px; }
 .pista-nombre { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 500; }
-.pista-nombre kbd { flex-shrink: 0; padding: 0 5px; border: 1px solid var(--color-border-main); border-bottom-width: 2px; border-radius: 4px; background: var(--color-bg-surface); font: 11px/16px var(--font-mono); color: var(--color-text-secondary); }
+.pista-nombre kbd { flex-shrink: 0; }
 .pista-resto { color: var(--color-text-secondary); }
 .campo[data-activo] > span:first-child { color: var(--color-text-primary); }
 .campo input[data-falta], .campo select[data-falta] { border-style: dashed; border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border-main)); }
@@ -1425,7 +1435,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .banco-form { grid-area: form; min-width: 0; align-self: stretch; padding-bottom: 6px; border-left: 1px solid var(--color-border-sub); }
 .banco-comprobaciones { grid-area: comp; min-width: 0; align-self: stretch; padding-bottom: 8px; border-left: 1px solid var(--color-border-sub); }
 .banco-armado[data-tipo="vigas"] .banco-comprobaciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); align-items: start; border-left: 0; border-top: 1px solid var(--color-border-sub); }
-.banco-armado h4 { margin: 8px 14px 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+.banco-armado h4 { margin: 8px 14px 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--color-text-tertiary); }
 .banco-armado h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .banco-esfuerzos { margin: 2px auto 0; max-width: 980px; }
 .banco-esfuerzos .tb b { color: var(--color-text-primary); font-weight: 700; }
@@ -1471,9 +1481,9 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .form-losa .listas-armado { margin-top: 2px; }
 @media (max-width: 1700px) { .form-losa { grid-template-columns: minmax(0, 1fr); } .form-losa .listas-armado { margin-top: 8px; } }
 .pestanas-lista { display: inline-flex; gap: 2px; }
-.pestanas-lista button { padding: 2px 9px; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; font: inherit; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+.pestanas-lista button { padding: 2px 9px; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; font: 500 12px var(--font-sans); text-transform: none; letter-spacing: 0; color: var(--color-text-secondary); }
 .pestanas-lista button[data-on] { border-bottom-color: var(--color-accent); color: var(--color-text-primary); }
-.titulo-lista { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-tertiary); }
+.titulo-lista { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--color-text-tertiary); }
 .filtro-lista { display: inline-flex; gap: 2px; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .filtro-lista button { padding: 1px 7px; border-radius: 8px; font-size: 11px; color: var(--color-text-secondary); }
 .filtro-lista button[data-on] { background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-text-primary); }

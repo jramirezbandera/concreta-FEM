@@ -21,10 +21,11 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import { Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import { Vacio } from "../componentes/Vacio.tsx";
 
 function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | null> }) {
   const pts = d.plantas.filter((p) => p.maestro && cotas.get(p.planta) !== null).map((p) => ({ z: cotas.get(p.planta)!, ux: p.maestro!.ux.v * 1000, uy: Math.abs(p.maestro!.uy.v * 1000) }));
-  if (pts.length < 1) return <p className="nota">Sin diafragmas rígidos: no hay maestro por planta.</p>;
+  if (pts.length < 1) return <Vacio titulo="Sin diafragmas rígidos">No hay maestro por planta.</Vacio>;
   // UI2-2: márgenes para los rótulos (las cotas a la izquierda, los valores a los dos lados y arriba)
   // y el perfil desde el arranque, que no se mueve: antes eran dos puntos sueltos arriba del todo.
   const [W, H, ml, mr, mt, mb] = [300, 200, 46, 12, 18, 24];

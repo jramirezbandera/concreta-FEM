@@ -112,21 +112,21 @@ function BotonCancelar({ p }: { p: ProyectoAbierto }) {
 
 function TextoEstado({ p }: { p: ProyectoAbierto }) {
   const e = p.estado;
-  if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : p.edicion?.pendiente ? "LEYENDO LO EDITADO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
+  if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "Calculando" : p.edicion?.pendiente ? "Leyendo lo editado" : "Abriendo"} · resultados desactualizados</span>;
   // La huella, en el título y en Revisión: en la píldora era un código que no dice nada (UI-43)
   const huella = e ? `Versión del modelo ${e.huella.slice(0, 8)}` : undefined;
   if (p.fase === "calculando")
     return (
       <span className="pill warn" title={huella} data-progreso={p.progreso ?? ""}>
-        CALCULANDO · {textoProgreso(p.progreso)}
+        Calculando · {textoProgreso(p.progreso)}
       </span>
     );
-  if (p.fase === "error") return <span className="pill fail" title={p.errores.map((d) => d.mensaje).join(" ") || undefined}>{!e ? "NO SE PUEDE ABRIR" : e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUDO COMPILAR"}</span>;
+  if (p.fase === "error") return <span className="pill fail" title={p.errores.map((d) => d.mensaje).join(" ") || undefined}>{!e ? "No se puede abrir" : e.compila ? "El cálculo falló" : "No se pudo compilar"}</span>;
   if (!e) return null;
-  if (e.compilando) return <span className="pill warn" title={`Lo que sólo necesita el modelo ya se dibuja; los diagnósticos, la malla y el cálculo esperan a la compilación. ${huella}`}>COMPILANDO</span>;
-  if (!e.compila) return <span className="pill fail" title={`Los errores, en Diagnósticos. ${huella}`}>NO COMPILA</span>;
-  if (e.calculado) return <span className="pill ok" title={huella}>CALCULADO</span>;
-  return <span className="pill neu" title={huella}>SIN CALCULAR</span>;
+  if (e.compilando) return <span className="pill warn" title={`Lo que sólo necesita el modelo ya se dibuja; los diagnósticos, la malla y el cálculo esperan a la compilación. ${huella}`}>Compilando</span>;
+  if (!e.compila) return <span className="pill fail" title={`Los errores, en Diagnósticos. ${huella}`}>No compila</span>;
+  if (e.calculado) return <span className="pill ok" title={huella}>Calculado</span>;
+  return <span className="pill neu" title={huella}>Sin calcular</span>;
 }
 
 const enCampo = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;

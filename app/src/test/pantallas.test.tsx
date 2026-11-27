@@ -133,7 +133,7 @@ describe("V1 · DOM", () => {
     await waitFor(() => expect(screen.queryByText("Calculando el peso propio…")).toBeNull());
     const pp = d.comprobaciones.find((c) => c.codigo === "sensatez/peso-propio")!;
     expect(pp.estado).not.toBe("pendiente");
-    await waitFor(() => expect(screen.queryByText("CALCULANDO…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Calculando…")).toBeNull());
     expect(screen.getByText(pp.titulo, { selector: "a span span" })).toBeTruthy();
   }, 60_000);
 

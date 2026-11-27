@@ -38,6 +38,7 @@ import { conMalla, Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVist
 import { COLUMNAS_BARRA, COLUMNAS_VANO, FILAS_BARRA, FILAS_VANO, NOTA_EXTREMOS, TablaExtremos } from "./Extremos.tsx";
 import { NOTA_TERNAS, TablaTernas } from "./Ternas.tsx";
 import { useEleccion } from "./useEleccion.ts";
+import { Vacio } from "../componentes/Vacio.tsx";
 
 /** Los diagramas de las vigas de una planta, en una vista: un clic elige la viga o la vigueta. */
 function PlantaDiagramas({ planta, vista, id, cargando }: { planta: string; vista: VistaPlanta; id: string | null; cargando: boolean }) {
@@ -313,7 +314,7 @@ export function ModoDiagramas() {
       </div>
     </>
   ) : (
-    <p className="nota">Elija una viga en la planta o en el navegador.</p>
+    <Vacio titulo="Ninguna viga elegida">Elíjala en la planta o en el navegador.</Vacio>
   );
 
   const propiedades = (

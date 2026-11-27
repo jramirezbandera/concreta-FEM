@@ -37,6 +37,7 @@ import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Dialogo } from "./Dialogos.tsx";
 import { CampoEmplazamiento, Etiqueta, useEmplazamiento } from "./Emplazamiento.tsx";
 import { Espectro } from "./Espectro.tsx";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 const NOMBRE_SISTEMA: Record<SistemaEstructural, string> = {
   "porticos-ha": "Pórticos de hormigón armado",
@@ -306,13 +307,13 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
     >
       <CampoEmplazamiento e={emp} />
 
-      <div role="tablist" className="mb-3 mt-4 flex gap-1 border-b border-border-main">
+      <Grupo rol="tablist" etiqueta="Acciones" className="mb-3 mt-4 flex gap-1 border-b border-border-main">
         {(["viento", "nieve", "sismo", "segundoOrden"] as const).map((p) => (
           <button key={p} type="button" role="tab" aria-selected={pestana === p} className="dock-tab" data-on={pestana === p} onClick={() => setPestana(p)}>
             {p === "viento" ? "Viento" : p === "nieve" ? "Nieve" : p === "sismo" ? "Sismo" : "Segundo orden"}
           </button>
         ))}
-      </div>
+      </Grupo>
       {pestana === "segundoOrden" ? (
         <div className="grid gap-3">
           <label className="flex items-start gap-2">

@@ -16,6 +16,7 @@ import { Seccion } from "../componentes/comunes.tsx";
 import { cota, fmt } from "../fmt.ts";
 import { useVistas, vistasDe, type EstadoVista, type TipoVista } from "../vistas/estado.ts";
 import { ejePorDefecto } from "../vistas/Zona.tsx";
+import { Vacio } from "../componentes/Vacio.tsx";
 
 type Eje = { id: string; nombre?: string; desde: Vec2; hasta: Vec2 };
 
@@ -148,7 +149,7 @@ function PlantaEsquema({ ejes, modelo, activo, otros, onEje }: { ejes: readonly 
   const forjados = [...(modelo?.losas ?? []), ...(modelo?.panos ?? [])].filter((f) => f.contorno.length >= 3);
   const pilares = modelo?.pilares ?? [];
   const pts: Vec2[] = [...ejes.flatMap((x) => [x.desde, x.hasta]), ...pilares.map((p) => [p.x, p.y] as Vec2), ...forjados.flatMap((f) => f.contorno)];
-  if (!pts.length) return <p className="sit-vacia">Sin ejes ni piezas aún: la planta esquemática sale al dibujarlos.</p>;
+  if (!pts.length) return <Vacio titulo="Sin ejes ni piezas">La planta esquemática sale al dibujarlos.</Vacio>;
   let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const [x, y] of pts) {
     x0 = Math.min(x0, x);

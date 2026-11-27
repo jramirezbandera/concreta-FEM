@@ -19,6 +19,7 @@ import { Dialogo } from "../editor/Dialogos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { importarDxf, type usePlantillasDxf } from "./plantillas.ts";
+import { Vacio } from "../componentes/Vacio.tsx";
 
 const REDONDEOS: { v: 0 | 0.01 | 0.001; nombre: string }[] = [
   { v: 0.001, nombre: "1 mm" },
@@ -50,7 +51,7 @@ export function NavPlantillas({ pl, herramienta, error }: Props) {
   return (
     <Seccion titulo="Plantillas DXF o DWG" valor={lista.length || undefined}>
       {/* M-23: vacía, lo justo */}
-      {!lista.length && <p className="nota">Ninguna. Un plano DXF o DWG en gris detrás de la planta, para calcar: «Plantilla» en la barra.</p>}
+      {!lista.length && <Vacio titulo="Sin plano de fondo">Con «Plantilla», un DXF o DWG en gris detrás de la planta, para calcar.</Vacio>}
       {error && <p className="nota text-state-fail">{error}</p>}
       {lista.map((t) => (
         <Ficha key={t.nombre} t={t} abierta={abierta === t.nombre} alternar={() => setAbierta(abierta === t.nombre ? null : t.nombre)} pl={pl} cambiar={(n, e) => cambiar(t, n, e)} quitar={() => ed.editar({ op: "plantillas", plantillas: lista.filter((x) => x.nombre !== t.nombre) }, `Quitar la plantilla «${t.nombre}»`)} herramienta={(h) => herramienta(h, t.nombre)} />

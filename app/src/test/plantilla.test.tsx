@@ -139,6 +139,6 @@ describe("la plantilla DXF (V2c-4)", () => {
     expect((within(nav).getByRole("button", { name: "En todas" }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(within(nav).getByRole("button", { name: "Quitar la plantilla Planta baja" }));
-    await waitFor(() => expect(within(nav).getByText(/Un plano DXF o DWG en gris detrás de la planta/)).toBeTruthy());
+    await waitFor(() => expect(within(nav).getByText("Sin plano de fondo")).toBeTruthy());
   }, 60_000);
 });

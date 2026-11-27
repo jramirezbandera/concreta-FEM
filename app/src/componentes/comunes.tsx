@@ -7,6 +7,7 @@ import type { Combinaciones } from "../../../src/visor/datos.ts";
 import { Campo } from "../armazon/Disposicion.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt, textoApp, coma, textoCaso } from "../fmt.ts";
+import { Vacio } from "./Vacio.tsx";
 
 /**
  * C-19: lo que hace de una fila de tabla algo que se elige con un clic y también con el teclado: una
@@ -207,7 +208,7 @@ export function agruparDiagnosticos(ds: readonly Diagnostico[]): GrupoDiagnostic
  */
 export function ListaDiagnosticos({ ds, onObjeto, max = 200, acciones }: { ds: readonly Diagnostico[]; onObjeto?: (id: string) => void; max?: number; acciones?: Readonly<Record<string, ReactNode>> }) {
   const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(() => new Set());
-  if (!ds.length) return <p className="nota">Sin errores ni avisos.</p>;
+  if (!ds.length) return <Vacio titulo="Sin errores ni avisos" />;
   const grupos = agruparDiagnosticos(ds);
   return (
     <ul className="m-0 list-none p-0">
@@ -220,7 +221,7 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200, acciones }: { ds: r
           <li key={k} className="border-b border-border-sub px-3.5 py-1.5 text-[12px]" data-severidad={sev}>
             <div className="flex items-center gap-2">
               <span className={`pill ${sev === "error" ? "fail" : sev === "aviso" ? "warn" : "neu"}`} style={{ height: 18, fontSize: 11 }}>
-                {sev === "error" ? "ERROR" : sev === "aviso" ? "AVISO" : "INFO"}
+                {sev === "error" ? "Error" : sev === "aviso" ? "Aviso" : "Nota"}
               </span>
               {g.causa && <span className="text-[11px] font-medium text-state-warn">Posible causa de un error</span>}
               {n > 1 && <span className="text-[11px] text-text-secondary">{n} iguales</span>}

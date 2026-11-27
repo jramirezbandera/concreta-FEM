@@ -36,6 +36,7 @@ import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../edit
 import { cota, fmt, plural } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
 import { Grupo } from "../componentes/Grupo.tsx";
+import { Vacio } from "../componentes/Vacio.tsx";
 
 /** V2c-3: los iconos de editar, de lucide. */
 export const IcMover: Icono = ({ size }) => <Move size={size} strokeWidth={1.5} aria-hidden="true" />;
@@ -504,7 +505,7 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
             {elegidos.length > 40 && <span>… y {elegidos.length - 40} más</span>}
           </div>
         ) : (
-          <p className="nota">Nada aún: elija en la vista (clic o ventana; con Ctrl+clic, varios e Intro).</p>
+          <Vacio titulo="Nada elegido">Elija en la vista: un clic o una ventana; con Ctrl+clic, varios e Intro.</Vacio>
         )}
       </Seccion>
       <Seccion titulo="Opciones" valor="para las siguientes">

@@ -129,7 +129,7 @@ function Documento({ doc }: { doc: Bloque[] }) {
 }
 
 const TONO = { bien: "ok", avisos: "warn", "no-aplica": "neu", pendiente: "neu" } as const;
-const TEXTO = { bien: "BIEN", avisos: "AVISOS", "no-aplica": "NO APLICA", pendiente: "CALCULANDO…" } as const;
+const TEXTO = { bien: "Bien", avisos: "Avisos", "no-aplica": "No aplica", pendiente: "Calculando…" } as const;
 
 export function EspacioRevision() {
   const { proyecto } = useVisor();
@@ -142,7 +142,7 @@ export function EspacioRevision() {
   const r = r1.datos || r1.diagnosticos ? r1 : r0;
   const x = r.datos;
 
-  const resumen = !x ? null : x.avisos ? { tono: "warn", texto: `${x.avisos} AVISO${x.avisos === 1 ? "" : "S"} DE SENSATEZ` } : { tono: "ok", texto: "SIN AVISOS DE SENSATEZ" };
+  const resumen = !x ? null : x.avisos ? { tono: "warn", texto: `${x.avisos} aviso${x.avisos === 1 ? "" : "s"} de sensatez` } : { tono: "ok", texto: "Sin avisos de sensatez" };
   const herramientas = (
     <span className="flex items-center gap-2 px-2 text-[13px] text-text-secondary">
       <IcInforme size={20} />

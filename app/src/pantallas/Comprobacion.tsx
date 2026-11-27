@@ -53,6 +53,8 @@ import { Dialogo } from "../editor/Dialogos.tsx";
 import { EditorRefuerzos, type NuevoElemento } from "../dibujo/refuerzos.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { Fuente3DModelo, FuenteEscena, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
+import { Vacio } from "../componentes/Vacio.tsx";
+import { Grupo } from "../componentes/Grupo.tsx";
 
 const TIPOS: { id: TipoComprobacion; nombre: string; title: string; icono: Icono }[] = [
   {
@@ -306,7 +308,7 @@ function FormArmado({
   const tablaElementos = (lista: "refuerzos" | "cercos", gs: readonly GrupoArmado[]) => (
     <div data-lista-armado={lista} className="min-w-0">
       <div className="titulo-lista">
-        <span role="tablist" aria-label="Refuerzos y cercos de la losa" className="pestanas-lista">
+        <Grupo rol="tablist" etiqueta="Refuerzos y cercos de la losa" className="pestanas-lista">
           {(["refuerzos", "cercos"] as const).map((l) => {
             const n = (l === "refuerzos" ? refuerzos : cercos).length;
             return n ? (
@@ -315,7 +317,7 @@ function FormArmado({
               </button>
             ) : null;
           })}
-        </span>
+        </Grupo>
         {lista === "refuerzos" && (
           <span role="group" aria-label="Refuerzos que se ven en la lista" className="filtro-lista">
             {(["todas", "inferior", "superior"] as const).map((c) => (
@@ -1378,9 +1380,9 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
                   <th>{tipo === "vigas" ? "Viga" : tipo === "losas" ? "Losa" : "Pilar"}</th>
                   <th>{tipo === "losas" ? "Tipo" : tipo === "punzonamiento" ? "Planta · losa" : tipo === "vigas" ? "Vano" : "Tramo"}</th>
                   {tipo !== "punzonamiento" && <th>{tipo === "losas" ? "Planta" : "Sección"}</th>}
-                  <th>Armado</th>
+                  <th className="txt">Armado</th>
                   <th>Aprov.</th>
-                  <th>Manda</th>
+                  <th className="txt">Manda</th>
                   <th>Estado</th>
                 </tr>
               </thead>
@@ -1408,7 +1410,9 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
                         {p.manda ? textoApp(p.manda.descripcion) : p.pendientes[0] ? textoApp(p.pendientes[0]) : "—"}
                         {p.manda && <small>{lugarDe(p.manda)}</small>}
                       </td>
-                      <td className={e.tono === "fail" ? "f" : e.tono === "warn" ? "w" : undefined}>{e.texto}</td>
+                      <td>
+                        <span className={`pill ${e.tono}`}>{e.texto}</span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1450,7 +1454,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     />
   );
 
-  const avisos = d && d.diagnosticos.length > 0 ? <ListaDiagnosticos ds={d.diagnosticos} onObjeto={(id) => setElegidos([id])} /> : <p className="nota">Sin avisos.</p>;
+  const avisos = d && d.diagnosticos.length > 0 ? <ListaDiagnosticos ds={d.diagnosticos} onObjeto={(id) => setElegidos([id])} /> : <Vacio titulo="Sin avisos" />;
 
   const banco = !activo ? (
     <div className="p-3">

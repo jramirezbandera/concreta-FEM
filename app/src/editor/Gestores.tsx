@@ -52,6 +52,7 @@ import { GestorPlantas } from "./GestorPlantas.tsx";
 import { cerrarGestor, useGestor, type PedidoGestor } from "./referencia.tsx";
 import "./gestores.css";
 import { Grupo } from "../componentes/Grupo.tsx";
+import { Vacio } from "../componentes/Vacio.tsx";
 
 /** El gestor abierto, si hay pedido (va una vez en `App`). */
 export function GestorAbierto() {
@@ -676,7 +677,7 @@ export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir,
         <Plus size={14} />
         {nuevaTexto ?? (titulo === "secciones" ? "Nueva sección" : "Nuevo material")}
       </button>
-      {elementos.length === 0 && <p className="ges-vacia">Ninguna en el proyecto.</p>}
+      {elementos.length === 0 && <Vacio titulo="Ninguna en el proyecto" />}
       {elementos.map((x) => (
         <button key={x.id} type="button" aria-current={x.id === elegida || undefined} onClick={() => onElegir(x.id)}>
           {/* `marca`: el id como la letra de su acción, con su color (casos) */}
