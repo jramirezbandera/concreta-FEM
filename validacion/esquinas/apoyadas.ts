@@ -50,7 +50,7 @@ const VARIANTES: Variante[] = [
     nombre: "A, de eje a eje",
     hueco: rect(6, 5, 12, 10),
     sinSecundaria: true,
-    esquinas: [[6, 5], [12, 5], [12, 10], [6, 10]].map((p) => ({ p: p as Vec2, tipo: "pilar" })),
+    esquinas: ([[6, 5], [12, 5], [12, 10], [6, 10]] satisfies Vec2[]).map((p) => ({ p, tipo: "pilar" })),
   },
   {
     nombre: "B, por el eje de la secundaria",
@@ -78,13 +78,13 @@ const VARIANTES: Variante[] = [
     nombre: "D, libre (control)",
     hueco: rect(7, 6, 11, 9),
     sinSecundaria: true,
-    esquinas: [[7, 6], [11, 6], [11, 9], [7, 9]].map((p) => ({ p: p as Vec2, tipo: "libre" })),
+    esquinas: ([[7, 6], [11, 6], [11, 9], [7, 9]] satisfies Vec2[]).map((p) => ({ p, tipo: "libre" })),
   },
   {
     nombre: "E, sin hueco (los pilares de A)",
     hueco: null,
     sinSecundaria: true,
-    esquinas: [[6, 5], [12, 5], [12, 10], [6, 10]].map((p) => ({ p: p as Vec2, tipo: "sin hueco" })),
+    esquinas: ([[6, 5], [12, 5], [12, 10], [6, 10]] satisfies Vec2[]).map((p) => ({ p, tipo: "sin hueco" })),
   },
 ];
 

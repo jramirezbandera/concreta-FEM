@@ -45,7 +45,7 @@ for (const [nombre, f] of Object.entries(MODELOS_CONGELADOS_CO2)) {
   const q = new Consultas(m.modelo, c, r.casos, m.opciones ?? {}, r.modal);
   const p = comprobarVigas(q, undefined, undefined, { proponer: true });
   if (!p.valido) throw new Error(`${nombre}: no propone`);
-  const armado = new Map(p.valor.vigas.flatMap((g) => g.vanos.map((v) => [`${g.viga}/${v.vano}`, v.armado] as const)));
+  const armado = new Map(p.valor.vigas.flatMap((g) => g.vanos.map((v) => [`${g.viga}/${v.vano}` as string, v.armado] as const)));
   let [interiores, distintos] = [0, 0];
   const quedan: string[] = [];
   for (const pr of porticosDe(q)) {
