@@ -505,11 +505,24 @@ export class Consultas {
   // ─── Vigas y viguetas ───────────────────────────────────────────────────────────────────────
 
   /** Dirección en planta de la barra b (de su nudo i a su nudo j). */
+  /**
+   * La dirección en planta de una barra: la de su tramo flexible (de i' a j', tras los offsets), que
+   * es la de la pieza dibujada. La recta entre sus nudos no vale: en una viga cuyo eje no pasa por el
+   * eje del pilar (enrasada a una cara, o con el punto fijo del pilar fuera de su centro), el nudo
+   * del pilar queda a un lado del eje de la viga y esa recta va inclinada, con lo que la media anchura
+   * del apoyo a lo largo de la viga salía de más (un 50 × 50 a 0,10 m del eje, 0,35 m en vez de 0,25)
+   * y la cara, dentro del vano.
+   */
   private direccionBarra(b: number): Vec2 {
-    const [i, j] = this.modelo.barras![b]!.nudos;
+    const barra = this.modelo.barras![b]!;
+    const [i, j] = barra.nudos;
     const [A, B] = [this.modelo.nudos[i]!, this.modelo.nudos[j]!];
-    const L = Math.hypot(B.x - A.x, B.y - A.y);
-    return [(B.x - A.x) / L, (B.y - A.y) / L];
+    const [di, dj] = [barra.offsets?.i, barra.offsets?.j];
+    const [dx, dy] = [B.x + (dj?.[0] ?? 0) - A.x - (di?.[0] ?? 0), B.y + (dj?.[1] ?? 0) - A.y - (di?.[1] ?? 0)];
+    const L = Math.hypot(dx, dy);
+    if (L > 1e-12) return [dx / L, dy / L];
+    const Ln = Math.hypot(B.x - A.x, B.y - A.y);
+    return [(B.x - A.x) / Ln, (B.y - A.y) / Ln];
   }
 
   /** Tramo de una polilínea en planta que pasa por P (a ≤ ε_snap), con su dirección. */

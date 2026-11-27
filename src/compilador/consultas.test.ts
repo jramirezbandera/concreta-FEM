@@ -154,6 +154,37 @@ describe("vigas por vanos (C5, criterio 5)", () => {
     expect(v.valor.axilSinValor).toBe(true);
   });
 
+  it("una viga enrasada a una cara de sus pilares (su eje a 0,10 m del de ellos): las caras de los apoyos, las mismas ±0,2 a lo largo de la viga", () => {
+    // El nudo del pilar queda a un lado del eje de la viga: la recta entre nudos va inclinada y daba
+    // una media anchura de más (la cara, dentro del vano: del lado inseguro en el momento de apoyo)
+    // Un brochal que acaba en la viga a 0,5 m de cada pilar le da nudos en su eje (como la malla de una losa)
+    const brochales = [0.5, 4.5, 5.5, 9.5, 10.5].map((x, i) => ({ id: `B${i}`, planta: "P1", puntos: [[x, 0.1], [x, 3]] as Vec2[], seccion: "v" }));
+    const e = preparar({
+      ...f,
+      pilares: [...f.pilares!, ...brochales.map((b, i): Pilar => ({ id: `PB${i}`, x: b.puntos[1]![0], y: 3, desde: "C", hasta: "P1", seccion: "p" }))],
+      vigas: [{ id: "V", planta: "P1", puntos: [[0, 0.1], [11.5, 0.1]], seccion: "v" }, ...brochales],
+    }).c;
+    const v = e.viga("V");
+    expect(v.valido).toBe(true);
+    if (!v.valido) return;
+    expect(v.valor.apoyos.map((a) => a.objeto)).toEqual(["P0", "P5", "P10"]);
+    v.valor.apoyos.forEach((a, i) => {
+      expect(a.s).toBeCloseTo(5 * i, 12);
+      expect(a.caras[0]).toBeCloseTo(5 * i - 0.2, 12);
+      expect(a.caras[1]).toBeCloseTo(5 * i + 0.2, 12);
+    });
+    const esperados = [
+      [0.2, 4.8],
+      [5.2, 9.8],
+      [10.2, 11.5],
+    ];
+    expect(v.valor.vanos.length).toBe(3);
+    v.valor.vanos.forEach((x, i) => {
+      expect(x.desde).toBeCloseTo(esperados[i]![0]!, 12);
+      expect(x.hasta).toBeCloseTo(esperados[i]![1]!, 12);
+    });
+  });
+
   it("en las caras, lo mismo que EsfuerzosPiezas a mano (bit a bit); los extremos del vano, exactos frente a un muestreo denso", () => {
     const v = c.viga("V");
     if (!v.valido) throw new Error();
