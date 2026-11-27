@@ -85,14 +85,25 @@ interface Pico {
  * la escala según lo que hay a cada lado del cero y los picos de cada tramo, sin los que pisarían a
  * otro mayor.
  */
-function bandaEsfuerzo(ts: readonly (readonly PuntoEsfuerzo[])[], X: (x: number) => number, yArriba: number, alto: number, abajo: boolean, capaz?: readonly (readonly PuntoCapacidad[])[]) {
+function bandaEsfuerzo(
+  ts: readonly (readonly PuntoEsfuerzo[])[],
+  X: (x: number) => number,
+  yArriba: number,
+  alto: number,
+  abajo: boolean,
+  capaz?: readonly (readonly PuntoCapacidad[])[],
+  /** §8.26: las caras de cada apoyo. Dentro de ellos no se rotulan picos (la viga se comprueba en la cara): se rotula el valor de la cara. */
+  apoyos: readonly (readonly [number, number])[] = [],
+  /** §8.26: el MRd dentro de los apoyos (la armadura que los atraviesa): una línea, sin relleno. */
+  capazApoyos?: readonly (readonly PuntoCapacidad[])[],
+) {
   const todo = ts.flat();
   // La escala, también con el área capaz (que no se salga de la banda)
   let [pos, neg] = [0, 0];
   for (const q of todo) [pos, neg] = [Math.max(pos, q.max), Math.max(neg, -q.min)];
   // Los picos que se rotulan, respecto a la envolvente (no al área capaz)
   const tope = Math.max(pos, neg, 1e-9);
-  for (const q of capaz?.flat() ?? []) [pos, neg] = [Math.max(pos, q.max), Math.max(neg, -q.min)];
+  for (const q of [...(capaz?.flat() ?? []), ...(capazApoyos?.flat() ?? [])]) [pos, neg] = [Math.max(pos, q.max), Math.max(neg, -q.min)];
   const k = alto / Math.max(pos + neg, 1e-9);
   const sg = abajo ? 1 : -1;
   const y0 = yArriba + (abajo ? neg : pos) * k;
@@ -100,7 +111,20 @@ function bandaEsfuerzo(ts: readonly (readonly PuntoEsfuerzo[])[], X: (x: number)
   const area = (de: (q: PuntoEsfuerzo) => number) => (todo.length ? `M ${X(todo[0]!.x)} ${y0} ${todo.map((q) => `L ${X(q.x)} ${Y(de(q))}`).join(" ")} L ${X(todo[todo.length - 1]!.x)} ${y0} Z` : "");
   const linea = (c: "max" | "min") => (todo.length ? `M ${todo.map((q) => `${X(q.x)} ${Y(q[c])}`).join(" L ")}` : "");
   const candidatos: Pico[] = [];
-  for (const t of ts) {
+  const enApoyo = (x: number) => apoyos.some(([a, b]) => x > a + 1e-9 && x < b - 1e-9);
+  for (const tramo of ts) {
+    if (!tramo.length) continue;
+    // Lo de dentro de un apoyo no cuenta: en su lugar, el valor en cada cara (interpolado)
+    const t: PuntoEsfuerzo[] = tramo.filter((q) => !enApoyo(q.x));
+    for (const x of apoyos.flat()) {
+      for (let i = 0; i + 1 < tramo.length; i++) {
+        const [a, b] = [tramo[i]!, tramo[i + 1]!];
+        if (x < a.x || x > b.x || b.x - a.x < 1e-9) continue;
+        const f = (x - a.x) / (b.x - a.x);
+        t.push({ x, max: a.max + f * (b.max - a.max), min: a.min + f * (b.min - a.min) });
+        break;
+      }
+    }
     if (!t.length) continue;
     const mas = t.reduce((a, q) => (q.max > a.max ? q : a), t[0]!);
     const menos = t.reduce((a, q) => (q.min < a.min ? q : a), t[0]!);
@@ -135,7 +159,9 @@ function bandaEsfuerzo(ts: readonly (readonly PuntoEsfuerzo[])[], X: (x: number)
       if (q.min < 0 && q.min < c.min - tol) fuera.push({ x: X(q.x), y: Y(q.min) });
     }
   }
-  return { y0, Y, area, linea, picos, en, capazLinea, capazArea, fuera };
+  const tramosApoyos = (capazApoyos ?? []).filter((t) => t.length > 1);
+  const capazApoyosLinea = (c: "max" | "min") => tramosApoyos.map((t) => `M ${t.map((q) => `${X(q.x)} ${Y(q[c])}`).join(" L ")}`).join(" ");
+  return { y0, Y, area, linea, picos, en, capazLinea, capazArea, capazApoyosLinea, fuera, yArriba, alto };
 }
 const ESFUERZOS_PORTICO = [
   { id: "My", nombre: "M", titulo: "M (kN·m): envolvente de ELU, lo positivo (tracción abajo) hacia abajo", abajo: true },
@@ -210,7 +236,10 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
   const altoEsf = verCapaz && capaz ? ALTO_ESFUERZO_CAPAZ : ALTO_ESFUERZO;
   const yEsfuerzo = (i: number) => yCota + 30 + i * altoEsf;
   const H = yCota + 20 + (curvas.length ? 10 + curvas.length * altoEsf : 0);
-  const bandas = curvas.map((e, i) => bandaEsfuerzo(esfuerzos!.esfuerzos[e.id]!, X, yEsfuerzo(i) + 30, altoEsf - 62, e.abajo, capazDe(e.id)));
+  const carasApoyos = useMemo(() => p.apoyos.filter((a) => a.caras[1] - a.caras[0] > 1e-6).map((a) => [a.caras[0], a.caras[1]] as const), [p.apoyos]);
+  const bandas = curvas.map((e, i) => bandaEsfuerzo(esfuerzos!.esfuerzos[e.id]!, X, yEsfuerzo(i) + 30, altoEsf - 62, e.abajo, capazDe(e.id), carasApoyos, e.id === "My" && verCapaz && capaz ? capaz.MyApoyos : undefined));
+  /** El apoyo en cuyo ancho cae una x (entre sus caras); null, en un vano. */
+  const apoyoEn = (x: number) => p.apoyos.find((a) => x > a.caras[0] + 1e-9 && x < a.caras[1] - 1e-9) ?? null;
   /** Lo que resiste la sección del cursor (el área capaz), para su lectura. */
   const resiste = (id: "My" | "Vz" | "T" | "N", x: number) => {
     const cz = capazDe(id);
@@ -404,6 +433,12 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
                       {g.fuera.length ? " · la envolvente pasa del área capaz" : " · área capaz (discontinua)"}
                     </tspan>
                   )}
+                  {carasApoyos.length > 0 && (
+                    <tspan className="dp-esf-combinaciones" data-nota-apoyos>
+                      {" "}
+                      · en gris, dentro de los apoyos: se comprueba en la cara
+                    </tspan>
+                  )}
                 </text>
                 {capazDe(e.id) && (
                   <g className="dp-capaz" data-capaz={e.id}>
@@ -418,6 +453,20 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
                 <path d={g.area((q) => Math.min(q.min, 0))} className="dp-esf-area" data-signo={signo("neg")} />
                 <path d={g.linea("max")} className="dp-esf-linea" data-signo={signo("pos")} />
                 <path d={g.linea("min")} className="dp-esf-linea" data-signo={signo("neg")} />
+                {/* §8.26: dentro de cada apoyo la viga no se comprueba (se comprueba en su cara): la envolvente, atenuada, y la armadura que lo atraviesa */}
+                {p.apoyos.map((a, k) =>
+                  a.caras[1] - a.caras[0] > 1e-6 ? (
+                    <rect key={`a${k}`} x={X(a.caras[0])} y={yEsfuerzo(i) + 16} width={X(a.caras[1]) - X(a.caras[0])} height={altoEsf - 34} className="dp-esf-apoyo" data-esf-apoyo={a.objeto}>
+                      <title>{`Dentro de ${a.objeto}: la viga se comprueba en la cara del apoyo, no aquí. Lo que se dibuja dentro es la ley del modelo de barras, con la reacción concentrada en el eje.${e.id === "My" ? " La línea de puntos es lo que resiste la sección con las barras que atraviesan el apoyo: la armadura de la cara tiene que seguir entera." : ""}`}</title>
+                    </rect>
+                  ) : null,
+                )}
+                {e.id === "My" && capazDe(e.id) && (
+                  <g className="dp-capaz-apoyos" data-capaz-apoyos>
+                    <path d={g.capazApoyosLinea("max")} />
+                    <path d={g.capazApoyosLinea("min")} />
+                  </g>
+                )}
                 {capazDe(e.id) && g.fuera.map((q, k) => <circle key={`f${k}`} cx={q.x} cy={q.y} r={3} className="dp-capaz-fuera" data-capaz-fuera />)}
                 {g.picos.map((c, k) => (
                   <g key={k}>
@@ -448,6 +497,7 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
                     <text x={X(cursor) + (izq ? -6 : 6)} y={yEsfuerzo(i) + 10} textAnchor={izq ? "end" : "start"} className="dp-cursor-valor">
                       {Math.abs(v.max - v.min) < 0.05 ? valorEsfuerzo(v.max) : `${valorEsfuerzo(v.min)} … ${valorEsfuerzo(v.max)}`}
                       {resiste(e.id, cursor)}
+                      {apoyoEn(cursor) ? ` · dentro de ${apoyoEn(cursor)!.objeto}: se comprueba en la cara` : ""}
                     </text>
                   </g>
                 );

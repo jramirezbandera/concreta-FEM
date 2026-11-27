@@ -98,10 +98,30 @@ describe("CO6 §8.24: el área capaz de las vigas", () => {
     expect(capacidadEn(c.T, 3)!.max).toBeCloseTo(Math.min(TRds, t.TRdMax), 9);
   });
 
+  it("§8.26: dentro de cada apoyo, el MRd con las barras que lo atraviesan: de cara a cara, casa con el de cada vano en su cara y no baja del menor de las dos", () => {
+    expect(c.MyApoyos.length).toBe(3);
+    c.MyApoyos.forEach((t, i) => {
+      const a = PORTICO.apoyos[i]!;
+      expect(t[0]!.x).toBeCloseTo(a.caras[0], 12);
+      expect(t[t.length - 1]!.x).toBeCloseTo(a.caras[1], 12);
+    });
+    // En P2 (interior): en cada cara, lo del vano de ese lado
+    const p2 = c.MyApoyos[1]!;
+    const [izq, der] = [capacidadEn(c.My, 5.8)!, capacidadEn(c.My, 6.2)!];
+    expect(p2[0]!.min).toBeCloseTo(izq.min, 9);
+    expect(p2[p2.length - 1]!.min).toBeCloseTo(der.min, 9);
+    // La superior de la cara (corrida + la de apoyo, que pasa) sigue entera dentro del apoyo
+    const menor = Math.min(-izq.min, -der.min);
+    for (const q of p2) expect(-q.min).toBeGreaterThanOrEqual(menor - 1e-9);
+    // Fuera de los vanos, `capacidadEn` de los vanos no da nada: lo de dentro del apoyo no cuenta como área capaz
+    expect(capacidadEn(c.My, 6)).toBeNull();
+  });
+
   it("sin armado, nada resiste; sin geometría (no se arma), no hay curva", () => {
     const vacio = capacidadPortico(PORTICO, despiecePortico(PORTICO, {}, DATOS), DATOS);
     expect(vacio.My.flat().every((q) => q.max === 0 && q.min === 0)).toBe(true);
     const sinG = capacidadPortico({ ...PORTICO, vanos: PORTICO.vanos.map((v) => ({ ...v, geometria: undefined })) as VanoPortico[] }, d, DATOS);
     expect(sinG.My.length).toBe(0);
+    expect(sinG.MyApoyos.length).toBe(0);
   });
 });

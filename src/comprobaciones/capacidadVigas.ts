@@ -21,8 +21,14 @@
  * decalaje). Las de piel no cuentan a flexión (tampoco en la comprobación). Los cercos, los del tramo
  * de cercos del despiece en esa x (antes del primero, los del tramo más cercano).
  *
- * Sólo en los vanos (de cara a cara de sus apoyos), y en los de hormigón rectangular. Puro: lo que se
- * comprueba no cambia; es otra forma de enseñarlo. Unidades: x en m del pórtico, kN y kN·m.
+ * En los vanos (de cara a cara de sus apoyos), y en los de hormigón rectangular. Dentro de cada apoyo
+ * (§8.26), sólo My y aparte (`MyApoyos`): el MRd de la sección de la viga con las barras que lo
+ * atraviesan, para ver que la armadura de la cara sigue entera dentro de él. Allí no es una
+ * comprobación: la viga se comprueba en la cara (CE A19 §5.3.2.2(3)) y la envolvente de dentro es la
+ * del modelo de barras, con la reacción concentrada en el eje.
+ *
+ * Puro: lo que se comprueba no cambia; es otra forma de enseñarlo. Unidades: x en m del pórtico, kN y
+ * kN·m.
  */
 import { getConcrete, getFyd } from "./concreta/data/materials.ts";
 import { getBarArea } from "./concreta/data/rebar.ts";
@@ -42,8 +48,17 @@ export interface PuntoCapacidad {
   min: number;
 }
 
-/** El área capaz de un pórtico por esfuerzo: por vano, sus puntos de izquierda a derecha (un escalón, dos puntos en la misma x). */
-export type CapacidadPortico = Record<"My" | "Vz" | "T", PuntoCapacidad[][]>;
+/**
+ * El área capaz de un pórtico por esfuerzo: por vano, sus puntos de izquierda a derecha (un escalón,
+ * dos puntos en la misma x). `MyApoyos`: el MRd dentro de cada apoyo con vigas armadas a algún lado,
+ * de cara a cara.
+ */
+export interface CapacidadPortico {
+  My: PuntoCapacidad[][];
+  Vz: PuntoCapacidad[][];
+  T: PuntoCapacidad[][];
+  MyApoyos: PuntoCapacidad[][];
+}
 
 /** Las rampas de anclaje se parten en esto para dibujarlas (MRd no es del todo lineal en As). */
 const PASOS_RAMPA = 4;
@@ -79,7 +94,7 @@ function parteBarra(b: BarraDespiece, x: number, lb: (x: number) => number): num
 
 /** El área capaz de un pórtico con su despiece (el de `despiecePortico` con el armado que se dibuja). */
 export function capacidadPortico(p: Portico, d: DespiecePortico, datos: DatosDespiece): CapacidadPortico {
-  const r: CapacidadPortico = { My: [], Vz: [], T: [] };
+  const r: CapacidadPortico = { My: [], Vz: [], T: [], MyApoyos: [] };
   const fyk = datos.fyk ?? 500;
   const fyd = getFyd(fyk);
   const vanoEn = (x: number): VanoPortico => p.vanos.reduce((m, v) => (dist(v, x) < dist(m, x) ? v : m), p.vanos[0]!);
@@ -110,17 +125,18 @@ export function capacidadPortico(p: Portico, d: DespiecePortico, datos: DatosDes
     return s;
   };
 
-  for (const v of p.vanos) {
+  /** El área capaz entre `desde` y `hasta` con la sección del vano `v` (un vano entero, o el ancho de un apoyo). */
+  const tramo = (v: VanoPortico, desde: number, hasta: number): Record<"My" | "Vz" | "T", PuntoCapacidad[]> | null => {
     const g = v.geometria;
-    if (!g) continue;
+    if (!g || !(hasta > desde)) return null;
     const mat = getConcrete(g.fck);
-    // Las x donde algo cambia: las puntas y los fines de anclaje de las barras, los tramos de cercos y los bordes del vano
-    const xs = new Set<number>([v.desde, v.hasta]);
+    // Las x donde algo cambia: las puntas y los fines de anclaje de las barras, los tramos de cercos y los bordes del tramo
+    const xs = new Set<number>([desde, hasta]);
     const escalones = new Set<number>();
-    const dentro = (x: number) => x > v.desde + EPS && x < v.hasta - EPS;
+    const dentro = (x: number) => x > desde + EPS && x < hasta - EPS;
     for (const { b, lb } of barras) {
       const [a, c] = b.x;
-      if (c < v.desde || a > v.hasta) continue;
+      if (c < desde || a > hasta) continue;
       for (const [punta, patilla, sentido] of [
         [a, b.patillas[0], 1],
         [c, b.patillas[1], -1],
@@ -154,7 +170,7 @@ export function capacidadPortico(p: Portico, d: DespiecePortico, datos: DatosDes
     const V: PuntoCapacidad[] = [];
     const T: PuntoCapacidad[] = [];
     for (const x of puntos) {
-      const s = seccionEn(Math.min(Math.max(x, v.desde), v.hasta));
+      const s = seccionEn(Math.min(Math.max(x, desde), hasta));
       const c = s.cercos;
       const oc = c?.diametro ?? 8;
       const mrd = (As: number, o: number, Ac: number, oc2: number) => {
@@ -192,10 +208,22 @@ export function capacidadPortico(p: Portico, d: DespiecePortico, datos: DatosDes
       const TRd = t ? Math.min(TRds, t.TRdMax) : 0;
       T.push({ x, max: TRd, min: -TRd });
     }
-    r.My.push(M);
-    r.Vz.push(V);
-    r.T.push(T);
+    return { My: M, Vz: V, T };
+  };
+
+  for (const v of p.vanos) {
+    const t = tramo(v, v.desde, v.hasta);
+    if (!t) continue;
+    r.My.push(t.My);
+    r.Vz.push(t.Vz);
+    r.T.push(t.T);
   }
+  // Dentro de cada apoyo, con la sección del vano de un lado (el de la izquierda, si lo hay)
+  p.apoyos.forEach((a, i) => {
+    const v = p.vanos.find((x) => x.apoyos[1] === i && x.geometria) ?? p.vanos.find((x) => x.apoyos[0] === i && x.geometria);
+    const t = v && tramo(v, a.caras[0], a.caras[1]);
+    if (t) r.MyApoyos.push(t.My);
+  });
   return r;
 }
 

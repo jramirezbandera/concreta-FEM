@@ -414,6 +414,10 @@ describe("CO6 · DOM: Comprobación", () => {
     expect(reg.pedidos.some((p) => p.tipo === "esfuerzos-portico" && p.viga === parte.pieza)).toBe(true);
     // §8.24: con ella, el área capaz del armado; si el pórtico entero cumple, la envolvente no pasa de ella
     expect(document.querySelector('[data-despiece-portico] [data-capaz="My"] path')).toBeTruthy();
+    // §8.26: dentro de cada apoyo con ancho, su banda (allí no se comprueba) y la línea de la armadura que lo atraviesa
+    expect(document.querySelectorAll('[data-despiece-portico] [data-esfuerzo="My"] [data-esf-apoyo]')).toHaveLength(dp.portico.apoyos.filter((a) => a.caras[1] - a.caras[0] > 1e-6).length);
+    expect(document.querySelector('[data-despiece-portico] [data-esfuerzo="My"] [data-capaz-apoyos] path')).toBeTruthy();
+    expect(document.querySelector('[data-despiece-portico] [data-esfuerzo="My"] [data-nota-apoyos]')?.textContent).toContain("se comprueba en la cara");
     if (dp.portico.vanos.every((v) => t.partes.find((p) => p.clave === v.clave)?.cumple)) expect(document.querySelectorAll('[data-despiece-portico] [data-esfuerzo="My"] [data-capaz-fuera]')).toHaveLength(0);
     expect(document.querySelector('[data-despiece-portico] [data-esfuerzo="Vz"]')).toBeNull();
     fireEvent.click(within(screen.getByRole("group", { name: "Esfuerzos bajo el despiece" })).getByLabelText("V"));

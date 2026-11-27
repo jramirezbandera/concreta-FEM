@@ -20,6 +20,8 @@ import type { Consultas, ExtremoDiagrama, Respuesta } from "../../compilador/con
 import type { Material, Seccion } from "../../compilador/fisico.ts";
 import type { Situacion } from "../../combinaciones/generador.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
+import { porticoDe } from "../porticos.ts";
+import { momentosEmpotramiento, type TrozoMomentos } from "./empotramiento.ts";
 import { SITUACIONES_ELU } from "./pilares.ts";
 
 /** Las zonas de un vano: el cuarto de la luz junto a cada apoyo y el centro. */
@@ -90,6 +92,13 @@ export interface DemandasVano {
   /** Algún tramo suyo lleva torsión de equilibrio (C4-k): hay que comprobarla. */
   torsionEquilibrio: boolean;
   zonas: DemandasZona[];
+  /**
+   * CO2-j: el momento de empotramiento perfecto del vano en la cara de cada apoyo por el que la viga
+   * continúa ([inicio, fin]; kN·m con su signo, el mayor en valor absoluto de las combinaciones de ELU
+   * sin sismo), para el momento mínimo del CE A19 §5.3.2.2(3). null: no hay apoyo, la viga no sigue
+   * al otro lado o no se puede calcular.
+   */
+  empotramiento: [ExtremoViga | null, ExtremoViga | null];
   /** null si no se puede: sin combinaciones de ELS o sin ningún apoyo (`sinFlecha` dice por qué). */
   flecha: FlechaVano | null;
   sinFlecha?: string;
@@ -120,6 +129,19 @@ export function demandasViga(q: Consultas, id: string, situaciones: readonly Sit
   let r = m.get(id);
   if (!r) m.set(id, (r = calcularDemandasViga(q, id, situaciones)));
   return r;
+}
+
+/**
+ * En qué apoyos del vano continúa la viga al otro lado ([inicio, fin]): otro vano del mismo pórtico
+ * (de esta viga o de la que la sigue) que se apoya en él. En un apoyo extremo, no: allí el momento es
+ * el que da la rigidez de lo que sujeta a la viga.
+ */
+function continuidad(q: Consultas, viga: string, vano: number): [boolean, boolean] {
+  const p = porticoDe(q, viga);
+  const v = p?.vanos.find((x) => x.viga === viga && x.vano === vano);
+  if (!p || !v) return [false, false];
+  const lado = (l: 0 | 1) => v.apoyos[l] !== null && p.vanos.some((w) => w !== v && w.apoyos[1 - l] === v.apoyos[l]);
+  return v.invertida ? [lado(1), lado(0)] : [lado(0), lado(1)];
 }
 
 function calcularDemandasViga(q: Consultas, id: string, situaciones: readonly Situacion[]): Respuesta<DemandasViga> {
@@ -198,6 +220,41 @@ function calcularDemandasViga(q: Consultas, id: string, situaciones: readonly Si
         if (!p.cpNegativo || neg.valor < p.cpNegativo.valor) p.cpNegativo = neg;
       });
     }
+    // ─── El momento de empotramiento perfecto en las caras con continuidad (CO2-j) ─────────────
+    const empotramiento: [ExtremoViga | null, ExtremoViga | null] = [null, null];
+    // Sólo entre dos apoyos: en un voladizo el momento del apoyo es el de la estática
+    const sigue: [boolean, boolean] = va.apoyoInicio && va.apoyoFin ? continuidad(q, id, i) : [false, false];
+    if (sigue[0] || sigue[1]) {
+      const todos = q.esfuerzosPiezas.tramos(id);
+      const suyos = todos.filter((t) => t.s1 > va.desde + 1e-9 && t.s0 < va.hasta - 1e-9).sort((a, b) => a.s0 - b.s0);
+      // Entre las caras o, si una cae en una zona rígida, desde el extremo del tramo flexible; sin huecos
+      const [xa, xb] = suyos.length ? [Math.max(va.desde, suyos[0]!.s0), Math.min(va.hasta, suyos[suyos.length - 1]!.s1)] : [0, 0];
+      const seguidos = suyos.every((t, k) => k === 0 || Math.abs(t.s0 - suyos[k - 1]!.s1) <= 1e-6);
+      for (let kc = 0; suyos.length && seguidos && xb - xa > 1e-6 && kc < elu.valor.factores.length; kc++) {
+        const f = elu.valor.factores[kc]!;
+        // Con el sismo del programa la ley no es la de unas cargas (modos combinados): no entra
+        if (!q.sup.esLineal(f)) continue;
+        const trozos: TrozoMomentos[] = [];
+        let [Ma, Mb] = [0, 0];
+        suyos.forEach((t, k) => {
+          const D = q.diagramaBarra(t.barra, f);
+          const [a, b] = [Math.max(xa, t.s0) - t.s0, Math.min(xb, t.s1) - t.s0];
+          if (!(b > a)) return;
+          if (k === 0) Ma = D.esfuerzosEn(a, 1)[4]!;
+          if (k === suyos.length - 1) Mb = D.esfuerzosEn(b, -1)[4]!;
+          const cortes = [a, ...D.estaciones().filter((y) => y > a + 1e-9 && y < b - 1e-9), b];
+          for (let j = 0; j + 1 < cortes.length; j++) trozos.push({ x0: t.s0 + cortes[j]!, x1: t.s0 + cortes[j + 1]!, M: (x) => D.esfuerzosEn(x - t.s0, 1)[4]! });
+        });
+        const m = momentosEmpotramiento(trozos, xa, xb, Ma, Mb);
+        if (!m) continue;
+        ([0, 1] as const).forEach((lado) => {
+          if (!sigue[lado] || !Number.isFinite(m[lado])) return;
+          const previo = empotramiento[lado];
+          if (!previo || Math.abs(m[lado]) > Math.abs(previo.valor)) empotramiento[lado] = { valor: m[lado], s: lado ? xb : xa, comb: elu.valor.nombres[kc]!, esfuerzos: [] };
+        });
+      }
+    }
+
     ZONAS.forEach((zona, k) => {
       const p = parciales[k]!;
       zonas.push({ zona, desde: p.desde, hasta: p.hasta, positivo: p.positivo!, negativo: p.negativo!, cortante: p.cortante!, torsion: p.torsion!, cpPositivo: p.cpPositivo ?? null, cpNegativo: p.cpNegativo ?? null });
@@ -250,6 +307,7 @@ function calcularDemandasViga(q: Consultas, id: string, situaciones: readonly Si
       apoyos: [va.apoyoInicio?.objeto ?? null, va.apoyoFin?.objeto ?? null],
       torsionEquilibrio: va.torsionEquilibrio,
       zonas,
+      empotramiento,
       flecha,
       ...(sinFlecha ? { sinFlecha } : {}),
     });

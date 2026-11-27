@@ -1,0 +1,5 @@
+== nucleo: 22 vanos, 24 caras con continuidad; el mínimo manda en 0; 0,65·M emp / M cara: mediana 0.63, de 0.34 a 0.73
+== ejemplo: 8 vanos, 0 caras con continuidad; el mínimo manda en 0; 0,65·M emp / M cara: mediana NaN, de NaN a NaN
+== vivienda: 30 vanos, 26 caras con continuidad; el mínimo manda en 0; 0,65·M emp / M cara: mediana 0.47, de -0.09 a 0.90
+== muestrario: 29 vanos, 28 caras con continuidad; el mínimo manda en 0; 0,65·M emp / M cara: mediana 0.54, de 0.24 a 0.86
+== pórtico de las pruebas de las vigas: 18 vanos, 12 caras con continuidad; el mínimo manda en 0; 0,65·M emp / M cara: mediana 0.53, de 0.47 a 0.79

@@ -1,0 +1,15 @@
+== portico-viento: 18 vanos
+   resumen antes {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}; ahora {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}
+   cambian: el armado propuesto en 0 vanos, si cumple en 0, lo pendiente en 0
+   filas que ya estaban: 0 desaparecen, 0 cambian de estado; la mayor diferencia de aprovechamiento, 0.00e+0; otras filas nuevas: 0
+   filas nuevas del momento mínimo: 12, aprovechamiento de 0.436 a 0.717 (mediana 0.463); manda en su vano en 0
+== portico-cargado-sismo: 18 vanos
+   resumen antes {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}; ahora {"vigas":10,"vanos":18,"cumplen":18,"noCumplen":0,"sinArmado":0}
+   cambian: el armado propuesto en 0 vanos, si cumple en 0, lo pendiente en 0
+   filas que ya estaban: 0 desaparecen, 0 cambian de estado; la mayor diferencia de aprovechamiento, 0.00e+0; otras filas nuevas: 0
+   filas nuevas del momento mínimo: 12, aprovechamiento de 0.327 a 0.652 (mediana 0.473); manda en su vano en 0
+== vivienda: 30 vanos
+   resumen antes {"vigas":18,"vanos":30,"cumplen":30,"noCumplen":0,"sinArmado":0}; ahora {"vigas":18,"vanos":30,"cumplen":30,"noCumplen":0,"sinArmado":0}
+   cambian: el armado propuesto en 0 vanos, si cumple en 0, lo pendiente en 0
+   filas que ya estaban: 0 desaparecen, 0 cambian de estado; la mayor diferencia de aprovechamiento, 3.33e-16 (Z-CUB-5/0 flecha-activa); otras filas nuevas: 0
+   filas nuevas del momento mínimo: 25, aprovechamiento de 0.036 a 0.806 (mediana 0.266); manda en su vano en 0

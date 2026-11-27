@@ -147,6 +147,32 @@ describe("CO2: las demandas de una viga, por zonas", () => {
     expect(q.vanoZonas("F1-X0", 9, f0).valido).toBe(false);
   });
 
+  it("CO2-j: el momento de empotramiento perfecto en las caras con continuidad es −w·L²/12 del vano entre caras con la mayor carga de ELU; en los apoyos extremos y en el voladizo, ninguno", () => {
+    const d = demandas(portico(), "F1-X0");
+    // 30 × 50 de 25 kN/m³, CM 15 y Q 10 kN/m: 1,35·(3,75 + 15) + 1,5·10
+    const w = 1.35 * (25 * 0.3 * 0.5 + 15) + 1.5 * 10;
+    const [v0, v1, v2] = d.vanos as [typeof d.vanos[number], typeof d.vanos[number], typeof d.vanos[number]];
+    // P1 es un apoyo extremo; por P3 y P5 la viga sigue (el voladizo cuenta como continuidad)
+    expect(v0.empotramiento[0]).toBeNull();
+    expect(v2.empotramiento).toEqual([null, null]);
+    for (const [e, v, s] of [
+      [v0.empotramiento[1], v0, v0.hasta],
+      [v1.empotramiento[0], v1, v1.desde],
+      [v1.empotramiento[1], v1, v1.hasta],
+    ] as const) {
+      const L = v.hasta - v.desde;
+      expect(e).not.toBeNull();
+      expect(e!.valor / ((-w * L * L) / 12)).toBeCloseTo(1, 9);
+      expect(e!.s).toBeCloseTo(s, 12);
+      expect(e!.comb.startsWith("ELU-PT")).toBe(true);
+    }
+    // Una viga de un vano entre dos pilares extremos no tiene ninguno
+    expect(demandas(portico(), "F1-Y1").vanos[0]!.empotramiento).toEqual([null, null]);
+    // Con el sismo del programa, el mismo: las combinaciones con sismo no entran
+    const s = demandas(portico({ sismo: true }), "F1-X0");
+    expect(s.vanos[1]!.empotramiento[0]!.valor).toBeCloseTo(v1.empotramiento[0]!.valor, 9);
+  });
+
   it("una viga que no existe, o que es un pilar, no tiene demandas", () => {
     const q = portico();
     expect(demandasViga(q, "V99").valido).toBe(false);

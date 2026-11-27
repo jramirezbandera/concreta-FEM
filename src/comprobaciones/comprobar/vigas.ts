@@ -110,6 +110,8 @@ export const TRACCION_MINIMA = 1;
 export const COMPRESION_RELEVANTE = 0.1;
 /** La torsión de compatibilidad se da desde esta fracción del torsor de fisuración TRd,c. */
 export const TORSION_INFORMATIVA = 0.05;
+/** El momento en la cara de un apoyo, no menos que esta parte del de empotramiento perfecto (CE A19 §5.3.2.2(3)). */
+export const FRACCION_EMPOTRAMIENTO = 0.65;
 /** La flecha total admisible: L/300 (DB SE 4.3.3.1(3), apariencia, combinación casi permanente). */
 export const FLECHA_TOTAL = 300;
 
@@ -347,6 +349,21 @@ export function comprobarVano(d: DemandasViga, v: DemandasVano, a: ArmadoViga): 
           c.elu,
         );
       }
+    }
+    // ─── El momento mínimo en la cara de un apoyo con continuidad (CO2-j, CE A19 §5.3.2.2(3)) ───
+    const emp = z.zona === "inicio" ? v.empotramiento?.[0] : z.zona === "fin" ? v.empotramiento?.[1] : null;
+    if (emp && emp.valor < -MOMENTO_MINIMO) {
+      const M = FRACCION_EMPOTRAMIENTO * -emp.valor;
+      const u = r.apoyo.MRd > 0 ? M / r.apoyo.MRd : Infinity;
+      const descripcion = "Momento minimo en la cara del apoyo: 0,65·M de empotramiento perfecto <= MRd";
+      anotar(
+        `${z.zona}/sup-empotramiento`,
+        { id: "empotramiento", description: descripcion, value: `${dec(M, 1)} kN·m (0,65 × ${dec(-emp.valor, 1)})`, limit: `${dec(Math.max(0, r.apoyo.MRd), 1)} kN·m`, utilization: u, status: toStatus(u), article: "CE Anejo 19 §5.3.2.2(3)" },
+        grupoSuperior,
+        `${nombre}, cara superior: ${descripcion}`,
+        z.zona,
+        emp,
+      );
     }
     anotar(`${z.zona}/as-max`, r.vano.checks.find((f) => f.id === "as-max")!, "seccion", `${nombre}: Armadura maxima (traccion o compresion)`, z.zona);
 

@@ -236,6 +236,34 @@ describe("CO2: comprobar un vano de viga", () => {
     expect(suben).toBeGreaterThan(0);
   });
 
+  it("CO2-j: el momento mínimo en la cara de un apoyo con continuidad es una fila de la superior de esa zona: 0,65·|M de empotramiento| / MRd", () => {
+    const d = demandas(portico(), "F1-X0");
+    const v = d.vanos[1]!;
+    const c = comprobarVano(d, v, armadoViga(ARMADO));
+    for (const [zona, k] of [["inicio", 0], ["fin", 1]] as const) {
+      const f = c.filas.find((x) => x.id === `${zona}/sup-empotramiento`)!;
+      const flexion = c.filas.find((x) => x.id === `${zona}/sup-bending`)!;
+      // El MRd, el de la fila de la flexión de esa cara: MEd / aprovechamiento
+      const MEd = -v.zonas[k === 0 ? 0 : 2]!.negativo.valor;
+      const MRd = MEd / flexion.aprovechamiento;
+      expect(f.aprovechamiento).toBeCloseTo((0.65 * -v.empotramiento[k]!.valor) / MRd, 9);
+      expect(f.grupo).toBe(zona === "inicio" ? "superiorInicio" : "superiorFin");
+      expect(f.articulo).toBe("CE Anejo 19 §5.3.2.2(3)");
+      expect(f.comb).toBe(v.empotramiento[k]!.comb);
+    }
+    // En el apoyo extremo del primer vano no hay fila; en el voladizo, tampoco
+    const c0 = comprobarVano(d, d.vanos[0]!, armadoViga(ARMADO));
+    expect(c0.filas.some((x) => x.id === "inicio/sup-empotramiento")).toBe(false);
+    expect(c0.filas.some((x) => x.id === "fin/sup-empotramiento")).toBe(true);
+    expect(comprobarVano(d, d.vanos[2]!, armadoViga(ARMADO)).filas.some((x) => x.id.endsWith("sup-empotramiento"))).toBe(false);
+    // Con el momento del modelo por debajo, es la que manda la superior: falla ella y dice qué armadura
+    const poco = comprobarVano({ ...d }, { ...v, empotramiento: [{ ...v.empotramiento[0]!, valor: -400 }, null] }, armadoViga(ARMADO));
+    const fila = poco.filas.find((x) => x.id === "inicio/sup-empotramiento")!;
+    expect(fila.estado).toBe("fail");
+    expect(fila.grupo).toBe("superiorInicio");
+    expect(poco.filas.some((x) => x.id === "fin/sup-empotramiento")).toBe(false);
+  });
+
   it("un vano sin armado no cumple", () => {
     const d = demandas(portico(), "F1-X0");
     const c = comprobarViga(d, (v) => (v.indice === 0 ? armadoViga(ARMADO) : null));
@@ -274,6 +302,7 @@ const vano = (o: Parameters<typeof zona>[1] = {}, torsionEquilibrio = false): De
   apoyos: ["P1", "P2"],
   torsionEquilibrio,
   zonas: [zona("inicio", o), zona("centro", o), zona("fin", o)],
+  empotramiento: [null, null],
   flecha: null,
   sinFlecha: "sin flecha en esta prueba",
 });
