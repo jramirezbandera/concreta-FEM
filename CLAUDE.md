@@ -1216,7 +1216,7 @@
   - **Comprobar:** VRd,c sin cercos por cara traccionada (la de mayor momento de ELU en la estación), con la fórmula del módulo y el As y el d de esa cara; cercos en los ábacos (`en: "abacos"`) y en una maciza con sus ramas por metro, con h ≥ 200 mm y st ≤ 1,5·d (§9.3.2).
   - **Proponer:** el cortante de un ábaco o una maciza entra en las zonas de refuerzo de su cara (hasta Ø16); lo que no basta, a una zona de cercos (`tablaCercosLosa`); con menos de 200 mm, sin propuesta. Lo que queda sin propuesta llega a la ficha, que ya no dice «todo cumple».
   - **Resultado:** la vivienda cumple con un refuerzo superior Ø8/150 en el ábaco de P2, sin cercos; las zonas de cercos de los nervios encogen. Referencias de CO3 y CO4 regeneradas a sabiendas (`validacion/co/out_cambiosCortante.txt`).
-  - **Por confirmar por el usuario:** la cara traccionada como la dominante (no la concomitante) y la tabla de cercos de las losas.
+  - **Confirmada por el usuario el 2026-11-28:** la cara traccionada, la de mayor momento de ELU en la estación (no la concomitante del cortante). **Por confirmar:** la tabla de cercos de las losas.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

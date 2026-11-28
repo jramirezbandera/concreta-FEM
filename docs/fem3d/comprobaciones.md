@@ -1189,7 +1189,7 @@ En el empalme, el área capaz no baja: con el solape de 1,5·lb, entre las dos p
 
 **Validación** (`losas.test.ts`): la fila del cortante es, por cara, la peor de V/VRd,c con la fórmula del Código y el As y el d del módulo llamado estación a estación; en un vano corto con mucha carga, un refuerzo de hasta Ø16 si basta (y sin él no cumple), cercos con sus ramas por metro si no (sin ellos, o un puesto más abajo en la tabla, no cumple; con 2 ramas por metro falla la separación transversal), y una losa de 18 cm queda sin propuesta. Lo que no vale de los cercos por metro (sin ramas, `en` en una maciza) se dice.
 
-**Por confirmar por el usuario:** la cara traccionada como la de mayor momento de ELU en la estación (con Wood–Armer las dos caras pueden tener momento: se toma la dominante, no la concomitante de la combinación del cortante) y la tabla de cercos de las losas.
+**Confirmada por el usuario el 2026-11-28:** la cara traccionada es la de mayor momento de ELU en la estación (con Wood–Armer las dos caras pueden tener momento: se toma la dominante, no la concomitante de la combinación del cortante). **Por confirmar:** la tabla de cercos de las losas.
 
 ## 9. Fuera de esta fase
 
