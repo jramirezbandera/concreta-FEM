@@ -2,29 +2,33 @@
  * El gestor de plantas (GE3, `docs/fem3d/gestores.md` §3.5), como la introducción de plantas de
  * CYPECAD. A la izquierda, el alzado esquemático del edificio a escala (SVG), con la cota de cada
  * forjado y la altura entre plantas acotada, y en azul lo que se va a añadir antes de añadirlo; un
- * clic elige una planta. A la derecha, o se añaden plantas (qué, dónde y con qué nombres) o se ven
- * los datos de la elegida (su formulario, el del inspector).
+ * clic elige una planta. A la derecha, o se añaden plantas o se edita la elegida (su formulario, el
+ * del inspector).
+ *
+ * Los formularios van en filas, con el nombre a la izquierda y, a la derecha, una nota corta que dice
+ * lo que hace falta saber (de la prueba de uso del 2026-11-28: los «?» con párrafos y la caja de
+ * bienvenida no explicaban nada). Debajo, lo que va a pasar en una frase: qué plantas se crean, a qué
+ * cota, y cuáles suben.
  *
  * Con un proyecto que empieza (`pedido.inicio`, al crearlo, con su planta sobre la cimentación), lo
  * primero es cuántas plantas tiene, de qué altura y dónde va la ±0,00 (`plantasEdificio`): sin plantas
  * no se dibuja nada.
  *
  * La cota de una planta se escribe en sus datos (`moverCota`): mueve sólo su forjado, y 0 la hace la
- * ±0,00. Debajo de la ficha se dice cuál es la ±0,00 y por qué.
+ * ±0,00. Debajo de la ficha se dice cuál es la ±0,00.
  *
  * Los datos de una planta van al modelo con «Aplicar», como en los demás gestores (`auditoria-ui.md`,
  * D-19), y no se tiran sin preguntar.
  *
  * Las alturas y el orden salen de `src/editor/plantas.ts`; aquí sólo se pinta.
  */
-import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Table2 } from "lucide-react";
 import type { Planta, TipoPlanta } from "../../../src/compilador/fisico.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
 import { textoUsos, usosDe } from "../../../src/editor/gestores.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { insertarPlantas, MAX_PLANTAS_NUEVAS, plantasEdificio, type InsercionPlantas } from "../../../src/editor/plantas.ts";
-import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt, plural } from "../fmt.ts";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
@@ -36,26 +40,25 @@ import { Grupo } from "../componentes/Grupo.tsx";
 
 const leer = (t: string): number => (t.trim() === "" ? NaN : Number(t.trim().replace(",", ".")));
 const TIPOS: readonly [TipoPlanta | "", string][] = [
-  ["", "planta"],
-  ["sotano", "sótano"],
-  ["cubierta", "cubierta"],
-  ["escalon", "escalón"],
+  ["", "Planta"],
+  ["sotano", "Sótano"],
+  ["cubierta", "Cubierta"],
+  ["escalon", "Escalón"],
 ];
+/** Lo que es cada tipo, en una línea, junto al desplegable. */
+const NOTA_TIPO: Readonly<Record<string, string>> = {
+  "": "un forjado normal",
+  sotano: "por debajo de la ±0,00",
+  cubierta: "no avisa si le falta la sobrecarga",
+  escalon: "muy cerca del de debajo, sin aviso de altura",
+};
 
 type Modo = "inicio" | "anadir" | "datos";
 
-/** Lo que dice el «?» de cada campo (la ayuda en un globo, no un texto debajo). */
-const AYUDA = {
-  plantas: "Cuántas plantas tiene el edificio sobre la cimentación, contando la cubierta. Cada planta es un forjado: sus pilares, vigas, forjados y cargas se dibujan en ella.",
-  primera: "De la cimentación a la cara superior del primer forjado. La cota de una planta es la cara superior de su forjado.",
-  demas: "De cara superior a cara superior de forjado, igual en todas. Con una sola planta no se usa.",
-  cero: "La cota ±0,00. En la primera planta: la cimentación queda por debajo, a la cota negativa de la primera altura (es un sótano). En la cimentación: todas las cotas son positivas. Sólo cambian las cotas que se ven, no el cálculo; se puede cambiar después escribiendo 0 en la cota de otra planta.",
-  cuantas: `De 1 a ${MAX_PLANTAS_NUEVAS}, todas con la misma altura y el mismo tipo.`,
-  altura: "De forjado a forjado (cara superior a cara superior): la de cada planta nueva hasta la de encima.",
-  tipo: "Planta, sótano o cubierta. Un sótano cambia el origen de las cotas: la ±0,00 queda en la planta más baja que no es sótano. Una cubierta no tiene que llevar la sobrecarga de las demás plantas (no se avisa si le falta).",
-  donde: "Encima: las nuevas van sobre la elegida y lo que hay encima sube. Debajo: van bajo ella, y ésta y lo que hay encima suben. La planta también se elige con un clic en el alzado.",
-  prefijo: "Los ids de las plantas nuevas: el prefijo y el primer número libre (N1, N2…). Las piezas y las cargas citan su planta por el id; se puede cambiar después.",
-};
+/** «N2», «N2 y N3», «N2, N3 y N4». */
+function lista(ids: readonly string[]): string {
+  return ids.length < 2 ? (ids[0] ?? "") : `${ids.slice(0, -1).join(", ")} y ${ids[ids.length - 1]}`;
+}
 
 export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
   const { proyecto, pedirTabla, setPlanta } = useVisor();
@@ -109,13 +112,11 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
 
   const anadir = () => {
     if (!r.ok) return setError(r.mensaje);
-    const texto =
-      modo === "inicio"
-        ? `${plural(r.plantas.length - 1, "planta")} sobre ${r.plantas[r.plantas.length - 1]!.id}`
-        : `${r.ids.length > 1 ? `Plantas ${r.ids.join(", ")}` : `Planta ${r.ids[0]}`} ${donde} de ${de}`;
-    if (!terminar(r.ids[0] ?? de, [r.operacion], texto)) return;
+    const sobre = r.plantas.length - 1;
+    const etiqueta = modo === "inicio" ? `Crear ${plural(sobre, "planta")} sobre la cimentación` : `Añadir ${lista(r.ids)} ${donde} de ${de}`;
+    if (!terminar(r.ids[0] ?? de, [r.operacion], etiqueta)) return;
     setError(null);
-    setAviso(`${texto}.`);
+    setAviso(modo === "inicio" ? `${plural(sobre, "planta creada", "plantas creadas")} sobre la cimentación.` : `${lista(r.ids)} ${r.ids.length > 1 ? "añadidas" : "añadida"} ${donde} de ${de}.`);
     setN("1");
     // Después, los datos de una planta y «Hecho» (`auditoria-ui.md`, UI-8): seguir en «Añadir», con la
     // primera nueva elegida y el número de antes, metía plantas en medio con un segundo clic
@@ -156,9 +157,10 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
     if (!actual) return;
     const id = actual.id;
     setError(null);
-    if (ficha.current?.aplicar()) setAviso(`${id}: cambiada.`);
+    if (ficha.current?.aplicar()) setAviso(`${id}: cambios aplicados.`);
     else setError("No se ha aplicado: falta o no vale lo marcado.");
   };
+  const nCero = cotaCero(plantas);
 
   return (
     <>
@@ -171,7 +173,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
         fondoCierra={modo !== "inicio" && !pendiente}
         pie={
           <>
-            <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("plantas"))} title="Para cambiar muchas a la vez o pegar de Excel">
+            <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("plantas"))} title="Abrir la tabla: para cambiar muchas a la vez o pegar de Excel">
               <Table2 size={14} />
               Abrir la tabla
             </button>
@@ -210,20 +212,20 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
       >
         <Alzado plantas={vista} nuevas={nuevas} elegida={nuevas.size || !actual ? null : actual.id} onElegir={elegir} />
         <div
-          className="ges-ficha"
+          className="ges-ficha gp-ficha"
           onKeyDown={(e) => {
             if (e.key === "Enter" && enCurso && e.target instanceof HTMLInputElement && e.target.closest("[data-anadir]")) anadir();
           }}
         >
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
           {modo !== "inicio" && (
-            <Grupo rol="tablist" etiqueta="Añadir o ver los datos" className="seg mb-3">
+            <Grupo rol="tablist" etiqueta="Añadir plantas o editar la elegida" className="seg gp-pestanas">
               <button type="button" role="tab" aria-selected={modo === "anadir"} data-on={modo === "anadir"} onClick={() => antes(() => (ficha.current?.descartar(), setModo("anadir"), setAviso(null)))}>
                 Añadir plantas
               </button>
               {actual && (
                 <button type="button" role="tab" aria-selected={modo === "datos"} data-on={modo === "datos"} onClick={() => (setModo("datos"), setAviso(null))}>
-                  Datos de {actual.id}
+                  Editar {actual.id}
                 </button>
               )}
             </Grupo>
@@ -237,49 +239,37 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
 
           {modo === "inicio" && (
             <div className="gp-form" data-anadir>
-              <p className="ges-bienvenida">
-                <strong>Empiece por las plantas.</strong> Todo lo que se dibuja va en una: diga cuántas tiene el edificio sobre la cimentación y de qué altura. Después podrá añadir más encima o debajo, y sótanos, desde «Plantas» en la barra.
-              </p>
-              <section className="gp-sec">
-                <h3>El edificio</h3>
-                <div className="gp-fila">
-                  <label className="gp-campo gp-corto">
-                    <span>
-                      Plantas <Ayuda texto={AYUDA.plantas} />
-                    </span>
-                    <input value={n} inputMode="numeric" aria-label="Número de plantas sobre la cimentación" data-error={!r.ok && !(leer(n) >= 1)} onChange={(e) => setN(e.target.value)} autoFocus />
-                  </label>
-                  <label className="gp-campo">
-                    <span>
-                      La primera <Ayuda texto={AYUDA.primera} />
-                    </span>
-                    <span className="gp-unidad" data-unidad="m">
-                      <input value={alturaBaja} inputMode="decimal" aria-label="Altura de la primera planta, m" data-error={!r.ok && !(leer(alturaBaja) > 0)} onChange={(e) => setAlturaBaja(e.target.value)} />
-                    </span>
-                  </label>
-                  <label className="gp-campo">
-                    <span>
-                      Las demás <Ayuda texto={AYUDA.demas} />
-                    </span>
-                    <span className="gp-unidad" data-unidad="m">
-                      <input value={altura} inputMode="decimal" aria-label="Altura de las demás plantas, m" disabled={leer(n) <= 1} data-error={!r.ok && leer(n) > 1 && !(leer(altura) > 0)} onChange={(e) => setAltura(e.target.value)} />
-                    </span>
-                  </label>
-                </div>
-                <div className="gp-fila">
-                  <span className="gp-etiqueta">
-                    La ±0,00, en <Ayuda texto={AYUDA.cero} />
-                  </span>
+              <header className="gp-cab">
+                <h3>¿Cuántas plantas tiene el edificio?</h3>
+                <p>Todo se dibuja en una planta. Más adelante podrá añadir, quitar o cambiar cada una.</p>
+              </header>
+              <div className="gp-rejilla">
+                <Linea etiqueta="Plantas sobre la cimentación" nota="contando la cubierta">
+                  <input className="gp-num" value={n} inputMode="numeric" aria-label="Número de plantas sobre la cimentación" data-error={!r.ok && !(leer(n) >= 1)} onChange={(e) => setN(e.target.value)} autoFocus />
+                </Linea>
+                <Linea etiqueta="Altura de la primera" nota="de la cimentación al primer forjado">
+                  <Metros valor={alturaBaja} etiqueta="Altura de la primera planta, m" mal={!r.ok && !(leer(alturaBaja) > 0)} onCambio={setAlturaBaja} />
+                </Linea>
+                <Linea etiqueta="Altura de las demás" nota={leer(n) <= 1 ? "con una planta no hace falta" : "de forjado a forjado, todas iguales"}>
+                  <Metros valor={altura} etiqueta="Altura de las demás plantas, m" desactivado={leer(n) <= 1} mal={!r.ok && leer(n) > 1 && !(leer(altura) > 0)} onCambio={setAltura} />
+                </Linea>
+                <Linea
+                  etiqueta="Cota ±0,00"
+                  como="div"
+                  ancho
+                  nota={cero === "cimentacion" ? "todas las cotas, positivas" : leer(alturaBaja) > 0 ? `la cimentación queda a ${cota(-leer(alturaBaja))}` : "la cimentación queda por debajo"}
+                >
                   <Grupo rol="radiogroup" etiqueta="Dónde va la cota ±0,00" className="seg gp-seg">
-                    {(["primera", "cimentacion"] as const).map((c) => (
+                    {(["cimentacion", "primera"] as const).map((c) => (
                       <button key={c} type="button" role="radio" aria-checked={cero === c} data-on={cero === c} onClick={() => setCero(c)}>
-                        {c === "primera" ? "la primera planta" : "la cimentación"}
+                        {c === "primera" ? "En la primera planta" : "En la cimentación"}
                       </button>
                     ))}
                   </Grupo>
-                </div>
-              </section>
-              <Nombres prefijo={prefijo} setPrefijo={setPrefijo} r={r} />
+                </Linea>
+                <Prefijo prefijo={prefijo} setPrefijo={setPrefijo} r={r} />
+              </div>
+              <Resumen r={r} antes={plantas} inicio />
               <button type="button" className="gp-enlace" onClick={() => setModo("anadir")}>
                 Prefiero añadirlas de una en una
               </button>
@@ -288,42 +278,23 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
 
           {modo === "anadir" && (
             <div className="gp-form" data-anadir>
-              <section className="gp-sec">
-                <h3>Qué plantas</h3>
-                <div className="gp-fila">
-                  <label className="gp-campo gp-corto">
-                    <span>
-                      Cuántas <Ayuda texto={AYUDA.cuantas} />
-                    </span>
-                    <input value={n} inputMode="numeric" aria-label="Número de plantas nuevas" data-error={!r.ok && !(leer(n) >= 1)} onChange={(e) => setN(e.target.value)} />
-                  </label>
-                  <label className="gp-campo">
-                    <span>
-                      Altura <Ayuda texto={AYUDA.altura} />
-                    </span>
-                    <span className="gp-unidad" data-unidad="m">
-                      <input value={altura} inputMode="decimal" aria-label="Altura de las plantas nuevas, m" data-error={!r.ok && !(leer(altura) > 0)} onChange={(e) => setAltura(e.target.value)} />
-                    </span>
-                  </label>
-                  <label className="gp-campo">
-                    <span>
-                      Tipo <Ayuda texto={AYUDA.tipo} />
-                    </span>
-                    <select className="sel" value={tipo} aria-label="Tipo de las plantas nuevas" onChange={(e) => setTipo(e.target.value as TipoPlanta | "")}>
-                      {TIPOS.map(([v, t]) => (
-                        <option key={v} value={v}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </section>
-              <section className="gp-sec">
-                <h3>
-                  Dónde <Ayuda texto={AYUDA.donde} />
-                </h3>
-                <div className="gp-fila">
+              <div className="gp-rejilla">
+                <Linea etiqueta="Cuántas" nota={`de 1 a ${MAX_PLANTAS_NUEVAS}, iguales`}>
+                  <input className="gp-num" value={n} inputMode="numeric" aria-label="Número de plantas nuevas" data-error={!r.ok && !(leer(n) >= 1)} onChange={(e) => setN(e.target.value)} />
+                </Linea>
+                <Linea etiqueta="Altura" nota="de cada una, de forjado a forjado">
+                  <Metros valor={altura} etiqueta="Altura de las plantas nuevas, m" mal={!r.ok && !(leer(altura) > 0)} onCambio={setAltura} />
+                </Linea>
+                <Linea etiqueta="Tipo" nota={NOTA_TIPO[tipo]}>
+                  <select className="sel gp-sel" value={tipo} aria-label="Tipo de las plantas nuevas" onChange={(e) => setTipo(e.target.value as TipoPlanta | "")}>
+                    {TIPOS.map(([v, t]) => (
+                      <option key={v} value={v}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </Linea>
+                <Linea etiqueta="Dónde" como="div" ancho>
                   <Grupo rol="radiogroup" etiqueta="Encima o debajo" className="seg gp-seg">
                     {(["encima", "debajo"] as const).map((d) => (
                       <button key={d} type="button" role="radio" aria-checked={donde === d} data-on={donde === d} onClick={() => setDonde(d)}>
@@ -331,26 +302,36 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                       </button>
                     ))}
                   </Grupo>
-                  <label className="gp-campo gp-ancho">
-                    <select className="sel" value={de} aria-label="Planta de referencia" onChange={(e) => elegir(e.target.value)}>
-                      {plantas.map((p, i) => (
-                        <option key={p.id} value={p.id}>
-                          {`${p.id} · ${cota(cotas[i] ?? null)}`}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </section>
-              <Nombres prefijo={prefijo} setPrefijo={setPrefijo} r={r} />
+                  <select className="sel gp-sel" value={de} aria-label="Planta de referencia" title="La planta también se elige con un clic en el alzado" onChange={(e) => elegir(e.target.value)}>
+                    {plantas.map((p, i) => (
+                      <option key={p.id} value={p.id}>
+                        {`${p.id} · ${cota(cotas[i] ?? null)}`}
+                      </option>
+                    ))}
+                  </select>
+                </Linea>
+                <Prefijo prefijo={prefijo} setPrefijo={setPrefijo} r={r} />
+              </div>
+              <Resumen r={r} antes={plantas} />
             </div>
           )}
 
           {modo === "datos" && actual && (
             <>
-              <FormularioObjeto id={actual.id} tabla="plantas" diferido={{ control: ficha, alCambiar }} />
-              <p className="ges-usos">{textoCero(plantas, actual.id)}</p>
-              <p className="ges-usos">{usos.length ? `La usan ${textoUsos(usos)}.` : "No la usa ningún objeto."}</p>
+              <FormularioObjeto id={actual.id} tabla="plantas" diferido={{ control: ficha, alCambiar }} sinTitulo />
+              <dl className="gp-info">
+                <div>
+                  <dt>Cota ±0,00</dt>
+                  <dd>
+                    {nCero === actual.id ? `Esta planta, ${actual.id}` : (nCero ?? "—")}
+                    <small>La planta más baja que no es sótano. Para cambiarla, escriba 0 en la cota de otra.</small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>La usan</dt>
+                  <dd>{usos.length ? textoUsos(usos) : "Nada todavía"}</dd>
+                </div>
+              </dl>
             </>
           )}
           {error && (
@@ -376,44 +357,103 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
   );
 }
 
-/** Cuál es la ±0,00 y cómo se cambia, dicho desde la planta `id`. */
-function textoCero(plantas: readonly Planta[], id: string): string {
+/** La ±0,00: la planta más baja que no es sótano. */
+function cotaCero(plantas: readonly Planta[]): string | undefined {
   let o = plantas.length - 1;
   while (o > 0 && plantas[o]!.tipo === "sotano") o--;
-  const cero = plantas[o]?.id;
-  if (!cero) return "";
-  if (cero === id) return `${id} es la ±0,00: la planta más baja que no es sótano. Las cotas se miden desde ella; para que la ±0,00 sea otra, escriba 0 en su cota.`;
-  return `La ±0,00 es ${cero} (la planta más baja que no es sótano). La cota de ${id} mueve sólo su forjado; con 0, ${id} pasa a ser la ±0,00.`;
+  return plantas[o]?.id;
 }
 
-/** El prefijo de los ids y, debajo, las plantas que salen con su cota (o por qué no salen). */
-function Nombres({ prefijo, setPrefijo, r }: { prefijo: string; setPrefijo: (v: string) => void; r: InsercionPlantas }) {
-  const cotas = r.ok ? cotasPlantas(r.plantas) : [];
-  const cotaDe = (id: string) => (r.ok ? cota(cotas[r.plantas.findIndex((p) => p.id === id)] ?? null) : "");
+/**
+ * Una fila del formulario: el nombre a la izquierda, el control y una nota corta. Un `<label>` (un
+ * clic en el nombre lleva al campo) salvo con botones dentro (`como="div"`), que el `<label>` pulsaría.
+ */
+function Linea({ etiqueta, nota, como = "label", ancho, children }: { etiqueta: string; nota?: ReactNode; como?: "label" | "div"; ancho?: boolean; children: ReactNode }) {
+  const Caja = como;
   return (
-    <section className="gp-sec">
-      <h3>Nombres</h3>
-      <div className="gp-fila">
-        <label className="gp-campo gp-corto">
-          <span>
-            Prefijo <Ayuda texto={AYUDA.prefijo} />
+    <Caja className="gp-linea" data-ancho={ancho || undefined}>
+      <span className="gp-et">{etiqueta}</span>
+      {/* A lo ancho (botones y una lista), la nota va detrás en la misma celda: si no, ensancharía la columna de los campos */}
+      <span className="gp-ctl">
+        {children}
+        {ancho && nota !== undefined && <small className="gp-nota">{nota}</small>}
+      </span>
+      {!ancho && nota !== undefined && <small className="gp-nota">{nota}</small>}
+    </Caja>
+  );
+}
+
+/** Un campo en metros, con la unidad dentro. */
+function Metros({ valor, etiqueta, mal, desactivado, onCambio }: { valor: string; etiqueta: string; mal: boolean; desactivado?: boolean; onCambio: (v: string) => void }) {
+  return (
+    <span className="gp-unidad" data-unidad="m">
+      <input className="gp-num gp-m" value={valor} inputMode="decimal" aria-label={etiqueta} disabled={desactivado} data-error={mal} onChange={(e) => onCambio(e.target.value)} />
+    </span>
+  );
+}
+
+/** El prefijo de los ids de las plantas nuevas, con los que salen. */
+function Prefijo({ prefijo, setPrefijo, r }: { prefijo: string; setPrefijo: (v: string) => void; r: InsercionPlantas }) {
+  return (
+    <Linea etiqueta="Nombres" nota={r.ok && r.ids.length ? `se llamarán ${r.ids.length > 3 ? `${r.ids[0]} … ${r.ids[r.ids.length - 1]}` : lista(r.ids)}` : "prefijo y el primer número libre"}>
+      <input className="gp-num" value={prefijo} aria-label="Prefijo de los ids" data-error={!r.ok && !prefijo.trim()} onChange={(e) => setPrefijo(e.target.value)} />
+    </Linea>
+  );
+}
+
+/**
+ * Lo que va a pasar, en una o dos frases: las plantas que se crean con su cota y las que ya había y
+ * cambian de cota (las de encima suben). Al empezar una obra, el edificio entero. O por qué no se puede.
+ */
+function Resumen({ r, antes, inicio }: { r: InsercionPlantas; antes: readonly Planta[]; inicio?: boolean }) {
+  if (!r.ok)
+    return (
+      <p className="gp-resumen" data-mal>
+        {r.mensaje}
+      </p>
+    );
+  const cs = cotasPlantas(r.plantas);
+  const cotaDe = (id: string) => cota(cs[r.plantas.findIndex((p) => p.id === id)] ?? null);
+  const nuevas = [...r.ids].reverse();
+  if (inicio) {
+    const cim = r.plantas[r.plantas.length - 1]!;
+    const sobre = r.plantas.slice(0, -1).reverse();
+    return (
+      <p className="gp-resumen" aria-label="Plantas que se crean">
+        {sobre.map((p, i) => (
+          <span key={p.id}>
+            {i > 0 && (i === sobre.length - 1 ? " y " : ", ")}
+            <b>{p.id}</b> a {cotaDe(p.id)}
           </span>
-          <input value={prefijo} aria-label="Prefijo de los ids" data-error={!r.ok && !prefijo.trim()} onChange={(e) => setPrefijo(e.target.value)} />
-        </label>
-        {r.ok ? (
-          <ul className="gp-nuevas" aria-label="Plantas que se crean">
-            {[...r.ids].reverse().map((id) => (
-              <li key={id}>
-                <b>{id}</b>
-                {cotaDe(id)}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="gp-mal">{r.mensaje}</p>
-        )}
-      </div>
-    </section>
+        ))}
+        {`; la cimentación, ${cim.id}, a ${cotaDe(cim.id)}.`}
+      </p>
+    );
+  }
+  const cs0 = cotasPlantas(antes);
+  const mueven = antes.flatMap((p, i) => {
+    const a = cs0[i];
+    const j = r.plantas.findIndex((x) => x.id === p.id);
+    const b = cs[j];
+    return a === null || a === undefined || b === null || b === undefined || Math.abs(b - a) < 1e-9 ? [] : [{ id: p.id, d: b - a }];
+  });
+  const verbo = (d: number, k: number) => (d > 0 ? (k === 1 ? "Sube" : "Suben") : k === 1 ? "Baja" : "Bajan");
+  const igual = mueven.length > 0 && mueven.every((x) => Math.abs(x.d - mueven[0]!.d) < 1e-9);
+  return (
+    <p className="gp-resumen" aria-label="Plantas que se crean">
+      {nuevas.length === 1 ? "Se crea " : "Se crean "}
+      {nuevas.map((id, i) => (
+        <span key={id}>
+          {i > 0 && (i === nuevas.length - 1 ? " y " : ", ")}
+          <b>{id}</b> a {cotaDe(id)}
+        </span>
+      ))}
+      .
+      {mueven.length > 0 &&
+        (igual
+          ? ` ${verbo(mueven[0]!.d, mueven.length)} ${fmt(Math.abs(mueven[0]!.d), 2)} m: ${lista(mueven.map((x) => x.id))}.`
+          : ` Cambian de cota ${lista(mueven.map((x) => x.id))}.`)}
+    </p>
   );
 }
 

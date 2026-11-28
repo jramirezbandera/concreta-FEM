@@ -226,16 +226,37 @@ const plantas: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sótano, cubierta o escalón (un forjado a poca altura del de debajo, como el escalón entre dos cubiertas: no se avisa de esa altura)", opciones: fijas(["planta", "sotano", "cubierta", "escalon"], "planta") },
-    { clave: "altura", titulo: "altura", unidad: "m", ayuda: "la del tramo de debajo: de su forjado al de la planta de debajo, como en un alzado; vacía en la más baja. En una fila nueva, que va abajo del todo, la del tramo que la une a la de encima" },
+    {
+      clave: "tipo",
+      titulo: "tipo",
+      ayuda: "Cubierta: no avisa si le falta la sobrecarga de uso. Sótano: queda por debajo de la ±0,00. Escalón: un forjado muy cerca del de debajo (dos cubiertas a distinta altura), sin aviso por su poca altura",
+      opciones: fijas(["planta", "sotano", "cubierta", "escalon"], "planta"),
+    },
+    {
+      clave: "altura",
+      titulo: "altura",
+      nombre: "Altura de la planta",
+      unidad: "m",
+      ayuda: "De la cara superior del forjado de debajo a la de éste; la más baja no tiene. En una fila nueva, que va abajo del todo, la que la separa de la de encima",
+    },
     {
       clave: "cota",
       titulo: "cota",
       unidad: "m",
       derivada: true,
-      ayuda: "la de la cara superior de su forjado. Escribirla mueve sólo ese forjado: cambian las alturas de sus tramos de debajo y de encima, y las demás plantas se quedan donde están. Con 0, esa planta pasa a ser la ±0,00 y las de debajo, sótanos. La ±0,00 (la más baja que no es sótano) sólo puede bajar: pasa a sótano y la ±0,00 es la de encima (la cimentación a −4,30 bajo la planta baja)",
+      ayuda: "La de la cara superior del forjado. Al cambiarla se mueve sólo este forjado: cambian su altura y la de la planta de encima. Con 0, esta planta pasa a ser la ±0,00",
     },
-    { clave: "diafragma", titulo: "diafragma", ayuda: "rígido: el forjado no se deforma en su plano y los nudos se mueven juntos en horizontal (lo normal en un forjado de hormigón continuo). Ninguno: lo ata en su plano la propia losa (semirrígido) o, sin losa, sólo las vigas; para plantas sin forjado continuo, con huecos grandes o muy alargadas, o si se quieren los axiles de las vigas, la membrana de la losa o diagonales en el plano. Vacío: rígido salvo en la más baja, donde arrancan los pilares", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
+    {
+      clave: "diafragma",
+      titulo: "diafragma",
+      ayuda: "Rígido: el forjado no se deforma en su plano, lo normal en un forjado de hormigón continuo. Ninguno: lo atan sólo la losa o las vigas; para plantas sin forjado continuo, con huecos grandes o muy alargadas. Automático: rígido en todas salvo en la más baja, donde arrancan los pilares",
+      opciones: (ctx, f) => {
+        const ps = ctx.modelo.plantas;
+        const id = (f?.id ?? "").trim();
+        const auto = !id ? "automático" : ps[ps.length - 1]?.id === id ? "automático: ninguno, es la más baja" : "automático: rígido";
+        return [{ valor: "", texto: `(${auto})` }, ...fijas(["rigido", "ninguno"])()];
+      },
+    },
   ],
   fila(o, ctx) {
     const p = o as unknown as Planta;

@@ -1229,6 +1229,11 @@
   - **Queda a la vista:** espacios, la paleta, deshacer y rehacer, el guardado, el estado del cálculo («Calcular» si falta) y «⋯».
   - Pruebas de `app/` adaptadas (185 pasan); los bancos de Chrome de i1, v1 y al, adaptados y sin pasar.
 - **2026-11-28: Mover y Copiar también en el alzado** (de la prueba de uso: Copiar no hacía nada desde un alzado, sólo Barra dibujaba en él). En un alzado, lo horizontal va a lo largo del plano (el desplazamiento de los puntos del modelo enganchados, bit a bit) y lo vertical, en plantas enteras (`niveles` de `transformar`: planta, base, cabeza y tramos de pilares y muros y extremos de barras; los ejes no; error si algo se sale del edificio; los ábacos no cambian de planta). Girar y Simetría dicen que van en planta. Prueba: `app/src/test/editarAlzado.test.ts`; comprobado en la app con la vivienda.
+- **2026-11-28: el gestor de plantas, rehecho** (de la prueba de uso: textos liosos y aspecto descuidado; `app/src/editor/GestorPlantas.tsx`). Sólo la app; el modelo no cambia.
+  - **Formularios en filas:** el nombre a la izquierda, el control y una nota corta a la derecha («de la cimentación al primer forjado»), sin «?» con párrafos ni caja de bienvenida; debajo, lo que va a pasar en una frase (`Resumen`: las plantas que se crean con su cota y las que suben o bajan, «Se crea N4 a 0,00. Suben 3,00 m: N3, N2 y N1.»).
+  - **«Editar N1»** (antes «Datos de N1»): el formulario de la tabla sin su título (`FormularioObjeto` con `sinTitulo`) y debajo la ±0,00 y quién usa la planta.
+  - **La tabla Plantas** (también en Propiedades y la hoja): «Altura de la planta», ayudas de tipo, cota y diafragma en una o dos frases, y el diafragma por defecto dice lo que vale en esa fila («automático: rígido» o «automático: ninguno, es la más baja»).
+  - Pruebas de `gestores.test.tsx` y `datosObra.test.tsx` adaptadas; los bancos de Chrome no se han pasado.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

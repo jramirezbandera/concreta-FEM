@@ -206,7 +206,18 @@ export interface ControlFicha {
  * que el gestor llama a `control.aplicar`; `alCambiar` dice si hay algo sin aplicar. Sin él, cada
  * campo se escribe al salir de él, como en Propiedades.
  */
-export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: NombreTabla; diferido?: { control: { current: ControlFicha | null }; alCambiar: (cambiado: boolean) => void } }) {
+export function FormularioObjeto({
+  id,
+  tabla,
+  diferido,
+  sinTitulo,
+}: {
+  id: string;
+  tabla: NombreTabla;
+  diferido?: { control: { current: ControlFicha | null }; alCambiar: (cambiado: boolean) => void };
+  /** Sin el título «Datos · …»: en un gestor, que ya dice qué se edita. */
+  sinTitulo?: boolean;
+}) {
   const { proyecto, setSeleccion } = useVisor();
   const [foco, setFoco] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null);
@@ -342,8 +353,7 @@ export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: N
   /** Un clic en el croquis lleva al campo. */
   const irACampo = (clave: string) => caja.current?.querySelector<HTMLElement>(`[data-clave="${clave}"]`)?.focus();
 
-  return (
-    <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`}>
+  const cuerpo = (
       <div className="form-datos" ref={caja}>
         {movido && <p className="nota">{movido}</p>}
         {pendiente && (
@@ -456,8 +466,8 @@ export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: N
           <b className="campo-oblig">*</b> obligatorio. Un campo vacío dice en gris lo que vale.
         </p>
       </div>
-    </Seccion>
   );
+  return sinTitulo ? cuerpo : <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`}>{cuerpo}</Seccion>;
 }
 
 /** Lo que se ve en un campo cuyo valor no es el mismo en todos los elegidos. */

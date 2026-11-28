@@ -403,13 +403,9 @@ describe("GE3: plantas", () => {
   it("una obra nueva empieza por sus plantas: cuántas y de qué altura, viendo el alzado; un paso de deshacer", async () => {
     await proyectoNuevo("ge3-inicio", true);
     const dlg = screen.getByRole("dialog", { name: "Plantas" });
-    expect(within(dlg).getByText("Empiece por las plantas.")).toBeTruthy();
-    // La ayuda de cada campo, en un globo al pasar por su «?» (no un texto debajo)
-    const q = within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }).closest("label")!.querySelector(".campo-q")!;
-    fireEvent.mouseEnter(q);
-    expect((await screen.findByRole("tooltip")).textContent).toMatch(/cara superior del primer forjado/);
-    fireEvent.mouseLeave(q);
-    expect(screen.queryByRole("tooltip")).toBeNull();
+    expect(within(dlg).getByRole("heading", { name: "¿Cuántas plantas tiene el edificio?" })).toBeTruthy();
+    // Lo que hace falta saber de cada campo, en una nota corta a su lado (no un «?» con un párrafo)
+    expect(within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }).closest("label")!.textContent).toMatch(/de la cimentación al primer forjado/);
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Número de plantas sobre la cimentación" }), { target: { value: "4" } });
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }), { target: { value: "4" } });
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de las demás plantas, m" }), { target: { value: "3" } });
@@ -421,10 +417,12 @@ describe("GE3: plantas", () => {
       ["N1", "", "3,00", "+4,00"],
       ["Cim", "", "4,00", "0,00"],
     ]);
+    // Lo que va a pasar, en una frase
+    expect(within(dlg).getByLabelText("Plantas que se crean").textContent).toBe("N1 a +4,00, N2 a +7,00, N3 a +10,00 y N4 a +13,00; la cimentación, Cim, a 0,00.");
     fireEvent.click(within(dlg).getByRole("button", { name: "Crear las plantas" }));
-    expect(within(dlg).getByRole("status").textContent).toBe("4 plantas sobre Cim.");
+    expect(within(dlg).getByRole("status").textContent).toBe("4 plantas creadas sobre la cimentación.");
     // Después, los datos de la primera sobre la cimentación y «Hecho», no otra planta nueva a medias (UI-8)
-    expect(within(dlg).getByRole("tab", { name: "Datos de N1" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(dlg).getByRole("tab", { name: "Editar N1" }).getAttribute("aria-selected")).toBe("true");
     expect(within(dlg).getByRole("button", { name: "Hecho" })).toBeTruthy();
     fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar" }));
     elegirTabla("plantas");
@@ -438,7 +436,8 @@ describe("GE3: plantas", () => {
     const dlg = screen.getByRole("dialog", { name: "Plantas" });
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Número de plantas sobre la cimentación" }), { target: { value: "2" } });
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }), { target: { value: "4,3" } });
-    fireEvent.click(within(dlg).getByRole("radio", { name: "la primera planta" }));
+    fireEvent.click(within(dlg).getByRole("radio", { name: "En la primera planta" }));
+    expect(within(dlg).getByText("la cimentación queda a −4,30")).toBeTruthy();
     const filas = () => [...within(dlg).getByRole("table", { name: "Cómo quedan las plantas" }).querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     expect(filas()).toEqual([
       ["N2 · nueva", "", "—", "+3,00"],
@@ -447,7 +446,7 @@ describe("GE3: plantas", () => {
     ]);
     fireEvent.click(within(dlg).getByRole("button", { name: "Crear las plantas" }));
     // En los datos, cuál es la ±0,00
-    expect(within(dlg).getByText(/^N1 es la ±0,00/)).toBeTruthy();
+    expect(within(dlg).getByText("Esta planta, N1")).toBeTruthy();
     // La cubierta, a +3,20: mueve sólo su forjado, con «Aplicar»
     fireEvent.click(within(dlg).getByRole("button", { name: "Elegir N2" }));
     const cota = within(dlg).getByRole("textbox", { name: /^cota/ });
@@ -463,7 +462,7 @@ describe("GE3: plantas", () => {
     fireEvent.change(within(dlg).getByRole("textbox", { name: /^cota/ }), { target: { value: "0" } });
     fireEvent.click(within(dlg).getByRole("button", { name: /^Aplicar/ }));
     expect(filas().map((f) => f[3])).toEqual(["+7,50", "+4,30", "0,00"]);
-    expect(within(dlg).getByText(/^Cim es la ±0,00/)).toBeTruthy();
+    expect(within(dlg).getByText("Esta planta, Cim")).toBeTruthy();
   }, 60_000);
 
   it("dos plantas de 3,20 m encima de N1, viendo antes las cotas; un paso de deshacer", async () => {
@@ -480,12 +479,13 @@ describe("GE3: plantas", () => {
       ["N1", "", "3,20", "+3,00"],
       ["Cim", "", "3,00", "0,00"],
     ]);
+    expect(within(dlg).getByLabelText("Plantas que se crean").textContent).toBe("Se crean N3 a +9,40 y N2 a +6,20.");
     fireEvent.click(within(dlg).getByRole("button", { name: "Añadir 2 plantas encima de N1" }));
-    expect(within(dlg).getByRole("status").textContent).toBe("Plantas N2, N3 encima de N1.");
+    expect(within(dlg).getByRole("status").textContent).toBe("N2 y N3 añadidas encima de N1.");
     // La de arriba de lo añadido y «Hecho»: un segundo clic ya no intercala plantas (UI-8)
-    expect(within(dlg).getByRole("tab", { name: "Datos de N3" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(dlg).getByRole("tab", { name: "Editar N3" }).getAttribute("aria-selected")).toBe("true");
     expect(within(dlg).queryByRole("button", { name: /^Añadir/ })).toBeNull();
-    expect(deshacer().getAttribute("title")).toMatch(/Plantas N2, N3 encima de N1/);
+    expect(deshacer().getAttribute("title")).toMatch(/Añadir N2 y N3 encima de N1/);
     fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar" }));
     elegirTabla("plantas");
     expect(idsTabla("plantas")).toEqual(["N3", "N2", "N1", "Cim"]);

@@ -115,7 +115,7 @@ describe("DO2: Datos de la obra", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: "Siguiente: plantas" }));
     // Después, las plantas en su modo de inicio
     dlg = screen.getByRole("dialog", { name: "Plantas" });
-    expect(within(dlg).getByText("Empiece por las plantas.")).toBeTruthy();
+    expect(within(dlg).getByRole("heading", { name: "¿Cuántas plantas tiene el edificio?" })).toBeTruthy();
     fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar" }));
     expect(deshacer().getAttribute("title")).toMatch(/Datos de la obra/);
     elegirTabla("materiales");
