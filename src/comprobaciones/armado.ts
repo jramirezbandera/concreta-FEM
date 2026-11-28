@@ -138,6 +138,24 @@ export function textoArmado(t: ArmadoTramoPilar): string {
   return `${partes.join(" + ")} · ${textoCercosPilar(t)}`;
 }
 
+/**
+ * «8Ø16», «4Ø20+4Ø16»: sólo las barras longitudinales, juntas por diámetro y de mayor a menor, para
+ * rotular un pilar en planta (UI2-35: con el armado entero sólo cabían 7 rótulos de 23).
+ */
+export function textoBarrasPilar(t: ArmadoTramoPilar): string {
+  const n = new Map<number, number>();
+  const sumar = (d: number | undefined, k: number) => {
+    if (d && k) n.set(d, (n.get(d) ?? 0) + k);
+  };
+  if (t.anillo) sumar(t.anillo.diametro, t.anillo.n);
+  else {
+    sumar(t.esquinas, 4);
+    sumar(t.caraB?.diametro, 2 * (t.caraB?.n ?? 0));
+    sumar(t.caraH?.diametro, 2 * (t.caraH?.n ?? 0));
+  }
+  return [...n].sort((a, b) => b[0] - a[0]).map(([d, k]) => `${k}Ø${d}`).join("+");
+}
+
 export const DIAMETROS = [6, 8, 10, 12, 16, 20, 25, 32];
 
 /** Lo que no vale de un armado de tramo, en palabras; vacío si es un dato admisible. */

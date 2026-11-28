@@ -762,11 +762,22 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   leyenda.push(...apoyos.leyenda);
   const extremos: ExtremoRotulado[] = [];
   if (pmax && pmin) {
+    // UI2-9: el rótulo, hacia el interior del mapa (el extremo suele estar en un borde: la punta de un
+    // voladizo), para no caer sobre el borde de la losa; el otro lado, de alternativa
+    const [cx0, cy0, cx1, cy1] = tris.length ? cajaDe(tris.flatMap((t) => t.p)) : [0, 0, 0, 0];
+    const centro: Vec2 = [(cx0 + cx1) / 2, (cy0 + cy1) / 2];
     for (const ex of extremosMapa(campo, vmin, vmax, env, { asiento })) {
       const [x, p, o, j] = ex.cual === "max" ? [vmax, pmax, omax, jmax] : [vmin, pmin, omin, jmin];
-      const [estilo, dy] = ex.cual === "max" ? (["extremo-maximo", -10] as const) : (["extremo-minimo", 20] as const);
+      const estilo = ex.cual === "max" ? "extremo-maximo" : "extremo-minimo";
+      // y del dibujo hacia abajo: un punto en la mitad de arriba, el rótulo debajo
+      const dy = p[1] > centro[1] ? 20 : -10;
+      const derecha = p[0] <= centro[0];
+      const [lado, otro] = [
+        { dx: derecha ? 9 : -9, ancla: derecha ? ("inicio" as const) : ("fin" as const) },
+        { dx: derecha ? -9 : 9, ancla: derecha ? ("fin" as const) : ("inicio" as const) },
+      ];
       P.push({ tipo: "marca", p, forma: "circulo", radio: 6, estilo, objeto: o });
-      P.push({ tipo: "texto", p, texto: env ? `${ex.texto} (${combDe(j)})` : ex.texto, tamano: 13, negrita: true, dx: 9, dy, fondo: true, prioridad: 100, alternativas: [{ dx: -9, dy, ancla: "fin" }], objeto: o });
+      P.push({ tipo: "texto", p, texto: env ? `${ex.texto} (${combDe(j)})` : ex.texto, tamano: 13, negrita: true, dx: lado.dx, dy, ancla: lado.ancla, fondo: true, prioridad: 100, alternativas: [{ dx: otro.dx, dy, ancla: otro.ancla }, { dx: lado.dx, dy: dy > 0 ? -10 : 20, ancla: lado.ancla }], objeto: o });
       extremos.push({ que: ex.que, valor: x, unidad: u, objeto: o, punto: p, comb: combDe(j) });
     }
   }

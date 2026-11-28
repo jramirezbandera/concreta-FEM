@@ -170,6 +170,12 @@ export interface Texto {
   color?: string;
   objeto?: string;
   /**
+   * m del modelo, a lo largo del texto, en los que tiene que caber (el vano de una viga): si con la
+   * escala del dibujo es más largo, no se pone, y sale al acercarse (UI2-35: los de los vanos cortos
+   * se metían en el nudo, encima del pilar y de la viga de al lado).
+   */
+  largo?: number;
+  /**
    * Qué rotula (I2), para que el visor decida con el zoom: `eje` (las burbujas) y `dato` (cargas,
    * diagnósticos, valores) siempre; `cota`, `id` (ids y secciones), al acercarse. Sin clase, `dato`.
    * `fem render` no la usa.

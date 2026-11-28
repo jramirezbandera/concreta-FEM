@@ -30,7 +30,7 @@ import { casetonesLosa, nerviosLosa, reticulaLosa } from "../compilador/abacos.t
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import { puntoEnRegion, type Region } from "../compilador/poligonos.ts";
-import { ARMADURAS_FORJADO, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type BarrasCara, type CercosViga } from "../comprobaciones/armado.ts";
+import { ARMADURAS_FORJADO, textoBarrasForjado, textoBarrasPilar, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type BarrasCara, type CercosViga } from "../comprobaciones/armado.ts";
 import { alzadoVano, cercosDibujados, cotasRefuerzo, nerviosDeRefuerzo, puntosCercos, puntosCercosMetro, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { abacosDePilares, alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, trozo, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
@@ -181,7 +181,11 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
             P.push({ tipo: "marca", p: en(b.x, b.y), forma: "circulo", radio: 1.6, estilo: "armado-barra" });
           }
         }
-        textos.push({ tipo: "texto", p: [c[0], c[1] + lado], texto: `${p.pieza} · ${p.texto ?? "sin armado"}`, tamano: 11, ancla: "medio", dy: -4, fondo: true, prioridad: claseAprovechamiento(p) === "no-cumple" ? 60 : 50, objeto: p.pieza });
+        // UI2-35: el pilar y sus barras («P1 8Ø16»); los cercos, en el banco. Si no cabe, en el mismo
+        // sitio y con menos prioridad, sólo el pilar: ninguno se queda sin nombre
+        const pr = claseAprovechamiento(p) === "no-cumple" ? 60 : 50;
+        textos.push({ tipo: "texto", p: [c[0], c[1] + lado], texto: `${p.pieza} ${a ? textoBarrasPilar(a as ArmadoTramoPilar) : "sin armado"}`, tamano: 11, ancla: "medio", dy: -4, fondo: true, prioridad: pr, objeto: p.pieza });
+        textos.push({ tipo: "texto", p: [c[0], c[1] + lado], texto: p.pieza, tamano: 11, ancla: "medio", dy: -4, fondo: true, prioridad: pr - 25, objeto: p.pieza });
         textos.push({ tipo: "texto", p: [c[0], c[1] - lado], texto: valor(p), tamano: 11, ancla: "medio", dy: 13, prioridad: 40, clase: "id", objeto: p.pieza });
       } else {
         const gm = p.geometria.tipo === "punzonamiento" ? p.geometria : undefined;
@@ -211,7 +215,7 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     if (tipo === "punzonamiento") abacosDePilares(P, centros);
     if (tipo === "pilares") {
       leyenda.push({ estilo: "armado-barra", texto: "Barras del tramo que llega a la planta, a escala en su huella" }, { estilo: "armado-cerco", texto: "Cerco" });
-      notas.push("Rótulo: el pilar y el armado de su tramo; debajo, el aprovechamiento de la comprobación que manda. Las barras se ven al acercarse.");
+      notas.push("Rótulo: el pilar y las barras de su tramo (los cercos, en su armado, abajo); debajo, el aprovechamiento de la comprobación que manda. Las barras se ven al acercarse.");
     } else {
       leyenda.push({ estilo: "armado-critico", texto: "Perímetro crítico, a 2·d de la cara del pilar" });
       if (conCercos) leyenda.push({ estilo: "armado-cerco", texto: "Perímetros de cercos" });
@@ -242,15 +246,21 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
       anotar(p, m.p);
       const a = p.armado.tipo === "vigas" ? (p.armado.armado as ArmadoVanoViga | undefined) : undefined;
       const al = alzadoVano(p.tramo[1] - p.tramo[0], a);
-      const rot = (f: number, texto: string, arriba: boolean, color: string, prioridad: number) => {
+      // UI2-35: cada rótulo, en lo que rotula (el del centro, en los tres cuartos centrales del vano; el
+      // de una zona de apoyo, en su cuarto): si no cabe a esta escala, sale al acercarse, en vez de
+      // meterse en el nudo, encima del pilar y de la viga de al lado
+      const luz = p.tramo[1] - p.tramo[0];
+      const rot = (f: number, texto: string, arriba: boolean, color: string, prioridad: number, largo = f === 0.5 ? 0.75 * luz : 0.25 * luz) => {
         const q = en(f);
-        textos.push({ tipo: "texto", p: q.p, texto, tamano: 11, ancla: "medio", dy: arriba ? -7 : 16, giro: q.giro, color, prioridad, fondo: true, objeto: p.pieza });
+        textos.push({ tipo: "texto", p: q.p, texto, tamano: 11, ancla: "medio", dy: arriba ? -7 : 16, giro: q.giro, color, prioridad, fondo: true, largo, objeto: p.pieza });
       };
       if (!a) rot(0.5, `sin armado`, true, "#6b7280", 45);
       else {
         const [ini, cen, fin] = al.zonas;
         if (cen.superior) rot(0.5, `sup ${barras(cen.superior)}`, true, COLOR_CARA.superior, 55);
         rot(0.5, [al.inferior ? `inf ${barras(al.inferior)}` : "", cen.cercos ? cercos(cen.cercos) : ""].filter(Boolean).join(" · "), false, COLOR_CARA.inferior, 54);
+        // Si con los cercos no cabe, en el mismo sitio y con menos prioridad, sólo la inferior
+        if (al.inferior && cen.cercos) rot(0.5, `inf ${barras(al.inferior)}`, false, COLOR_CARA.inferior, 44);
         for (const [z, f] of [[ini, 0.125], [fin, 0.875]] as const) {
           if (z.superiorPropia && z.superior) rot(f, barras(z.superior), true, COLOR_CARA.superior, 48);
           if (z.cercosPropios && z.cercos) rot(f, cercos(z.cercos), false, COLOR_CERCOS, 47);

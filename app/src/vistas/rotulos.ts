@@ -134,6 +134,11 @@ export function colocarRotulos(textos: readonly Texto[], px: (q: Vec2) => [numbe
   for (const [t] of orden) {
     const tam = Math.max(TEXTO_MINIMO, t.tamano);
     const w = medir(t.texto, tam, !!t.negrita);
+    // Más largo que lo que rotula (el vano de una viga): al acercarse
+    if (t.largo !== undefined && w > t.largo * escala) {
+      omitidos++;
+      continue;
+    }
     const g = (-(t.giro ?? 0) * Math.PI) / 180;
     const [c, s] = [Math.cos(g), Math.sin(g)];
     let puesto = false;

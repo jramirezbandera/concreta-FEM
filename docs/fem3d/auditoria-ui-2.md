@@ -373,3 +373,14 @@ El punto 4 de §6.
 - **El banco co6**, al día con el «—» del armado (sigue sin adaptar al espacio Comprobación).
 - **Pruebas:** las de `app/` (185), `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` sin errores. Comprobado en la app con la vivienda en tema oscuro: Vigas y Punzonamiento a 1920 × 1080 y Vigas a 1366 × 768; Diagnósticos con sus tres avisos a 1920 px.
 - **Sin comprobar:** el tema claro, y las demás tablas del panel (Pilares, Armado, Reacciones), que siguen con el tope de 1 180 px.
+
+### 7.8 El lienzo: los rótulos del armado y el de la flecha (2026-11-28)
+
+El punto 5 de §6, en parte. **UI2-35, decidida por el usuario el 2026-11-28:** el rótulo corto (el cuadro de pilares queda como trabajo aparte, en las mejoras visuales del armado).
+
+- **UI2-35, los pilares:** el rótulo es el pilar y sus barras longitudinales, juntas por diámetro («P1 8Ø16», «P4 4Ø20+4Ø16»; `textoBarrasPilar`, `src/comprobaciones/armado.ts`); los cercos, en su armado, abajo. Si aun así no cabe, en el mismo sitio y con menos prioridad va sólo el pilar, así que ninguno se queda sin nombre. En la cubierta de la vivienda, los 23 rotulados (antes, 7).
+- **UI2-35, las vigas:** no se pisaban entre ellos, sino que en un vano corto el rótulo era más largo que la viga y se metía en el nudo, encima del pilar y de la viga de al lado. Ahora un rótulo puede llevar `largo` (m del modelo a lo largo del texto, `Texto.largo` en `escena.ts`): si a la escala del dibujo no cabe, no se pone y sale al acercarse (en la app, `vistas/rotulos.ts`; en `fem render`, `svg.ts`). Los del centro del vano, en sus tres cuartos centrales; los de una zona de apoyo, en su cuarto. Si «inf 2Ø12 · cØ6/150 (3R)» no cabe, en su sitio va «inf 2Ø12».
+- **UI2-9, el rótulo de la flecha:** iba siempre a la derecha del punto y, como el extremo suele estar en un borde (la punta de un voladizo), caía sobre el borde de la losa. Ahora va hacia el interior del mapa, a un lado y arriba o abajo según dónde está el punto; los otros, de alternativa. Cambia el SVG de las figuras de uz (sólo la posición del rótulo).
+- **No hecho:** UI2-37 (los chips de cada vista), UI2-20 (lo elegido) y el encuadre de Armado: están en `vistas/Zona.tsx` y `vista3d.ts`, que otra sesión tenía sin commit.
+- **Pruebas:** las de `app/` (185), `src/agente/render`, `src/comprobaciones`, `estilos.test.ts` y `textos.test.ts`, en verde; en `src/agente` y `src/visor`, todas salvo la de VC5 en `alzadoResultados.test.ts`, que la otra sesión estaba escribiendo. `tsc` de la app sin errores. Comprobado en la app con la vivienda: Pilares y Vigas de Comprobación en planta, con zoom, y la flecha de Losas.
+- **Sin comprobar:** el tema claro y 1366 px.

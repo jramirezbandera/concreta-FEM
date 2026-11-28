@@ -331,6 +331,11 @@ export function escenaASvg(e: Escena): Svg {
   for (const [t] of orden) {
     const tam = Math.max(TEXTO_MINIMO, t.tamano);
     const w = anchoTexto(t.texto, tam, t.negrita);
+    // Más largo que lo que rotula (el vano de una viga): no cabe a esta escala
+    if (t.largo !== undefined && w > t.largo * escala) {
+      omitidos++;
+      continue;
+    }
     const g = (-(t.giro ?? 0) * Math.PI) / 180;
     const [c, s] = [Math.cos(g), Math.sin(g)];
     let puesto = false;
