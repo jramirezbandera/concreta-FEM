@@ -425,7 +425,7 @@ function SeccionBase({ planta, armadura }: { planta: string | null; armadura: Ar
   };
   const fila = (id: string | null) => (
     <tr key={id ?? "comun"}>
-      <td>{id ?? <span className="text-text-primary">Todas</span>}</td>
+      <td className={id ? undefined : "et"}>{id ?? <span className="text-text-primary">Todas</span>}</td>
       {LISTA_ARMADURAS.map((k) => (
         <CeldaBase
           key={k}
@@ -569,7 +569,7 @@ function SeccionFiltro({ filtro, base, onCambio }: { filtro: FiltroArmado | unde
 
 export function ModoArmado() {
   const { proyecto, planta, seleccion, setSeleccion } = useVisor();
-  const pan = usePaneles("resultados:armado", { props: true, dock: true, pestana: "franjas" });
+  const pan = usePaneles("resultados:armado", { nav: false, props: true, dock: true, pestana: "franjas" });
   const vistas = useVistas();
   // El armado se ve en planta y en 3D: si no hay ninguna, la vista activa pasa a ser una planta
   const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta" || v.tipo === "3d");

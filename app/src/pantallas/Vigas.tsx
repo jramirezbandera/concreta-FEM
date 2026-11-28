@@ -114,7 +114,7 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
     x && (
       <>
         <tr>
-          <td>{t} máx.</td>
+          <td className="et">{t} máx.</td>
           <td data-estacion={x.max.v}>
             {fmt(x.max.v, 2)}
             <small>
@@ -124,7 +124,7 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
           </td>
         </tr>
         <tr>
-          <td>{t} mín.</td>
+          <td className="et">{t} mín.</td>
           <td>
             {fmt(x.min.v, 2)}
             <small>

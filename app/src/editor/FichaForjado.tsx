@@ -12,6 +12,7 @@
  *
  * Lo que escriben va por `escribir`, como un campo más (un paso de deshacer).
  */
+import { Mas } from "../componentes/Mas.tsx";
 import { fijarAbacosPilares, toleranciaAbacos } from "../../../src/editor/abacos.ts";
 import { desnivelEnrasado, forjadosParaEnrasar, type Enrase } from "../../../src/editor/desnivel.ts";
 import { useVisor } from "../contexto.ts";
@@ -60,7 +61,7 @@ export function FijarAbacos({ losa }: { losa: string }) {
   };
   return (
     <div className="px-3.5 py-2">
-      <p className="nota">Los ábacos en los pilares los pone el cálculo y siguen a los pilares: no se eligen uno a uno. Fijados, quedan como ábacos propios del forjado, que se mueven, se estiran y se unen.</p>
+      <p className="nota">Siguen a los pilares y no se eligen uno a uno; fijados, se editan como ábacos propios del forjado.</p>
       <button type="button" className="btn" onClick={fijar}>
         Fijar como polígonos
       </button>
@@ -140,9 +141,11 @@ export function PesoForjado({ id, fila, ctx, escribir }: Props) {
   const conEscrito = escrito !== undefined && Number.isFinite(escrito);
   const medio = (pp: number) =>
     f !== null && mat && canto > 0 ? (
-      <p className="mt-1" data-testid="peso-medio">
-        Peso medio con los ábacos ({n(100 * f, 1)} % del área): {n(pesoMedioConMacizo(pp, gammaMaterial(mat) * canto, f), 2)} kN/m², sólo como dato. El cálculo pesa cada zona con lo suyo: repartir este medio contaría los ábacos dos veces.
-      </p>
+      <Mas etiqueta="Peso medio con los ábacos">
+        <p data-testid="peso-medio">
+          {n(pesoMedioConMacizo(pp, gammaMaterial(mat) * canto, f), 2)} kN/m² con los ábacos ({n(100 * f, 1)} % del área), sólo como dato. El cálculo pesa cada zona con lo suyo: repartir este medio contaría los ábacos dos veces.
+        </p>
+      </Mas>
     ) : null;
   // Sin cálculo posible (casetón «perdido», vigueta que no es una T) pero con el pp escrito: manda él
   if (!d && conEscrito)
@@ -184,9 +187,11 @@ export function PesoForjado({ id, fila, ctx, escribir }: Props) {
             {tipo === "reticular" ? `; los ábacos, macizos: ${n(d.gamma)} × canto.` : "."}
           </p>
           {d.metodo === "estimado" && d.pesoHueco > 0 && !conEscrito && (
-            <p className="mt-1" data-testid="peso-estimado">
-              El {n(d.pesoHueco)} kN/m³ es un peso específico aparente equivalente (kN por m³ del hueco entre nervios, no la densidad del material de la pieza), estimado para predimensionar: no es un peso certificado ni de norma. Con la ficha del fabricante, escriba su relleno.
-            </p>
+            <Mas etiqueta="Peso estimado: qué es">
+              <p data-testid="peso-estimado">
+                El {n(d.pesoHueco)} kN/m³ es un peso específico aparente equivalente (kN por m³ del hueco entre nervios, no la densidad del material de la pieza), estimado para predimensionar: no es un peso certificado ni de norma. Con la ficha del fabricante, escriba su relleno.
+              </p>
+            </Mas>
           )}
           {d.metodo !== "estimado" && !conEscrito && procedencia && <p className="mt-1">El relleno es {procedencia}.</p>}
         </>
@@ -224,9 +229,12 @@ export function TerrenoForjado({ fila, ctx }: Props) {
   return (
     <div className="nota" data-testid="terreno-forjado">
       <p>
-        Longitud característica l = (D/k)^¼ = <b>{n(l, 2)} m</b> (D, la rigidez a flexión de la losa): a esa distancia de un pilar, su carga ya se ha repartido en el terreno.
+        Longitud característica l = (D/k)^¼ = <b>{n(l, 2)} m</b>: a esa distancia de un pilar, su carga ya se ha repartido en el terreno.
       </p>
-      <p className="mt-1">La losa se malla a l/{MALLA_CIMENTACION} = {n(l / MALLA_CIMENTACION, 2)} m como mucho. Cada nudo lleva un muelle con k por su área (Winkler); el cálculo es lineal, así que si alguno queda a tracción (despega) se avisa y ahí no vale. En Resultados · Losas, «σ terreno».</p>
+      <p className="mt-1">Malla de l/{MALLA_CIMENTACION} = {n(l / MALLA_CIMENTACION, 2)} m como mucho.</p>
+      <Mas>
+        <p>Cada nudo lleva un muelle con k por su área (Winkler). El cálculo es lineal: si alguno queda a tracción (despega) se avisa y ahí no vale. La tensión del terreno, en Resultados · Losas, «σ terreno».</p>
+      </Mas>
     </div>
   );
 }
@@ -258,7 +266,8 @@ export function RigidezAligeradoPanel({ fila, ctx, escribir, errores, rigidez }:
       </p>
       <TablaMultiplicadores r={r} mia={mia} escribir={escribir} />
       {errores.multiplicadores && <p className="error">{errores.multiplicadores}</p>}
-      <p className="text-[12px] leading-snug text-text-secondary mt-1.5">
+      <Mas etiqueta="Cómo se aplican">
+      <p className="text-[12px] leading-snug text-text-secondary">
         {mia ? (
           <>
             Van sobre la maciza con el ν del hormigón ({n(r.nu, 2)}), los ábacos son macizos (1) y las vigas planas a sus lados no se rebajan.
@@ -272,6 +281,7 @@ export function RigidezAligeradoPanel({ fila, ctx, escribir, errores, rigidez }:
           <>Los de la T bruta del nervio (opción «bruta»), sin efecto Poisson (ν = 0, como un emparrillado); los ábacos, macizos.</>
         )}
       </p>
+      </Mas>
     </div>
   );
 }

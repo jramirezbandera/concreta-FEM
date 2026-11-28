@@ -150,7 +150,7 @@ export function ModoModal() {
               <tr key={x.modo} className="clic" data-on={x.modo === modo} onClick={() => setModo(x.modo)}>
                 <td>
                   {x.modo}
-                  {s?.direcciones.some((d) => d.dominante.modo === x.modo) && <small>dominante según {s.direcciones.filter((d) => d.dominante.modo === x.modo).map((d) => d.eje).join(" e ")}</small>}
+                  {s?.direcciones.some((d) => d.dominante.modo === x.modo) && <small className="txt">dominante según {s.direcciones.filter((d) => d.dominante.modo === x.modo).map((d) => d.eje).join(" e ")}</small>}
                 </td>
                 <td>{fmt(x.T, 3)}</td>
                 <td>{fmt(x.f, 2)}</td>

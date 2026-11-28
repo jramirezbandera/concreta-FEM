@@ -206,7 +206,7 @@ function TerrenoPlanta({ t, combinaciones }: { t: readonly TerrenoLosa[]; combin
 
 export function ModoLosas() {
   const { proyecto, planta } = useVisor();
-  const pan = usePaneles("resultados:losas", { props: true, pestana: "combinaciones" });
+  const pan = usePaneles("resultados:losas", { nav: false, props: true, pestana: "combinaciones" });
   const vistas = useVistas();
   // El mapa se ve en planta y en 3D: si no hay ninguna, la vista activa pasa a ser una planta
   const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta" || v.tipo === "3d");
@@ -431,7 +431,7 @@ export function ModoLosas() {
                       <tr key={f.id}>
                         <td>
                           {f.id}
-                          <small>{f.tipo === "pano" ? "unidireccional" : "losa"}</small>
+                          <small className="txt">{f.tipo === "pano" ? "Unidireccional" : "Losa"}</small>
                         </td>
                         <td>
                           {mm(f.maxima.v)}

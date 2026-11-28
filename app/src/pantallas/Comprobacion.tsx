@@ -36,6 +36,7 @@ import type { DatosArmar, DatosEsfuerzosArmado, FichaComprobacion, FilaModulo, P
 import type { TipoElegible } from "../../../src/visor/protocolo.ts";
 import { ALTO_DOCK_MINIMIZADO, altoMedioDock, Chip, Disposicion, Herramienta, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { Situacion } from "../armazon/Situacion.tsx";
+import { NavComprobacion } from "./NavComprobacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcAbacos, IcComprobacion, IcLosas, IcPilares, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { AvanceTarea, useTareas } from "../componentes/AvanceTareas.tsx";
@@ -1478,7 +1479,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
                       title="Doble clic: su armado"
                     >
                       <td>{p.pieza}</td>
-                      <td>{p.parte}</td>
+                      <td className="txt">{p.parte}</td>
                       {tipo !== "punzonamiento" && <td>{(tipo === "losas" ? p.planta : p.seccion) ?? "—"}</td>}
                       <td className="txt">{p.texto ?? "—"}</td>
                       <td className={e.tono === "fail" ? "f" : undefined}>{aprov(p.aprovechamiento)}</td>
@@ -1677,7 +1678,26 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
             }}
           />
         }
-        nav={{ titulo: "Navegador", contenido: <Situacion /> }}
+        nav={{
+          titulo: "Navegador",
+          contenido: (
+            <>
+              <Situacion />
+              <NavComprobacion
+                tipo={modo}
+                tipos={TIPOS}
+                partes={modo ? partes : []}
+                nombres={PARTE[tipo]}
+                clave={clave}
+                cargando={r.cargando || proponiendose}
+                estado={estadoDe}
+                elegir={elegir}
+                abrirArmado={() => pan.abrirPestana("armado")}
+                ponerTipo={ponerModo}
+              />
+            </>
+          ),
+        }}
         props={{ titulo: "Propiedades", contenido: propiedades }}
         dock={[
           {

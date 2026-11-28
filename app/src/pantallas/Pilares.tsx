@@ -126,7 +126,7 @@ const YA_ABIERTOS = new WeakSet<object>();
 
 export function ModoPilares() {
   const { proyecto, planta, setPlanta, seleccion, setSeleccion } = useVisor();
-  const pan = usePaneles("resultados:pilares", { props: true, dock: true, pestana: "cuadro" });
+  const pan = usePaneles("resultados:pilares", { nav: false, props: true, dock: true, pestana: "cuadro" });
   const vistas = useVistas();
   const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta" || v.tipo === "3d");
   useEffect(() => {

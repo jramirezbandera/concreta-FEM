@@ -132,10 +132,13 @@ describe("Situación", () => {
     expect(sit().querySelector(".sit-alzado")).toBeTruthy();
     expect(sit().querySelector(".sit-planta")).toBeNull();
 
-    // En Resultados también: el navegador lleva la Situación y navega igual
+    // En Resultados también: el navegador (plegado por defecto, UI2-c) lleva la Situación y navega igual
     // El ejemplo se calcula solo al abrirlo
     await waitFor(() => expect(screen.getByRole("button", { name: "Resultados" }).hasAttribute("disabled")).toBe(false), { timeout: 90_000 });
     fireEvent.click(screen.getByRole("button", { name: "Resultados" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Abrir navegador" })).toBeTruthy());
+    expect(screen.queryByText("Situación", { selector: "h2 span" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir navegador" }));
     await waitFor(() => expect(screen.getByText("Situación", { selector: "h2 span" })).toBeTruthy());
     fireEvent.click(within(sit()).getByRole("button", { name: `Ver la planta ${p1!.id}` }));
     expect(within(sit()).getByRole("button", { name: `Ver la planta ${p1!.id}` }).getAttribute("aria-pressed")).toBe("true");

@@ -206,12 +206,12 @@ export function EspacioRevision() {
           <>
             <Seccion titulo="Identidad">
               <div className="fila">
-                <span>Huella</span>
-                <span className="v">{e.huella.slice(0, 16)}</span>
+                <span>Versión del modelo</span>
+                <span className="v" title="Cambia con cualquier dato que cambie el cálculo">{e.huella.slice(0, 8)}</span>
               </div>
               <div className="fila">
-                <span>Núcleo</span>
-                <span className="v">{proyecto.cliente?.motor?.slice(0, 16)}</span>
+                <span>Versión del motor</span>
+                <span className="v">{proyecto.cliente?.motor?.slice(0, 8)}</span>
               </div>
               <p className="nota">El informe vale para esta versión del proyecto: si el modelo cambia, se rehace.</p>
             </Seccion>
@@ -221,7 +221,7 @@ export function EspacioRevision() {
                 <a key={c.codigo} href={`#${ancla(x.documento.findIndex((b) => b.tipo === "titulo" && b.texto.includes(c.titulo)))}`} className="flex items-center justify-between gap-2 border-b border-border-sub px-3.5 py-1.5 text-[12px] text-text-secondary hover:bg-bg-elevated">
                   <span className="min-w-0">
                     <span className="block text-text-primary">{c.titulo}</span>
-                    {c.peor && <span className="mono block truncate text-[11px] text-text-muted">peor: {c.peor}</span>}
+                    {c.peor && <span className="block truncate text-[11px] text-text-muted">Peor: {c.peor}</span>}
                   </span>
                   <span className={`pill ${TONO[c.estado]}`}>{TEXTO[c.estado]}</span>
                 </a>

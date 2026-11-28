@@ -34,7 +34,7 @@ describe("Propiedades de una carga", () => {
   it("una de superficie: sólo sus campos, y la q como un número hacia abajo", async () => {
     const { container, editar } = montar("CM-PB");
     expect([...container.querySelectorAll(".campo-grupo")].map((h) => h.textContent)).toEqual(["La carga", "Dónde", "Valor"]);
-    expect(nombres(container)).toEqual(["id", "tipo*", "caso*", "planta*", "forjado", "zona", "q"]);
+    expect(nombres(container)).toEqual(["Referencia", "tipo*", "caso*", "planta*", "forjado", "zona", "q"]);
     expect((screen.getByLabelText("puntos") as HTMLInputElement).placeholder).toBe("todo el forjado");
     expect(screen.getByRole("radio", { name: "↓ Gravedad" }).getAttribute("aria-checked")).toBe("true");
     const q = screen.getByLabelText("q") as HTMLInputElement;
@@ -66,7 +66,7 @@ describe("Propiedades de una carga", () => {
 
   it("una puntual: la posición del punto, y el momento sólo si se pide", () => {
     const { container } = montar("WX+P1");
-    expect(nombres(container)).toEqual(["id", "tipo*", "caso*", "planta*", "x del punto*", "y del punto*", "F"]);
+    expect(nombres(container)).toEqual(["Referencia", "tipo*", "caso*", "planta*", "x del punto*", "y del punto*", "F"]);
     expect(screen.getByRole("radio", { name: "X" }).getAttribute("aria-checked")).toBe("true");
     expect((screen.getByLabelText("F") as HTMLInputElement).value).toBe("27");
     expect(container.querySelector("details")).toBeNull();

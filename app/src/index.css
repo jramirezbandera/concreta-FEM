@@ -227,7 +227,7 @@ body {
   font-size: 12px; font-weight: 600;
   color: var(--color-text-secondary);
 }
-.sec > span + span { font-weight: 400; font-size: 11px; font-family: var(--font-mono); color: var(--color-text-tertiary); }
+.sec > span + span { font-weight: 400; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--color-text-tertiary); }
 /* El título no se parte por un guion («Extremos de CUB-↵S»): cede lo de la derecha, que se parte a su lado */
 .sec > span:first-child { flex-shrink: 0; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sec > span + span { min-width: 0; text-align: right; }
@@ -268,6 +268,19 @@ body {
 }
 .lista-fila:hover { background: var(--color-bg-elevated); color: var(--color-text-primary); }
 .lista-fila[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
+/* UI2-c: el navegador de Comprobación, con cada pieza y su aprovechamiento (NavComprobacion.tsx) */
+.nav-comp-tipo { grid-template-columns: 16px 1fr; color: var(--color-text-primary); }
+.nav-comp-tipo svg { color: var(--color-text-tertiary); }
+.nav-comp-fila { grid-template-columns: 1fr 44px 40px; height: 28px; font-size: 12px; }
+.nav-comp-fila .mono { color: var(--color-text-primary); }
+.nav-comp-fila[data-on="true"] .mono { color: inherit; }
+.nav-comp-parte { color: var(--color-text-tertiary); }
+.nav-comp-barra { height: 4px; border-radius: 2px; background: var(--color-bg-elevated); overflow: hidden; }
+.nav-comp-barra > i { display: block; height: 100%; border-radius: 2px; background: var(--color-state-ok); }
+.nav-comp-fila[data-tono="warn"] .nav-comp-barra > i { background: var(--color-state-warn); }
+.nav-comp-fila[data-tono="fail"] .nav-comp-barra > i { background: var(--color-state-fail); }
+.nav-comp-aprov { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; }
+.nav-comp-fila[data-tono="fail"] .nav-comp-aprov { color: var(--color-state-fail); font-weight: 500; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -367,13 +380,15 @@ input.sel:focus, textarea.sel:focus, .campo input:focus:not(:read-only), .campo 
   color: var(--color-text-primary); white-space: nowrap;
 }
 .tb td small { display: block; font-size: 11px; color: var(--color-text-tertiary); white-space: normal; }
+/* UI2-d: la nota de una cifra va en mono si es una combinación o un id; con palabras, .txt */
+.tb td small.txt { font-family: var(--font-sans); }
 .tb tbody tr:last-child td { border-bottom: 0; }
 .tb td.txt { font-family: var(--font-sans); white-space: normal; }
 /* UI2-26: en las tablas de Comprobación el texto va a la izquierda (a la derecha, sólo los números) y el estado, en su píldora */
 [data-tabla-comprobacion] th.txt, [data-tabla-comprobacion] td.txt { text-align: left; }
 [data-tabla-comprobacion] td .pill { height: 20px; }
 /* Las etiquetas de una tabla con celdas de varias filas (las ternas de los pilares): a la izquierda, arriba */
-.tb td.et { text-align: left; vertical-align: top; padding-left: 14px; }
+.tb td.et { font-family: var(--font-sans); text-align: left; vertical-align: top; padding-left: 14px; }
 .tb tr.grupo td { background: var(--color-bg-elevated); font-family: var(--font-sans); font-weight: 500; }
 .tb tr.max td, .tb tr[data-on="true"] td { background: var(--color-tint-accent); }
 .tb tr.clic { cursor: pointer; }
@@ -389,7 +404,7 @@ input.sel:focus, textarea.sel:focus, .campo input:focus:not(:read-only), .campo 
 /* UI2-15: una tecla se ve igual en todas partes (la paleta, las pistas, las herramientas, las notas) */
 .kbd, .dib-tecla, .paleta-pie kbd, .pista-nombre kbd {
   display: inline-block; padding: 0 5px; border: 1px solid var(--color-border-main); border-bottom-width: 2px; border-radius: 4px;
-  background: var(--color-bg-surface); font: 11px/16px var(--font-mono); color: var(--color-text-secondary); white-space: nowrap;
+  background: var(--color-bg-surface); font: 500 11px/16px var(--font-sans); color: var(--color-text-secondary); white-space: nowrap;
 }
 
 /* Lienzo: lo que dibuja ocupa su caja */
@@ -928,7 +943,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .dock-tab:hover { color: var(--color-text-primary); }
 .dock-tab[data-on="true"] { color: var(--color-text-primary); font-weight: 500; }
 .dock-tab[data-on="true"]::after { background: var(--color-accent); }
-.dock-tab .insignia { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 8px; background: var(--color-bg-elevated); font: 500 11px var(--font-mono); color: var(--color-text-tertiary); }
+.dock-tab .insignia { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 8px; background: var(--color-bg-elevated); font: 500 11px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--color-text-tertiary); }
 .dock-cuerpo { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
 
 .barra-estado {
@@ -950,7 +965,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .arbol-fila:hover { background: var(--color-bg-elevated); }
 .arbol-fila[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
 .arbol-fila:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
-.arbol-fila .n { margin-left: auto; padding-left: 6px; font: 11px var(--font-mono); color: var(--color-text-tertiary); white-space: nowrap; }
+.arbol-fila .n { margin-left: auto; padding-left: 6px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--color-text-tertiary); white-space: nowrap; }
 .arbol-fila[data-on="true"] .n { color: color-mix(in srgb, var(--color-accent) 70%, var(--color-text-tertiary)); }
 .arbol-fila .giro { flex-shrink: 0; color: var(--color-text-tertiary); transition: transform .15s; }
 .arbol-fila[aria-expanded="true"] .giro { transform: rotate(90deg); }
@@ -1220,6 +1235,17 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
   font: normal 600 11px/1 var(--font-sans); color: var(--color-text-tertiary); cursor: help;
   position: relative; padding: 0; margin: 0 0 0 2px; background: none; vertical-align: middle;
 }
+/* UI2-12: la ayuda en el nombre del campo, subrayado de puntos, en vez de un «?» por campo */
+.campo-ayuda { display: inline-flex; min-width: 0; text-decoration: underline dotted var(--color-border-strong); text-underline-offset: 3px; cursor: help; }
+.campo-ayuda:hover, .campo-ayuda[data-abierta] { text-decoration-color: var(--color-accent); color: var(--color-text-primary); }
+/* UI2-21: «Más…», lo que explica más de una línea, plegado (componentes/Mas.tsx) */
+.mas { margin-top: 4px; }
+.mas > summary { display: inline-flex; cursor: pointer; list-style: none; font-size: 12px; color: var(--color-accent-text); }
+.mas > summary::-webkit-details-marker { display: none; }
+.mas > summary:hover { text-decoration: underline; }
+.mas > summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 2px; }
+.mas[open] > summary { color: var(--color-text-tertiary); }
+.mas-cuerpo { margin-top: 4px; }
 .campo-q:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); border-color: var(--color-accent); }
 /* Más fácil de coger con el ratón que sus 13 px */
 .campo-q::after { content: ""; position: absolute; inset: -4px; }
@@ -1650,7 +1676,7 @@ select.sel { font-family: var(--font-sans); }
 .acc-derivados { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--color-border-sub); font-size: 12px; }
 .acc-derivados > div { display: flex; gap: 6px; }
 .acc-derivados dt { color: var(--color-text-secondary); }
-.acc-derivados dd { margin: 0; font-family: var(--font-mono); color: var(--color-accent-text); }
+.acc-derivados dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--color-accent-text); }
 .acc-fuente { flex-basis: 100%; margin: 0; color: var(--color-text-tertiary); }
 .acc-titulo { margin: 6px 0 0; font: 600 12px var(--font-sans); color: var(--color-text-secondary); }
 .acc-cifras { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; margin: 0; }

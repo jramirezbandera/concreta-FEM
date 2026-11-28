@@ -3,15 +3,19 @@
  * 2026-10-28: el texto bajo el campo empujaba los demás). El globo va en `document.body` con
  * posición fija, así que no lo recorta el panel que se desplaza ni un diálogo; sale debajo del «?»
  * y, si no cabe, encima, sin salirse de la ventana.
+ *
+ * UI2-12: con `children`, la ayuda va en el nombre del campo (subrayado de puntos) y no en un «?»
+ * aparte: un «?» por campo era ruido. Así no es una parada del tabulador ni se come el clic de la
+ * etiqueta (que lleva al campo); el globo sale al pasar el ratón o al tocarlo.
  */
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /** Lo que tarda en salir, para que no salten globos al cruzar el panel con el ratón. */
 const ESPERA_MS = 120;
 const MARGEN = 8;
 
-export function Ayuda({ texto }: { texto: string }) {
+export function Ayuda({ texto, children }: { texto: string; children?: ReactNode }) {
   const ancla = useRef<HTMLSpanElement>(null);
   const id = useId();
   const globo = useRef<HTMLDivElement>(null);
@@ -53,6 +57,22 @@ export function Ayuda({ texto }: { texto: string }) {
     <>
       {/* UI-55: se abre también con el foco (teclado, lector de pantalla) y al tocarlo. Un <span> y no un
           <button>: dentro de un <label>, un botón pasaría a ser el campo de la etiqueta */}
+      {children !== undefined ? (
+        <span
+          ref={ancla}
+          className="campo-ayuda"
+          data-abierta={abierta || undefined}
+          aria-describedby={abierta ? id : undefined}
+          onMouseEnter={() => {
+            clearTimeout(espera.current);
+            espera.current = window.setTimeout(() => setAbierta(true), ESPERA_MS);
+          }}
+          onMouseLeave={cerrar}
+          onTouchStart={() => setAbierta((x) => !x)}
+        >
+          {children}
+        </span>
+      ) : (
       <span
         ref={ancla}
         role="button"
@@ -86,6 +106,7 @@ export function Ayuda({ texto }: { texto: string }) {
       >
         ?
       </span>
+      )}
       {abierta &&
         createPortal(
           <div

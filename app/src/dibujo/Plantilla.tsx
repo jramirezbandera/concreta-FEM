@@ -590,8 +590,13 @@ export function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, c
   return (
     <label className="campo">
       <span>
-        <span className="campo-nombre">{etiqueta}</span>
-        {ayuda && <Ayuda texto={ayuda} />}
+        {ayuda ? (
+          <Ayuda texto={ayuda}>
+            <span className="campo-nombre">{etiqueta}</span>
+          </Ayuda>
+        ) : (
+          <span className="campo-nombre">{etiqueta}</span>
+        )}
       </span>
       <span className="dib-unidad" data-unidad={unidad}>
         <input value={mostrado} placeholder={falta ? "obligatorio" : vacio} data-error={mal || (!!falta && !mostrado.trim())} aria-label={etiqueta} aria-invalid={mal} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
@@ -846,8 +851,9 @@ function CampoBalasto({ etiqueta, valor, onCambio, ayuda, falta, vacio }: { etiq
   return (
     <label className="campo">
       <span>
-        <span className="campo-nombre">{etiqueta}</span>
-        <Ayuda texto={ayuda} />
+        <Ayuda texto={ayuda}>
+          <span className="campo-nombre">{etiqueta}</span>
+        </Ayuda>
       </span>
       <span className="dib-unidad" data-unidad="kN/m³">
         <input value={mostrado} placeholder={falta ? "obligatorio" : vacio} data-error={!!error || (!!falta && !t)} aria-label={etiqueta} aria-invalid={!!error} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
@@ -903,8 +909,9 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
             {num("capa", "capa", "m", "Capa de compresión (hf).")}
             <label className="campo">
               <span>
-                <span className="campo-nombre">casetón</span>
-                <Ayuda texto="De qué es el casetón: con él sale el peso propio (hormigón de nervios y capa más el casetón en el hueco). «Perdido de otro material» pide escribir el pp." />
+                <Ayuda texto="De qué es el casetón: con él sale el peso propio (hormigón de nervios y capa más el casetón en el hueco). «Perdido de otro material» pide escribir el pp.">
+                  <span className="campo-nombre">casetón</span>
+                </Ayuda>
               </span>
               <select className="sel" value={t.caseton ?? CASETON_POR_DEFECTO} aria-label="Casetón" onChange={(x) => poner({ caseton: x.target.value as Caseton })}>
                 {CASETONES.map((c) => (
@@ -916,8 +923,9 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
             </label>
             <label className="chk">
               <input type="checkbox" checked={t.abacos !== false} onChange={(x) => poner({ abacos: x.target.checked })} />
-              <span>Con ábacos</span>
-              <Ayuda texto="Un ábaco macizo en cada pilar que llega al forjado: desde el eje del pilar, el 15 % de la luz de cada lado y en cada dirección de los nervios (hacia un borde sin vano, hasta el borde), redondeado a casetones enteros. Los que se tocan se unen. Después se retocan uno a uno con la herramienta Ábaco." />
+              <Ayuda texto="Un ábaco macizo en cada pilar que llega al forjado: desde el eje del pilar, el 15 % de la luz de cada lado y en cada dirección de los nervios (hacia un borde sin vano, hasta el borde), redondeado a casetones enteros. Los que se tocan se unen. Después se retocan uno a uno con la herramienta Ábaco.">
+                <span>Con ábacos</span>
+              </Ayuda>
             </label>
           </>
         )}
@@ -927,8 +935,9 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
             <CampoSeccion modelo={m} valor={t.seccion} tipo="vigueta" etiqueta="vigueta" editar={editar} onCambio={(seccion) => poner({ seccion })} />
             <label className="campo">
               <span>
-                <span className="campo-nombre">bovedilla</span>
-                <Ayuda texto="De qué es la bovedilla: con ella y una vigueta en T sale el peso propio (vigueta y capa más la bovedilla en el hueco)." />
+                <Ayuda texto="De qué es la bovedilla: con ella y una vigueta en T sale el peso propio (vigueta y capa más la bovedilla en el hueco).">
+                  <span className="campo-nombre">bovedilla</span>
+                </Ayuda>
               </span>
               <select className="sel" value={t.bovedilla ?? BOVEDILLA_POR_DEFECTO} aria-label="Bovedilla" onChange={(x) => poner({ bovedilla: x.target.value as Bovedilla })}>
                 {BOVEDILLAS.map((b) => (
@@ -952,8 +961,9 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
         )}
         <label className="campo">
           <span>
-            <span className="campo-nombre">nombre</span>
-            <Ayuda texto="Lo que se rotula en la planta (por ejemplo «Reticular 25+5/72»). Vacío: el id con el canto+capa/intereje (cm), o «maciza» y el canto. Se cambia luego en Propiedades." />
+            <Ayuda texto="Lo que se rotula en la planta (por ejemplo «Reticular 25+5/72»). Vacío: el id con el canto+capa/intereje (cm), o «maciza» y el canto. Se cambia luego en Propiedades.">
+              <span className="campo-nombre">nombre</span>
+            </Ayuda>
           </span>
           <input className="sel" value={t.nombre ?? ""} placeholder="el id y el tipo" aria-label="nombre del forjado" onChange={(x) => poner({ nombre: x.target.value || undefined })} />
         </label>

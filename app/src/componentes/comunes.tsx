@@ -218,16 +218,13 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200, acciones }: { ds: r
         const abierto = abiertos.has(k);
         const sev = g.d.severidad;
         return (
-          <li key={k} className="border-b border-border-sub px-3.5 py-1.5 text-[12px]" data-severidad={sev}>
+          <li key={k} className="border-b border-border-sub px-3.5 py-1.5 text-[12px]" data-severidad={sev} data-codigo={g.d.codigo}>
             <div className="flex items-center gap-2">
               <span className={`pill ${sev === "error" ? "fail" : sev === "aviso" ? "warn" : "neu"}`} style={{ height: 18, fontSize: 11 }}>
                 {sev === "error" ? "Error" : sev === "aviso" ? "Aviso" : "Nota"}
               </span>
               {g.causa && <span className="text-[11px] font-medium text-state-warn">Posible causa de un error</span>}
               {n > 1 && <span className="text-[11px] text-text-secondary">{n} iguales</span>}
-              <span className="mono ml-auto truncate text-[11px] text-text-tertiary" title="El código del diagnóstico">
-                {g.d.codigo}
-              </span>
             </div>
             <p className="mt-1 text-text-secondary">{textoApp(g.d.mensaje)}</p>
             {acciones?.[g.d.codigo]}

@@ -84,7 +84,7 @@ function TablaPorCaso({ d, seleccion, onObjeto }: { d: ReaccionesCasos; seleccio
             <tr key={o.id} className="clic" data-on={o.id === seleccion} {...filaElegible(() => onObjeto(o.id), o.id === seleccion)}>
               <td>
                 {o.id}
-                <small className="id">
+                <small className="id txt">
                   {o.tipo} · {o.planta}
                 </small>
               </td>
@@ -97,7 +97,7 @@ function TablaPorCaso({ d, seleccion, onObjeto }: { d: ReaccionesCasos; seleccio
           ))}
           {i < 3 && (
             <tr>
-              <td>Suma</td>
+              <td className="et">Suma</td>
               {d.totales.map((t, k) => (
                 <td key={k}>{fmt(t[i], 1)}</td>
               ))}
@@ -162,7 +162,7 @@ function PlantasConReacciones({ d, planta, onPlanta }: { d: Reacciones3D | null;
 
 export function ModoReacciones() {
   const { proyecto, seleccion, setSeleccion } = useVisor();
-  const pan = usePaneles("resultados:reacciones", { props: true, dock: true, pestana: "reacciones" });
+  const pan = usePaneles("resultados:reacciones", { nav: false, props: true, dock: true, pestana: "reacciones" });
   const { poner } = useVistas();
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });

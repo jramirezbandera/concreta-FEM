@@ -125,20 +125,26 @@ const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCro
 /** Los campos que no se enseñan como campo: los lleva el croquis de su grupo (los multiplicadores; el valor de una carga). */
 const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados: new Set(["multiplicadores"]), pilares: new Set(["tramos"]), cargas: new Set(["q", "qb", "F", "M"]) };
 
-/** El nombre del campo: «*» si es obligatorio y «?» si tiene ayuda (en un globo, al pasar el ratón). */
+/** UI2-11: el nombre de obra del campo, si la columna lo tiene («Libre en la base» por «lib. base»). */
+const nombreCampo = (c: Columna) => c.nombre ?? c.titulo;
+
+/** El nombre del campo: «*» si es obligatorio y, si tiene ayuda, subrayado de puntos (en un globo, al pasar el ratón; UI2-12). */
 function Etiqueta({ c, estado, conUnidad, titulo }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean; titulo?: string }) {
+  // Con ayuda, el globo dice el nombre entero: sin el `title`, que sacaría una segunda pista encima
+  const nombre = (
+    <span className="campo-nombre" title={c.ayuda ? undefined : (titulo ?? nombreCampo(c))} data-simbolo={esSimbolo(titulo ?? nombreCampo(c)) || undefined}>
+      {titulo ?? nombreCampo(c)}
+      {estado?.obligatorio && (
+        <b className="campo-oblig" title="obligatorio">
+          *
+        </b>
+      )}
+    </span>
+  );
   return (
     <span>
-      <span className="campo-nombre" title={titulo ?? c.titulo} data-simbolo={esSimbolo(titulo ?? c.titulo) || undefined}>
-        {titulo ?? c.titulo}
-        {estado?.obligatorio && (
-          <b className="campo-oblig" title="obligatorio">
-            *
-          </b>
-        )}
-      </span>
+      {c.ayuda ? <Ayuda texto={c.ayuda}>{nombre}</Ayuda> : nombre}
       {c.unidad && conUnidad && <small>{c.unidad}</small>}
-      {c.ayuda && <Ayuda texto={c.ayuda} />}
     </span>
   );
 }
@@ -397,7 +403,7 @@ export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: N
                       data-error={!!err}
                       data-falta={falta || undefined}
                       data-clave={c.clave}
-                      aria-label={c.titulo}
+                      aria-label={nombreCampo(c)}
                       aria-invalid={!!err}
                       onChange={(e) => {
                         setErrores({ ...errores, [c.clave]: "" });
@@ -424,7 +430,7 @@ export function FormularioObjeto({ id, tabla, diferido }: { id: string; tabla: N
                       data-error={!!err}
                       data-falta={falta || undefined}
                       data-clave={c.clave}
-                      aria-label={c.titulo}
+                      aria-label={nombreCampo(c)}
                       aria-invalid={!!err}
                       onChange={(e) => {
                         setBorrador({ ...borrador, [c.clave]: e.target.value });
@@ -535,7 +541,7 @@ export function FormularioVarios({ ids, tabla }: { ids: readonly string[]; tabla
                       className="sel"
                       value={c.valor === null ? VARIOS : valor}
                       data-error={!!err}
-                      aria-label={c.columna.titulo}
+                      aria-label={nombreCampo(c.columna)}
                       aria-invalid={!!err}
                       onChange={(e) => {
                         setErrores({ ...errores, [clave]: "" });
@@ -558,7 +564,7 @@ export function FormularioVarios({ ids, tabla }: { ids: readonly string[]; tabla
                         placeholder={c.valor === null ? "(varios)" : c.columna.calculada ? undefined : "—"}
                         readOnly={c.columna.calculada}
                         data-error={!!err}
-                        aria-label={c.columna.titulo}
+                        aria-label={nombreCampo(c.columna)}
                         aria-invalid={!!err}
                         onChange={(e) => {
                           setBorrador({ ...borrador, [clave]: e.target.value });

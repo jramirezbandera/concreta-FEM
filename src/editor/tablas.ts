@@ -32,6 +32,11 @@ export type NombreTabla = (typeof TABLAS)[number];
 export interface Columna {
   clave: string;
   titulo: string;
+  /**
+   * UI2-11: el nombre en Propiedades, si el título de la columna es una abreviatura o un nombre del
+   * fichero («lib. base», «pp», «id»): allí hay sitio. La hoja sigue con el título corto.
+   */
+  nombre?: string;
   unidad?: string;
   /** Qué va en la celda y en qué formato. */
   ayuda?: string;
@@ -208,7 +213,7 @@ function losaBajo(ctx: Contexto, f: Fila, tabla: "pilares" | "muros"): string | 
 /** Lo que vale la base vacía: apoyada en su losa de cimentación o empotrada. */
 const baseDefecto = (losa: string | undefined) => (losa ? `sobre la losa ${losa}` : "empotrado");
 
-const id: Columna = { clave: "id", titulo: "id", ayuda: "único en todo el modelo; vacío en una fila nueva: se pone solo" };
+const id: Columna = { clave: "id", titulo: "id", nombre: "Referencia", ayuda: "único en todo el modelo; vacío en una fila nueva: se pone solo" };
 const nombre: Columna = { clave: "nombre", titulo: "nombre" };
 
 // ─── Plantas ────────────────────────────────────────────────────────────────────────────────────
@@ -457,8 +462,8 @@ const pilares: DefTabla = {
       ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga, una losa, un muro u otro pilar). Vacía en una losa de cimentación, se apoya en ella",
       opciones: (ctx, f) => fijas(["empotrado", "articulado", "ninguno"], baseDefecto(f && losaBajo(ctx, f, "pilares")))(),
     },
-    { clave: "libBase", titulo: "lib. base", ayuda: GDL },
-    { clave: "libCabeza", titulo: "lib. cabeza", ayuda: GDL },
+    { clave: "libBase", titulo: "lib. base", nombre: "Libre en la base", ayuda: GDL },
+    { clave: "libCabeza", titulo: "lib. cabeza", nombre: "Libre en la cabeza", ayuda: GDL },
   ],
   fila(o) {
     const p = o as unknown as Pilar;
@@ -522,8 +527,8 @@ const vigas: DefTabla = {
     { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "eje en planta: «x y; x y; …» (al menos 2)" },
     { clave: "seccion", titulo: "sección", opciones: secciones_(), referencia: "secciones" },
     { clave: "insercion", titulo: "inserción", ayuda: "plano (por defecto: el eje en el plano del forjado, C1-c) o superior", opciones: fijas(["plano", "superior"], "plano") },
-    { clave: "libInicio", titulo: "lib. inicio", ayuda: GDL },
-    { clave: "libFin", titulo: "lib. fin", ayuda: GDL },
+    { clave: "libInicio", titulo: "lib. inicio", nombre: "Libre en el inicio", ayuda: GDL },
+    { clave: "libFin", titulo: "lib. fin", nombre: "Libre en el fin", ayuda: GDL },
   ],
   fila(o) {
     const v = o as unknown as Viga;
@@ -575,8 +580,8 @@ const barras: DefTabla = {
     { clave: "seccion", titulo: "sección", opciones: secciones_(), referencia: "secciones" },
     { clave: "giro", titulo: "giro", unidad: "°", ayuda: "de la sección alrededor de su eje; con 0, el canto h en el plano vertical de la barra (en una vertical, según +X)", defecto: () => "0" },
     { clave: "soloTraccion", titulo: "sólo tracción", ayuda: "sí: una diagonal esbelta que sólo trabaja a tracción. Se calcula lineal y se avisa si queda comprimida en alguna combinación", opciones: fijas(["sí", "no"], "no") },
-    { clave: "libInicio", titulo: "lib. inicio", ayuda: GDL },
-    { clave: "libFin", titulo: "lib. fin", ayuda: GDL },
+    { clave: "libInicio", titulo: "lib. inicio", nombre: "Libre en el inicio", ayuda: GDL },
+    { clave: "libFin", titulo: "lib. fin", nombre: "Libre en el fin", ayuda: GDL },
   ],
   fila(o) {
     const b = o as unknown as Barra;
@@ -889,6 +894,7 @@ const forjados: DefTabla = {
     {
       clave: "pp",
       titulo: "pp",
+      nombre: "Peso propio",
       unidad: "kN/m²",
       ayuda:
         "peso propio. Vacío, sale solo: γ·canto en una maciza; en un reticular, el hormigón de nervios y capa más el casetón en el hueco (los ábacos, γ·canto); en un unidireccional, la vigueta en T y la capa más la bovedilla. Lo escrito manda (en un reticular, es el de la zona aligerada: los ábacos pesan γ·canto). Obligatorio con un casetón «perdido de otro material» o una vigueta que no es una T",

@@ -37,8 +37,8 @@ describe("Propiedades de un forjado", () => {
     const { container } = montar("L1");
     expect([...container.querySelectorAll(".campo-grupo")].map((h) => h.textContent)).toEqual(["General", "Geometría en planta", "Sección", "Cota", "Material y peso"]);
     expect(nombre(screen.getByLabelText("canto"))).toBe("canto*");
-    expect(nombre(screen.getByLabelText("pp"))).toBe("pp");
-    expect((screen.getByLabelText("pp") as HTMLInputElement).placeholder).toBe("6,25 = γ·canto");
+    expect(nombre(screen.getByLabelText("Peso propio"))).toBe("Peso propio");
+    expect((screen.getByLabelText("Peso propio") as HTMLInputElement).placeholder).toBe("6,25 = γ·canto");
     expect((screen.getByLabelText("dirección") as HTMLInputElement).placeholder).toBe("0 (según +X)");
     expect(screen.getByRole("img", { name: /^Planta del forjado/ })).toBeTruthy();
     expect(screen.getByRole("img", { name: "Sección de la losa maciza" })).toBeTruthy();
@@ -72,19 +72,20 @@ describe("Propiedades de un forjado", () => {
 
   it("en un reticular con casetón perdido, el pp es obligatorio y vacío lo dice", () => {
     montar("L2");
-    const pp = screen.getByLabelText("pp") as HTMLInputElement;
-    expect(nombre(pp)).toBe("pp*");
+    const pp = screen.getByLabelText("Peso propio") as HTMLInputElement;
+    expect(nombre(pp)).toBe("Peso propio*");
     fireEvent.change(pp, { target: { value: "" } });
     expect(pp.placeholder).toBe("obligatorio");
     expect(pp.dataset.falta).toBe("true");
     expect(screen.getByRole("img", { name: "Sección del reticular" }).textContent).toContain("nervio 12");
   });
 
-  it("la ayuda sale en un globo al pasar por su «?», y un clic en una cota lleva a su campo", () => {
+  it("la ayuda sale en un globo al pasar por el nombre del campo (UI2-12: sin «?»), y un clic en una cota lleva a su campo", () => {
     vi.useFakeTimers();
     const { container } = montar("L2");
     expect(container.querySelector("p.ayuda")).toBeNull();
-    const q = screen.getByLabelText("ábacos").closest("label")!.querySelector(".campo-q")!;
+    expect(container.querySelector(".campo-q")).toBeNull();
+    const q = screen.getByLabelText("ábacos").closest("label")!.querySelector(".campo-ayuda")!;
     fireEvent.mouseEnter(q);
     expect(screen.queryByRole("tooltip")).toBeNull();
     act(() => void vi.advanceTimersByTime(200));
