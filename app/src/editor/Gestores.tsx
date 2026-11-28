@@ -380,7 +380,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
           {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
-            <p className="ges-aviso" role="status">
+            <p className="msj ok ges-aviso" role="status">
               {aviso}
             </p>
           )}
@@ -444,7 +444,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
             </div>
           </div>
           {error && (
-            <p className="ges-error" role="alert">
+            <p className="msj fail ges-error" role="alert">
               {error}
             </p>
           )}
@@ -903,7 +903,7 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
           {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
-            <p className="ges-aviso" role="status">
+            <p className="msj ok ges-aviso" role="status">
               {aviso}
             </p>
           )}
@@ -977,7 +977,7 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
             </div>
           </div>
           {error && (
-            <p className="ges-error" role="alert">
+            <p className="msj fail ges-error" role="alert">
               {error}
             </p>
           )}

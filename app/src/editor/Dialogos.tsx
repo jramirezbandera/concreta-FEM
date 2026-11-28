@@ -258,7 +258,7 @@ export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCe
             ))}
         </>
       )}
-      {error && <p className="mt-2 text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </Dialogo>
   );
 }
@@ -336,9 +336,9 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
         ))}
       </div>
       <p className="dlg-nota">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga o su forjado, o a la pieza igual que ya esté en el mismo sitio. Lo que ya está no se duplica. Los pilares y los muros no se copian: se alargan con su «desde» y su «hasta».</p>
-      {prueba && !prueba.ok && <p className="mt-2 text-state-fail">{prueba.errores.map((e) => e.mensaje).join(" ")}</p>}
+      {prueba && !prueba.ok && <p className="msj fail">{prueba.errores.map((e) => e.mensaje).join(" ")}</p>}
       {prueba?.ok && prueba.avisos && <p className="dlg-nota">{prueba.avisos.join(" ")}</p>}
-      {error && <p className="mt-2 text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </Dialogo>
   );
 }
@@ -412,7 +412,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
           <p className="dlg-nota">Las cargas y demás referencias siguen a su objeto. Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
       )}
-      {error && <p className="mt-2 text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </Dialogo>
   );
 }
@@ -499,7 +499,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
               </span>
             </label>
           </div>
-          <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
+          <div className="campos-lado mt-4">
             <label htmlFor="abacos-losa">Forjado</label>
             <select id="abacos-losa" className="sel" value={losa} onChange={(e) => setLosa(e.target.value)}>
               {reticulares.map((l) => (
@@ -519,7 +519,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
             )}
           </div>
           {"error" in p ? (
-            <p className="mt-3 text-state-fail">{p.error}</p>
+            <p className="msj fail">{p.error}</p>
           ) : (
             <ul className="mt-3 list-disc pl-5" aria-label="Lo que se va a hacer">
               <li>{p.nuevos.length ? `${plural(p.nuevos.length, "ábaco nuevo", "ábacos nuevos")}: ${p.nuevos.map((x) => x.pilar).join(", ")}.` : "Ningún ábaco nuevo."}</li>
@@ -531,7 +531,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
           <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
       )}
-      {error && <p className="mt-2 text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </Dialogo>
   );
 }
@@ -586,7 +586,7 @@ export function DialogoAlinear({ onCerrar }: { onCerrar: (hecho?: string) => voi
         <input id="alinear-tol" className="sel mono" value={cm} inputMode="decimal" aria-invalid={!!malTol} data-error={!!malTol} onChange={(e) => setCm(e.target.value)} />
       </div>
       {malTol ? (
-        <p className="mt-3 text-state-fail">{malTol}</p>
+        <p className="msj fail">{malTol}</p>
       ) : !p || !p.grupos.length ? (
         <p className="mt-3">No hay nada casi alineado: no cambia nada.</p>
       ) : (
@@ -613,15 +613,15 @@ export function DialogoAlinear({ onCerrar }: { onCerrar: (hecho?: string) => voi
             {p.grupos.length > 12 && <li className="text-text-muted">… y {p.grupos.length - 12} más</li>}
           </ul>
           {p.avisos.map((a, i) => (
-            <p key={i} className="mt-2 text-state-warn">
+            <p key={i} className="msj warn">
               {textoApp(a)}
             </p>
           ))}
-          {p.quedan > 0 && <p className="mt-2 text-state-warn">Después {p.quedan === 1 ? "queda 1 recta" : `quedan ${p.quedan} rectas`} con piezas casi alineadas (lo que estaba a más de la tolerancia del valor elegido): vuelva a alinear o corríjalo a mano.</p>}
+          {p.quedan > 0 && <p className="msj warn">Después {p.quedan === 1 ? "queda 1 recta" : `quedan ${p.quedan} rectas`} con piezas casi alineadas (lo que estaba a más de la tolerancia del valor elegido): vuelva a alinear o corríjalo a mano.</p>}
           <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
       )}
-      {error && <p className="mt-2 text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </Dialogo>
   );
 }
@@ -676,7 +676,7 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
           <p>
             Un zuncho en cada lado del borde (contorno y huecos) que no va sobre una viga, un muro, un apoyo lineal u otro forjado. Su eje va por el de los pilares del lado; sin pilares, enrasado por fuera. El forjado no se toca: el cálculo lleva a la viga lo que cae en su ancho y en la franja de hasta su ancho que quede entre su cara de fuera y el borde del forjado.
           </p>
-          <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
+          <div className="campos-lado mt-4">
             <label htmlFor="vb-losa">Forjado</label>
             <select id="vb-losa" className="sel" value={losa} onChange={(e) => setLosa(e.target.value)}>
               {losas.map((l) => (
@@ -692,7 +692,7 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
             <input id="vb-h" className="sel mono" value={h} inputMode="decimal" aria-invalid={typeof nh === "string"} data-error={typeof nh === "string"} onChange={(e) => setH(e.target.value)} />
           </div>
           {"error" in p ? (
-            <p className="mt-3 text-state-fail">{p.error}</p>
+            <p className="msj fail">{p.error}</p>
           ) : (
             <ul className="mt-3 list-disc pl-5" aria-label="Lo que se va a hacer">
               <li>
@@ -711,7 +711,7 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
           <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
       )}
-      {error && <p className="mt-2 text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </Dialogo>
   );
 }

@@ -303,3 +303,23 @@ Lo que quedaba a mano del punto 2 y el arranque del punto 3. Tres de estos cambi
 - **Comprobado en el navegador** con la vivienda, a 1920 × 1080: la ficha de un forjado con sus etiquetas («Ábacos en pilares» y «Punto de paso» enteras, «id» sin tocar), y Propiedades a 360 px en Diagramas y en Pilares, con sus tablas enteras; sin errores en la consola.
 - **Sin comprobar:** los gestores y el banco de armado con los títulos nuevos, Armado y Reacciones a 360 px, el tema oscuro, 1366 px y los bancos de Chrome.
 - **Lo que queda del punto 2:** el `Campo` único (seis disposiciones), las cajas con leyenda de Obra y Acciones, los nueve avisos, los segmentados sueltos y la escala de espacios.
+
+### 7.4 Avisos y campos (2026-11-28)
+
+Sin commit todavía.
+
+- **UI2-15, los avisos (E-19):** de nueve maneras a cuatro, cada una con su sitio:
+  - `.msj` con su tono (`ok`, `warn`, `fail` o `neu`): el aviso dentro de un panel o de un diálogo, una caja con el fondo de su tono. Sustituye a `.ges-aviso`, `.ges-error`, `.ayuda-sin`, `.aviso-proponer`, el de Inicio hecho con utilidades y los 50 párrafos `.nota` o sueltos que sólo cambiaban el color del texto (57 sitios en 23 ficheros);
+  - `.banda`: lo de toda la app, bajo la barra (no cambia);
+  - `.aviso-flota`: los dos flotantes (versión nueva y «Calculado»), con la misma caja;
+  - el error de un campo, bajo él (no cambia).
+- **UI2-15, los campos (E-11, E-16):**
+  - un solo control de texto, esté suelto (`.sel`), en un `.campo` o en un `.gp-campo`: 28 px, 13 px, el mismo borde, foco y error en una sola regla (antes, tres copias con 12 y 13 px y dos rellenos);
+  - `.sel.denso` (24 px), sólo en una tabla o en una fila de varios campos: el armado del banco y los multiplicadores del forjado, que llevaban estilos en línea;
+  - `.campos-lado`: la rejilla de etiqueta al lado en un diálogo, en lugar de las rejillas de utilidades de Ábacos, Alinear y Acciones, con la etiqueta como la de un `.campo`.
+- **Quedan tres disposiciones, con su sitio:** etiqueta al lado (`.campo` en los paneles; `.campos-lado` y `.acc-form` en los diálogos), etiqueta encima (`.gp-campo`, en los gestores) y en fila (`.herr-campo` en la barra y el armado del banco).
+- **Pruebas:** las de `app/` (177), `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` sin errores.
+- **Comprobado en el navegador** con la vivienda, a 1920 × 1080: el gestor de secciones, el diálogo de ábacos con un valor mal escrito (su aviso en caja roja), el flotante «Calculado» y el banco de armado de un pilar; sin errores en la consola.
+- **Sin comprobar:** los avisos en los paneles (Cargas, Modal, Losas, Plantillas), la ficha de acciones, el tema oscuro, 1366 px y los bancos de Chrome.
+- **Sin hacer:** la unidad «(m)» en la etiqueta de tres campos (dos pruebas los buscan por ese texto), `.acc-form` y `.campos-lado` siguen siendo dos clases, y las etiquetas de un `.campo` dentro de un gestor no llevan la mayúscula inicial.
+- **Lo que queda del punto 2:** las cajas con leyenda de Obra y Acciones, los segmentados sueltos y la escala de espacios.

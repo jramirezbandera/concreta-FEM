@@ -216,7 +216,7 @@ function CamposGrupo({ g, borrador, onCambio }: { g: GrupoArmado; borrador: Read
           <label key={c.ruta} className="flex items-center gap-1 text-[12px] text-text-secondary">
             {c.etiqueta}
             {c.clase === "diametro" ? (
-              <select className="sel" style={{ height: 24, width: 62 }} aria-label={nombre} value={borrador[c.ruta] ?? ""} onChange={(e) => onCambio(c.ruta, e.target.value)}>
+              <select className="sel denso" style={{ width: 62 }} aria-label={nombre} value={borrador[c.ruta] ?? ""} onChange={(e) => onCambio(c.ruta, e.target.value)}>
                 <option value="">—</option>
                 {DIAMETROS_BARRA.map((d) => (
                   <option key={d} value={String(d)}>
@@ -225,7 +225,7 @@ function CamposGrupo({ g, borrador, onCambio }: { g: GrupoArmado; borrador: Read
                 ))}
               </select>
             ) : (
-              <input className="sel text-right" style={{ height: 24, width: c.clase === "mm" ? 62 : 48 }} inputMode="decimal" aria-label={nombre} placeholder={c.defecto} title={c.defecto ? `Vacío, ${c.defecto}` : undefined} value={borrador[c.ruta] ?? ""} onChange={(e) => onCambio(c.ruta, e.target.value)} />
+              <input className="sel denso text-right" style={{ width: c.clase === "mm" ? 62 : 48 }} inputMode="decimal" aria-label={nombre} placeholder={c.defecto} title={c.defecto ? `Vacío, ${c.defecto}` : undefined} value={borrador[c.ruta] ?? ""} onChange={(e) => onCambio(c.ruta, e.target.value)} />
             )}
           </label>
         );
@@ -691,9 +691,9 @@ function BancoArmado({
       </header>
       {(error || aviso) && (
         <div className="banco-avisos">
-          {error && <p className="nota text-state-fail">{error}</p>}
+          {error && <p className="msj fail">{error}</p>}
           {aviso && (
-            <p className="nota aviso-proponer" data-aviso-proponer>
+            <p className="msj neu aviso-proponer" data-aviso-proponer>
               {aviso}
             </p>
           )}
@@ -743,7 +743,7 @@ function BancoArmado({
             {ficha.pendientes.length > 0 &&
               !noAplica &&
               ficha.pendientes.map((x) => (
-                <p key={x} className="nota text-state-warn">
+                <p key={x} className="msj warn">
                   Sin comprobar: {textoApp(x)}
                 </p>
               ))}
@@ -754,7 +754,7 @@ function BancoArmado({
           <div>
             <h4>Sin comprobar</h4>
             {ficha.pendientes.map((x) => (
-              <p key={x} className="nota text-state-warn">
+              <p key={x} className="msj warn">
                 {textoApp(x)}
               </p>
             ))}
@@ -820,7 +820,7 @@ function Ficha({ tipo, ficha, cargando, editar }: { tipo: TipoComprobacion; fich
       {ficha.pendientes.length > 0 && (
         <Seccion titulo="Sin comprobar" valor={ficha.pendientes.length}>
           {ficha.pendientes.map((x) => (
-            <p key={x} className="nota text-state-warn">
+            <p key={x} className="msj warn">
               {textoApp(x)}
             </p>
           ))}
@@ -1347,7 +1347,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       <AvisoDesactualizado que="estas comprobaciones" />
     </div>
   ) : r.diagnosticos ? (
-    <p className="nota text-state-fail">{r.diagnosticos.map((x) => textoApp(x.mensaje)).join(" ")}</p>
+    <p className="msj fail">{r.diagnosticos.map((x) => textoApp(x.mensaje)).join(" ")}</p>
   ) : !d ? (
     <>
       {avances}
@@ -1436,7 +1436,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     return r;
   }, [d, tipo]);
   const panelPortico = tipo !== "vigas" || !elegida ? null : pp.diagnosticos ? (
-    <p className="nota text-state-fail">{pp.diagnosticos.map((x) => textoApp(x.mensaje)).join(" ")}</p>
+    <p className="msj fail">{pp.diagnosticos.map((x) => textoApp(x.mensaje)).join(" ")}</p>
   ) : !portico ? (
     <p className="nota">Preparando el pórtico…</p>
   ) : (

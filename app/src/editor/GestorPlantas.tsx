@@ -230,7 +230,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
           )}
           {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), ficha.current?.descartar(), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
-            <p className="ges-aviso" role="status">
+            <p className="msj ok ges-aviso" role="status">
               {aviso}
             </p>
           )}
@@ -354,7 +354,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
             </>
           )}
           {error && (
-            <p className="ges-error" role="alert">
+            <p className="msj fail ges-error" role="alert">
               {error}
             </p>
           )}

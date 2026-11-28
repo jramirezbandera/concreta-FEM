@@ -584,7 +584,7 @@ export function DespiecePortico({ datos, armados, estados, elegida, activo, onVa
         )}
       </div>
       {d.avisos.map((a) => (
-        <p key={a} className="nota text-state-warn" data-aviso-despiece>
+        <p key={a} className="msj warn" data-aviso-despiece>
           {a}
         </p>
       ))}

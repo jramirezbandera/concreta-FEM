@@ -220,7 +220,7 @@ export function ModoModal() {
   const propiedades = (
     <>
       <Cabecera icono={IcModal} tipo="Modal" titulo={m ? `Modo ${m.modo}` : "Masas y modos"} detalle={<>Las masas salen de las cargas (G entero, Q por la fracción del art. 3.2 de la NCSE-02) y los modos, de la condensación exacta a los diafragmas rígidos: todos, tres por planta con masa.</>} />
-      {modal.diagnosticos && <p className="nota text-state-fail">{modal.diagnosticos.map((y) => textoApp(y.mensaje)).join(" ")}</p>}
+      {modal.diagnosticos && <p className="msj fail">{modal.diagnosticos.map((y) => textoApp(y.mensaje)).join(" ")}</p>}
       {m && (
         <Seccion titulo={`Modo ${m.modo}`}>
           <div className="fila">
@@ -315,7 +315,7 @@ export function ModoModal() {
             <span>Peso sísmico</span>
             <span className="v">{fmt(s.peso, 0)} kN</span>
           </div>
-          {s.direcciones.some((d) => d.thetaMaxima >= 0.1) && <p className="nota text-state-warn">θ llega a {fmt(Math.max(...s.direcciones.map((d) => d.thetaMaxima)), 2)}: hay que considerar los efectos de segundo orden (art. 3.8){so?.amplificar ? ": el cálculo los considera con el γz de cada hipótesis horizontal (Segundo orden global, abajo), que no es el método de la norma sismorresistente." : ", y el segundo orden global del cálculo está desactivado: las combinaciones son de primer orden."}</p>}
+          {s.direcciones.some((d) => d.thetaMaxima >= 0.1) && <p className="msj warn">θ llega a {fmt(Math.max(...s.direcciones.map((d) => d.thetaMaxima)), 2)}: hay que considerar los efectos de segundo orden (art. 3.8){so?.amplificar ? ": el cálculo los considera con el γz de cada hipótesis horizontal (Segundo orden global, abajo), que no es el método de la norma sismorresistente." : ", y el segundo orden global del cálculo está desactivado: las combinaciones son de primer orden."}</p>}
           {sismo.datos?.curva && sismo.datos.espectro && <Espectro curva={sismo.datos.curva} periodos={sismo.datos.periodos} TA={sismo.datos.espectro.emplazamiento.TA} TB={sismo.datos.espectro.emplazamiento.TB} ac={sismo.datos.espectro.emplazamiento.ac} />}
           <p className="nota">El emplazamiento y la curva, en Cargas · Sismo. Los casos EX±e y EY±e entran en las combinaciones de la situación sísmica de todas las pantallas.</p>
         </Seccion>
@@ -331,7 +331,7 @@ export function ModoModal() {
             </div>
           ))}
           {segundoOrden.datos?.problemas.map((d) => (
-            <p key={d.codigo} className={`nota ${d.severidad === "error" ? "text-state-fail" : d.severidad === "aviso" ? "text-state-warn" : ""}`}>
+            <p key={d.codigo} className={d.severidad === "error" ? "msj fail" : d.severidad === "aviso" ? "msj warn" : "nota"}>
               {textoApp(d.mensaje)}
             </p>
           ))}

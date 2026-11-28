@@ -324,7 +324,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
             </span>
             <Ayuda texto={AYUDA.amplificar} />
           </label>
-          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+          <div className="campos-lado">
             <Etiqueta htmlFor="so-m" ayuda={AYUDA.multiplicador}>
               Multiplicador de los desplazamientos
             </Etiqueta>
@@ -342,7 +342,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
             </span>
             <Ayuda texto={AYUDA.imperfeccion} />
           </label>
-          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+          <div className="campos-lado">
             <Etiqueta htmlFor="ig-theta" ayuda={AYUDA.inclinacion}>
               Inclinación θ
             </Etiqueta>
@@ -464,7 +464,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
               <option value="expuesta">Fuertemente expuesta (+20 %)</option>
             </select>
           </div>
-          {nieveCalc && !nieveCalc.nieve && <p className="nota acc-nota text-state-warn">{nieveCalc.motivo}</p>}
+          {nieveCalc && !nieveCalc.nieve && <p className="msj warn acc-nota">{nieveCalc.motivo}</p>}
           {nieveCalc?.nieve && (
             <>
               <h4 className="acc-titulo">Lo que sale</h4>
@@ -475,7 +475,7 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
                 <Cifra n="qn plana" v={nieveCalc.nieve.qnPlana === null ? "—" : `${fmt(nieveCalc.nieve.qnPlana, 2)} kN/m²`} t="μ·sk con μ = 1: cubierta plana o de hasta 30° (art. 3.5.3); de 30° a 60°, μ baja hasta 0" />
                 <Cifra n="ψ del caso" v={nieveCalc.nieve.psi === null ? "—" : nieveCalc.nieve.psi === "nieve-mas-de-1000" ? "más de 1 000 m" : "hasta 1 000 m"} t="DB SE, tabla 4.2, por la altitud de la obra" />
               </dl>
-              {nieveCalc.nieve.frontera && <p className="nota acc-nota text-state-warn">Zona de clima invernal: {nieveCalc.nieve.frontera}</p>}
+              {nieveCalc.nieve.frontera && <p className="msj warn acc-nota">Zona de clima invernal: {nieveCalc.nieve.frontera}</p>}
               {nieveCalc.nieve.notas.map((x) => (
                 <p key={x} className="nota acc-nota">
                   {x}
@@ -738,12 +738,12 @@ function ResumenViento({ d, aplicado }: { d: DatosViento | null; aplicado: boole
     <div className="grid gap-2">
       <h4 className="acc-titulo">Lo que da en el modelo{!aplicado && <span className="text-state-warn"> · lo aplicado: pulse «Aplicar» para ver lo de estos datos</span>}</h4>
       {d.errores.map((p) => (
-        <p key={p.codigo + p.mensaje} className="nota acc-nota text-state-fail">
+        <p key={p.codigo + p.mensaje} className="msj fail acc-nota">
           {textoApp(p.mensaje)}
         </p>
       ))}
       {d.avisos.map((p) => (
-        <p key={p.codigo + p.mensaje} className="nota acc-nota text-state-warn">
+        <p key={p.codigo + p.mensaje} className="msj warn acc-nota">
           {textoApp(p.mensaje)}
         </p>
       ))}
@@ -838,7 +838,7 @@ function ResumenSismo({ d, aplicado }: { d: DatosSismo | null; aplicado: boolean
     <div className="grid gap-2">
       <h4 className="acc-titulo">Lo que da en el modelo{!aplicado && <span className="text-state-warn"> · lo aplicado: pulse «Aplicar» para ver lo de estos datos</span>}</h4>
       {d.problemas.map((p) => (
-        <p key={p.codigo + p.mensaje} className={`nota acc-nota ${p.severidad === "error" ? "text-state-fail" : "text-state-warn"}`}>
+        <p key={p.codigo + p.mensaje} className={`msj acc-nota ${p.severidad === "error" ? "fail" : "warn"}`}>
           {textoApp(p.mensaje)}
         </p>
       ))}

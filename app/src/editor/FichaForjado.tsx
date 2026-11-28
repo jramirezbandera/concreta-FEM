@@ -64,7 +64,7 @@ export function FijarAbacos({ losa }: { losa: string }) {
       <button type="button" className="btn" onClick={fijar}>
         Fijar como polígonos
       </button>
-      {error && <p className="nota text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </div>
   );
 }
@@ -118,7 +118,7 @@ export function CotaForjado({ id, fila, ctx, escribir }: Props) {
           </button>
         </div>
       )}
-      {error && <p className="nota text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </div>
   );
 }
@@ -320,7 +320,7 @@ function CeldaMultiplicador({ clave, r, escribir }: { clave: keyof Multiplicador
   };
   return (
     <input
-      className="w-[64px] text-right rounded border border-border-main bg-bg-primary px-1 py-px font-mono text-[12px] data-[error=true]:border-state-fail"
+      className="sel denso w-[64px] text-right"
       value={mostrado}
       placeholder="1"
       data-error={mal}

@@ -979,9 +979,9 @@ function PlantillaCargaPanel({ h, t, modelo: m, poner }: { h: NombreCargaH; t: P
   return (
     <Seccion titulo="Plantilla" valor={t.caso ? `caso ${t.caso}` : "sin caso"}>
       <div className="py-1">
-        {!t.caso && <p className="nota text-state-fail">Elija el caso activo en la barra (o cree uno con Casos).</p>}
+        {!t.caso && <p className="msj fail">Elija el caso activo en la barra (o cree uno con Casos).</p>}
         {casoPP && (
-          <p className="nota text-state-warn" data-aviso-peso-propio>
+          <p className="msj warn" data-aviso-peso-propio>
             {casoPP} es el caso del peso propio, que calcula el programa: lo que dibuje aquí se mezcla con él.{" "}
             {cm && !cm.crear.length ? `Elija ${cm.id} en «Caso activo».` : "Cree un caso de cargas muertas (Casos, «Cargas muertas») y elíjalo en «Caso activo»."}
           </p>

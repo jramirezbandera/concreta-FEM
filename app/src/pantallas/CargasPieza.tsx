@@ -128,7 +128,7 @@ export function PropiedadesCargas({ id, caso, plantillas: t, setPlantillas, edit
             )}
             {conPP && !vacio && (
               <>
-                <p className="nota text-state-warn">Están en el caso del peso propio y se mezclan con lo que calcula el programa: mejor en uno de cargas muertas.</p>
+                <p className="msj warn">Están en el caso del peso propio y se mezclan con lo que calcula el programa: mejor en uno de cargas muertas.</p>
                 <PasarACargasMuertas />
               </>
             )}
@@ -239,7 +239,7 @@ function Anadir({ d, caso, t, setPlantillas, editar }: { d: Datos; caso: string;
             Añadir a {d.id}
           </button>
         </div>
-        {error && <p className="nota text-state-fail">{error}</p>}
+        {error && <p className="msj fail">{error}</p>}
         <p className="nota">Los mismos valores que la herramienta {forjado ? "Superficie" : barra ? "En barra" : "Empuje"}: para un trozo, dibújela.</p>
       </div>
     </Seccion>
@@ -286,7 +286,7 @@ export function ResumenCaso({ caso, setCaso }: { caso: string; setCaso?: (c: str
           ) : (
             <p className="nota">Dibuje las cargas con las herramientas de la barra o elija un forjado, una viga, un pilar o un muro para añadirle una.</p>
           )}
-          {c?.pesoPropio && filas.length > 0 && <p className="nota text-state-warn">Son del usuario, en el caso del peso propio: se mezclan con lo que calcula el programa.</p>}
+          {c?.pesoPropio && filas.length > 0 && <p className="msj warn">Son del usuario, en el caso del peso propio: se mezclan con lo que calcula el programa.</p>}
         </Seccion>
       )}
       {c?.pesoPropio && (

@@ -226,7 +226,7 @@ export function ModoDeformada() {
           </>
         }
       />
-      {d.diagnosticos && <p className="nota text-state-fail">{d.diagnosticos.map((y) => y.mensaje).join(" ")}</p>}
+      {d.diagnosticos && <p className="msj fail">{d.diagnosticos.map((y) => y.mensaje).join(" ")}</p>}
       {x && (
         <>
           <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)}`}>

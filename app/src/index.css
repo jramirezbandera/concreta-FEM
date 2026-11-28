@@ -242,6 +242,18 @@ body {
 .vacio-titulo { font-weight: 500; color: var(--color-text-secondary); }
 .vacio-como { color: var(--color-text-tertiary); }
 .nota { margin: 8px 14px 10px; font-size: 12px; line-height: 1.45; color: var(--color-text-secondary); }
+/*
+ * UI2-15: un aviso dentro de un panel o de un diálogo (un error, una advertencia, algo hecho o una
+ * nota del programa): una caja con el fondo de su tono. Antes había nueve maneras. Los otros tres
+ * avisos tienen su sitio: `.banda` (de toda la app, bajo la barra), los flotantes (`.aviso-flota`)
+ * y el error de un campo, bajo él (`.campo p.error`).
+ */
+.msj { margin: 6px 14px; padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.45; background: var(--color-bg-elevated); color: var(--color-text-primary); }
+.msj.ok { background: var(--color-tint-ok); color: var(--color-state-ok-text); }
+.msj.warn { background: var(--color-tint-warn); color: var(--color-state-warn-text); }
+.msj.fail { background: var(--color-tint-fail); color: var(--color-state-fail-text); }
+.msj + .msj { margin-top: 4px; }
+:where(.dialogo-cuerpo, .gp-form) .msj { margin: 10px 0 0; }
 
 .lista-fila {
   display: grid; align-items: center; gap: 8px;
@@ -300,15 +312,28 @@ html[data-theme="dark"] .seg > button[data-on="true"] { background: var(--color-
 .seg > button:disabled { opacity: .45; cursor: default; }
 .seg.mono > button { font-family: var(--font-mono); }
 
-.sel {
+/*
+ * UI2-15, E-11: un solo control de texto (campo o desplegable), esté donde esté: 28 px, 13 px, el
+ * mismo borde y el mismo foco. `.sel` suelto, o dentro de un `.campo` (etiqueta al lado, en los
+ * paneles) o de un `.gp-campo` (etiqueta encima, en los diálogos). `.denso`, 24 px, sólo dentro de
+ * una tabla o de una fila de varios campos.
+ */
+.sel, .campo input, .campo select, .gp-campo input, .gp-campo select {
   height: 28px; min-width: 0; padding: 0 8px;
   border: 1px solid var(--color-border-main); border-radius: 6px;
   background: var(--color-bg-primary); color: var(--color-text-primary);
   font: 13px var(--font-mono);
   transition: border-color .12s, box-shadow .12s;
 }
-input.sel:hover, textarea.sel:hover { border-color: var(--color-border-strong); }
-input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-ring); }
+.campo input, .campo select, .gp-campo input, .gp-campo select { width: 100%; }
+.campo select, .gp-campo select { font-family: var(--font-sans); }
+.sel.denso { height: 24px; padding: 0 6px; font-size: 12px; }
+input.sel:hover, textarea.sel:hover, .campo input:hover:not(:read-only), .campo select:hover, .gp-campo input:hover, .gp-campo select:hover { border-color: var(--color-border-strong); }
+input.sel:focus, textarea.sel:focus, .campo input:focus:not(:read-only), .campo select:focus-visible, .gp-campo input:focus, .gp-campo select:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-ring); }
+.sel[data-error="true"], .campo input[data-error="true"], .campo select[data-error="true"], .gp-campo input[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
+/* Campos con la etiqueta al lado en un diálogo: la etiqueta, como la de un `.campo` */
+.campos-lado { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 16px; }
+.campos-lado > label, .acc-form > label { font-size: 12px; color: var(--color-text-secondary); }
 
 .chk { display: flex; align-items: center; gap: 8px; min-height: 26px; padding: 0 14px; color: var(--color-text-secondary); cursor: pointer; }
 .chk input { accent-color: var(--color-accent); margin: 0; }
@@ -508,19 +533,10 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .campo > span { display: flex; align-items: baseline; gap: 5px; min-width: 0; font-size: 12px; color: var(--color-text-secondary); cursor: default; }
 .campo > span small { font: 11px var(--font-mono); color: var(--color-text-tertiary); white-space: nowrap; }
 .campo:focus-within > span { color: var(--color-text-primary); }
-.campo input, .campo select {
-  width: 100%; height: 28px; padding: 0 8px;
-  border: 1px solid var(--color-border-main); border-radius: 6px;
-  background: var(--color-bg-primary); color: var(--color-text-primary); font: 12px var(--font-mono);
-  transition: border-color .12s, box-shadow .12s;
-}
-.campo input:hover:not(:read-only), .campo select:hover { border-color: var(--color-border-strong); }
-.campo input:focus:not(:read-only), .campo select:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-ring); }
 .campo select { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* UI2-5: un valor que no cabe acaba en «…» (mientras no se escribe en él) */
 .campo input:not(:focus) { text-overflow: ellipsis; }
 .campo input:read-only { border-color: transparent; background: var(--color-bg-surface); color: var(--color-text-secondary); }
-.campo input[data-error="true"], .campo select[data-error="true"], .dialogo input.sel[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
 .campo p { grid-column: 2; margin: 3px 0 2px; font-size: 11px; line-height: 1.4; color: var(--color-text-tertiary); }
 .campo p.error { color: var(--color-state-fail); }
 
@@ -535,7 +551,6 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .insp-cab > .btn, .insp-cab > .ib, .insp-cab > .pill { flex-shrink: 0; align-self: flex-start; }
 .insp-cab > .cab-icono { align-self: flex-start; margin-top: 2px; }
 /* Los desplegables de un formulario dicen texto (plantas con su nombre, secciones con su forma): en la letra de la interfaz */
-.campo select { font-family: var(--font-sans); }
 /* Una tabla de campos (la armadura base): columnas iguales que caben en el panel */
 .tb-base { table-layout: fixed; }
 .tb-base th:first-child, .tb-base td:first-child { width: 64px; }
@@ -607,19 +622,15 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .banda.ok { background: var(--color-tint-ok); color: var(--color-state-ok-text); }
 
 /* Aviso de versión nueva (armazon/AvisoVersion.tsx): abajo a la derecha, sobre la barra de estado */
-.aviso-version {
-  position: fixed; right: 16px; bottom: 40px; z-index: 45; display: flex; align-items: center; gap: 10px;
-  max-width: calc(100vw - 32px); padding: 8px 8px 8px 14px; border: 1px solid var(--color-border-main); border-radius: 8px;
+.aviso-flota {
+  position: fixed; bottom: 40px; display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 32px); padding: 6px 6px 6px 14px; border: 1px solid var(--color-border-main); border-radius: 8px;
   background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 13px; box-shadow: var(--shadow-pop);
 }
+.aviso-version { right: 16px; z-index: 45; }
 
 /* «Calculado · Ver resultados» (P-27): abajo en el centro, flotando, para no mover el dibujo ni pisar el aviso de versión */
-.aviso-calculado {
-  position: fixed; left: 50%; bottom: 40px; z-index: 44; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
-  width: max-content; max-width: min(640px, calc(100vw - 32px)); padding: 6px 6px 6px 14px;
-  border: 1px solid var(--color-border-main); border-left: 4px solid var(--color-state-ok-text); border-radius: 8px;
-  background: var(--color-bg-primary); color: var(--color-text-primary); font-size: 13px; box-shadow: var(--shadow-pop);
-}
+.aviso-calculado { left: 50%; z-index: 44; transform: translateX(-50%); width: max-content; max-width: min(640px, calc(100vw - 32px)); border-left: 4px solid var(--color-state-ok-text); }
 
 /* ── Armazón (I1, docs/fem3d/interfaz.md §3 y §13) ─────────────────────────── */
 
@@ -1050,8 +1061,8 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .ges-ficha { min-height: 0; overflow-y: auto; padding: 10px 18px 16px; }
 .ges-ficha .campo { padding: 3px 0; }
 .ges-para { margin: 0 0 8px; font-size: 12px; color: var(--color-text-secondary); }
-.ges-aviso { margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; background: var(--color-tint-ok); color: var(--color-state-ok); }
-.ges-error { margin: 10px 0 0; padding: 6px 10px; border-radius: 6px; font-size: 12px; background: var(--color-tint-fail); color: var(--color-state-fail); }
+.ges-aviso { margin: 0 0 8px; }
+.ges-error { margin: 10px 0 0; }
 .ges-tipos { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 4px; }
 .ges-tipo { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 6px; border: 1px solid var(--color-border-main); border-radius: 8px; background: var(--color-bg-primary); cursor: pointer; font-size: 12px; color: var(--color-text-primary); }
 .ges-tipo small { font-size: 11px; color: var(--color-text-tertiary); }
@@ -1134,17 +1145,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .gp-campo.gp-ancho { flex: 1; min-width: 160px; width: auto; }
 .gp-campo > span:first-child:not(.gp-unidad) { font-size: 12px; color: var(--color-text-secondary); }
 .gp-campo:focus-within > span:first-child:not(.gp-unidad) { color: var(--color-text-primary); }
-.gp-campo input, .gp-campo select {
-  width: 100%; height: 28px; padding: 0 9px;
-  border: 1px solid var(--color-border-main); border-radius: 6px;
-  background: var(--color-bg-primary); color: var(--color-text-primary); font: 13px var(--font-mono);
-  transition: border-color .12s, box-shadow .12s;
-}
-.gp-campo select { font-family: var(--font-sans); }
-.gp-campo input:hover, .gp-campo select:hover { border-color: var(--color-border-strong); }
-.gp-campo input:focus, .gp-campo select:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-ring); }
 .gp-campo input:disabled { opacity: .5; }
-.gp-campo input[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
 .gp-unidad { position: relative; display: block; }
 .gp-unidad::after { content: attr(data-unidad); position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 12px var(--font-mono); color: var(--color-text-tertiary); pointer-events: none; }
 .gp-unidad input { padding-right: 24px; }
@@ -1493,7 +1494,7 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 .minima-reducida { margin: 8px 14px 4px; padding: 7px 10px; border: 1px solid var(--color-border-sub); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--color-text-primary); }
 .minima-reducida p { margin-top: 4px; font-size: 12px; color: var(--color-text-secondary); }
 /* §8.16: lo que ha hecho «Proponer», y las comprobaciones y las hipótesis de la pieza, bajo el armado */
-.aviso-proponer { margin: 2px 14px 4px; padding: 6px 10px; border-radius: 8px; background: var(--color-bg-elevated); color: var(--color-text-primary); }
+.aviso-proponer { margin: 2px 14px 4px; }
 .hipotesis { margin: 2px 14px 8px; padding-left: 16px; list-style: disc; font-size: 12px; line-height: 1.45; color: var(--color-text-secondary); }
 .hipotesis li + li { margin-top: 3px; }
 .barra-proponer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 14px 2px; }

@@ -75,7 +75,7 @@ export function AyudaCaso({ caso, m, campo }: { caso: CasoFisico; m: ModeloFisic
           </div>
         </div>
       ) : (
-        <p className="ayuda-sin">Sin acción: se calcula y se puede consultar, pero no entra en las combinaciones CTE/NCSE. Elija una en «acción».</p>
+        <p className="msj warn ayuda-sin">Sin acción: se calcula y se puede consultar, pero no entra en las combinaciones CTE/NCSE. Elija una en «acción».</p>
       )}
       {info && (
         <section>

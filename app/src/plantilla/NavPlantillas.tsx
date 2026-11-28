@@ -52,7 +52,7 @@ export function NavPlantillas({ pl, herramienta, error }: Props) {
     <Seccion titulo="Plantillas DXF o DWG" valor={lista.length || undefined}>
       {/* M-23: vacía, lo justo */}
       {!lista.length && <Vacio titulo="Sin plano de fondo">Con «Plantilla», un DXF o DWG en gris detrás de la planta, para calcar.</Vacio>}
-      {error && <p className="nota text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
       {lista.map((t) => (
         <Ficha key={t.nombre} t={t} abierta={abierta === t.nombre} alternar={() => setAbierta(abierta === t.nombre ? null : t.nombre)} pl={pl} cambiar={(n, e) => cambiar(t, n, e)} quitar={() => ed.editar({ op: "plantillas", plantillas: lista.filter((x) => x.nombre !== t.nombre) }, `Quitar la plantilla «${t.nombre}»`)} herramienta={(h) => herramienta(h, t.nombre)} />
       ))}
@@ -141,7 +141,7 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
             }} />
           </Linea>
           {est?.tipo === "falta" && <p className="nota">No está en este navegador ni junto al proyecto: elíjalo.</p>}
-          {est?.tipo === "error" && <p className="nota text-state-fail">{est.mensaje}</p>}
+          {est?.tipo === "error" && <p className="msj fail">{est.mensaje}</p>}
           <Linea k="Unidades">
             <select className="sel" aria-label="Unidades del DXF" value={t.unidades} onChange={(x) => cambiar({ ...t, unidades: x.target.value as UnidadDxf }, `Unidades de la plantilla «${t.nombre}»`)}>
               {(Object.keys(UNIDADES) as UnidadDxf[]).map((u) => (
@@ -203,11 +203,11 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
             </p>
           )}
           {d?.avisos.map((a) => (
-            <p key={a} className="nota text-state-warn">
+            <p key={a} className="msj warn">
               {a}
             </p>
           ))}
-          {aviso && <p className="nota text-state-fail">{aviso}</p>}
+          {aviso && <p className="msj fail">{aviso}</p>}
         </div>
       )}
     </div>

@@ -31,7 +31,7 @@ html[data-theme="dark"] {
 .ayuda-panel p { margin: 0; }
 .ayuda-cab { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
 .ayuda-cab b { display: block; font-size: 13px; font-weight: 600; color: var(--color-text-primary); }
-.ayuda-sin { padding: 8px 10px; border-radius: 6px; background: var(--color-tint-warn); color: var(--color-state-warn); }
+.ayuda-sin { margin: 0; }
 
 /* ψ: tres columnas con su valor y lo que es */
 .ayuda-psi { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }

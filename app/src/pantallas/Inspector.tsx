@@ -93,7 +93,7 @@ export function Inspector({ id }: { id: string }) {
         </button>
       </Cabecera>
       {ed && tabla && <FormularioObjeto id={id} tabla={tabla} />}
-      {r.diagnosticos && !tabla && <p className="nota text-state-warn">{r.diagnosticos.map((d) => d.mensaje).join(" ")} (puede que ya no exista en esta versión del proyecto).</p>}
+      {r.diagnosticos && !tabla && <p className="msj warn">{r.diagnosticos.map((d) => d.mensaje).join(" ")} (puede que ya no exista en esta versión del proyecto).</p>}
       {r.diagnosticos && tabla && <p className="nota">Compilando la versión nueva…</p>}
       {o && (
         <>

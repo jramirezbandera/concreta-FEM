@@ -191,7 +191,7 @@ export function TramosPilarPanel({ id, fila, ctx, escribir, errores }: Props) {
 function Fuera({ t, quitar }: { t: TramosPilar; general: string; quitar: () => void }) {
   if (!t.fuera.length) return null;
   return (
-    <p className="nota text-state-warn mt-1">
+    <p className="msj warn">
       {t.fuera.map((x) => `${x.planta}: ${x.seccion}`).join("; ")} no {t.fuera.length === 1 ? "es de ningún tramo" : "son de ningún tramo"} de este pilar (cada tramo va por la planta de su cabeza, entre {t.tramos[t.tramos.length - 1]!.base} y {t.tramos[0]!.cabeza}).{" "}
       <button type="button" className="text-accent hover:underline" onClick={quitar}>
         Quitar{t.fuera.length === 1 ? "lo" : "los"}

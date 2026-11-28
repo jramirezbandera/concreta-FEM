@@ -34,7 +34,7 @@ export function PasarACargasMuertas({ alHacer, compacto = false }: { alHacer?: (
       <button type="button" className={compacto ? "btn" : "btn btn-p"} style={compacto ? { height: 22, padding: "0 8px", fontSize: 11 } : undefined} onClick={pasar} title={`A un caso de cargas muertas con la misma acción: las combinaciones dan lo mismo. Un paso de deshacer.`}>
         {texto}
       </button>
-      {error && <p className="nota text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </div>
   );
 }

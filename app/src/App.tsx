@@ -602,7 +602,7 @@ export function App() {
           )}
           {recienCalculado && espacioValido !== "resultados" && espacioValido !== "comprobacion" && espacioValido !== "revision" && e?.calculado && (
             // Flotando sobre la vista: como banda, empujaba el dibujo 39 px al aparecer y otra vez al irse
-            <div className="aviso-calculado" role="status">
+            <div className="aviso-flota aviso-calculado" role="status">
               <span className="min-w-0 flex-1">
                 <strong>Calculado{e.origen !== "guardados" && proyecto.tiempos.calcular !== undefined ? ` en ${fmt(proyecto.tiempos.calcular, 1)} s` : ""}.</strong> Los resultados de esta versión ya se pueden ver.
               </span>

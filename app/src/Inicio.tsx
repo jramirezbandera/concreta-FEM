@@ -278,7 +278,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
               </label>
             </div>
             {error && (
-              <p role="alert" className="flex items-start gap-2 rounded-md bg-tint-fail px-3 py-2 text-[12px] text-state-fail-text">
+              <p role="alert" className="msj fail flex items-start gap-2" style={{ margin: 0 }}>
                 <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" /> {error}
               </p>
             )}

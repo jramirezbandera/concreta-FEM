@@ -42,8 +42,8 @@ export function FichaAbacos({ ids }: { ids: string[] }) {
   );
   const pie = (
     <>
-      {error && <p className="nota text-state-fail">{error}</p>}
-      {hecho && <p className="nota text-state-warn">{hecho}</p>}
+      {error && <p className="msj fail">{error}</p>}
+      {hecho && <p className="msj warn">{hecho}</p>}
     </>
   );
 

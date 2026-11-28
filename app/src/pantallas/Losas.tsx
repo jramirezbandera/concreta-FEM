@@ -191,7 +191,7 @@ function TerrenoPlanta({ t, combinaciones }: { t: readonly TerrenoLosa[]; combin
             </tbody>
           </table>
           {x.despegue ? (
-            <p className="nota text-state-warn" data-despegue={x.losa}>
+            <p className="msj warn" data-despegue={x.losa}>
               Despega {fmt(x.despegue.area, 1)} m² (el {fmt(100 * x.despegue.fraccion, 1)} % de la losa) en {x.despegue.comb}. El cálculo es lineal y sus muelles trabajan a tracción, que el terreno no da: ahí los resultados no valen. Revise el canto, las cargas o el balasto.
             </p>
           ) : (

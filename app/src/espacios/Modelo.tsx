@@ -725,8 +725,8 @@ function Proyecto() {
         </div>
       )}
       {e.compilando && <p className="nota">Compilando: los diagnósticos, la malla y el cálculo salen al terminar.</p>}
-      {!e.compila && !e.compilando && <p className="nota text-state-fail">El modelo no compila: se dibuja con sus diagnósticos. {ed ? "Corríjalo en las tablas (los errores, en Diagnósticos, abajo)." : "Corríjalo en el proyecto.json."}</p>}
-      {proyecto.fase === "error" && e.compila && <p className="nota text-state-fail">El cálculo falló: {proyecto.errores.map((d) => d.mensaje).join(" ")}</p>}
+      {!e.compila && !e.compilando && <p className="msj fail">El modelo no compila: se dibuja con sus diagnósticos. {ed ? "Corríjalo en las tablas (los errores, en Diagnósticos, abajo)." : "Corríjalo en el proyecto.json."}</p>}
+      {proyecto.fase === "error" && e.compila && <p className="msj fail">El cálculo falló: {proyecto.errores.map((d) => d.mensaje).join(" ")}</p>}
     </Seccion>
   );
 }

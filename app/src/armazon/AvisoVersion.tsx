@@ -103,7 +103,7 @@ export function AvisoVersion({ activo = import.meta.env.PROD, actual = __VERSION
 
   if (!(nueva || (activo && enEspera)) || cerrado) return null;
   return (
-    <div className="aviso-version" role="status">
+    <div className="aviso-flota aviso-version" role="status">
       <span>Hay una nueva versión de Concreta FEM disponible.</span>
       <button type="button" className="btn btn-p" onClick={() => (enEspera ? aplicar(updateServiceWorker) : location.reload())}>
         <RefreshCw size={14} /> Actualizar

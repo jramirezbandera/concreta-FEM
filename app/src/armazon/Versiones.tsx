@@ -130,7 +130,7 @@ export function DialogoVersiones({ id, nombre, onCerrar, onRestaurada }: { id: s
           })}
         </ul>
       )}
-      {error && <p className="mt-2 text-state-fail">{error}</p>}
+      {error && <p className="msj fail">{error}</p>}
     </Dialogo>
   );
 }

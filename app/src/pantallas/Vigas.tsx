@@ -320,7 +320,7 @@ export function ModoDiagramas() {
   const propiedades = (
     <>
         {!v && <Cabecera icono={IcDiagramas} tipo="Diagramas" titulo="Ninguna pieza elegida" detalle="Elija una viga, una vigueta, un pilar o una barra en una vista o en el navegador." />}
-        {viga.diagnosticos && <p className="nota text-state-fail">{viga.diagnosticos.map((x) => x.mensaje).join(" ")}</p>}
+        {viga.diagnosticos && <p className="msj fail">{viga.diagnosticos.map((x) => x.mensaje).join(" ")}</p>}
         {v && (
           <>
             <Cabecera
