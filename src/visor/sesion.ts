@@ -47,7 +47,7 @@ import type { ResultadoCaso, ResultadoModal } from "../motor/modelo.ts";
 import { alambrico } from "./alambrico.ts";
 import { solido, type Solido } from "./solido.ts";
 import { diagramas3D, type Diagramas3D, type Esfuerzo3D, type PiezasDiagrama } from "./diagramas3d.ts";
-import { elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
+import { visibleConFiltro, type FiltroObjetos, elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
 import type { TipoElegible } from "./protocolo.ts";
 import { isovalores3D, valorEnLamina, type Isovalores3D, type SuperficiesMapa } from "./isovalores3d.ts";
 import { pilares3D, type MagnitudPilares, type Pilares3D } from "./pilares3d.ts";
@@ -983,7 +983,7 @@ export class Sesion {
   }
 
   /** VC5: lo que hay bajo un punto de una escena plana con resultados (`Objetivo2D`), o null. */
-  objetivo(fu: FuenteEscena, punto: readonly [number, number], radio: number): Objetivo2D | null {
+  objetivo(fu: FuenteEscena, punto: readonly [number, number], radio: number, filtro?: FiltroObjetos): Objetivo2D | null {
     const rr = this.rr;
     if (!rr) return null;
     const q: Vec2 = [punto[0], punto[1]];
@@ -993,7 +993,7 @@ export class Sesion {
     const pilares = fu.tipo === "alzado" ? !!fu.pilares : fu.vista.vista === "pilares-n";
     const reacciones = fu.tipo === "alzado" ? !!fu.reacciones : fu.vista.vista === "reacciones";
     if (!diagramas && !pilares && !reacciones) return null;
-    const el = this.elegir(fu, punto, radio, undefined, pilares ? ["pilar"] : undefined);
+    const el = this.elegir(fu, punto, radio, undefined, pilares ? ["pilar"] : undefined, filtro);
     if (!el) return null;
     const id = el.objeto;
     if (reacciones) return { tipo: "reaccion", objeto: id };
@@ -1030,17 +1030,25 @@ export class Sesion {
   }
 
   /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */
-  elegir(fu: FuenteEscena, punto: readonly [number, number] | null, radio: number, objetos?: readonly string[], elegibles?: readonly TipoElegible[]): Eleccion | null {
+  elegir(fu: FuenteEscena, punto: readonly [number, number] | null, radio: number, objetos?: readonly string[], elegibles?: readonly TipoElegible[], filtro?: FiltroObjetos): Eleccion | null {
     const e = this.escenaDe(fu);
     if (!e.valido) return null;
     if (objetos !== undefined) return objetos.length ? resaltar(e.valor, objetos) : null;
-    return punto ? elegir(e.valor, punto, radio, this.admite(elegibles)) : null;
+    return punto ? elegir(e.valor, punto, radio, this.admiteVisible(elegibles, filtro)) : null;
   }
 
   /** Los objetos de una ventana de una escena (`elegirVentana`). */
-  ventana(fu: FuenteEscena, caja: [number, number, number, number], modo: "dentro" | "toca", elegibles?: readonly TipoElegible[]): string[] {
+  ventana(fu: FuenteEscena, caja: [number, number, number, number], modo: "dentro" | "toca", elegibles?: readonly TipoElegible[], filtro?: FiltroObjetos): string[] {
     const e = this.escenaDe(fu);
-    return e.valido ? elegirVentana(e.valor, caja, modo, this.admite(elegibles)) : [];
+    return e.valido ? elegirVentana(e.valor, caja, modo, this.admiteVisible(elegibles, filtro)) : [];
+  }
+
+  /** Lo de unos tipos (`admite`) que además se ve con el filtro de la vista (VC6: lo aislado y lo oculto). */
+  private admiteVisible(elegibles: readonly TipoElegible[] | undefined, filtro: FiltroObjetos | undefined): ((objeto: string) => boolean) | undefined {
+    const a = this.admite(elegibles);
+    const v = visibleConFiltro(filtro);
+    if (!v) return a;
+    return a ? (o) => a(o) && v(o) : v;
   }
 
   /** Los objetos del proyecto de unos tipos (`TipoElegible`), como predicado; sin tipos, todos. */

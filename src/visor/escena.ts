@@ -39,6 +39,20 @@ export interface Capa {
   segmentos: Float32Array;
   /** Caja de sus vértices, respecto al origen (el rectángulo que cubre el stencil). */
   caja: Caja;
+  /**
+   * VC6: los trozos de `abanicos` y `segmentos` (índices de sus números, [a0, a1) y [s0, s1)) de cada
+   * primitiva con objeto, para quitar en la vista lo de los objetos ocultos (`filtrarObjetos`).
+   */
+  trozos?: TrozoCapa[];
+}
+
+/** VC6: lo que una primitiva con objeto pone en su capa. */
+export interface TrozoCapa {
+  objeto: string;
+  a0: number;
+  a1: number;
+  s0: number;
+  s1: number;
 }
 
 export type Glifo = Extract<Primitiva, { tipo: "marca" } | { tipo: "flecha" }>;
@@ -131,7 +145,7 @@ class Acumulador {
 
 export function prepararEscena(e: Escena): EscenaPreparada {
   const origen = origenDe(e);
-  const capas: (Omit<Capa, "abanicos" | "segmentos" | "caja"> & { a: Acumulador })[] = [];
+  const capas: (Omit<Capa, "abanicos" | "segmentos" | "caja"> & { a: Acumulador; t: TrozoCapa[] })[] = [];
   const glifos: Glifo[] = [];
   const textos: Texto[] = [];
   const lineasRotuladas: LineaRotulada[] = [];
@@ -139,13 +153,20 @@ export function prepararEscena(e: Escena): EscenaPreparada {
     const ult = capas[capas.length - 1];
     if (ult && ult.estilo === estilo && ult.forma === forma && ult.relleno === relleno) return ult.a;
     const a = new Acumulador(origen);
-    capas.push({ estilo, forma, ...(relleno !== undefined ? { relleno } : {}), a });
+    capas.push({ estilo, forma, ...(relleno !== undefined ? { relleno } : {}), a, t: [] });
     return a;
+  };
+  // VC6: lo que pone una primitiva con objeto, en su capa (la última)
+  const trozo = (objeto: string | undefined, a: Acumulador, poner: () => void) => {
+    const [a0, s0] = [a.abanicos.length, a.segmentos.length];
+    poner();
+    if (objeto !== undefined) capas[capas.length - 1]!.t.push({ objeto, a0, a1: a.abanicos.length, s0, s1: a.segmentos.length });
   };
   for (const p of e.primitivas) {
     switch (p.tipo) {
       case "poligono": {
-        capa(p.estilo, "area", p.relleno).poligono(p.anillos);
+        const a = capa(p.estilo, "area", p.relleno);
+        trozo(p.objeto, a, () => a.poligono(p.anillos));
         break;
       }
       case "region": {
@@ -153,10 +174,12 @@ export function prepararEscena(e: Escena): EscenaPreparada {
         for (const r of p.anillos) a.anillo(r, true);
         break;
       }
-      case "linea":
-        capa(p.estilo, "trazo", undefined).linea(p.puntos);
+      case "linea": {
+        const a = capa(p.estilo, "trazo", undefined);
+        trozo(p.objeto, a, () => a.linea(p.puntos));
         if (p.rotulo) lineasRotuladas.push({ puntos: p.puntos, texto: p.rotulo });
         break;
+      }
       case "marca":
       case "flecha":
         glifos.push(p);
@@ -170,7 +193,7 @@ export function prepararEscena(e: Escena): EscenaPreparada {
     titulo: e.titulo,
     cabecera: e.cabecera,
     origen,
-    capas: capas.map(({ a, ...c }) => ({ ...c, abanicos: new Float32Array(a.abanicos), segmentos: new Float32Array(a.segmentos), caja: a.caja })),
+    capas: capas.map(({ a, t, ...c }) => ({ ...c, abanicos: new Float32Array(a.abanicos), segmentos: new Float32Array(a.segmentos), caja: a.caja, ...(t.length ? { trozos: t } : {}) })),
     glifos,
     textos,
     lineasRotuladas,
@@ -200,6 +223,57 @@ export function sinEjes(e: EscenaPreparada): EscenaPreparada {
     textos: e.textos.filter((t) => t.clase !== "cota" && !(t.clase === "eje" && t.objeto !== undefined && ejes.has(t.objeto))),
     leyenda: e.leyenda.filter((l) => !l.estilo || !ESTILOS_EJES.has(l.estilo)),
   };
+}
+
+// ─── Aislar y ocultar (VC6) ─────────────────────────────────────────────────────────────────────
+
+/** Lo que se aísla y se oculta en una vista (los de `FiltroVista` que no son del 3D). */
+export interface FiltroObjetos {
+  aislados?: readonly string[] | null;
+  ocultos?: readonly string[];
+}
+
+/**
+ * ¿Se ve un objeto con un filtro? Como en el 3D: no si está oculto, y con aislados, sólo si es uno de
+ * ellos; lo de una pieza («<losa>/R1», un refuerzo) va con ella. null: el filtro no quita nada.
+ */
+export function visibleConFiltro(f: FiltroObjetos | undefined | null): ((objeto: string) => boolean) | null {
+  if (!f || (!f.aislados && !f.ocultos?.length)) return null;
+  const aislados = f.aislados ? new Set(f.aislados) : null;
+  const ocultos = new Set(f.ocultos ?? []);
+  const pieza = (o: string) => {
+    const k = o.lastIndexOf("/");
+    return k > 0 ? o.slice(0, k) : o;
+  };
+  return (o) => !ocultos.has(o) && !ocultos.has(pieza(o)) && (!aislados || aislados.has(o) || aislados.has(pieza(o)));
+}
+
+/**
+ * VC6: la escena sin lo de los objetos que no se ven (sus trozos de las capas, sus glifos, sus
+ * textos y sus extremos). Lo que no es de ningún objeto (ejes, plantas, isobandas) se queda.
+ */
+export function filtrarObjetos(e: EscenaPreparada, ve: (objeto: string) => boolean): EscenaPreparada {
+  const capas = e.capas.map((c) => {
+    const fuera = c.trozos?.filter((t) => !ve(t.objeto));
+    if (!fuera?.length) return c;
+    const quita = (v: Float32Array, rangos: [number, number][]) => {
+      const n = rangos.reduce((s, [a, b]) => s + (b - a), 0);
+      const r = new Float32Array(v.length - n);
+      let [k, i] = [0, 0];
+      for (const [a, b] of rangos.sort((x, y) => x[0] - y[0])) {
+        r.set(v.subarray(i, a), k);
+        k += a - i;
+        i = b;
+      }
+      r.set(v.subarray(i), k);
+      return r;
+    };
+    // Sin sus trozos: los índices ya no valen (se filtra siempre la escena entera)
+    const { trozos: _t, ...resto } = c;
+    return { ...resto, abanicos: quita(c.abanicos, fuera.map((t) => [t.a0, t.a1])), segmentos: quita(c.segmentos, fuera.map((t) => [t.s0, t.s1])) };
+  });
+  const v = (o: string | undefined) => o === undefined || ve(o);
+  return { ...e, capas, glifos: e.glifos.filter((g) => v(g.objeto)), textos: e.textos.filter((t) => v(t.objeto)), extremos: e.extremos.filter((x) => v(x.objeto)) };
 }
 
 // ─── Elegir con el ratón ────────────────────────────────────────────────────────────────────────

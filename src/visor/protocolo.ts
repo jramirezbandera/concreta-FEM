@@ -10,7 +10,7 @@ import type { EscalaMapa } from "../agente/render/isovalores.ts";
 import type { Campo, Envolvente } from "../agente/render/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { DatosDeformada, DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ReaccionesCasos, ValorPunto } from "./datos.ts";
-import type { Eleccion, EscenaPreparada } from "./escena.ts";
+import type { Eleccion, EscenaPreparada, FiltroObjetos } from "./escena.ts";
 import type { Alambrico } from "./alambrico.ts";
 import type { Solido } from "./solido.ts";
 import type { Diagramas3D } from "./diagramas3d.ts";
@@ -51,10 +51,10 @@ export type Pedido =
   | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido; comprobacion?: ComprobacionAlzado } & ExtrasAlzado
   /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
   /** VC5: lo que hay bajo el cursor de una planta o un alzado con resultados. */
-  | { tipo: "objetivo"; fuente: FuenteEscena; punto: readonly [number, number]; radio: number }
-  | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[]; elegibles?: TipoElegible[] }
+  | { tipo: "objetivo"; fuente: FuenteEscena; punto: readonly [number, number]; radio: number; filtro?: FiltroObjetos }
+  | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[]; elegibles?: TipoElegible[]; /** VC6: lo aislado y lo oculto de la vista no se elige. */ filtro?: FiltroObjetos }
   /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */
-  | { tipo: "ventana"; fuente: FuenteEscena; caja: [number, number, number, number]; modo: "dentro" | "toca"; elegibles?: TipoElegible[] }
+  | { tipo: "ventana"; fuente: FuenteEscena; caja: [number, number, number, number]; modo: "dentro" | "toca"; elegibles?: TipoElegible[]; filtro?: FiltroObjetos }
   /** El 3D alámbrico del modelo físico (I2). */
   | { tipo: "alambrico" }
   /** El 3D sólido: las secciones extruidas, con sus aristas (I3). */

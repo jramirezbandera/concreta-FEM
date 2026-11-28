@@ -80,7 +80,7 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 3. **VC3, Comprobación en el alzado y el color en el 3D** (CV-4; **hecho el 2026-11-28**, §8).
 4. **VC4, Pilares y muros en el alzado** (CV-5; **hecho el 2026-11-28**, §9).
 5. **VC5, el valor bajo el cursor en las vistas planas** (CV-6; **hecho el 2026-11-28**, §10).
-6. **VC6, aislar y ocultar en planta y alzado** (CV-8), si después de lo demás sigue haciendo falta.
+6. **VC6, aislar y ocultar en planta y alzado** (CV-8; **hecho el 2026-11-28**, §11).
 
 ## 6. VC1 hecho (2026-11-28)
 
@@ -143,3 +143,14 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 - **Comprobado en la app** con el ejemplo del núcleo: la planta de Pilares (P0-5, N −272,9 kN en la base, con su combinación), la de Diagramas (VX5 en s = 3,02 m: My máx. 69,7 kN·m, el rotulado) y la de Losas (↓ 1,87 mm junto a la flecha máxima).
 - **Sin sonda todavía:** Deformada y Modal (no la tienen tampoco en el 3D) y Comprobación (su clic abre el armado de la pieza).
 - **No probado:** los bancos de Chrome.
+
+## 11. VC6 hecho (2026-11-28)
+
+- **La regla, la del 3D:** H aísla lo elegido en la vista activa (otra vez, lo suelta), Ctrl+H lo oculta y Mayús+H lo muestra todo, ahora también en una planta o un alzado. Usan el mismo filtro de la vista (`aislados` y `ocultos` de `FiltroVista`); el rango de plantas, los tipos y la caja de sección siguen siendo sólo del 3D. Lo aislado y lo oculto salen en la cabecera de la planta y del alzado como chips que lo quitan.
+- **El worker** (`src/visor/escena.ts`): cada capa de la escena preparada lleva los trozos de sus números de cada primitiva con objeto (`Capa.trozos`), y `filtrarObjetos` quita los de lo que no se ve, con sus glifos, textos y extremos; lo que no es de ningún objeto (ejes, plantas, isobandas) se queda. `visibleConFiltro` es la regla del 3D: lo de una pieza («<losa>/R1») va con ella. Los búferes de las capas no cambian.
+- **La app:** `Fuente2D` filtra la escena que le llega, así que vale para todas las plantas y los alzados de todos los modos sin pedidos nuevos; lo elegido que no se ve no se resalta; elegir, la ventana y la sonda de VC5 llevan el filtro (`filtro` en los pedidos `elegir`, `ventana` y `objetivo`) y no cogen lo que no se ve.
+- **Prueba** (`src/visor/aislar.test.ts`, la retícula con núcleo, planta y alzado): filtrar la escena preparada da, estilo a estilo, los mismos números que prepararla sin las primitivas de lo que no se ve, y los mismos glifos y textos; con el filtro, un clic y una ventana no cogen lo oculto ni lo que no está aislado.
+- **Comprobado en la app** con el ejemplo del núcleo, en la planta de Modelo: Ctrl+H oculta el muro del núcleo (chip «Ocultos: 1»), H lo deja solo (chip «Aislados: 1») y Mayús+H lo devuelve todo.
+- **No probado:** los bancos de Chrome.
+
+Con VC6, los seis tramos de la revisión están hechos.

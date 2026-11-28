@@ -23,7 +23,7 @@ import type { Cargas3D } from "../../../src/visor/cargas3d.ts";
 import type { Solido } from "../../../src/visor/solido.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
-import { sinEjes, type Eleccion, type EscenaPreparada } from "../../../src/visor/escena.ts";
+import { filtrarObjetos, visibleConFiltro, sinEjes, type Eleccion, type EscenaPreparada } from "../../../src/visor/escena.ts";
 import { IcEjes } from "../armazon/iconos.tsx";
 import type { FuenteEscena, Objetivo2D, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
 import { useSonda2D, type PuntoSonda } from "./sonda.ts";
@@ -388,6 +388,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         {tipo === "alzado" && eje && fuentes.cabeceraAlzado?.(vv, i)}
         {/* R-30 y VC1: en un modo que no se dibuja en alzado, decirlo (se veía el modelo solo, sin explicación) */}
         {tipo === "alzado" && eje && noSeDibuja}
+        {/* VC6: lo aislado y lo oculto también en planta y alzado (H, Ctrl+H, Mayús+H) */}
+        {tipo !== "3d" && filtroObjetos(v) && <ChipsFiltro filtro={filtroObjetos(v)} onCambio={(f) => poner(i, { filtro: { ...v.filtro, aislados: f.aislados ?? null, ocultos: f.ocultos ?? [] } })} />}
         {tipo === "3d" && (
           <>
             <Desplegable
@@ -572,6 +574,13 @@ export function planoAlzado(eje: string, v: EstadoVista): { eje: string; profund
 }
 
 const NOMBRE_FILTRO: Record<TipoFiltro, string> = { pilar: "Pilares", viga: "Vigas", barra: "Barras", losa: "Losas", pano: "Unidireccionales", muro: "Muros", apoyo: "Apoyos" };
+
+/** VC6: lo que una planta o un alzado toman del filtro de la vista: lo aislado y lo oculto (lo demás es del 3D). */
+export function filtroObjetos(v: EstadoVista | undefined): FiltroVista | undefined {
+  const f = v?.filtro;
+  if (!f || (!f.aislados && !f.ocultos?.length)) return undefined;
+  return { ...(f.aislados ? { aislados: f.aislados } : {}), ...(f.ocultos?.length ? { ocultos: f.ocultos } : {}) };
+}
 
 /** Lo que filtra un 3D, en chips que lo quitan con un clic (I3). */
 function ChipsFiltro({ filtro, onCambio }: { filtro: FiltroVista | undefined; onCambio: (f: FiltroVista) => void }) {
@@ -772,10 +781,18 @@ export function Fuente2D({ escena: escenaEntera, resaltado = null, marcas, event
   const v = vista instanceof Vista2D ? vista : null;
   // El botón «Ejes» de la barra de la vista
   const conEjes = estado.ejes !== false;
-  const escena = useMemo(() => (escenaEntera && !conEjes ? sinEjes(escenaEntera) : escenaEntera), [escenaEntera, conEjes]);
+  // VC6: sin lo aislado fuera ni lo oculto
+  const claveFiltro = JSON.stringify(filtroObjetos(estado) ?? null);
+  const ve = useMemo(() => visibleConFiltro(JSON.parse(claveFiltro) as FiltroVista | null), [claveFiltro]);
+  const escena = useMemo(() => {
+    const e = escenaEntera && !conEjes ? sinEjes(escenaEntera) : escenaEntera;
+    return e && ve ? filtrarObjetos(e, ve) : e;
+  }, [escenaEntera, conEjes, ve]);
+  // Lo elegido que no se ve, tampoco se resalta (como en el 3D)
+  const resaltadoVisto = resaltado && ve && !resaltado.objetos.some(ve) ? null : resaltado;
   useEffect(() => v?.ponerEscena(escena), [v, escena]);
   useEffect(() => v?.ponerPlantilla(plantilla), [v, plantilla]);
-  useEffect(() => v?.ponerResaltado(resaltado), [v, resaltado]);
+  useEffect(() => v?.ponerResaltado(resaltadoVisto), [v, resaltadoVisto]);
   useEffect(() => v?.ponerMarcas(marcas), [v, marcas]);
   // VC5: el valor bajo el cursor, como en el 3D
   const { alPasar, sonda } = useSonda2D(textoSonda, claveSonda);
@@ -808,6 +825,9 @@ export function useEleccionEscena(fuente: FuenteEscena | null, elegibles?: reado
   ultimo.current = elegidos;
   const cliente = proyecto.cliente;
   const soloClave = elegibles?.join(",") ?? "";
+  // VC6: lo que no se ve no se elige
+  const celdaFiltro = useContext(ContextoCelda);
+  const claveFiltro = JSON.stringify(filtroObjetos(celdaFiltro?.v) ?? null);
   const anadir = useCallback(
     (ids: string[], ctrl: boolean) => {
       const ya = ultimo.current;
@@ -823,7 +843,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null, elegibles?: reado
       clic: async (p, radio, ctrl, doble) => {
         if (!cliente || !fuente) return;
         // C-12: con el cliente cerrado por una edición, el clic no hace nada (sin rechazo en la consola)
-        const r = await sinObsoleto(cliente.pedir({ tipo: "elegir", fuente, punto: p, radio, ...(soloClave ? { elegibles: soloClave.split(",") as TipoElegible[] } : {}) }));
+        const r = await sinObsoleto(cliente.pedir({ tipo: "elegir", fuente, punto: p, radio, ...(soloClave ? { elegibles: soloClave.split(",") as TipoElegible[] } : {}), ...(claveFiltro !== "null" ? { filtro: JSON.parse(claveFiltro) as FiltroVista } : {}) }));
         if (!r) return;
         const o = r.ok && r.valor ? (r.valor as Eleccion).objeto : null;
         if (doble && o && ejes?.some((x) => x.id === o)) return abrirAlzado(o);
@@ -832,7 +852,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null, elegibles?: reado
       },
       ventana: async (caja, modo, ctrl) => {
         if (!cliente || !fuente) return;
-        const r = await sinObsoleto(cliente.pedir({ tipo: "ventana", fuente, caja, modo, ...(soloClave ? { elegibles: soloClave.split(",") as TipoElegible[] } : {}) }));
+        const r = await sinObsoleto(cliente.pedir({ tipo: "ventana", fuente, caja, modo, ...(soloClave ? { elegibles: soloClave.split(",") as TipoElegible[] } : {}), ...(claveFiltro !== "null" ? { filtro: JSON.parse(claveFiltro) as FiltroVista } : {}) }));
         if (!r) return;
         if (!r.ok) return;
         let ids = r.valor as string[];
@@ -846,7 +866,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null, elegibles?: reado
         anadir(ids, ctrl);
       },
     }),
-    [cliente, fuente, ejes, abrirAlzado, anadir, setElegidos, proyecto.edicion, soloClave],
+    [cliente, fuente, ejes, abrirAlzado, anadir, setElegidos, proyecto.edicion, soloClave, claveFiltro],
   );
   const pedido = usePedido(cliente, fuente && elegidos.length ? { tipo: "elegir", fuente, punto: null, radio: 0, objetos: elegidos } : null);
   const resaltado = pedido.datos && elegidos.includes(pedido.datos.objeto) ? pedido.datos : null;
@@ -897,16 +917,18 @@ export type SondaObjetivo = (o: Objetivo2D, escena: EscenaPreparada | null) => P
 export function useSondaObjetivo(fu: FuenteEscena | null, sonda: SondaObjetivo | undefined, escena: EscenaPreparada | null): ((o: PuntoSonda) => Promise<string[] | null>) | null {
   const { proyecto } = useVisor();
   const cliente = proyecto.cliente;
+  const filtro = filtroObjetos(useContext(ContextoCelda)?.v);
   return useMemo(
     () =>
       cliente && fu && sonda && !proyecto.desactualizado
         ? async (o: PuntoSonda) => {
-            const r = await sinObsoleto(cliente.pedir({ tipo: "objetivo", fuente: fu, punto: o.p, radio: o.radio }));
+            const r = await sinObsoleto(cliente.pedir({ tipo: "objetivo", fuente: fu, punto: o.p, radio: o.radio, ...(filtro ? { filtro } : {}) }));
             const x = r?.ok ? (r.valor as Objetivo2D | null) : null;
             return x ? sonda(x, escena) : null;
           }
         : null,
-    [cliente, fu, sonda, escena, proyecto.desactualizado],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- el filtro, por su contenido
+    [cliente, fu, sonda, escena, proyecto.desactualizado, JSON.stringify(filtro ?? null)],
   );
 }
 

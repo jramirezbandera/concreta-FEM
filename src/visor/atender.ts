@@ -212,11 +212,11 @@ export class Atendedor {
         return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "objetivo":
-        return bien("objetivo", s.objetivo(p.fuente, p.punto, p.radio));
+        return bien("objetivo", s.objetivo(p.fuente, p.punto, p.radio, p.filtro));
       case "elegir":
-        return bien("elegir", s.elegir(p.fuente, p.punto, p.radio, p.objetos, p.elegibles));
+        return bien("elegir", s.elegir(p.fuente, p.punto, p.radio, p.objetos, p.elegibles, p.filtro));
       case "ventana":
-        return bien("ventana", s.ventana(p.fuente, p.caja, p.modo, p.elegibles));
+        return bien("ventana", s.ventana(p.fuente, p.caja, p.modo, p.elegibles, p.filtro));
       case "alambrico":
         return bien("alambrico", alambrico(s.proyecto.modelo));
       case "solido":

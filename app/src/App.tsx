@@ -269,10 +269,10 @@ export function App() {
         return;
       }
       if (paleta || document.querySelector("[role=dialog]")) return;
-      // I3: H aísla lo elegido en el 3D activo (otra vez, lo suelta); Ctrl+H lo oculta; Mayús+H lo muestra todo
+      // I3: H aísla lo elegido en la vista activa (otra vez, lo suelta); Ctrl+H lo oculta; Mayús+H lo muestra todo; VC6: también en planta y alzado
       if (k === "h" && !x.altKey && !enCampo(x.target) && !(x.target as HTMLElement | null)?.closest?.("[role=grid]")) {
         const v = vistasRef.current.vistas[vistasRef.current.activa];
-        if (v?.tipo !== "3d") return;
+        if (!v) return;
         x.preventDefault();
         const f = v.filtro ?? {};
         const ids = elegidosRef.current;
