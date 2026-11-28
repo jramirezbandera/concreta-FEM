@@ -31,7 +31,7 @@ import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import { puntoEnRegion, type Region } from "../compilador/poligonos.ts";
 import { ARMADURAS_FORJADO, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type BarrasCara, type CercosViga } from "../comprobaciones/armado.ts";
-import { alzadoVano, cercosDibujados, cotasRefuerzo, nerviosDeRefuerzo, puntosCercos, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
+import { alzadoVano, cercosDibujados, cotasRefuerzo, nerviosDeRefuerzo, puntosCercos, puntosCercosMetro, refuerzosDibujados, seccionPilarArmada, type RefuerzoDibujado } from "../comprobaciones/dibujoArmado.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { abacosDePilares, alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, trozo, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
 import { CLASE_CERCOS, type Diagramas3D } from "./diagramas3d.ts";
@@ -312,14 +312,14 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
           for (const tr of b.tramos) P.push({ tipo: "linea", puntos: tr, estilo: b.cara === "inferior" ? "armado-inferior-base" : "armado-superior-base", objeto: p.pieza });
         }
       // Los cercos de los nervios: el contorno de su zona, a trazos, y un punto por cerco sobre el eje de cada nervio
-      const zonasCercos = cara === "todas" || cara === "cercos" ? cercosDibujados(l.eje1, a) : [];
+      const zonasCercos = cara === "todas" || cara === "cercos" ? cercosDibujados(l.eje1, a, !!l.reticular) : [];
       const nervios = zonasCercos.length ? nerviosLosa(l) : [];
       for (const z of zonasCercos) {
         const anillos = recorteTramos(region, z.zona);
         if (!anillos.length) continue;
         hayCercos = true;
         for (const an of anillos) P.push({ tipo: "linea", puntos: [...an, an[0]!], estilo: "armado-cercos", objeto: `${p.pieza}/C${z.indice + 1}` });
-        for (const q of puntosCercos(z, nervios)) if (!region || puntoEnRegion(q, region)) P.push({ tipo: "marca", p: q, forma: "circulo", radio: 1.7, estilo: "armado-cercos-punto", objeto: `${p.pieza}/C${z.indice + 1}` });
+        for (const q of z.porMetro ? puntosCercosMetro(z) : puntosCercos(z, nervios)) if (!region || puntoEnRegion(q, region)) P.push({ tipo: "marca", p: q, forma: "circulo", radio: 1.7, estilo: "armado-cercos-punto", objeto: `${p.pieza}/C${z.indice + 1}` });
         textos.push({ tipo: "texto", p: z.centro, texto: z.texto, tamano: 11, ancla: "medio", dy: 4, giro: giroTexto(z.d), color: COLOR_CERCOS, fondo: true, prioridad: 30, objeto: `${p.pieza}/C${z.indice + 1}` });
       }
       // Los refuerzos: la zona, la barra, la línea de reparto y el rótulo
@@ -387,7 +387,7 @@ export function vistaArmadoBarras(s: Sesion, planta: string, tipo: TipoComprobac
     if (carasBase.has("inferior")) leyenda.push({ estilo: "armado-inferior-base", texto: "Armadura base inferior" });
     if (carasBase.has("superior")) leyenda.push({ estilo: "armado-superior-base", texto: "Armadura base superior" });
     if (carasBase.size) notas.push(`La armadura base, más fina: en un reticular, una línea por nervio; en una maciza, una barra cada separación${baseSalteada ? " (con muchas, una de cada pocas)" : ""}. Cada cara va 3 cm a un lado de su sitio, para que se vean las dos.`);
-    if (hayCercos) leyenda.push({ estilo: "armado-cercos-punto", texto: "Cercos de los nervios: un punto por cerco, con sus ramas (R)" });
+    if (hayCercos) leyenda.push({ estilo: "armado-cercos-punto", texto: "Cercos: en los nervios, un punto por cerco, con sus ramas (R); en los ábacos y las macizas, un punto por rama" });
     if (hayNervios) leyenda.push({ estilo: "armado-caseton", texto: "Casetones del reticular: los nervios van entre ellos" });
     if (porNervios) notas.push("En los nervios, cada refuerzo se dibuja con una barra sobre el eje de cada nervio que arma, unidas por su línea de reparto. Rótulo: cuántos nervios, las barras de cada uno y su largo. Se suma a la armadura base.");
     if (porZona) notas.push(`${porNervios ? "Los demás refuerzos (a una separación)" : "Cada refuerzo"}: su zona, una barra de punta a punta y la línea de reparto, que cruza lo que cubre; se suma a la armadura base. Rótulo: las barras y su largo.`);

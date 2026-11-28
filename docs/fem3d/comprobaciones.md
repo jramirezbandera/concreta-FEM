@@ -442,7 +442,7 @@ Pasan los criterios 5 a 14 en lo de las losas; falta su parte de la app (CO6), l
 - **CO3-g, la base propuesta** es la mínima que cumple las reglas de armado (o la que cubre la armadura base de AB, si se dio); lo demás va a refuerzos. Sale una base pequeña y muchos refuerzos.
 - **CO3-h, un refuerzo por zona, en el rectángulo que la envuelve:** una zona alargada (la línea de pilares de una losa plana) recibe el refuerzo de su peor estación en todo su rectángulo. No se parte ni se iguala.
 - **CO3-i, la cuantía mínima** se exige en cuanto la cara tracciona en alguna estación del grupo, por poco que sea (como CO2-g).
-- **CO3-j, el cortante se toma en la estación** (en la cara del apoyo, no a un canto útil), contra VRd,c con el menor canto útil y la menor armadura de las dos caras, que es lo que hace el módulo.
+- **CO3-j, el cortante se toma en la estación** (en la cara del apoyo, no a un canto útil), contra VRd,c con el menor canto útil y la menor armadura de las dos caras, que es lo que hace el módulo. **Cambiada el 2026-11-28 (CO3-l, §8.29):** con el As y el d de la cara traccionada.
 
 **Medido** (`validacion/co/medirLosas.ts`, `out_medirLosas.txt`; el tiempo, como información):
 
@@ -1158,6 +1158,38 @@ En el empalme, el área capaz no baja: con el solape de 1,5·lb, entre las dos p
 **La referencia congelada de CO2, regenerada a sabiendas** con el registro de `out_cambiosUnificar.txt`.
 
 **Validación:** `armar/vigas.test.ts` (con una zona fijada, la zona no se mueve y suben los cercos que pide el cortante, y nada baja de lo propuesto sin ella; al proponer los dos pórticos de las pruebas, los 8 apoyos interiores de cada uno con la misma superior a cada lado y no menos que la mayor de las propuestas sueltas; con un lado escrito en el proyecto, el otro sube hasta él si es mayor y si es menor no). A mano en la app con VX0 del núcleo.
+
+### 8.29 CO3-l: el cortante de los ábacos y de las macizas, con acero longitudinal y, si no basta, con cercos (2026-11-28)
+
+**De la prueba de uso con la vivienda:** con el armado propuesto, L-CUB no cumplía a cortante (1,029 en la cara de la viga de borde Z-CUB-5, delante de P2, en el ábaco: 125,5 frente a 122,0 kN/m) y la ficha decía «el primer armado de las tablas con el que todo cumple». La propuesta no tenía nada que arreglara un cortante en un ábaco o una maciza: la parrilla del ábaco se elegía sin la fila del cortante, los refuerzos sólo respondían a la flexión y la fisuración, y los cercos sólo iban en los nervios. P2 está dentro del ancho de su viga, así que no tiene punzonamiento (CO4-3): ese cortante es lo único que comprueba esa zona.
+
+**Decidido por el usuario:**
+
+- **Primero acero longitudinal; si no tiene sentido, cercos.** El límite: un refuerzo de hasta Ø16 (a cualquier separación de la tabla, hasta 100 mm: unos 2 000 mm²/m, ρl ≈ 0,8 % en 25 cm). Con eso el cortante sin cercos llega a unos 120–130 kN/m en una losa de 20–30 cm; los cercos mínimos dan ya unos 170.
+- **ρl, el de la cara traccionada** (Anejo 19 §6.2.2(1)), no la menor de las dos caras ni el menor canto útil, que es lo que hace el módulo de Concreta. Cambia CO3-j en eso; el cortante se sigue tomando en la cara del apoyo.
+
+**Comprobar** (`comprobar/losas.ts`):
+
+- Sin cercos, la fila del módulo se sustituye por una por cara traccionada: VRd,c con la fórmula del módulo (6.2a y 6.2b con su vmín) y el As y el d que da el módulo de esa cara (`vrdcCara`). La cara de cada estación es la de mayor momento de ELU (`caraTraccionada`); si ninguna tracciona, la más débil. En los ábacos y las macizas la fila lleva la armadura de esa cara (la arregla un refuerzo); en los nervios, como antes, pide cercos.
+- **Cercos en los ábacos** (`en: "abacos"`) **y en una maciza:** `CercosForjado` con sus ramas **por metro** de ancho (obligatorias), `cercosPorMetro`. Las filas, las del módulo con cercos (VRd,s, la biela, ρw,mín, sl ≤ 0,75·d), más el canto mínimo de una losa con armadura de cortante (h ≥ 200 mm, §9.3.2(1)) y la separación transversal entre ramas (st ≤ 1,5·d, §9.3.2(4)).
+
+**Proponer** (`armar/losas.ts`):
+
+1. Las estaciones de un ábaco o una maciza que no cumplen a cortante sin cercos entran en las zonas de refuerzo de su cara traccionada (`estacionesQueFallan`), como las de la flexión: en un ábaco, el refuerzo de todo el ábaco; en una maciza, la zona con su despiece.
+2. `dimensionar` sube el refuerzo por el cortante sólo hasta `DIAMETRO_MAXIMO_CORTANTE` (16). Si con eso no cumple, se queda el primero con el que cumple la flexión, o ninguno si la flexión no lo pide.
+3. Lo que aun así falla recibe una zona de cercos (`tablaCercosLosa`: Ø6, Ø8 y Ø10 a 200, 150, 100 y 75 mm, con 3 a 10 ramas por metro, de menos a más acero por m²), de un largo de 0,5 m como mínimo, como las de los nervios. Con menos de 200 mm de canto, sin propuesta: «hay que subir el canto».
+4. Lo que se queda sin refuerzo o sin cercos en una losa propuesta va también a `sinPropuesta` del pedido `armar`, y «Proponer» en la ficha ya no dice «todo cumple» de una losa que no cumple.
+
+**En la app:** los cercos de los ábacos y de las macizas se dibujan en planta con un punto por rama (`puntosCercosMetro`) y su rótulo «cØ6/100 · 5 ramas/m»; en el banco, la pestaña «Cercos» y el campo «ramas por metro»; «Añadir» pone cercos en una maciza o, en un reticular, en los nervios o en los ábacos.
+
+**Medido:**
+
+- La vivienda de la app (`ejemplos/app/vivienda.json`): L-CUB cumple con un refuerzo superior Ø8/150 en el ábaco de P2 (0,995), sin cercos; L-CUB-S, igual que antes. Las zonas de cercos de los nervios encogen, por ρl de la cara traccionada.
+- `validacion/co/cambiosCortante.ts` (`out_cambiosCortante.txt`): las referencias congeladas de CO3 y CO4, **regeneradas a sabiendas**. En CO3, ninguna losa deja de cumplir; la vivienda pasa a cumplir entera (un refuerzo superior Ø10/300 en el ábaco de P2, y cuatro zonas de cercos de nervio más cortas); en las demás sólo bajan los cortantes (el peor del reticular, de 0,968 a 0,714). En CO4 sólo cambia la cuantía de P2 de la vivienda (ρl,mín/ρl de 0,858 a 0,709), por ese refuerzo.
+
+**Validación** (`losas.test.ts`): la fila del cortante es, por cara, la peor de V/VRd,c con la fórmula del Código y el As y el d del módulo llamado estación a estación; en un vano corto con mucha carga, un refuerzo de hasta Ø16 si basta (y sin él no cumple), cercos con sus ramas por metro si no (sin ellos, o un puesto más abajo en la tabla, no cumple; con 2 ramas por metro falla la separación transversal), y una losa de 18 cm queda sin propuesta. Lo que no vale de los cercos por metro (sin ramas, `en` en una maciza) se dice.
+
+**Por confirmar por el usuario:** la cara traccionada como la de mayor momento de ELU en la estación (con Wood–Armer las dos caras pueden tener momento: se toma la dominante, no la concomitante de la combinación del cortante) y la tabla de cercos de las losas.
 
 ## 9. Fuera de esta fase
 

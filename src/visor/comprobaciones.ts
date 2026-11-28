@@ -736,6 +736,9 @@ export function* pasosArmar(s: Sesion, p: PedidoArmar): Generator<ProgresoTarea,
       armado.forjados = armadoPropuestoLosas(r.valor, previo?.forjados);
       diagnosticos.push(...r.diagnosticos);
       anotar("losas", r.valor.losas.map((l) => ({ clave: l.losa, origen: l.origen, pendientes: l.pendientes.map((y) => y.motivo) })));
+      // Lo que se queda sin refuerzo o sin cercos en una losa con propuesta (CO3-l: un cortante que ni el
+      // longitudinal ni los cercos arreglan), también: si no, la losa parecería resuelta
+      for (const l of r.valor.losas) if (l.origen === "propuesto") for (const z of l.sinRefuerzo ?? []) sinPropuesta.push({ tipo: "losas", clave: l.losa, motivo: z.motivo });
     } else {
       // Con el armado de las losas que queda: el que se acaba de proponer o el del proyecto
       const r = yield* deTipo(pasosPunzonamientos(q, armado.forjados, previo?.punzonamiento, datos, { ids, proponer: true }), tipo, k + 1, partes);

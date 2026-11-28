@@ -24,8 +24,8 @@ import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts"
 import { calcular } from "../motor/calcular.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { ARMADURAS_FORJADO, areaBarra, areaBarrasForjado, erroresArmadoForjado, type ArmadoForjado, type BarrasForjado } from "./armado.ts";
-import { LARGO_MINIMO, LARGO_MINIMO_CERCOS, MODULO_LARGO, proponerLosa, tablaCercosNervio, tablaNervios, tablaParrillas } from "./armar/losas.ts";
-import { armadoLosa, comprobarLosa, cubre, entradasLosa, estacionesQueFallan, type ComprobacionLosa } from "./comprobar/losas.ts";
+import { DIAMETRO_MAXIMO_CORTANTE, LARGO_MINIMO, LARGO_MINIMO_CERCOS, MODULO_LARGO, proponerLosa, tablaCercosLosa, tablaCercosNervio, tablaNervios, tablaParrillas } from "./armar/losas.ts";
+import { armadoLosa, caraTraccionada, comprobarLosa, cubre, entradasLosa, estacionesQueFallan, type ComprobacionLosa } from "./comprobar/losas.ts";
 import { forjadosDefaults } from "./concreta/data/defaults.ts";
 import { calcForjados } from "./concreta/lib/calculations/rcSlabs.ts";
 import { demandasLosa, direccionArmadura, type DemandasLosa } from "./demandas/losas.ts";
@@ -275,9 +275,23 @@ describe("CO3: comprobar una losa", () => {
         expect(fs[0]!.aprovechamiento).toBeCloseTo(peorDe((r) => r.apoyo.checks, id), 12);
         if (g.sup.length === 0 && inf) expect(peor(c, `${eje}-inf/${id}`)).toBeGreaterThanOrEqual(peorDe((r) => r.vano.checks, id) - 1e-12);
       }
-      const corte = filas.filter((f) => f.id === `${eje}/shear`);
-      expect(corte.length).toBe(1);
-      expect(corte[0]!.aprovechamiento).toBeCloseTo(peorDe((r) => r.shearChecks, "shear", (e) => e.cortante !== null), 12);
+      // El cortante sin cercos (CO3-l): una fila por cara traccionada, con VRd,c de la fórmula del
+      // Código y el As y el d de esa cara del módulo llamado a mano
+      const corte = c.filas.filter((f) => f.id === `${eje}/shear` && g.estaciones.some((e) => e.franja === f.franja && e.s === f.s));
+      const vrdc = (sec: { As: number; d: number }) => {
+        const k = Math.min(1 + Math.sqrt(200 / sec.d), 2);
+        const rho = Math.min(sec.As / (1000 * sec.d), 0.02);
+        return (Math.max((0.18 / 1.5) * k * Math.cbrt(100 * rho * 25), (0.051 / 1.5) * k ** 1.5 * Math.sqrt(25)) * 1000 * sec.d) / 1000;
+      };
+      const porCara = new Map<string, number>();
+      for (const { e, r } of una) {
+        if (e.cortante === null) continue;
+        const [vi, vs] = [vrdc(r.vano), vrdc(r.apoyo)];
+        const cara = caraTraccionada(e) ?? (vi <= vs ? "inferior" : "superior");
+        porCara.set(cara, Math.max(porCara.get(cara) ?? 0, e.cortante / (cara === "inferior" ? vi : vs)));
+      }
+      expect(corte.length).toBe(porCara.size);
+      for (const f of corte) expect(f.aprovechamiento).toBeCloseTo(porCara.get(f.armadura!.endsWith("inf") ? "inferior" : "superior")!, 9);
       // La fila del momento dice su estación y su combinación, y son las del máximo
       const m = filas.find((f) => f.id === `${eje}-sup/bending`)!;
       const est = g.estaciones.find((e) => e.franja === m.franja && e.s === m.s)!;
@@ -305,17 +319,18 @@ describe("CO3: comprobar una losa", () => {
     expect(ids).not.toContain("x-sup/as-min");
     expect(ids).not.toContain("x-sup/cracking");
     expect(ids).toContain("x-sup/bar-spacing-maciza");
-    // VRd,c (CE Anejo 19 §6.2.2), con el menor canto útil y la menor armadura de las dos caras
-    const corte = c.filas.find((f) => f.id === "x/shear")!;
-    const dd = Math.min(200 - 30 - 6, 200 - 30 - 4);
-    const As = Math.min(areaBarrasForjado(inf), areaBarrasForjado(sup));
+    // VRd,c (CE Anejo 19 §6.2.2), con el canto útil y la armadura de la cara traccionada (CO3-l): la inferior
+    const corte = c.filas.find((f) => f.id === "x/shear" && f.armadura === "x-inf")!;
+    const dd = 200 - 30 - 6;
+    const As = areaBarrasForjado(inf);
     const k = Math.min(1 + Math.sqrt(200 / dd), 2);
     const rho = Math.min(As / (1000 * dd), 0.02);
     const VRdc = (Math.max((0.18 / 1.5) * k * Math.cbrt(100 * rho * 25), (0.051 / 1.5) * k ** 1.5 * Math.sqrt(25)) * 1000 * dd) / 1000;
-    expect(Math.abs(corte.fila.limitNum! / VRdc - 1)).toBeLessThanOrEqual(1e-9);
+    // El módulo redondea el área de la barra (113,1 mm² el Ø12; CO4-1): ≤ 1e-5
+    expect(Math.abs(corte.fila.limitNum! / VRdc - 1)).toBeLessThanOrEqual(1e-5);
     const V = Math.max(...d.direcciones[0].estaciones.map((e) => e.cortante!));
-    expect(corte.aprovechamiento).toBeCloseTo(V / VRdc, 9);
-    expect(corte.grupo).toBe("cortante");
+    expect(corte.aprovechamiento / (V / VRdc)).toBeCloseTo(1, 4);
+    expect(corte.grupo).toBe("base:x-inf");
   });
 
   it("un refuerzo sólo cuenta en las estaciones que cubre, y el que no cubre ninguna se dice", () => {
@@ -402,6 +417,9 @@ describe("CO3: proponer el armado de una losa", () => {
     }
     const c = tablaCercosNervio();
     for (let i = 1; i < c.length; i++) expect(areaBarra(c[i]!.diametro) / c[i]!.separacion).toBeGreaterThanOrEqual(areaBarra(c[i - 1]!.diametro) / c[i - 1]!.separacion);
+    const l = tablaCercosLosa();
+    const acero = (x: (typeof l)[number]) => (x.ramas! * areaBarra(x.diametro)) / x.separacion;
+    for (let i = 1; i < l.length; i++) expect(acero(l[i]!)).toBeGreaterThanOrEqual(acero(l[i - 1]!));
   });
 
   it("en una maciza: lo propuesto cumple, es determinista, y con la base o con un refuerzo un puesto más abajo, no (criterios 12 y 13)", () => {
@@ -518,6 +536,67 @@ describe("CO3: proponer el armado de una losa", () => {
   });
 });
 
+describe("CO3-l: el cortante de una maciza o un ábaco, con acero longitudinal y, si no basta, con cercos", () => {
+  // Un vano corto (1,5 m) con mucha carga: el cortante manda sobre la flexión
+  const corta = (cm: number, q: number, h = 0.2) => demandas(consultas(losaEnDosApoyos({ L: 1.5, cm, q, h })));
+  const cortantes = (c: ComprobacionLosa) => c.filas.filter((f) => f.id === "x/shear");
+
+  it("si basta con un refuerzo de hasta Ø16 en la cara traccionada, eso, y sin cercos", () => {
+    const d = corta(100, 60);
+    const p = proponerLosa(d);
+    expect(p.sinRefuerzo).toEqual([]);
+    expect(p.armado!.cercos).toBeUndefined();
+    const c = comprobarLosa(d, armadoLosa(p.armado!));
+    expect(c.cumple).toBe(true);
+    // Sin el refuerzo inferior, el cortante no cumple: lo ha puesto el cortante
+    const r = p.armado!.refuerzos!.filter((x) => x.armadura === "x-inf");
+    expect(r.length).toBe(1);
+    expect(r[0]!.barras.diametro).toBeLessThanOrEqual(DIAMETRO_MAXIMO_CORTANTE);
+    const sin = comprobarLosa(d, armadoLosa({ ...p.armado!, refuerzos: p.armado!.refuerzos!.filter((x) => x.armadura !== "x-inf") }));
+    expect(cortantes(sin).some((f) => f.estado === "fail" && f.armadura === "x-inf")).toBe(true);
+  });
+
+  it("si con Ø16 no basta, cercos con sus ramas por metro donde el cortante no cumple, que cumplen las reglas de una losa (§9.3.2)", () => {
+    const d = corta(150, 80);
+    const p = proponerLosa(d);
+    expect(p.sinRefuerzo).toEqual([]);
+    const cs = p.armado!.cercos!;
+    expect(cs.length).toBeGreaterThan(0);
+    for (const x of cs) {
+      expect(x.en).toBeUndefined();
+      expect(x.cercos.ramas).toBeGreaterThanOrEqual(1);
+    }
+    // Ningún refuerzo pasa de Ø16 por el cortante: el que hay es el de la flexión
+    expect((p.armado!.refuerzos ?? []).every((x) => x.barras.diametro <= DIAMETRO_MAXIMO_CORTANTE)).toBe(true);
+    const c = comprobarLosa(d, armadoLosa(p.armado!));
+    expect(c.cumple).toBe(true);
+    const ids = new Set(c.filas.map((f) => f.id));
+    for (const id of ["x/shear-max", "x/rho-w-min", "x/stirrup-spacing-max", "x/slab-stirrup-h", "x/slab-stirrup-st"]) expect(ids.has(id), id).toBe(true);
+    // Sin los cercos, el cortante no cumple
+    expect(comprobarLosa(d, armadoLosa({ ...p.armado!, cercos: [] })).cumple).toBe(false);
+    // Con los cercos un puesto más abajo en la tabla, tampoco
+    const tabla = tablaCercosLosa();
+    const menos = cs.map((x) => ({ ...x, cercos: tabla[Math.max(0, tabla.findIndex((y) => JSON.stringify(y) === JSON.stringify(x.cercos)) - 1)]! }));
+    if (cs.some((x) => JSON.stringify(x.cercos) !== JSON.stringify(tabla[0]))) expect(comprobarLosa(d, armadoLosa({ ...p.armado!, cercos: menos })).cumple).toBe(false);
+  });
+
+  it("una losa de menos de 200 mm no admite cercos: queda sin propuesta, y dice que hay que subir el canto", () => {
+    const d = corta(150, 80, 0.18);
+    const p = proponerLosa(d);
+    expect(p.armado!.cercos).toBeUndefined();
+    expect(p.sinRefuerzo.some((x) => /subir el canto/.test(x.motivo))).toBe(true);
+    expect(comprobarLosa(d, armadoLosa(p.armado!)).cumple).toBe(false);
+  });
+
+  it("una regla de la losa con cercos no cumple: el canto y la separación transversal entre ramas", () => {
+    const d = corta(150, 80);
+    const p = proponerLosa(d);
+    const pocas = p.armado!.cercos!.map((x) => ({ ...x, cercos: { ...x.cercos, ramas: 2 } }));
+    const c = comprobarLosa(d, armadoLosa({ ...p.armado!, cercos: pocas }));
+    expect(c.filas.some((f) => f.id === "x/slab-stirrup-st" && f.estado === "fail")).toBe(true);
+  });
+});
+
 describe("CO3: las losas de un proyecto", () => {
   it("sin armado no cumplen; con el propuesto, sí, y lo propuesto es un dato válido del proyecto", () => {
     const { q } = plana();
@@ -557,10 +636,13 @@ describe("CO3: las losas de un proyecto", () => {
     expect(codigos({ L: { base, refuerzos: [{ armadura: "x-sup", s: [0, 1], t: [0, 1], barras: D12A200 }] } })).toEqual(["armado/barras"]);
     expect(codigos({ L: { base, refuerzos: [{ armadura: "x-sup", s: [1, 0], t: [0, 1], barras: D12A200, en: "abacos" }] } })).toEqual(["armado/barras"]);
     expect(codigos({ L: { base, cercos: [{ direccion: "x", s: [0, 1], t: [0, 1], cercos: { diametro: 7, separacion: 100 } }] } })).toEqual(["armado/barras"]);
-    // En una maciza, separación; ni ábacos ni cercos
+    // En una maciza, separación; sin ábacos; los cercos, con sus ramas por metro (CO3-l)
     const m = losaPlana();
     expect(comprobarArmado({ forjados: { L: { base: cuatro(D12A200) } } }, m)).toEqual([]);
-    expect(comprobarArmado({ forjados: { L: { base: cuatro(D12A200), abacos: cuatro(D12A200), cercos: [] } } }, m).length).toBe(2);
+    expect(comprobarArmado({ forjados: { L: { base: cuatro(D12A200), abacos: cuatro(D12A200), cercos: [] } } }, m).length).toBe(1);
+    expect(comprobarArmado({ forjados: { L: { base: cuatro(D12A200), cercos: [{ direccion: "x", s: [0, 1], t: [0, 1], cercos: { diametro: 6, separacion: 150, ramas: 5 } }] } } }, m)).toEqual([]);
+    expect(erroresArmadoForjado({ base: cuatro(D12A200), cercos: [{ direccion: "x", s: [0, 1], t: [0, 1], cercos: { diametro: 6, separacion: 150 } }] }, false)).toHaveLength(1);
+    expect(erroresArmadoForjado({ base: cuatro(D12A200), cercos: [{ direccion: "x", s: [0, 1], t: [0, 1], cercos: { diametro: 6, separacion: 150, ramas: 5 }, en: "abacos" }] }, false)).toHaveLength(1);
     expect(comprobarArmado({ forjados: { L: { base: cuatro({ diametro: 12, n: 2 }) } } }, m).length).toBe(8);
   });
 });

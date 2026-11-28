@@ -65,9 +65,9 @@ export function lindesNervios(ejes: readonly number[], bordes: readonly number[]
   return todos.filter((x, i) => i === 0 || x - todos[i - 1]! > 1e-6);
 }
 
-/** ¿Va por nervios? Unos cercos, o un refuerzo de n barras por nervio que no es de los ábacos. */
+/** ¿Va por nervios? Unos cercos que no son de los ábacos, o un refuerzo de n barras por nervio que no es de los ábacos. (En una maciza no hay nervios a los que ir.) */
 export function porNervios(a: Pick<ArmadoForjado, "refuerzos" | "cercos"> | undefined, e: ElementoLosa): boolean {
-  if (e.lista === "cercos") return true;
+  if (e.lista === "cercos") return a?.cercos?.[e.indice]?.en !== "abacos";
   const x = a?.refuerzos?.[e.indice];
   return !!x && x.en !== "abacos" && (x.barras as { n?: number }).n !== undefined;
 }

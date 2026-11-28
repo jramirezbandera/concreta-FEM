@@ -33,7 +33,7 @@ export interface LosaArmada {
 }
 
 /** Lo que se va a añadir: un refuerzo de una armadura (en un reticular, de los ábacos o de los nervios) o unos cercos de nervios. */
-export type NuevoElemento = { lista: "refuerzos"; armadura: ArmaduraForjado; en?: "abacos" | "nervios" } | { lista: "cercos"; direccion: "x" | "y" };
+export type NuevoElemento = { lista: "refuerzos"; armadura: ArmaduraForjado; en?: "abacos" | "nervios" } | { lista: "cercos"; direccion: "x" | "y"; en?: "abacos" | "nervios" };
 
 const metros = (x: number) => x.toFixed(2).replace(".", ",");
 /** Las medidas de una zona y, si va por nervios (`ejes`: los de los nervios que cruza), cuántos coge. */
@@ -124,7 +124,7 @@ export class EditorRefuerzos {
   private engancheNuevo(losa: LosaArmada): Enganche {
     const n = this.nuevo;
     if (!n) return NADA;
-    return n.lista === "cercos" ? this.enganche(losa, n.direccion) : n.en === "nervios" ? this.enganche(losa, n.armadura) : NADA;
+    return n.lista === "cercos" ? (n.en === "abacos" ? NADA : this.enganche(losa, n.direccion)) : n.en === "nervios" ? this.enganche(losa, n.armadura) : NADA;
   }
 
   private zonaNueva(losa: LosaArmada, a: Vec2, b: Vec2): Rango | null {

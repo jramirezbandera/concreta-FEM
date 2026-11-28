@@ -12,7 +12,7 @@
  * alzado de un vano y las losas, en m.
  */
 import type { Vec2 } from "../compilador/fisico.ts";
-import { ramasDe, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraForjado, type BarrasCara, type Cercos, type CercosViga } from "./armado.ts";
+import { cercosPorMetro, ramasDe, textoBarrasForjado, type ArmadoForjado, type ArmadoTramoPilar, type ArmadoVanoViga, type ArmaduraForjado, type BarrasCara, type Cercos, type CercosViga } from "./armado.ts";
 
 /** A qué grupo del armado pertenece una barra dibujada (el de su campo en el formulario). */
 export type GrupoBarras = "esquinas" | "caraB" | "caraH" | "anillo" | "inferior" | "superior" | "piel";
@@ -373,9 +373,11 @@ export interface CercosDibujados {
   giro: number;
   /** «cØ6/150 (2R)»: siempre con sus ramas. */
   texto: string;
-  /** Separación entre cercos, m, y ramas de cada uno. */
+  /** Separación entre cercos, m, y ramas de cada uno (en los de un ábaco o una maciza, por metro de ancho). */
   separacion: number;
   ramas: number;
+  /** CO3-l: cercos de un ábaco o de una maciza, con sus ramas por metro (no de los nervios). */
+  porMetro: boolean;
   largo: number;
   ancho: number;
 }
@@ -425,12 +427,13 @@ export function nerviosDeRefuerzo(x: Pick<RefuerzoDibujado, "porNervio" | "en" |
   return ejes.filter((t) => t >= x.t[0] - 1e-6 && t <= x.t[1] + 1e-6).sort((a, b) => a - b);
 }
 
-/** Las zonas de cercos de los nervios de un reticular, en planta. */
-export function cercosDibujados(eje1: number | undefined, a: Pick<ArmadoForjado, "cercos"> | undefined): CercosDibujados[] {
+/** Las zonas de cercos de una losa, en planta: los de los nervios de un reticular y, CO3-l, los de sus ábacos o los de una maciza (`reticular`: false). */
+export function cercosDibujados(eje1: number | undefined, a: Pick<ArmadoForjado, "cercos"> | undefined, reticular = true): CercosDibujados[] {
   const r: CercosDibujados[] = [];
   (a?.cercos ?? []).forEach((x, indice) => {
     if (!x || !rango(x.s) || !rango(x.t) || !cercosValidos(x.cercos) || (x.direccion !== "x" && x.direccion !== "y")) return;
     const { d, n } = ejesArmadura(eje1, x.direccion);
+    const porMetro = cercosPorMetro(x, reticular);
     r.push({
       indice,
       direccion: x.direccion,
@@ -441,13 +444,35 @@ export function cercosDibujados(eje1: number | undefined, a: Pick<ArmadoForjado,
       s: [x.s[0], x.s[1]],
       t: [x.t[0], x.t[1]],
       giro: grados(d),
-      texto: `cØ${x.cercos.diametro}/${x.cercos.separacion} (${ramasDe(x.cercos)}R)`,
+      texto: porMetro ? `cØ${x.cercos.diametro}/${x.cercos.separacion} · ${ramasDe(x.cercos)} ramas/m` : `cØ${x.cercos.diametro}/${x.cercos.separacion} (${ramasDe(x.cercos)}R)`,
       separacion: x.cercos.separacion / 1000,
       ramas: ramasDe(x.cercos),
+      porMetro,
       largo: x.s[1] - x.s[0],
       ancho: x.t[1] - x.t[0],
     });
   });
+  return r;
+}
+
+/**
+ * CO3-l: las ramas de unos cercos de un ábaco o de una maciza, una a una: filas a lo largo de la
+ * dirección cada `separacion`, y en cada una, una rama cada 1/ramas m a través, centradas en la zona.
+ */
+export function puntosCercosMetro(z: Pick<CercosDibujados, "d" | "n" | "s" | "t" | "separacion" | "ramas">): Vec2[] {
+  if (!(z.separacion > 0) || !(z.ramas > 0)) return [];
+  const st = 1 / z.ramas;
+  const ancho = z.t[1] - z.t[0];
+  const nt = Math.max(1, Math.floor(ancho / st + 1e-9));
+  const t0 = (z.t[0] + z.t[1]) / 2 - ((nt - 1) * st) / 2;
+  const ns = Math.max(0, Math.floor((z.s[1] - z.s[0]) / z.separacion + 0.5 + 1e-9));
+  const paso = Math.max(1, Math.ceil((ns * nt) / MAXIMO_PUNTOS_CERCOS));
+  const r: Vec2[] = [];
+  for (let j = 0; j < nt; j++)
+    for (let k = 0; k < ns; k += paso) {
+      const [s, t] = [z.s[0] + (k + 0.5) * z.separacion, t0 + j * st];
+      r.push([s * z.d[0] + t * z.n[0], s * z.d[1] + t * z.n[1]]);
+    }
   return r;
 }
 

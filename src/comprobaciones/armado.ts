@@ -318,16 +318,26 @@ export interface RefuerzoForjado {
 }
 
 /**
- * Cercos de los nervios de un reticular en un rectángulo de la losa, en los ejes de los nervios de su
- * dirección (como un refuerzo: s a lo largo de los nervios X o Y, t en transversal; m). Fuera de
- * ellos, los nervios van sin armadura transversal.
+ * Cercos en un rectángulo de la losa, en los ejes de su dirección (como un refuerzo: s a lo largo de
+ * las franjas X o Y, t en transversal; m). Fuera de ellos, la losa va sin armadura transversal.
+ *
+ * - **De los nervios de un reticular** (sin `en`): cercos de cada nervio, de `ramas` ramas (2 por
+ *   defecto).
+ * - **De los ábacos de un reticular** (`en: "abacos"`) **o de una losa maciza** (CO3-l): cercos
+ *   repartidos por la losa, con `ramas` ramas **por metro** de ancho (obligatorio), cada `separacion`
+ *   a lo largo de la dirección.
  */
 export interface CercosForjado {
   direccion: "x" | "y";
   s: [number, number];
   t: [number, number];
   cercos: CercosViga;
+  /** En un reticular: los cercos son de los ábacos (ramas por metro). Sin él, de los nervios. */
+  en?: "abacos";
 }
+
+/** CO3-l: ¿van los cercos repartidos por metro de losa (ábacos o maciza) y no por nervio? */
+export const cercosPorMetro = (c: Pick<CercosForjado, "en">, reticular: boolean): boolean => !reticular || c.en === "abacos";
 
 /** El armado de una losa maciza o reticular (CO3). */
 export interface ArmadoForjado {
@@ -336,7 +346,7 @@ export interface ArmadoForjado {
   /** En un reticular: la parrilla de los ábacos (Ø y separación). En ellos no se cuentan las barras de los nervios. */
   abacos?: Record<ArmaduraForjado, BarrasForjado>;
   refuerzos?: RefuerzoForjado[];
-  /** En un reticular: los cercos de los nervios, por zonas. */
+  /** Los cercos, por zonas: de los nervios o de los ábacos de un reticular, o de una losa maciza (CO3-l). */
   cercos?: CercosForjado[];
 }
 
@@ -386,16 +396,19 @@ export function erroresArmadoForjado(a: ArmadoForjado, reticular: boolean): stri
     if (!reticular && x.en !== undefined) r.push(`${que}: «en» es de los reticulares`);
     barras(x.barras, `${que} (${x.armadura})`, reticular && x.en === "nervios");
   });
-  if (a.cercos !== undefined && !reticular) r.push("los cercos son de los nervios de un reticular");
   (a.cercos ?? []).forEach((x, i) => {
     const que = `los cercos ${i + 1}`;
     if (x.direccion !== "x" && x.direccion !== "y") r.push(`${que}: la dirección tiene que ser x o y`);
+    if (reticular && x.en !== undefined && x.en !== "abacos") r.push(`${que}: «en» es «abacos» o nada (los nervios)`);
+    if (!reticular && x.en !== undefined) r.push(`${que}: «en» es de los reticulares`);
     for (const [k, v] of [["s", x.s], ["t", x.t]] as const) if (!(Array.isArray(v) && v.length === 2 && v.every(Number.isFinite) && v[1] > v[0])) r.push(`${que}: ${k} tiene que ser [desde, hasta] en m, con hasta > desde`);
     const c = x.cercos;
     if (!c || typeof c !== "object") return void r.push(`${que}: faltan el diámetro y la separación`);
     if (!DIAMETROS.includes(c.diametro)) r.push(`${que}: Ø${String(c.diametro)} no es un diámetro de barra (${DIAMETROS.join(", ")})`);
     if (!(Number.isFinite(c.separacion) && c.separacion > 0)) r.push(`${que}: la separación ${String(c.separacion)} no vale (mm, > 0)`);
-    if (c.ramas !== undefined && !(Number.isInteger(c.ramas) && c.ramas >= 2)) r.push(`${que}: ${String(c.ramas)} ramas no vale (un entero ≥ 2)`);
+    if (cercosPorMetro(x, reticular)) {
+      if (!(Number.isInteger(c.ramas) && c.ramas! >= 1)) r.push(`${que}: en ${reticular ? "los ábacos" : "una losa maciza"} hay que dar las ramas por metro de ancho (ramas, un entero ≥ 1)`);
+    } else if (c.ramas !== undefined && !(Number.isInteger(c.ramas) && c.ramas >= 2)) r.push(`${que}: ${String(c.ramas)} ramas no vale (un entero ≥ 2)`);
   });
   return r;
 }

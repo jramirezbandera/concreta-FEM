@@ -133,10 +133,10 @@ const BASE: { id: "si" | "no"; nombre: string; title: string }[] = [
   { id: "no", nombre: "No", title: "Sólo los refuerzos y los cercos: la armadura base es de toda la losa y va en la leyenda" },
 ];
 const CARAS: { id: CaraDibujada; nombre: string; title: string }[] = [
-  { id: "todas", nombre: "Todo", title: "Los refuerzos de las dos caras (los inferiores en azul y los superiores en rojo) y los cercos de los nervios" },
+  { id: "todas", nombre: "Todo", title: "Los refuerzos de las dos caras (los inferiores en azul y los superiores en rojo) y los cercos" },
   { id: "inferior", nombre: "Inferior", title: "Sólo los refuerzos de la cara inferior" },
   { id: "superior", nombre: "Superior", title: "Sólo los refuerzos de la cara superior" },
-  { id: "cercos", nombre: "Cercos", title: "Sólo las zonas de cercos de los nervios" },
+  { id: "cercos", nombre: "Cercos", title: "Sólo las zonas de cercos (de los nervios, de los ábacos o de una losa maciza)" },
 ];
 
 /** Lo que se puede añadir a una losa en la planta (§8.12): su clave en el desplegable. */
@@ -145,8 +145,8 @@ const ANADIR: { id: string; nombre: string; nuevo: NuevoElemento }[] = [
   { id: "x-sup", nombre: "Refuerzo X superior", nuevo: { lista: "refuerzos", armadura: "x-sup" } },
   { id: "y-inf", nombre: "Refuerzo Y inferior", nuevo: { lista: "refuerzos", armadura: "y-inf" } },
   { id: "y-sup", nombre: "Refuerzo Y superior", nuevo: { lista: "refuerzos", armadura: "y-sup" } },
-  { id: "cercos-x", nombre: "Cercos de nervios X", nuevo: { lista: "cercos", direccion: "x" } },
-  { id: "cercos-y", nombre: "Cercos de nervios Y", nuevo: { lista: "cercos", direccion: "y" } },
+  { id: "cercos-x", nombre: "Cercos X", nuevo: { lista: "cercos", direccion: "x" } },
+  { id: "cercos-y", nombre: "Cercos Y", nuevo: { lista: "cercos", direccion: "y" } },
 ];
 const enFoco = () => {
   const a = document.activeElement;
@@ -313,7 +313,7 @@ function FormArmado({
             const n = (l === "refuerzos" ? refuerzos : cercos).length;
             return n ? (
               <button key={l} type="button" role="tab" aria-selected={l === lista} data-on={l === lista || undefined} onClick={() => setListaVista(l)}>
-                {l === "refuerzos" ? "Refuerzos" : "Cercos de los nervios"} · {n}
+                {l === "refuerzos" ? "Refuerzos" : "Cercos"} · {n}
               </button>
             ) : null;
           })}
@@ -1009,7 +1009,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   );
   er.elegido = editable && elemento ? { losa: elemento.losa, elemento: { lista: elemento.lista, indice: elemento.indice } } : null;
   const nuevoElegido = editable ? (ANADIR.find((x) => x.id === anadir)?.nuevo ?? null) : null;
-  er.nuevo = nuevoElegido?.lista === "refuerzos" ? { ...nuevoElegido, en: anadirEn } : nuevoElegido;
+  er.nuevo = nuevoElegido ? { ...nuevoElegido, en: anadirEn } : null;
   er.alAvisar = setAvisoPlanta;
   er.alMover = (losa, e, zona) => {
     const a = entero?.forjados?.[losa];
@@ -1019,9 +1019,10 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     const a = entero?.forjados?.[losa];
     const reticular = !!losasModelo?.find((l) => l.id === losa)?.reticular;
     if (!a) return;
-    if (n.lista === "cercos" && !reticular) return setAvisoPlanta(`La losa ${losa} es maciza: los cercos son de los nervios de un reticular.`);
     const en = reticular ? anadirEn : undefined;
-    const nuevo: RefuerzoForjado | CercosForjado = n.lista === "cercos" ? { direccion: n.direccion, ...zona, cercos: { diametro: 6, separacion: 150 } } : { armadura: n.armadura, ...zona, barras: en === "nervios" ? { diametro: 12, n: 1 } : { diametro: 12, separacion: 200 }, ...(en ? { en } : {}) };
+    // CO3-l: unos cercos de los ábacos o de una maciza, con sus ramas por metro de ancho
+    const porMetro = !reticular || en === "abacos";
+    const nuevo: RefuerzoForjado | CercosForjado = n.lista === "cercos" ? { direccion: n.direccion, ...zona, cercos: porMetro ? { diametro: 6, separacion: 150, ramas: 5 } : { diametro: 6, separacion: 150 }, ...(reticular && en === "abacos" ? { en } : {}) } : { armadura: n.armadura, ...zona, barras: en === "nervios" ? { diametro: 12, n: 1 } : { diametro: 12, separacion: 200 }, ...(en ? { en } : {}) };
     const r = conElemento(a, nuevo);
     if (!escribirLosa(losa, r.armado, `Añadir ${idElemento(losa, r.elemento)}`)) return;
     setAnadir("");
@@ -1187,6 +1188,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           const v = fc.datos.find((y) => y.nombre.startsWith("vEd / vRd,c"))?.valor;
           return decir(`No hace falta armadura de punzonamiento: ${fc.pieza} cumple sin ella${typeof v === "number" ? ` (vEd/vRd,c = ${fmt(v, 2)} ≤ 1)` : ""}. No se ha cambiado nada.`);
         }
+        if (!fc.cumple) return decir(`Lo propuesto es lo que ya tiene, y no cumple${fc.manda ? ` «${textoApp(fc.manda.descripcion)}»` : ""}: las tablas no tienen nada que lo arregle. No se ha cambiado nada; hay que cambiar la sección, el canto o el material.`);
         return decir("Lo propuesto es lo que ya tiene: el primer armado de las tablas con el que todo cumple. No se ha cambiado nada.");
       }
       const ap = ed.editar({ op: "armado", armado: datos.armado }, `Armado propuesto: ${fc.pieza}`);
@@ -1262,14 +1264,14 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
         <div role="group" aria-label="Añadir a una losa" className="flex items-center gap-1.5">
           <select className="sel" style={{ height: 28 }} value={anadir} onChange={(x) => setAnadir(x.target.value)} aria-label="Añadir a una losa" title="Un refuerzo o una zona de cercos nuevos: elija cuál y dé en la planta dos esquinas opuestas de su zona">
             <option value="">Añadir…</option>
-            {ANADIR.filter((x) => hayReticular || x.nuevo.lista === "refuerzos").map((x) => (
+            {ANADIR.map((x) => (
               <option key={x.id} value={x.id}>
                 {x.nombre}
               </option>
             ))}
           </select>
-          {hayReticular && anadir !== "" && er.nuevo?.lista === "refuerzos" && (
-            <select className="sel" style={{ height: 28 }} value={anadirEn} onChange={(x) => setAnadirEn(x.target.value as "nervios" | "abacos")} aria-label="En un reticular, el refuerzo es de" title="En un reticular: el refuerzo es de los nervios (barras por nervio) o de los ábacos (una parrilla)">
+          {hayReticular && anadir !== "" && (
+            <select className="sel" style={{ height: 28 }} value={anadirEn} onChange={(x) => setAnadirEn(x.target.value as "nervios" | "abacos")} aria-label={`En un reticular, ${er.nuevo?.lista === "cercos" ? "los cercos son" : "el refuerzo es"} de`} title={er.nuevo?.lista === "cercos" ? "En un reticular: los cercos son de los nervios (cercos de cada nervio) o de los ábacos (repartidos, con sus ramas por metro)" : "En un reticular: el refuerzo es de los nervios (barras por nervio) o de los ábacos (una parrilla)"}>
               <option value="nervios">en los nervios</option>
               <option value="abacos">en los ábacos</option>
             </select>

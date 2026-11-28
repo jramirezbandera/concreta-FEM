@@ -48,8 +48,17 @@
  * cumple el suelo geométrico (y no la mínima del módulo), y donde no llega a 1,2 veces lo que pide el
  * ELU van refuerzos, como donde no llega la flexión.
  *
- * En una maciza y en los ábacos no propone armadura transversal: una fila de cortante que falla ahí
- * deja la losa sin cumplir (junto a los pilares es del punzonamiento, CO4).
+ * **El cortante de los ábacos y de una maciza (CO3-l, decidido por el usuario el 2026-11-28):** primero
+ * con acero longitudinal y, si no basta con un armado razonable, con cercos.
+ *  - Sin cercos, VRd,c depende del acero de la cara traccionada (`../comprobar/losas.ts`), así que sus
+ *    estaciones entran en las zonas de refuerzo de esa cara, como las de la flexión. El refuerzo sólo
+ *    se sube por el cortante hasta `DIAMETRO_MAXIMO_CORTANTE` (Ø16; a cualquier separación de la tabla,
+ *    hasta 100 mm: unos 2 000 mm²/m); más allá, si la flexión no pide más, se queda el que pide la
+ *    flexión, o ninguno.
+ *  - Lo que aun así no cumple recibe una zona de cercos con sus ramas por metro (`tablaCercosLosa`),
+ *    de la que menos acero tiene. Una losa de menos de 200 mm no admite armadura de cortante
+ *    (§9.3.2(1)): queda sin propuesta, y hay que subir el canto.
+ * Junto a los pilares, el cortante es del punzonamiento (CO4).
  */
 import type { Vec2 } from "../../compilador/fisico.ts";
 import { zonasRefuerzo, type FranjaTramos } from "../../agente/refuerzos.ts";
@@ -60,6 +69,12 @@ import { armadoLosa, comprobarLosa, cubre, cubreCercos, estacionesQueFallan, est
 import { direccionArmadura, type DemandasLosa, type EstacionLosa, type SeccionLosa } from "../demandas/losas.ts";
 
 export const DIAMETROS_LOSA = [8, 10, 12, 16, 20, 25] as const;
+/** CO3-l: el mayor diámetro de un refuerzo de un ábaco o una maciza que se sube sólo por el cortante; más allá, cercos. */
+export const DIAMETRO_MAXIMO_CORTANTE = 16;
+/** CO3-l: los cercos de un ábaco o una maciza: diámetros, separaciones (mm) y ramas por metro de ancho. */
+export const DIAMETROS_CERCOS_LOSA = [6, 8, 10] as const;
+export const SEPARACIONES_CERCOS_LOSA = [200, 150, 100, 75] as const;
+export const RAMAS_CERCOS_LOSA = [3, 4, 5, 6, 8, 10] as const;
 export const SEPARACIONES_LOSA = [300, 250, 200, 150, 125, 100] as const;
 export const BARRAS_NERVIO = [1, 2, 3, 4] as const;
 
@@ -81,6 +96,14 @@ export function tablaNervios(): BarrasForjado[] {
 
 export const DIAMETROS_CERCO_NERVIO = [6, 8, 10] as const;
 export const SEPARACIONES_CERCO_NERVIO = [200, 150, 100, 75] as const;
+
+/** CO3-l: los cercos de un ábaco o una maciza, con sus ramas por metro, de menos a más acero por m² (a igual acero, los más separados y con menos ramas). */
+export function tablaCercosLosa(): CercosViga[] {
+  const t: CercosViga[] = [];
+  for (const diametro of DIAMETROS_CERCOS_LOSA) for (const separacion of SEPARACIONES_CERCOS_LOSA) for (const ramas of RAMAS_CERCOS_LOSA) t.push({ diametro, separacion, ramas });
+  const acero = (c: CercosViga) => (c.ramas! * areaBarra(c.diametro)) / c.separacion;
+  return t.sort((p, q) => acero(p) - acero(q) || q.separacion - p.separacion || p.ramas! - q.ramas! || p.diametro - q.diametro);
+}
 
 /** Los cercos de un nervio (dos ramas), de menos a más acero por metro (a igual acero, los más separados). */
 export function tablaCercosNervio(): CercosViga[] {
@@ -109,7 +132,9 @@ export interface OpcionesProponerLosa {
 }
 
 /** Las filas que dependen de la demanda: las arregla un refuerzo, no la base (la mínima reducida de CO3-k, también). */
-const DEMANDA = /\/(bending|cracking|as-min-elu)$/;
+const DEMANDA = /\/(bending|cracking|as-min-elu|shear)$/;
+/** CO3-l: la fila del cortante sin cercos de un ábaco o una maciza (con su armadura: la de su cara traccionada). */
+const esCortante = (f: { id: string }) => f.id.endsWith("/shear");
 const EPS = 1e-9;
 
 /** El despiece (cabecera): las puntas de un refuerzo o de una zona de cercos van a este módulo, m. */
@@ -276,7 +301,7 @@ export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesP
   // ─── 2. Los cercos de los nervios, zona a zona ────────────────────────────────────────────────
   const tabla = tablaCercosNervio();
   const cercos: CercosForjado[] = [];
-  if (reticular) a.cercos = cercos;
+  a.cercos = cercos;
   /**
    * Cercos en las zonas de nervios sin cortante. `conFlexion`: tras los refuerzos, los cercos tampoco
    * pueden hacer fallar la flexión (cambian el canto útil y el hueco de las barras).
@@ -290,7 +315,7 @@ export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesP
       if (!fallan.length) continue;
       // Las zonas de la dirección se rehacen con todo lo que ha pedido cercos, para unirlas con las de antes
       for (const e of fallan) pidenCercos[k - 1].add(e);
-      for (let i = cercos.length - 1; i >= 0; i--) if (cercos[i]!.direccion === eje) cercos.splice(i, 1);
+      for (let i = cercos.length - 1; i >= 0; i--) if (cercos[i]!.direccion === eje && cercos[i]!.en === undefined) cercos.splice(i, 1);
       const piezas = zonasDe(k, `${eje}-inf`, pidenCercos[k - 1]).map((z) => piezaDe(k, z.estaciones));
       for (const { caja: rect } of despiece(piezas, () => 0, LARGO_MINIMO_CERCOS, HOLGURA_UNION_CERCOS)) {
         const c: CercosForjado = { direccion: eje, ...rect, cercos: tabla[0]! };
@@ -325,20 +350,42 @@ export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesP
   const fctm = fctmAdherencia(d.material.fck);
   /** Lo que se alarga cada punta de un refuerzo: el decalaje (el canto) más el anclaje de su barra, m. */
   const alarga = (diametro: number, arm: ArmaduraForjado) => d.espesor + computeAnchorage(diametro, fctm, fyd, arm.endsWith("inf") ? "inf" : "sup", 1000 * d.espesor).lb_rqd / 1000;
-  /** El primer refuerzo de la tabla que cumple en su rectángulo; si ninguno, queda dicho. */
+  /**
+   * El primer refuerzo de la tabla que cumple en su rectángulo; si ninguno, queda dicho. El cortante sin
+   * cercos (CO3-l) sólo sube el refuerzo hasta `DIAMETRO_MAXIMO_CORTANTE`: si con eso no cumple, se
+   * queda el primero con el que cumple la flexión (o ninguno, si la flexión no lo pide), y el cortante
+   * va a los cercos.
+   */
   const dimensionar = (arm: ArmaduraForjado, rect: Rectangulo, en: "abacos" | "nervios" | undefined, zona: string): RefuerzoForjado | null => {
     const k = direccionArmadura(arm);
     const r: RefuerzoForjado = { armadura: arm, s: rect.s, t: rect.t, barras: parrillas[0]!, ...(en ? { en } : {}) };
     const cubiertas = d.direcciones[k - 1]!.estaciones.filter((e) => cubre(r, e));
     refuerzos.push(r);
     let motivo = "";
+    let flexion: BarrasForjado | null = null;
     for (const b of en === "nervios" ? nervios : parrillas) {
       r.barras = b;
       const c = probar({ direccion: k, estaciones: cubiertas });
-      const f = c.filas.find((x) => x.armadura === arm && x.estado === "fail" && x.grupo !== "seccion");
       const p = c.pendientes[0];
-      if (!f && !p) return r;
-      motivo = p?.motivo ?? `«${f!.descripcion}»`;
+      if (p) {
+        motivo = p.motivo;
+        continue;
+      }
+      const fs = c.filas.filter((x) => x.armadura === arm && x.estado === "fail" && x.grupo !== "seccion");
+      const f = fs.find((x) => !esCortante(x));
+      if (!f && !flexion) flexion = b;
+      if (!fs.length && (b === flexion || b.diametro <= DIAMETRO_MAXIMO_CORTANTE)) return r;
+      // Cumple, pero sólo por el cortante y con más de Ø16: eso es de los cercos
+      if (fs.length) motivo = `«${(f ?? fs[0])!.descripcion}»`;
+    }
+    if (flexion) {
+      // El cortante no se arregla con un refuerzo razonable: ¿lo pide la flexión?
+      refuerzos.pop();
+      const sin = probar({ direccion: k, estaciones: cubiertas });
+      if (!sin.pendientes.length && !sin.filas.some((x) => x.armadura === arm && x.estado === "fail" && x.grupo !== "seccion" && !esCortante(x))) return null;
+      refuerzos.push(r);
+      r.barras = flexion;
+      return r;
     }
     refuerzos.pop();
     sinRefuerzo.push({ armadura: arm, zona, ...(en ? { en } : {}), motivo: `ningún refuerzo de la tabla cumple ${motivo}: la sección no basta` });
@@ -412,6 +459,47 @@ export function proponerLosa(d: DemandasLosa, datos?: DatosArmado, op: OpcionesP
   }
   // Un refuerzo en segunda capa baja el canto útil del nervio, y con él su cortante sin cercos: otra pasada
   if (reticular && refuerzos.length) pasoCercos(true);
+
+  // ─── 4. Los cercos de los ábacos y de una maciza (CO3-l): el cortante que el longitudinal no arregla ──
+  const tablaLosa = tablaCercosLosa();
+  const clave = (f: { id: string; franja?: string; s?: number }) => `${f.id}|${f.franja ?? ""}|${f.s ?? ""}`;
+  for (const k of [1, 2] as const) {
+    const eje = k === 1 ? ("x" as const) : ("y" as const);
+    const fallan = estacionesSinCortante(d, armadoLosa(a, datos), k, reticular ? ["abaco"] : ["maciza"]);
+    if (!fallan.length) continue;
+    if (d.espesor < 0.2 - EPS) {
+      sinRefuerzo.push({ zona: `${d.losa}:${eje}:cortante`, ...(reticular ? { en: "abacos" as const } : {}), motivo: `el cortante no cumple sin cercos ni con un refuerzo de hasta Ø${DIAMETRO_MAXIMO_CORTANTE}, y una losa de ${Math.round(1000 * d.espesor)} mm no admite armadura de cortante (h < 200 mm, CE Anejo 19 §9.3.2(1)): hay que subir el canto` });
+      continue;
+    }
+    const piezas = zonasDe(k, `${eje}-inf`, new Set(fallan)).flatMap((z) => {
+      const es = z.estaciones.filter((e) => e.seccion !== "nervio");
+      return es.length ? [piezaDe(k, es)] : [];
+    });
+    for (const { caja: rect } of despiece(piezas, () => 0, LARGO_MINIMO_CERCOS, HOLGURA_UNION_CERCOS)) {
+      const c: CercosForjado = { direccion: eje, s: rect.s, t: rect.t, cercos: tablaLosa[0]!, ...(reticular ? { en: "abacos" as const } : {}) };
+      const cubiertas = d.direcciones[k - 1]!.estaciones.filter((e) => cubreCercos(c, e));
+      // Lo que ya fallaba sin ellos (y no es el cortante) no lo tienen que arreglar los cercos
+      const antes = new Set(probar({ direccion: k, estaciones: cubiertas }).filas.filter((f) => f.estado === "fail" && !esCortante(f)).map(clave));
+      cercos.push(c);
+      let vale = false;
+      let motivo = "";
+      for (const x of tablaLosa) {
+        c.cercos = x;
+        const r = probar({ direccion: k, estaciones: cubiertas });
+        const f = r.filas.find((y) => y.estado === "fail" && !antes.has(clave(y)));
+        const pe = r.pendientes[0];
+        if (!f && !pe) {
+          vale = true;
+          break;
+        }
+        motivo = pe?.motivo ?? `«${f!.descripcion}»`;
+      }
+      if (!vale) {
+        cercos.pop();
+        sinRefuerzo.push({ zona: `${d.losa}:${eje}:C${reticular ? "a" : "m"}@${rect.s[0].toFixed(2)},${rect.t[0].toFixed(2)}`, ...(reticular ? { en: "abacos" as const } : {}), motivo: `ningunos cercos de la tabla cumplen ${motivo}: la sección no basta` });
+      }
+    }
+  }
   if (!cercos.length) delete a.cercos;
   if (!refuerzos.length) delete a.refuerzos;
   return { armado: a, comprobacion: probar(), probados, sinRefuerzo };

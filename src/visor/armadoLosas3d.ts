@@ -110,7 +110,7 @@ export function armadoLosas3D(f: ModeloFisico, origen: [number, number, number],
     }
     // Los cercos de los nervios: el contorno de su zona, a media altura de la losa
     if (cara === "todas" || cara === "cercos")
-      for (const z of cercosDibujados(l.eje1, a)) {
+      for (const z of cercosDibujados(l.eje1, a, !!l.reticular)) {
         const k = objetos.push(`${l.id}/C${z.indice + 1}`) - 1;
         let n = 0;
         for (let i = 0; i < 4; i++)

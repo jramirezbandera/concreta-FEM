@@ -1,0 +1,30 @@
+== CO3, las losas
+losa-dos-apoyos: {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0} → {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0}
+  L: cumple true → true; filas de cortante 2 → 3; el peor cortante 0.432 → 0.406
+losa-plana-sismo: {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0} → {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0}
+  L: cumple true → true; filas de cortante 6 → 10; el peor cortante 0.721 → 0.581
+losa-reticular: {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0} → {"losas":1,"cumplen":1,"noCumplen":0,"sinArmado":0}
+  L: cumple true → true; filas de cortante 54 → 62; el peor cortante 0.968 → 0.714
+vivienda: {"losas":2,"cumplen":1,"noCumplen":1,"sinArmado":0} → {"losas":2,"cumplen":2,"noCumplen":0,"sinArmado":0}
+  L-CUB: cumple false → true; filas de cortante 33 → 48; el peor cortante 1.003 → 0.999
+    refuerzos: 11 → 12
+      + {"armadura":"y-sup","s":[14.05,15.05],"t":[-6.75,-4.75],"barras":{"diametro":10,"separacion":300},"en":"abacos"}
+    cercos: 9 → 9
+      − {"direccion":"x","s":[1.05,1.6],"t":[7.835,9.995],"cercos":{"diametro":6,"separacion":150}}
+      − {"direccion":"x","s":[1.05,1.6],"t":[13.595,15.035],"cercos":{"diametro":6,"separacion":150}}
+      − {"direccion":"y","s":[7.35,7.9],"t":[0.25,0.97],"cercos":{"diametro":6,"separacion":150}}
+      − {"direccion":"y","s":[9.35,10.65],"t":[-1.19,1.69],"cercos":{"diametro":6,"separacion":150}}
+      + {"direccion":"x","s":[1.05,1.6],"t":[7.835,9.275],"cercos":{"diametro":6,"separacion":150}}
+      + {"direccion":"x","s":[1.05,1.6],"t":[14.315,15.035],"cercos":{"diametro":6,"separacion":150}}
+      + {"direccion":"y","s":[7.5,8],"t":[0.25,0.97],"cercos":{"diametro":6,"separacion":150}}
+      + {"direccion":"y","s":[9.85,10.65],"t":[-1.19,0.97],"cercos":{"diametro":6,"separacion":150}}
+  L-CUB-S: cumple true → true; filas de cortante 38 → 49; el peor cortante 1.000 → 0.957
+
+== CO4, el punzonamiento
+losa-bordes: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}; uniones que cambian: 0
+losa-bordes-7m: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":9,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":9,"sinArmadoLosa":0,"pendientes":0}; uniones que cambian: 0
+losa-bordes-hueco: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}; uniones que cambian: 0
+losa-plana-sismo: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}; uniones que cambian: 0
+reticular-bordes: {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0} → {"uniones":9,"cumplen":9,"noCumplen":0,"conArmadura":1,"sinArmadoLosa":0,"pendientes":0}; uniones que cambian: 0
+vivienda: {"uniones":12,"cumplen":12,"noCumplen":0,"conArmadura":0,"sinArmadoLosa":0,"pendientes":0} → {"uniones":12,"cumplen":12,"noCumplen":0,"conArmadura":0,"sinArmadoLosa":0,"pendientes":0}; uniones que cambian: 1
+  P2@CUB: vEd/vRd,c 0.263 → 0.263; ρl,min/ρl 0.858 → 0.709; cumple true → true

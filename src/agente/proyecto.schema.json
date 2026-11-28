@@ -366,7 +366,7 @@
           "items": {
             "$ref": "#/$defs/CercosForjado"
           },
-          "description": "En un reticular: los cercos de los nervios, por zonas."
+          "description": "Los cercos, por zonas: de los nervios o de los ábacos de un reticular, o de una losa maciza (CO3-l)."
         }
       },
       "required": [
@@ -1179,6 +1179,10 @@
         },
         "cercos": {
           "$ref": "#/$defs/CercosViga"
+        },
+        "en": {
+          "const": "abacos",
+          "description": "En un reticular: los cercos son de los ábacos (ramas por metro). Sin él, de los nervios."
         }
       },
       "required": [
@@ -1188,7 +1192,7 @@
         "cercos"
       ],
       "additionalProperties": false,
-      "description": "Cercos de los nervios de un reticular en un rectángulo de la losa, en los ejes de los nervios de su\ndirección (como un refuerzo: s a lo largo de los nervios X o Y, t en transversal; m). Fuera de\nellos, los nervios van sin armadura transversal."
+      "description": "Cercos en un rectángulo de la losa, en los ejes de su dirección (como un refuerzo: s a lo largo de\nlas franjas X o Y, t en transversal; m). Fuera de ellos, la losa va sin armadura transversal.\n\n- **De los nervios de un reticular** (sin `en`): cercos de cada nervio, de `ramas` ramas (2 por\n  defecto).\n- **De los ábacos de un reticular** (`en: \"abacos\"`) **o de una losa maciza** (CO3-l): cercos\n  repartidos por la losa, con `ramas` ramas **por metro** de ancho (obligatorio), cada `separacion`\n  a lo largo de la dirección."
     },
     "CercosViga": {
       "type": "object",

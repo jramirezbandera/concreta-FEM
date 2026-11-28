@@ -9,6 +9,7 @@
  */
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { ArmadoParte, TipoComprobacion } from "../visor/comprobaciones.ts";
+import { cercosPorMetro } from "../comprobaciones/armado.ts";
 
 export interface CampoArmado {
   /** La ruta del valor en el armado de la pieza («caraB.n», «base.x-inf.diametro»). */
@@ -129,11 +130,18 @@ export function gruposArmado(p: ArmadoParte): GrupoArmado[] {
       nota: `${m2(r.s)} × ${m2(r.t)} m`,
     };
   });
-  const zonas: GrupoArmado[] = (p.armado?.cercos ?? []).map((c, indice) => ({
-    ...cercos(`cercos.${indice}.cercos`, `C${indice + 1} · nervios ${c.direccion === "y" ? "Y" : "X"}`),
-    elemento: { lista: "cercos" as const, indice },
-    nota: `${m2(c.s)} × ${m2(c.t)} m`,
-  }));
+  // CO3-l: los de los ábacos y los de una maciza llevan sus ramas por metro de ancho (obligatorias)
+  const zonas: GrupoArmado[] = (p.armado?.cercos ?? []).map((c, indice) => {
+    const porMetro = cercosPorMetro(c, !!p.reticular);
+    const dir = c.direccion === "y" ? "Y" : "X";
+    const g = cercos(`cercos.${indice}.cercos`, `C${indice + 1} · ${porMetro ? (p.reticular ? `ábacos ${dir}` : dir) : `nervios ${dir}`}`, false, !porMetro);
+    return {
+      ...g,
+      campos: porMetro ? [...g.campos, { ruta: `cercos.${indice}.cercos.ramas`, etiqueta: "ramas por metro", clase: "n" as const }] : g.campos,
+      elemento: { lista: "cercos" as const, indice },
+      nota: `${m2(c.s)} × ${m2(c.t)} m`,
+    };
+  });
   return [...(p.reticular ? [...base("base", "Nervios,", true, false), ...base("abacos", "Ábacos,", false, true)] : base("base", "Base", false, false)), ...refuerzos, ...zonas];
 }
 

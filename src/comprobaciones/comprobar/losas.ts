@@ -29,8 +29,19 @@
  *    de caber en su ancho: se le quita ese diámetro al canto, que da el mismo canto útil (la
  *    fisuración y la cuantía mínima salen entonces con el recubrimiento de la obra y ese canto);
  *  - la fisuración, con el momento cuasipermanente entero (`loadType: "custom"`, ψ₂ = 0);
- *  - el cortante, contra VRd,c; en los nervios cubiertos por una zona de cercos (`cercos`), con ellos
- *    (si la cubren varias, con la de más acero por metro).
+ *  - el cortante, contra VRd,c; donde lo cubre una zona de cercos (`cercos`), con ellos (si la cubren
+ *    varias, con la de más acero por metro): en los nervios, cercos de nervio; en los ábacos y en una
+ *    maciza, cercos con sus ramas por metro de ancho (CO3-l).
+ *
+ * **El cortante sin cercos (CO3-l):** el módulo toma para ρl la menor armadura de las dos caras y el
+ * menor canto útil. El Anejo 19 §6.2.2(1) pide la armadura **traccionada** (anclada lbd + d más allá de
+ * la sección, que es lo que hace el despiece de los refuerzos): aquí VRd,c sale con la fórmula del
+ * módulo y el As y el d que da el módulo de la cara que tracciona en cada estación (la de mayor
+ * momento de ELU; si ninguna tracciona, la más débil). Las estaciones de un grupo se reparten por esa
+ * cara y sale una fila por cara. En los ábacos y en una maciza la fila lleva la armadura de esa cara:
+ * la arregla un refuerzo (o, si no basta con uno razonable, una zona de cercos; `../armar/losas.ts`).
+ * Con cercos, las filas son las del módulo, más el canto mínimo de una losa con armadura de cortante
+ * (§9.3.2(1)) y la separación transversal entre ramas (§9.3.2(4)) en los ábacos y las macizas.
  *
  * Qué filas se toman: las de la flexión de una cara (momento, cuantía mínima, fisuración), sólo si
  * esa cara tracciona en alguna estación del grupo; la separación y la cuantía máxima, siempre; la del
@@ -52,7 +63,8 @@
 import { calcForjados, type ForjadosResult } from "../concreta/lib/calculations/rcSlabs.ts";
 import { asMinRectangular } from "../concreta/lib/calculations/cuantiaMinima.ts";
 import { getConcrete, getFyd } from "../concreta/data/materials.ts";
-import type { CheckRow, CheckStatus } from "../concreta/lib/calculations/types.ts";
+import { makeCheckQty, makeDetailingCheck, type CheckRow, type CheckStatus } from "../concreta/lib/calculations/types.ts";
+import { GAMMA_C } from "../concreta/data/factors.ts";
 import { forjadosDefaults, type ForjadosInputs } from "../concreta/data/defaults.ts";
 import { areaBarra, cuantiaGeometrica, DATOS_ARMADO, FACTOR_MINIMA_REDUCIDA, ramasDe, type ArmadoForjado, type ArmaduraForjado, type BarrasForjado, type CercosForjado, type DatosArmado, type Exposicion, type RefuerzoForjado } from "../armado.ts";
 import { armaduraDe, direccionArmadura, type DemandasLosa, type EstacionLosa, type SeccionLosa } from "../demandas/losas.ts";
@@ -75,8 +87,9 @@ export function armadoLosa(a: ArmadoForjado, d?: DatosArmado): ArmadoLosa {
 
 /**
  * Lo que hay que aumentar si una fila falla: la base de una armadura, la parrilla de los ábacos, un
- * refuerzo o una zona de cercos (su índice), el cortante sin cercos (en un nervio, pide una zona de
- * cercos; en una maciza, nada que proponer) o la sección (nada que proponer).
+ * refuerzo o una zona de cercos (su índice), el cortante sin cercos de un nervio (pide una zona de
+ * cercos; el de un ábaco o una maciza va con su cara traccionada, CO3-l) o la sección (nada que
+ * proponer).
  */
 export type GrupoLosa = `base:${ArmaduraForjado}` | `abacos:${ArmaduraForjado}` | `refuerzo:${number}` | `cercos:${number}` | "cortante" | "seccion";
 
@@ -136,10 +149,62 @@ export function cubre(r: RefuerzoForjado, e: Pick<EstacionLosa, "s" | "t0" | "t1
   return e.s >= r.s[0] - EPS && e.s <= r.s[1] + EPS && tc >= r.t[0] - EPS && tc <= r.t[1] + EPS;
 }
 
-/** ¿Cubre la zona de cercos la estación? (sólo los nervios llevan cercos). */
+/** ¿Cubre la zona de cercos la estación? (los de los nervios, sólo nervios; los de los ábacos, sólo ábacos; en una maciza, la losa). */
 export function cubreCercos(c: CercosForjado, e: Pick<EstacionLosa, "s" | "t0" | "t1" | "seccion">): boolean {
   const tc = (e.t0 + e.t1) / 2;
-  return e.seccion === "nervio" && e.s >= c.s[0] - EPS && e.s <= c.s[1] + EPS && tc >= c.t[0] - EPS && tc <= c.t[1] + EPS;
+  if (e.seccion === "abaco" ? c.en !== "abacos" : c.en !== undefined) return false;
+  return e.s >= c.s[0] - EPS && e.s <= c.s[1] + EPS && tc >= c.t[0] - EPS && tc <= c.t[1] + EPS;
+}
+
+/** CO3-l: la cara que tracciona en una estación: la de mayor momento de ELU; null si ninguna. */
+export function caraTraccionada(e: Pick<EstacionLosa, "inferior" | "superior">): "inferior" | "superior" | null {
+  const cara = e.superior >= e.inferior ? "superior" : "inferior";
+  return e[cara] > MOMENTO_MINIMO ? cara : null;
+}
+
+/**
+ * CO3-l: VRd,c (kN, por metro o por nervio) con la armadura de una cara: la fórmula del módulo
+ * (Anejo 19 §6.2.2, ec. 6.2a y 6.2b, con su vmín) con el As y el d de esa cara que da el módulo.
+ * `b`, el ancho del cortante (mm): 1 000 en una maciza o un ábaco, el del nervio en un reticular.
+ */
+export function vrdcCara(sec: Pick<ForjadosResult["vano"], "As" | "d">, b: number, fck: number): number {
+  const d = sec.d;
+  if (!(d > 0)) return 0;
+  const k = Math.min(1 + Math.sqrt(200 / d), 2);
+  const rho = Math.min(sec.As / (b * d), 0.02);
+  const v1 = ((0.18 / GAMMA_C) * k * Math.pow(100 * rho * fck, 1 / 3) * b * d) / 1000;
+  const v2 = ((0.051 / GAMMA_C) * Math.pow(k, 1.5) * Math.sqrt(fck) * b * d) / 1000;
+  return Math.max(v1, v2);
+}
+
+interface CortanteCara {
+  cara: "inferior" | "superior";
+  /** El mayor cortante de las estaciones de esa cara, kN (por metro o por nervio). */
+  VEd: number;
+  VRdc: number;
+  de: EstacionLosa;
+  estaciones: EstacionLosa[];
+}
+
+/** El cortante sin cercos de un grupo, por la cara que tracciona en cada estación (CO3-l). */
+function cortantesPorCara(res: ForjadosResult, g: Pick<Grupo, "seccion" | "estaciones">, d: Pick<DemandasLosa, "material" | "reticular">): CortanteCara[] {
+  const fck = d.material.tipo === "hormigon" ? d.material.fck : NaN;
+  const b = g.seccion === "nervio" ? 1000 * d.reticular!.nervio : 1000;
+  const vrdc = { inferior: vrdcCara(res.vano, b, fck), superior: vrdcCara(res.apoyo, b, fck) };
+  const debil = vrdc.inferior <= vrdc.superior ? "inferior" : "superior";
+  const r = new Map<"inferior" | "superior", CortanteCara>();
+  for (const e of g.estaciones) {
+    if (e.cortante === null) continue;
+    const cara = caraTraccionada(e) ?? debil;
+    const v = e.cortante * e.ancho;
+    const x = r.get(cara);
+    if (!x) r.set(cara, { cara, VEd: v, VRdc: vrdc[cara], de: e, estaciones: [e] });
+    else {
+      x.estaciones.push(e);
+      if (v > x.VEd) [x.VEd, x.de] = [v, e];
+    }
+  }
+  return (["inferior", "superior"] as const).flatMap((c) => (r.has(c) ? [r.get(c)!] : []));
 }
 
 /** La sección de un grupo de estaciones: su clase, los refuerzos que las cubren en cada cara y sus cercos (−1, sin ellos). */
@@ -259,6 +324,7 @@ export function entradaGrupo(d: Pick<DemandasLosa, "espesor" | "material" | "ret
     };
   return {
     ...comun,
+    ...(c ? { stirrupsEnabled: true, vano_stirrupDiam: c.diametro, vano_stirrupSpacing: c.separacion, vano_stirrupLegs: ramasDe(c), apoyo_stirrupDiam: c.diametro, apoyo_stirrupSpacing: c.separacion, apoyo_stirrupLegs: ramasDe(c) } : {}),
     variant: "maciza",
     base_inf_phi_mac: bi.diametro,
     base_inf_s_mac: bi.separacion ?? 0,
@@ -372,8 +438,10 @@ export function comprobarLosa(d: DemandasLosa, a: ArmadoLosa, op: OpcionesCompro
           }
         }
       }
-      if (x.conCortante)
+      if (x.conCortante) {
         for (const f of res.shearChecks) {
+          // Sin cercos, el cortante va por la cara traccionada (CO3-l), abajo
+          if (f.id === "shear" && g.cercos < 0) continue;
           const de = x.de.cortante;
           filas.push({
             id: `${eje}/${f.id}`,
@@ -390,6 +458,42 @@ export function comprobarLosa(d: DemandasLosa, a: ArmadoLosa, op: OpcionesCompro
             fila: f,
           });
         }
+        if (g.cercos < 0)
+          for (const v of cortantesPorCara(res, g, d)) {
+            const losa = g.seccion !== "nervio";
+            const f = makeCheckQty("shear", `Cortante VEd ≤ VRd,c (sin cercos; ρl de la cara ${v.cara})`, v.VEd, v.VRdc, "force", "CE Anejo 19 §6.2.2");
+            filas.push({
+              id: `${eje}/shear`,
+              ...(losa ? { armadura: armaduraDe(k, v.cara) } : {}),
+              direccion: k,
+              seccion: g.seccion,
+              refuerzos: v.cara === "inferior" ? g.inf : g.sup,
+              descripcion: f.description,
+              articulo: f.article,
+              aprovechamiento: f.utilization,
+              estado: f.status,
+              franja: v.de.franja,
+              s: v.de.s,
+              comb: v.de.combCortante,
+              grupo: losa ? basico(v.cara) : "cortante",
+              fila: f,
+            });
+          }
+        else if (g.seccion !== "nervio") {
+          // Las reglas de una losa con armadura de cortante (§9.3.2)
+          const c = a.cercos![g.cercos]!.cercos;
+          const h = 1000 * d.espesor;
+          const dd = Math.min(res.vano.d, res.apoyo.d);
+          const st = 1000 / ramasDe(c);
+          const de = x.de.cortante;
+          const reglas: [CheckRow, GrupoLosa][] = [
+            [makeDetailingCheck("slab-stirrup-h", "Canto mínimo de una losa con armadura de cortante", 200, h, "h,mín = 200 mm", `h = ${h.toFixed(0)} mm`, "CE Anejo 19 §9.3.2(1)"), "seccion"],
+            [makeDetailingCheck("slab-stirrup-st", "Separación transversal entre ramas", st, 1.5 * dd, `st = ${st.toFixed(0)} mm`, `st,máx = 1,5·d = ${(1.5 * dd).toFixed(0)} mm`, "CE Anejo 19 §9.3.2(4)"), `cercos:${g.cercos}`],
+          ];
+          for (const [f, grupo] of reglas)
+            filas.push({ id: `${eje}/${f.id}`, direccion: k, seccion: g.seccion, refuerzos: [...new Set([...g.inf, ...g.sup])], descripcion: f.description, articulo: f.article, aprovechamiento: f.utilization, estado: f.status, ...(de ? { franja: de.franja, s: de.s, comb: de.combCortante } : {}), grupo, fila: f });
+        }
+      }
     }
   }
   const r = fin();
@@ -415,22 +519,25 @@ function filasMinimaReducida(minima: CheckRow, flexion: CheckRow, h: number, fyk
 }
 
 /**
- * Las estaciones de los nervios de una dirección en las que el cortante no cumple con el armado dado
- * (las que piden cercos): las de cada grupo cuyo cortante, en su nervio, no es menor que el resistente
- * del grupo. Un grupo cumple la fila del cortante si y sólo si no falla ninguna de sus estaciones.
+ * Las estaciones de una dirección en las que el cortante no cumple con el armado dado (las que piden
+ * cercos), de las secciones dadas (los nervios, por defecto): sin cercos, las que pasan del VRd,c de
+ * su cara traccionada (CO3-l); con cercos, las que no quedan por debajo del resistente del grupo. Un
+ * grupo cumple sus filas del cortante si y sólo si no falla ninguna de sus estaciones.
  */
-export function estacionesSinCortante(d: DemandasLosa, a: ArmadoLosa, k: 1 | 2): EstacionLosa[] {
+export function estacionesSinCortante(d: DemandasLosa, a: ArmadoLosa, k: 1 | 2, secciones: readonly SeccionLosa[] = ["nervio"]): EstacionLosa[] {
   const r: EstacionLosa[] = [];
   if (d.material.tipo !== "hormigon") return r;
   for (const g of grupos(a, k, d.direcciones[k - 1]!.estaciones)) {
-    if (g.seccion !== "nervio") continue;
+    if (!secciones.includes(g.seccion)) continue;
     const parcial = entradaGrupo(d, a, k, g);
     if ("motivo" in parcial) continue;
     const x = esfuerzosGrupo(g);
     if (!x.conCortante) continue;
     const res = calcForjados(entradaLosa(parcial, x));
-    if (!res.valid || !res.shearChecks.some((f) => f.id === "shear" && f.status === "fail")) continue;
-    for (const e of g.estaciones) if (e.cortante !== null && e.cortante * e.ancho >= res.VRd) r.push(e);
+    if (!res.valid) continue;
+    if (g.cercos < 0) {
+      for (const v of cortantesPorCara(res, g, d)) if (v.VEd >= v.VRdc) for (const e of v.estaciones) if (e.cortante! * e.ancho >= v.VRdc) r.push(e);
+    } else if (res.shearChecks.some((f) => f.id === "shear" && f.status === "fail")) for (const e of g.estaciones) if (e.cortante !== null && e.cortante * e.ancho >= res.VRd) r.push(e);
   }
   return r;
 }
@@ -444,6 +551,9 @@ export function estacionesSinCortante(d: DemandasLosa, a: ArmadoLosa, k: 1 | 2):
  *
  * Con la armadura mínima reducida (CO3-k) y un grupo que no llega a la mínima del módulo, el momento
  * no puede pasar de MRd/1,2 (la fila `as-min-elu`).
+ *
+ * En los ábacos y en una maciza sin cercos, también las del cortante sin cercos cuya cara traccionada es
+ * la de esta armadura (CO3-l): las arregla más acero en esa cara.
  */
 export function estacionesQueFallan(d: DemandasLosa, a: ArmadoLosa, armadura: ArmaduraForjado): EstacionLosa[] {
   const k = direccionArmadura(armadura);
@@ -460,6 +570,13 @@ export function estacionesQueFallan(d: DemandasLosa, a: ArmadoLosa, armadura: Ar
     };
     const [M, Mcp] = inferior ? [x.inferior, x.cpInferior] : [x.superior, x.cpSuperior];
     const falla = (sec: NonNullable<ReturnType<typeof con>>, id: string) => sec.checks.some((f) => f.id === id && f.status === "fail");
+    // CO3-l: el cortante sin cercos de un ábaco o una maciza, por la cara traccionada
+    if (g.seccion !== "nervio" && g.cercos < 0 && x.conCortante) {
+      const res = calcForjados(entradaLosa(parcial, x));
+      if (res.valid)
+        for (const v of cortantesPorCara(res, g, d))
+          if (v.cara === (inferior ? "inferior" : "superior") && v.VEd >= v.VRdc) for (const e of v.estaciones) if (e.cortante! * e.ancho >= v.VRdc) r.push(e);
+    }
     const sec = con(M, Mcp);
     if (!sec) continue;
     // CO3-k: sin la mínima del módulo, la alternativa: 1,2·MEd ≤ MRd
@@ -480,7 +597,7 @@ export function estacionesQueFallan(d: DemandasLosa, a: ArmadoLosa, armadura: Ar
     for (const e of g.estaciones) {
       const [m, cp] = inferior ? [e.inferior, e.cpInferior] : [e.superior, e.cpSuperior];
       // «falla» del módulo: aprovechamiento ≥ 1
-      if ((fallaM && (reducida ? FACTOR_MINIMA_REDUCIDA * m * e.ancho > sec.MRd * (1 + 1e-9) : m * e.ancho >= sec.MRd)) || cp * e.ancho > cpLimite) r.push(e);
+      if ((fallaM && (reducida ? FACTOR_MINIMA_REDUCIDA * m * e.ancho > sec.MRd * (1 + 1e-9) : m * e.ancho >= sec.MRd)) || cp * e.ancho > cpLimite) if (!r.includes(e)) r.push(e);
     }
   }
   return r;
