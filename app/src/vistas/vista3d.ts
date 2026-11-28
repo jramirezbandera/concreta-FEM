@@ -1604,9 +1604,20 @@ export class Vista3D extends Vista {
     return mejor < 0 ? null : c.objetos[v.objetoTri[mejor]!]!.id;
   }
 
-  /** El objeto bajo un píxel: en sólido, la pieza que se ve; si no, el eje del alámbrico más cercano a menos de 6 px. */
+  /**
+   * El objeto bajo un píxel: en sólido, la pieza que se ve; si no, el eje del alámbrico más cercano a
+   * menos de 6 px. En translúcido, la arista y, si no hay ninguna cerca, la cara que corta el rayo: si
+   * no, el interior de una losa (sin aristas) no se elegía.
+   */
   objetoEn(x: number, y: number): string | null {
-    if (this.modoPintado === "solido" && this.sol) return this.objetoSolidoEn(x, y);
+    const m = this.modoPintado;
+    if (m === "solido" && this.sol) return this.objetoSolidoEn(x, y);
+    const arista = this.aristaEn(x, y);
+    return arista ?? (m === "translucido" && this.sol ? this.objetoSolidoEn(x, y) : null);
+  }
+
+  /** El eje del alámbrico más cercano a un píxel, a menos de 6 px. */
+  private aristaEn(x: number, y: number): string | null {
     const a = this.alamb;
     const p = this.proyectados();
     const o = this.origen;
