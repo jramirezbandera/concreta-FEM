@@ -225,7 +225,7 @@ export function ModoPilares() {
           <span>ν &gt; {fmt(LIMITE_NU, 2)}</span>
           <span className={`v ${pasan ? "text-state-warn" : ""}`}>{pasan}</span>
         </div>
-        <p className="nota">ν = Nd/(Ac·fcd), fcd = fck/1,5, en los tramos de hormigón: el aviso de A3 (orden de magnitud). La comprobación de norma es la del módulo de pilares de Concreta. El cuadro de la planta, abajo.</p>
+        <p className="nota">ν = Nd/(Ac·fcd), fcd = fck/1,5, en los tramos de hormigón: un orden de magnitud. La comprobación de norma, en Comprobación. El cuadro de la planta, abajo.</p>
       </Seccion>
       {id && pilar.datos && (
             <Seccion titulo={`Pilar ${id}`} valor={plural(pilar.datos.filas.length, "tramo")}>
@@ -258,7 +258,7 @@ export function ModoPilares() {
       herramientas={herramientas}
       vista={vistaPlanta}
       nav={{ titulo: "Navegador", contenido: <Situacion /> }}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
+      props={{ titulo: "Propiedades", contenido: propiedades }}
       dock={[
         { id: "cuadro", titulo: `Cuadro bajo ${planta ?? ""}`, insignia: filas.length, contenido: cuadro },
         { id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: d.datos?.combinaciones.nombres.length, contenido: d.datos ? <TablaCombinaciones c={d.datos.combinaciones} /> : <p className="nota">…</p> },

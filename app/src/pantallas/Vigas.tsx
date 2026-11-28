@@ -383,7 +383,7 @@ export function ModoDiagramas() {
         </>
       ) }}
       vista={vistaPlanta}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
+      props={{ titulo: "Propiedades", contenido: propiedades }}
       dock={[
         { id: "alzado", titulo: v ? `Alzado · ${v.id}` : "Alzado", contenido: alzado },
         { id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: v?.combinaciones.nombres.length, contenido: v ? <TablaCombinaciones c={v.combinaciones} /> : <p className="nota">…</p> },

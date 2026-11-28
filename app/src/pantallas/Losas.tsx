@@ -463,7 +463,7 @@ export function ModoLosas() {
       herramientas={herramientas}
       vista={vista}
       nav={{ titulo: "Navegador", contenido: <Situacion /> }}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 340 }}
+      props={{ titulo: "Propiedades", contenido: propiedades }}
       dock={[{ id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: x?.combinaciones.nombres.length, contenido: x ? <TablaCombinaciones c={x.combinaciones} resaltar={x.dibujada?.nombre} /> : <p className="nota">…</p> }]}
     />
   );

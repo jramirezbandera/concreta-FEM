@@ -362,7 +362,7 @@ export function ModoReacciones() {
       herramientas={herramientas}
       vista={vista}
       nav={{ titulo: "Navegador", contenido: <Situacion /> }}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 380 }}
+      props={{ titulo: "Propiedades", contenido: propiedades }}
       dock={[
         { id: "reacciones", titulo: "Por caso", insignia: porCaso?.objetos.length, contenido: tablaCasos },
         { id: "dibujado", titulo: "Lo dibujado", insignia: d?.objetos.length, contenido: tabla },

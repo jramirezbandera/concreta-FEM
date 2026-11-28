@@ -819,7 +819,7 @@ export function ModoArmado() {
       herramientas={herramientas}
       vista={vista}
       nav={{ titulo: "Navegador", contenido: <Situacion /> }}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 360 }}
+      props={{ titulo: "Propiedades", contenido: propiedades }}
       dock={[
         { id: "franjas", titulo: "Franjas", insignia: d?.filas.length, contenido: tabla },
         { id: "refuerzos", titulo: "Refuerzos", insignia: conBase ? zonas.length : undefined, contenido: tablaZonas },

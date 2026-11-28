@@ -28,6 +28,7 @@ import { ValorCarga } from "./FichaCarga.tsx";
 import { CotaForjado, FijarAbacos, PesoForjado, RigidezAligeradoPanel, TerrenoForjado } from "./FichaForjado.tsx";
 import { TramosPilarPanel } from "./FichaPilar.tsx";
 import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
+import { esSimbolo } from "../fmt.ts";
 
 /** El grupo que va plegado: lo que casi nunca hace falta (2026-10-28, cargas). */
 const AVANZADAS = "Opciones avanzadas";
@@ -128,7 +129,7 @@ const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados
 function Etiqueta({ c, estado, conUnidad, titulo }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean; titulo?: string }) {
   return (
     <span>
-      <span className="campo-nombre" title={titulo ?? c.titulo}>
+      <span className="campo-nombre" title={titulo ?? c.titulo} data-simbolo={esSimbolo(titulo ?? c.titulo) || undefined}>
         {titulo ?? c.titulo}
         {estado?.obligatorio && (
           <b className="campo-oblig" title="obligatorio">

@@ -27,7 +27,7 @@ html[data-theme="dark"] {
 
 /* El panel de ayuda */
 .ayuda-panel { display: flex; flex-direction: column; gap: 12px; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }
-.ayuda-panel h4 { margin: 0 0 4px; font: 600 11px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.ayuda-panel h4 { margin: 0 0 4px; font: 600 12px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--color-text-secondary); }
 .ayuda-panel p { margin: 0; }
 .ayuda-cab { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
 .ayuda-cab b { display: block; font-size: 13px; font-weight: 600; color: var(--color-text-primary); }

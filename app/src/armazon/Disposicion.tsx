@@ -300,8 +300,11 @@ export interface Lateral {
  * El ancho de un panel lateral (UI-50): el suyo a 1920 px y menos en una ventana más estrecha, sin
  * bajar de lo que necesita (el navegador, 200 px; las propiedades, 272 px o el 80 % del suyo).
  */
+export const ANCHO_PROPIEDADES = 360;
+
 function anchoPanel(izq: boolean, ancho?: number): string {
-  const a = ancho ?? (izq ? 248 : 300);
+  // UI2-17: Propiedades mide lo mismo en todos los espacios y modos (antes, de 300 a 400 px)
+  const a = ancho ?? (izq ? 248 : ANCHO_PROPIEDADES);
   const min = izq ? Math.min(a, 200) : Math.min(a, Math.max(272, Math.round(a * 0.8)));
   return `clamp(${min}px, ${((a / 1920) * 100).toFixed(2)}vw, ${a}px)`;
 }

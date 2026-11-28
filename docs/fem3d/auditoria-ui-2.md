@@ -289,3 +289,17 @@ Otra tanda del punto 2 de §6. Sin commit todavía.
 - **Comprobado en el navegador** con la vivienda, a 1920 × 1080: «Calculado» y la tecla de la paleta en la barra, los vacíos del navegador y «Bien» en Revisión; sin errores en la consola.
 - **Sin comprobar en el navegador:** la tabla de Comprobación con su píldora y su texto a la izquierda, las pestañas con el teclado, el tema oscuro, 1366 px y los bancos de Chrome.
 - **Lo que queda del punto 2:** `Campo` y `Seccion` únicos (seis disposiciones de campo y los títulos en cajas con leyenda), los nueve avisos, los segmentados sueltos y las escalas de alto y de espacio.
+
+### 7.3 Propiedades y títulos (2026-11-28)
+
+Lo que quedaba a mano del punto 2 y el arranque del punto 3. Tres de estos cambios aplican una recomendación de §5 (UI2-b con 360 px en vez de 340, UI2-a sólo en la mayúscula inicial y UI2-f); el usuario las confirmó el 2026-11-28.
+
+- **UI2-17 (decisión UI2-b, recomendada):** Propiedades mide 360 px en todos los espacios y modos (`ANCHO_PROPIEDADES`, `armazon/Disposicion.tsx`); antes, de 300 a 400. Se propusieron 340; con 360 caben sin apretar las tablas de vanos de Diagramas y las ternas de Pilares. No es ajustable todavía.
+- **UI2-11 (decisión UI2-a, a medias):** las etiquetas de Propiedades y de las plantillas, con mayúscula inicial («Nombre», «Giro», «Punto fijo»), por CSS: el texto del DOM no cambia y las pruebas leen lo mismo. Un símbolo o una sigla se queda como está («x», «q», «z0», «id», «pp», «fck MPa»; `esSimbolo`, `fmt.ts`). **Queda** dar nombre de obra a las abreviadas («lib. base», «pp»), que sí cambia el texto.
+- **UI2-21 (decisión UI2-f, en parte):** los «Supuestos del cálculo» de Propiedades, plegados, como el equilibrio. **Quedan** los párrafos largos de la ficha del forjado y de Armado.
+- **UI2-15:** un solo título de sección (12 px, seminegrita, sin mayúsculas) en los gestores, el banco de armado, las listas, la ayuda de los casos y los menús de enganches y de opciones; las mayúsculas quedan sólo para los rótulos de la barra de herramientas. Los campos, a 28 px en todas partes.
+- **UI2-23 (en parte):** fuera «el aviso de A3» y «el módulo de pilares de Concreta» de Pilares.
+- **Pruebas:** las de `app/` (177) y `estilos.test.ts`, en verde; `tsc` sin errores.
+- **Comprobado en el navegador** con la vivienda, a 1920 × 1080: la ficha de un forjado con sus etiquetas («Ábacos en pilares» y «Punto de paso» enteras, «id» sin tocar), y Propiedades a 360 px en Diagramas y en Pilares, con sus tablas enteras; sin errores en la consola.
+- **Sin comprobar:** los gestores y el banco de armado con los títulos nuevos, Armado y Reacciones a 360 px, el tema oscuro, 1366 px y los bancos de Chrome.
+- **Lo que queda del punto 2:** el `Campo` único (seis disposiciones), las cajas con leyenda de Obra y Acciones, los nueve avisos, los segmentados sueltos y la escala de espacios.

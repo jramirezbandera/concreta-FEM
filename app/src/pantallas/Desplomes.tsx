@@ -259,7 +259,7 @@ export function ModoDeformada() {
       herramientas={herramientas}
       vista={vista}
       nav={{ titulo: "Navegador", contenido: <Situacion /> }}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 320 }}
+      props={{ titulo: "Propiedades", contenido: propiedades }}
       dock={[
         { id: "desplomes", titulo: "Desplomes por planta", contenido: tabla },
         { id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: x?.combinaciones.nombres.length, contenido: x ? <TablaCombinaciones c={x.combinaciones} resaltar={x.pesima} /> : <p className="nota">…</p> },

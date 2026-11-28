@@ -109,6 +109,15 @@ export function textoApp(t: string): string {
     .replace(/\d+(?:\.\d+)+/g, (n) => (n.split(".").length > 2 ? n : n.replace(".", ",")));
 }
 
+/**
+ * UI2-11: una etiqueta que es un símbolo o una sigla («x», «q», «z0», «pp», «id», «fck MPa») no
+ * lleva la mayúscula inicial que el CSS pone a las demás («Giro», «Punto fijo»).
+ */
+export function esSimbolo(etiqueta: string): boolean {
+  const p = etiqueta.trim().split(/\s/)[0] ?? "";
+  return p.length <= 2 || /\d/.test(p) || /^(fck|fyk|fyd|fcd)$/i.test(p);
+}
+
 /** Un texto con números en punto decimal (las combinaciones, «0.8·G + 1.5·Q»), con coma (UI-44). */
 export const coma = (t: string): string => t.replace(/(\d)\.(\d)/g, "$1,$2");
 

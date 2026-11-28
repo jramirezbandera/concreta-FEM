@@ -33,7 +33,7 @@ import { IcAbacos, IcApoyo, IcApoyoLineal, IcBarra, IcEjes, IcEmpuje, IcEnBarra,
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
-import { cota, fmt, plural } from "../fmt.ts";
+import { cota, fmt, plural, esSimbolo } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
 import { Grupo } from "../componentes/Grupo.tsx";
 import { Vacio } from "../componentes/Vacio.tsx";
@@ -630,7 +630,7 @@ function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio, etiqueta = "se
   const elegida = m.secciones.find((s) => s.id === valor);
   return (
     <div className="campo">
-      <span>{etiqueta}</span>
+      <span data-simbolo={esSimbolo(etiqueta) || undefined}>{etiqueta}</span>
       {ninguna ? (
         <button type="button" className="btn btn-p" onClick={() => abrir(NUEVA)}>
           <Plus size={14} />
@@ -661,7 +661,7 @@ function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio, etiqueta = "se
 export function Segmentado<T extends string>({ etiqueta, valor, opciones, onCambio, ayuda }: { etiqueta: string; valor: T; opciones: readonly (readonly [T, string])[]; onCambio: (v: T) => void; ayuda?: ReactNode }) {
   return (
     <div className="campo">
-      <span>{etiqueta}</span>
+      <span data-simbolo={esSimbolo(etiqueta) || undefined}>{etiqueta}</span>
       <Grupo rol="radiogroup" etiqueta={etiqueta} className="seg dib-seg">
         {opciones.map(([v, texto]) => (
           <button key={v} type="button" role="radio" aria-checked={valor === v} data-on={valor === v} onClick={() => onCambio(v)}>

@@ -1581,7 +1581,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           />
         }
         nav={{ titulo: "Navegador", contenido: <Situacion /> }}
-        props={{ titulo: "Propiedades", contenido: propiedades, ancho: 330 }}
+        props={{ titulo: "Propiedades", contenido: propiedades }}
         dock={[
           {
             id: "tabla",

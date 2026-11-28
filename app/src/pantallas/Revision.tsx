@@ -199,7 +199,6 @@ export function EspacioRevision() {
       }
       props={{
         titulo: "Informe",
-        ancho: 320,
         contenido: (
           <>
         <Cabecera icono={IcInforme} tipo="Informe de revisión" titulo={!x ? "—" : x.avisos ? "Con avisos" : "Sin avisos"} detalle="Comprobaciones de orden de magnitud del modelo y de sus resultados; no son comprobaciones de norma." />

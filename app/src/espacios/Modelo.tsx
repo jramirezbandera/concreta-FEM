@@ -1055,7 +1055,12 @@ function ResumenPlanta() {
       )}
       <Equilibrio estado={e} />
       {e.hipotesis.length > 0 && (
-        <Seccion titulo="Supuestos del cálculo" valor={e.hipotesis.length}>
+        // UI2-21: plegados: son 19 párrafos y están también en el informe de Revisión
+        <details className="equilibrio">
+          <summary className="sec">
+            <span>Supuestos del cálculo</span>
+            <span>{e.hipotesis.length}</span>
+          </summary>
           <ol className="m-0 list-decimal py-1 pl-8 pr-3.5 text-[12px] leading-snug text-text-secondary">
             {e.hipotesis.map((h, i) => (
               <li key={i} className="py-0.5">
@@ -1063,7 +1068,7 @@ function ResumenPlanta() {
               </li>
             ))}
           </ol>
-        </Seccion>
+        </details>
       )}
       <p className="nota">Un clic en el dibujo, en el navegador o en una tabla elige un objeto.</p>
     </>

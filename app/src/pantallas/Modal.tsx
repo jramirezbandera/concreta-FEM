@@ -352,7 +352,7 @@ export function ModoModal() {
       herramientas={herramientas}
       vista={vista}
       nav={{ titulo: "Navegador", contenido: <Situacion /> }}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 340 }}
+      props={{ titulo: "Propiedades", contenido: propiedades }}
       dock={[
         { id: "modos", titulo: "Modos", insignia: md?.numeroDeModos, contenido: tablaModos },
         { id: "cortantes", titulo: "Cortantes de planta", contenido: tablaCortantes },
