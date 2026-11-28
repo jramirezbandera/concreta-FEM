@@ -359,3 +359,17 @@ Las decisiones UI2-c, UI2-d y UI2-e del usuario (§5) y el resto del punto 3.
 - **UI2-23, la jerga:** fuera el código de cada diagnóstico de la lista (sigue en `data-codigo`), y en Revisión «Versión del modelo» y «Versión del motor» con 8 caracteres en vez de «Huella» y «Núcleo» con 16.
 - **Pruebas:** las de `app/` (185) con cuatro puestas al día (las etiquetas nuevas, la ayuda sin «?» y la Situación de Resultados, que abre antes el navegador), las del editor, `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` sin errores. Comprobado en la app con la vivienda: la lista de Comprobación (sin pestaña, Vigas y Pilares; un clic y el doble clic), las fichas de un forjado y de un pilar, sin errores en la consola.
 - **Sin comprobar:** los bancos de Chrome tras estos cambios, el tema oscuro y 1366 px de la lista nueva.
+
+### 7.7 Las tablas del panel inferior (2026-11-28)
+
+El punto 4 de §6.
+
+- **UI2-26, las tablas de Comprobación:**
+  - las tablas del panel no pasan de 1 180 px (D-15, para no estirarlas), y con ese tope «Manda» («Apoyo de inicio, cara superior: Momento resistente MRd ≥ Md») se partía en tres líneas con 740 px libres al lado. Ahora su columna tiene un ancho de frase (entre 26 y 42 em) y la tabla puede llegar al ancho del panel: en Vigas, 1 326 px y dos líneas por fila (la frase y dónde manda), también a 1366 px sin desplazamiento horizontal;
+  - el texto y los ids, a la izquierda, con su cabecera («Vano», «Tramo», «Sección», «Planta»); a la derecha, sólo el aprovechamiento;
+  - en Punzonamiento, el motivo de «No se comprueba» llega hasta los dos puntos («P1 queda dentro del ancho de las vigas Z-CUB-5, Z-CUB-6»), con el texto entero en la pista de la celda y en el banco; antes eran cuatro líneas. Su armado sale como «—», porque ya lo dice el estado. Con filas de una línea, la tabla cabe en dos columnas (`TablaEnColumnas`).
+- **UI2-25, Diagnósticos:** la lista va en columnas de 40 em (`.diag-lista`, columnas CSS que no parten un aviso), con el texto a 90 caracteres como mucho; en un panel estrecho, una sola columna. La frase de arriba de la pestaña («Lo que se comprueba del modelo…») sigue a todo el ancho: es de `espacios/Modelo.tsx`, que otra sesión estaba editando.
+- **UI2-14:** hecho en §7.6.
+- **El banco co6**, al día con el «—» del armado (sigue sin adaptar al espacio Comprobación).
+- **Pruebas:** las de `app/` (185), `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` sin errores. Comprobado en la app con la vivienda en tema oscuro: Vigas y Punzonamiento a 1920 × 1080 y Vigas a 1366 × 768; Diagnósticos con sus tres avisos a 1920 px.
+- **Sin comprobar:** el tema claro, y las demás tablas del panel (Pilares, Armado, Reacciones), que siguen con el tope de 1 180 px.

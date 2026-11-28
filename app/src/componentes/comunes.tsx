@@ -211,7 +211,7 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200, acciones }: { ds: r
   if (!ds.length) return <Vacio titulo="Sin errores ni avisos" />;
   const grupos = agruparDiagnosticos(ds);
   return (
-    <ul className="m-0 list-none p-0">
+    <ul className="diag-lista m-0 list-none p-0">
       {grupos.slice(0, max).map((g) => {
         const k = `${g.d.severidad}|${g.d.codigo}`;
         const n = g.todos.length;

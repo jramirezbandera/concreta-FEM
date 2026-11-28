@@ -182,6 +182,14 @@ export function tipoDeElegido(id: string | undefined, m: { pilares?: readonly { 
 }
 
 const aprov = (x: number | null) => (x === null ? "—" : fmt(x, 2));
+/**
+ * UI2-26: por qué no se comprueba, en la tabla, hasta los dos puntos («P1 queda dentro del ancho de
+ * las vigas V1, V2»); entero, en la pista de la celda y en el banco de armado. Entero eran cuatro líneas.
+ */
+const motivoCorto = (s: string) => {
+  const i = s.indexOf(": ");
+  return i > 0 ? s.slice(0, i) : s;
+};
 
 /**
  * §8.16: el 3D de Comprobación con las losas a la vista: los refuerzos de las losas barra a barra, en la
@@ -1474,8 +1482,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
               <thead>
                 <tr>
                   <th>{tipo === "vigas" ? "Viga" : tipo === "losas" ? "Losa" : "Pilar"}</th>
-                  <th>{tipo === "losas" ? "Tipo" : tipo === "punzonamiento" ? "Planta · losa" : tipo === "vigas" ? "Vano" : "Tramo"}</th>
-                  {tipo !== "punzonamiento" && <th>{tipo === "losas" ? "Planta" : "Sección"}</th>}
+                  <th className="txt">{tipo === "losas" ? "Tipo" : tipo === "punzonamiento" ? "Planta · losa" : tipo === "vigas" ? "Vano" : "Tramo"}</th>
+                  {tipo !== "punzonamiento" && <th className="izq">{tipo === "losas" ? "Planta" : "Sección"}</th>}
                   <th className="txt">Armado</th>
                   <th>Aprov.</th>
                   <th className="txt">Manda</th>
@@ -1499,11 +1507,12 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
                     >
                       <td>{p.pieza}</td>
                       <td className="txt">{p.parte}</td>
-                      {tipo !== "punzonamiento" && <td>{(tipo === "losas" ? p.planta : p.seccion) ?? "—"}</td>}
-                      <td className="txt">{p.texto ?? "—"}</td>
+                      {tipo !== "punzonamiento" && <td className="izq">{(tipo === "losas" ? p.planta : p.seccion) ?? "—"}</td>}
+                      {/* «no se comprueba» ya lo dice su estado */}
+                      <td className="txt">{p.origen === "no-aplica" ? "—" : (p.texto ?? "—")}</td>
                       <td className={e.tono === "fail" ? "f" : undefined}>{aprov(p.aprovechamiento)}</td>
-                      <td className="txt">
-                        {p.manda ? textoApp(p.manda.descripcion) : p.pendientes[0] ? textoApp(p.pendientes[0]) : "—"}
+                      <td className="txt manda" title={!p.manda && p.origen === "no-aplica" && p.pendientes[0] ? textoApp(p.pendientes[0]) : undefined}>
+                        {p.manda ? textoApp(p.manda.descripcion) : p.pendientes[0] ? (p.origen === "no-aplica" ? motivoCorto(textoApp(p.pendientes[0])) : textoApp(p.pendientes[0])) : "—"}
                         {p.manda && <small>{lugarDe(p.manda)}</small>}
                       </td>
                       <td>

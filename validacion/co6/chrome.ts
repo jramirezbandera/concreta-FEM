@@ -218,7 +218,9 @@ try {
       const u = f[col + 1] === "—" ? null : Number(f[col + 1]!.replace(",", "."));
       const du = u === null || p.aprovechamiento === null ? (u === p.aprovechamiento ? 0 : Infinity) : Math.abs(u - p.aprovechamiento);
       mayor = Math.max(mayor, du);
-      if (f[0] !== p.pieza || f[col] !== (p.texto ?? "—") || f.at(-1) !== estadoDe(p) || du > 0.0051) difieren.push(`${p.clave}: «${f[col]}» ${f[col + 1]} ${f.at(-1)} / «${p.texto ?? "—"}» ${p.aprovechamiento} ${estadoDe(p)}`);
+      // UI2-26: en la tabla, «—» en el armado de lo que no se comprueba (lo dice su estado)
+      const texto = p.origen === "no-aplica" ? "—" : (p.texto ?? "—");
+      if (f[0] !== p.pieza || f[col] !== texto || f.at(-1) !== estadoDe(p) || du > 0.0051) difieren.push(`${p.clave}: «${f[col]}» ${f[col + 1]} ${f.at(-1)} / «${texto}» ${p.aprovechamiento} ${estadoDe(p)}`);
     });
     comprobar(filas.length === partes.length && !difieren.length, `${NOMBRE[tipo]}: ${filas.length} filas, las de Node (pieza, armado y estado idénticos; el aprovechamiento, a ${mayor.toExponential(1)} de lo que se enseña); ${n.valor.resumen.cumplen} cumplen y ${n.valor.resumen.noCumplen} no${difieren.length ? `\n    ${difieren.slice(0, 5).join("\n    ")}` : ""} · ${(ms2 / 1000).toFixed(2)} s`);
     // CO6-d: la planta, con la leyenda del aprovechamiento
