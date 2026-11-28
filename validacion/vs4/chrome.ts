@@ -199,7 +199,8 @@ try {
     await medir("abrir y calcular", tCalculo);
     // Resultados · Modal (con sismo, la forma del modo 1 animada; sin él, la pantalla lo dice)
     const irA = (modo: string) => `__v1.boton("Resultados", document.querySelector("nav")).click(); await __v1.esperar(() => __v1.boton("${modo}", document.querySelector("[role=toolbar]"))); __v1.boton("${modo}", document.querySelector("[role=toolbar]")).click()`;
-    await medir("Resultados · Modal", await accion(irA("Modal"), `document.querySelector('.celda[data-tipo="3d"]')`));
+    // VC2: Modal ya no pasa la vista a 3D al entrar; se pide, para medir como antes (lo que deja el 3D)
+    await medir("Resultados · Modal", await accion(`${irA("Modal")}; { const s = document.querySelector('.celda[data-activa="true"] select[aria-label="Tipo de vista"]') ?? document.querySelector('select[aria-label="Tipo de vista"]'); if (s && s.value !== "3d") { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, "3d"); s.dispatchEvent(new Event("change", { bubbles: true })); } }`, `document.querySelector('.celda[data-tipo="3d"]')`));
     // Losas: la envolvente de M11 en la planta activa, en una vista de planta (Modal deja la vista en
     // 3D, y el 3D de Losas pinta todas las plantas con una escala común: no es el mapa de una planta).
     // El desplegable es un <select> de React: el valor por el setter nativo y el evento «change»

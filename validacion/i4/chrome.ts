@@ -414,7 +414,8 @@ try {
 
   log("\n## Deformada animada");
   {
-    await pagina(`__i2.boton("Deformada").click()`);
+    // VC2: Deformada ya no pasa la vista a 3D al entrar: la animación y el orbitar son del 3D
+    await pagina(`__i2.boton("Deformada").click(); { const s = document.querySelector('.celda[data-activa="true"] select[aria-label="Tipo de vista"]') ?? document.querySelector('select[aria-label="Tipo de vista"]'); if (s && s.value !== "3d") { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, "3d"); s.dispatchEvent(new Event("change", { bubbles: true })); } }`);
     await pagina(`await __i2.esperar(() => __i2.boton("Animar"), 60000);`);
     await quietos();
     await pagina(`__i2.boton("Animar").click()`);

@@ -858,10 +858,10 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
   // La clave estable: el objeto cambia en cada render
   const clave = JSON.stringify(fuente);
   const fu = useMemo(() => (clave === "null" ? null : (JSON.parse(clave) as FuenteEscena)), [clave]);
-  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}) }) : null);
+  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}), ...(fu.reacciones ? { reacciones: fu.reacciones } : {}), ...(fu.deformada ? { deformada: fu.deformada } : {}) }) : null);
   const { eventos, resaltado } = useEleccionEscena(fu, elegibles);
   // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
-  const resultados = fu?.tipo === "alzado" && !!fu.diagramas;
+  const resultados = fu?.tipo === "alzado" && (!!fu.diagramas || !!fu.deformada);
   // M-25: la planta del modelo o de las cargas sólo necesita el modelo físico (AL-4): tras editar
   // con Elegir (estirar, un pinzamiento, Propiedades) no se vela, como al dibujar; sale la nueva en
   // cuanto el worker la abre. Antes se atenuaba con lo de antes hasta entonces.
@@ -875,7 +875,7 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
   ) : escena.diagnosticos ? (
     <Aviso tono="fail">{escena.diagnosticos.map((d) => d.mensaje).join(" ")}</Aviso>
   ) : !escena.datos && escena.cargando ? (
-    <Aviso>{resultados ? "Preparando los diagramas…" : "Preparando la vista…"}</Aviso>
+    <Aviso>{fu?.tipo === "alzado" && fu.diagramas ? "Preparando los diagramas…" : "Preparando la vista…"}</Aviso>
   ) : null;
   const cursor = useMemo(() => (fu?.tipo === "alzado" ? (q: Vec2) => `u ${fmt(q[0], 3)} · z ${fmt(q[1], 3)} m` : undefined), [fu?.tipo]);
   return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} dibujo={dibujo} plantilla={plantilla} />;

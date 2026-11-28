@@ -26,7 +26,7 @@ import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { CaraDibujada } from "./armadoPlanta.ts";
 import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, PedidoArmar, ProgresoTarea, TipoComprobacion } from "./comprobaciones.ts";
 import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
-import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
+import type { CargasAlzado, DeformadaPedido, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 /**
  * Lo único que se puede elegir en una planta (Comprobación: sólo lo de la pestaña; antes se cogía sin
@@ -47,7 +47,7 @@ export type Pedido =
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
   /** Un alzado; con `diagramas`, los de las barras del plano, y con `reacciones`, las de sus objetos (I4); con `cargas`, las de un caso. */
-  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado }
+  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido }
   /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
   | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[]; elegibles?: TipoElegible[] }
   /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */

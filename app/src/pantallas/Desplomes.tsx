@@ -6,7 +6,7 @@
  * I4: la deformada lleva debajo la original (las barras y el alámbrico, en gris), se puede animar
  * (de 0 a la escala y vuelta) y rotula el nudo del mayor |u| y el del menor uz, de su consulta.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { DatosDesplomes } from "../../../src/visor/datos.ts";
 import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
@@ -19,8 +19,8 @@ import { useVisor } from "../contexto.ts";
 import { cota, fmt, fraccion, mm, coma } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, vistasDe } from "../vistas/estado.ts";
-import { Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import type { EstadoVista } from "../vistas/estado.ts";
+import { conMalla, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
 import { Vacio } from "../componentes/Vacio.tsx";
 
 function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | null> }) {
@@ -82,14 +82,8 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
 
 export function ModoDeformada() {
   const { proyecto, planta } = useVisor();
-  const pan = usePaneles("resultados:deformada", { props: true, dock: true, pestana: "desplomes" });
-  const vistas = useVistas();
-  // La deformada se ve en 3D: si no hay ninguno, la vista activa pasa a serlo
-  const sin3D = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "3d");
-  useEffect(() => {
-    if (sin3D) vistas.irATipo("3d");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
-  }, []);
+  const pan = usePaneles("resultados:deformada", { nav: false, props: true, dock: true, pestana: "desplomes" });
+  // VC2: la deformada se ve también en planta y en alzado, así que ya no se fuerza un 3D al entrar
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [escalaDada, setEscalaDada] = useState<number | null>(null);
@@ -138,6 +132,12 @@ export function ModoDeformada() {
     <ZonaVistas
       fuentes={{
         dibuja: "La deformada",
+        // VC2: en planta, lo horizontal y el d/h de cada pilar; en alzado, δ en el plano y d/h por tramo (del worker, `src/agente/render/deformada.ts`)
+        planta: (v: EstadoVista) => (v.planta ? <FuenteEscena fuente={def ? { tipo: "planta", planta: v.planta, vista: conMalla({ vista: "deformada" as const, deformada: { combinaciones: def, escala } }, v) } : { tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} /> : null),
+        malla: true,
+        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), ...(def ? { deformada: { combinaciones: def, escala } } : {}) } : null} />,
+        cabeceraPlanta: () => cabecera,
+        cabeceraAlzado: () => cabecera,
         tresD: () =>
           proyecto.desactualizado ? (
             <div className="velo">
@@ -146,7 +146,12 @@ export function ModoDeformada() {
           ) : (
             <Fuente3DModelo deformada={def3D} modo="analitico" />
           ),
-        cabecera3D: () =>
+        cabecera3D: () => cabecera,
+      }}
+    />
+  );
+  // La misma cabecera en las tres vistas
+  const cabecera =
           proyecto.desactualizado ? null : deformada.diagnosticos?.some((x) => x.codigo === "visor/deformada-sismo") ? (
             // VS-o: con el sismo del programa no hay deformada de la combinación
             <Chip title={deformada.diagnosticos[0]!.mensaje}>
@@ -162,10 +167,7 @@ export function ModoDeformada() {
                 <span className="mono">{deformada.datos?.comb ?? "—"}</span> · desplazamiento total máx. {fmt(deformada.datos?.extremos.find((y) => y.que === "mayor |u|")?.valor ?? null, 2)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
               </Chip>
             </>
-          ),
-      }}
-    />
-  );
+          );
 
   const tabla = x ? (
     <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)}`}>

@@ -10,7 +10,7 @@
  *
  * Todo número sale de las consultas de la sesión (pedidos `modal`, `modo` y `sismo`).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { Situacion } from "../armazon/Situacion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
@@ -21,21 +21,16 @@ import { useVisor } from "../contexto.ts";
 import { cota, fmt, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, vistasDe } from "../vistas/estado.ts";
-import { Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import type { EstadoVista } from "../vistas/estado.ts";
+import { conMalla, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
 import { Espectro } from "../editor/Espectro.tsx";
 
 const pct = (x: number) => `${fmt(100 * x, 1)} %`;
 
 export function ModoModal() {
   const { proyecto } = useVisor();
-  const pan = usePaneles("resultados:modal", { props: true, dock: true, pestana: "modos" });
-  const vistas = useVistas();
-  const sin3D = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "3d");
-  useEffect(() => {
-    if (sin3D) vistas.irATipo("3d");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
-  }, []);
+  const pan = usePaneles("resultados:modal", { nav: false, props: true, dock: true, pestana: "modos" });
+  // VC2: la forma del modo se ve también en planta y en alzado, así que ya no se fuerza un 3D al entrar
   const e = proyecto.estado!;
   const [modo, setModo] = useState(1);
   const [escalaDada, setEscalaDada] = useState<number | null>(null);
@@ -101,6 +96,12 @@ export function ModoModal() {
     <ZonaVistas
       fuentes={{
         dibuja: "La forma del modo",
+        // VC2: la forma del modo también en planta (el diafragma girado y desplazado) y en alzado (del worker, `src/agente/render/deformada.ts`)
+        planta: (v: EstadoVista) => (v.planta ? <FuenteEscena fuente={md && modo <= n ? { tipo: "planta", planta: v.planta, vista: conMalla({ vista: "deformada" as const, deformada: { modo, escala } }, v) } : { tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} /> : null),
+        malla: true,
+        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), ...(md && modo <= n ? { deformada: { modo, escala } } : {}) } : null} />,
+        cabeceraPlanta: () => cabecera,
+        cabeceraAlzado: () => cabecera,
         tresD: () =>
           proyecto.desactualizado ? (
             <div className="velo">
@@ -109,7 +110,12 @@ export function ModoModal() {
           ) : (
             <Fuente3DModelo deformada={def3D} modo="analitico" />
           ),
-        cabecera3D: () =>
+        cabecera3D: () => cabecera,
+      }}
+    />
+  );
+  // La misma cabecera en las tres vistas
+  const cabecera =
           proyecto.desactualizado || !m ? null : (
             <>
               <Chip>
@@ -117,10 +123,7 @@ export function ModoModal() {
               </Chip>
               <Chip acento>masa efectiva {pct(m.masaEfectiva[0])} X · {pct(m.masaEfectiva[1])} Y · {pct(m.masaEfectiva[2])} giro</Chip>
             </>
-          ),
-      }}
-    />
-  );
+          );
 
   const tablaModos = md ? (
     <Seccion titulo="Modos de vibración" valor={`${md.numeroDeModos}, tres por planta con masa`}>

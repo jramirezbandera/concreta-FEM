@@ -76,7 +76,7 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 **Tramos**, cada uno con su prueba y sin tocar el cálculo:
 
 1. **VC1, el contrato** (CV-1, CV-3, CV-7). Pequeño; arregla lo del usuario. **Hecho el 2026-11-28** (§6).
-2. **VC2, la deformada en el alzado y en la planta** (CV-2): la deformada del analítico en el plano del pórtico, con su escala y los desplomes de cada planta rotulados (los de `fem consultar desplomes`), y en la planta el diafragma desplazado; lo mismo para los modos en Modal. Con el sismo del programa, como en el 3D: sin deformada de la combinación (VS-o).
+2. **VC2, la deformada en el alzado y en la planta** (CV-2; **hecho el 2026-11-28**, §7): la deformada del analítico en el plano del pórtico, con su escala y los desplomes de cada planta rotulados (los de `fem consultar desplomes`), y en la planta el diafragma desplazado; lo mismo para los modos en Modal. Con el sismo del programa, como en el 3D: sin deformada de la combinación (VS-o).
 3. **VC3, Comprobación en el alzado y el color en el 3D** (CV-4).
 4. **VC4, Pilares y muros en el alzado** (CV-5).
 5. **VC5, el valor bajo el cursor en las vistas planas** (CV-6).
@@ -90,3 +90,16 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 - **`FuentesVistas.herramientaFuera`:** en Modelo y Cargas, con una herramienta de dibujo activa, el alzado y el 3D lo dicen («Esta herramienta dibuja en planta; aquí, un clic elige»; con Barra, sólo el 3D: «Barra dibuja en planta y en alzado…»).
 - **Prueba:** `app/src/test/coherenciaVistas.test.tsx` (los avisos en los tipos sin fuente y el botón que cambia la vista, ninguno en un modo sin `dibuja`, la herramienta fuera sólo donde no va) y `comprobacion.test.tsx` sin cambios. Comprobado en la app: Deformada en 2 × 2, Comprobación · Pilares en alzado y en 3D, y Modelo con Pilar y con Barra.
 - **No probado:** que en el 3D de Comprobación · Pilares un clic en una viga no la elija (va por el mismo contexto que el alzado, comprobado); los bancos de Chrome.
+
+## 7. VC2 hecho (2026-11-28)
+
+- **El worker** (`src/agente/render/deformada.ts`, puro): `vistaAlzadoDeformada` y `vistaPlantaDeformada`, como la deformada del 3D: los nudos del modelo analítico desplazados u·escala, cada barra de nudo a nudo (sin su curvatura ni el giro de las zonas rígidas), sobre el modelo sin deformar en gris.
+  - **Alzado:** las barras y los muros del plano y el corte deformado de las losas que lo cruzan (la flecha a lo largo del eje). Con una combinación, cada pilar del plano rotula en cada planta su desplazamiento en el plano δ (mm; no en sus apoyos) y en cada tramo su desplome relativo d/h, el de `Consultas.desplomes` (con las dos componentes: el de la tabla). Lo normal al plano no se ve, y lo dice una nota.
+  - **Planta:** las barras de la planta, el borde de sus losas (los lados de una sola lámina) y la cabeza de cada pilar que llega, con su d/h; en las notas, el maestro del diafragma (ux, uy y el giro). Sólo lo horizontal.
+  - **Un modo** (Modal), igual pero sin rótulos (no tiene unidades).
+  - Con el sismo del programa no hay deformada de la combinación (VS-o): sale el mismo error que en el 3D.
+- **El pedido:** la vista de planta `{ vista: "deformada", deformada }` y `deformada` en el alzado, con `DeformadaPedido` = una combinación o un modo, y su escala (`src/visor/sesion.ts`, `deformadaDibujo`). Estilos nuevos `deformada`, `deformada-lamina` y `deformada-nudo`, en los dos temas.
+- **La app:** Deformada y Modal dan planta y alzado (con la misma cabecera en las tres vistas y la malla encima en planta) y ya no pasan la vista a 3D al entrar. La animación sigue siendo sólo del 3D.
+- **Prueba** (`src/visor/deformada.test.ts`, con el edificio de A2): con escala 0, la deformada del alzado es el modelo analítico sin deformar; en planta, las cabezas de los pilares se mueven como el diafragma de la consulta de la planta (u = u_m + rz × (r − r_m), a la precisión de Float32); el mayor d/h rotulado de cada planta es el de `deriva`. El caso del modo sólo comprueba el error, porque ese edificio no tiene modal (en la app, con la vivienda, sí se ve).
+- **Comprobado en la app** con la vivienda: el alzado del eje 2 (la flecha de la losa entre D y G, δ y d/h), la planta CUB con el d/h de cada pilar y la planta de Modal con el diafragma girado.
+- **Bancos de Chrome:** i1, i4 y vs4 piden ahora el 3D al entrar en Deformada y Modal (lo hacía la pantalla); no se han pasado.

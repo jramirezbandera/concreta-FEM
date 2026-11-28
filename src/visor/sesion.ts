@@ -52,7 +52,8 @@ import { reacciones3D, type Reacciones3D } from "./reacciones3d.ts";
 import { cargas3D, type Cargas3D } from "./cargas3d.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
 import { casosPrograma, datosModal, datosSegundoOrden, datosSismo, datosViento, fisicoConPrograma, formaModo, type CasoVisor, type DatosModal, type DatosSegundoOrden, type DatosSismo, type DatosViento } from "./programa.ts";
-import type { DatosDeformada } from "./datos.ts";
+import { desplazamientos, type DatosDeformada } from "./datos.ts";
+import { vistaAlzadoDeformada, vistaPlantaDeformada, type DeformadaDibujo } from "../agente/render/deformada.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
 
@@ -92,6 +93,8 @@ export type VistaResultadosPlanta = (
   | { vista: "armado"; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: FiltroArmado }
   /** Las reacciones de los objetos de la planta (I4); `escala`, la de las flechas horizontales. */
   | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number }
+  /** VC2: la deformada de la planta (lo horizontal), de una combinación o de un modo. */
+  | { vista: "deformada"; deformada: DeformadaPedido }
   /** CO6-d: las partes de un tipo de comprobación, del color de su aprovechamiento; el armado va en el pedido, como el de AB. */
   /** `dibujo: "armado"` (§8.11): con el armado en barras dibujado; `cara`, los refuerzos de las losas que se ven. */
   | { vista: "comprobacion"; de: TipoComprobacion; armado?: ArmadoProyecto; dibujo?: "armado"; cara?: CaraDibujada; /** En un reticular, sus casetones de fondo (por defecto, sí). */ reticula?: boolean; /** También la armadura base de las losas, barra a barra (por defecto, no). */ base?: boolean; /** Los datos de armado de la obra, si han cambiado desde que se abrió (`Sesion.datosArmado`). */ datos?: DatosArmadoObra }
@@ -116,6 +119,9 @@ export interface ReaccionesAlzado {
   escala?: number;
 }
 
+/** VC2: una deformada en planta o en alzado: la de una combinación (una sola) o la forma de un modo, por la escala. */
+export type DeformadaPedido = ({ combinaciones: EleccionCombinaciones } | { modo: number }) & { escala: number };
+
 /** Las cargas de un caso en un alzado (tras I4). */
 export interface CargasAlzado {
   caso: string;
@@ -124,7 +130,7 @@ export interface CargasAlzado {
 }
 
 /** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado (con diagramas o reacciones, en I4; con las cargas de un caso, tras I4). */
-export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado };
+export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido };
 
 /** Los diagramas de las barras en el 3D (I4). */
 export interface PedidoDiagramas3D {
@@ -698,6 +704,10 @@ export class Sesion {
           const conj = this.conjunto(v.combinaciones, "reacciones");
           if (!conj.valido) return conj;
           e = vistaReacciones(rr, planta, conj.valor, d, v.escala);
+        } else if (v.vista === "deformada") {
+          const def = this.deformadaDibujo(v.deformada);
+          if (!def.valido) return def;
+          e = vistaPlantaDeformada(rr, planta, def.valor, d);
         } else {
           const conj = this.conjunto(v.combinaciones, v.vista === "campo" ? propositoCampo(v.campo) : "esfuerzos");
           if (!conj.valido) return conj;
@@ -720,9 +730,9 @@ export class Sesion {
   }
 
   /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico (también con las cargas); con diagramas o reacciones (I4), el cálculo. */
-  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado, deformada?: DeformadaPedido): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
     const f = this.proyecto.modelo;
-    const clave = JSON.stringify(["alzado", p, diagramas ?? null, ...(reacciones ? [reacciones] : []), ...(cargas ? [{ cargas }] : [])]);
+    const clave = JSON.stringify(["alzado", p, diagramas ?? null, ...(reacciones ? [reacciones] : []), ...(cargas ? [{ cargas }] : []), ...(deformada ? [{ deformada }] : [])]);
     const hecha = this.escenas.get(clave);
     if (hecha) return { valido: true, valor: hecha };
     let plano: PlanoAlzado | null;
@@ -748,6 +758,12 @@ export class Sesion {
       const conj = this.conjunto(reacciones.combinaciones, "reacciones");
       if (!conj.valido) return conj;
       e = vistaAlzadoReacciones(rr, plano, conj.valor, d, reacciones.escala, modo);
+    } else if (deformada) {
+      const rr = this.rr;
+      if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "La deformada necesita el cálculo." }] };
+      const def = this.deformadaDibujo(deformada);
+      if (!def.valido) return def;
+      e = vistaAlzadoDeformada(rr, plano, def.valor, d, modo);
     } else if (cargas) {
       const fp = this.fisicoCargas;
       if (!fp.casos.some((c) => c.id === cargas.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${cargas.caso} no existe.` }] };
@@ -757,8 +773,8 @@ export class Sesion {
     return { valido: true, valor: e };
   }
 
-  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
-    const e = this.alzadoA4(p, diagramas, reacciones, cargas);
+  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado, deformada?: DeformadaPedido): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const e = this.alzadoA4(p, diagramas, reacciones, cargas, deformada);
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
@@ -879,7 +895,24 @@ export class Sesion {
   }
 
   escenaDe(fu: FuenteEscena): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
-    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas, fu.reacciones, fu.cargas);
+    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas, fu.reacciones, fu.cargas, fu.deformada);
+  }
+
+  /**
+   * VC2: lo que dibuja una deformada en planta o en alzado: los desplazamientos de la del 3D
+   * (`desplazamientos`, también su error con el sismo del programa) con los factores de su
+   * combinación para los rótulos, o la forma de un modo, sin ellos.
+   */
+  private deformadaDibujo(p: DeformadaPedido): { valido: true; valor: DeformadaDibujo } | { valido: false; diagnosticos: Diagnostico[] } {
+    if ("modo" in p) {
+      const m = this.modo(p.modo);
+      return m.valido ? { valido: true, valor: { u: m.valor.u, escala: p.escala, etiqueta: m.valor.etiqueta } } : m;
+    }
+    const d = desplazamientos(this, p.combinaciones);
+    if (!d.valido) return d;
+    const conj = this.conjunto(p.combinaciones, "desplazamientos");
+    if (!conj.valido) return conj;
+    return { valido: true, valor: { u: d.valor.u, escala: p.escala, etiqueta: d.valor.etiqueta, factores: conj.valor.factores[0]!, comb: d.valor.comb } };
   }
 
   /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */

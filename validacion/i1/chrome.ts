@@ -218,7 +218,8 @@ try {
   await medir("modo Diagramas", `__i1.boton("Diagramas").click()`, `document.body.innerText.includes("Vanos de cara a cara")` /* UI-46: el alzado de la pieza se abre al elegirla; al entrar, la primera viga en Propiedades */, "7-resultados-diagramas");
   await medir("modo Pilares", `__i1.boton("Pilares").click()`, `document.querySelector("tr.clic")`, "8-resultados-pilares");
   await medir("elegir un pilar (cuadro)", `document.querySelectorAll("tr.clic")[5].click()`, `document.querySelector(".panel.der svg")`, "9-resultados-pilar");
-  await medir("modo Deformada", `__i1.boton("Deformada").click()`, `document.querySelector('.celda[data-tipo="3d"]')`, "10-resultados-deformada");
+  // VC2: Deformada ya no pasa la vista a 3D al entrar (se dibuja también en planta y en alzado): se pide aquí
+  await medir("modo Deformada", `__i1.boton("Deformada").click(); { const s = document.querySelector('.celda[data-activa="true"] select[aria-label="Tipo de vista"]') ?? document.querySelector('select[aria-label="Tipo de vista"]'); if (s && s.value !== "3d") { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, "3d"); s.dispatchEvent(new Event("change", { bubbles: true })); } }`, `document.querySelector('.celda[data-tipo="3d"]')`, "10-resultados-deformada");
   await medir("plegar las propiedades", `__i1.boton("Plegar propiedades").click()`);
   await medir("abrir las propiedades", `__i1.boton("Abrir propiedades").click()`);
   await medir("espacio Revisión", espacio("Revisión"), `document.querySelector("article")`, "11-revision");

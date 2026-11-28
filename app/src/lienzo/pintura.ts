@@ -89,6 +89,9 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "armado-critico-sin": { stroke: "#6b7280", sw: 0.9, dash: "2 3" },
   "armado-nervio": { stroke: "#6e8a5f", sw: 0.9 },
   "armado-caseton": { fill: "#232a34", stroke: "#414b5a", sw: 0.6 },
+  deformada: { stroke: "#a78bfa", sw: 2.2 },
+  "deformada-lamina": { stroke: "#8b5cf6", sw: 1 },
+  "deformada-nudo": { fill: "#a78bfa", stroke: "#a78bfa", sw: 1 },
 };
 
 export function pintura(estilo: Estilo, tema: Theme): Pintura {

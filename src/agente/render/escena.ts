@@ -126,7 +126,11 @@ export type Estilo =
   /** Los ejes de los nervios de un reticular, bajo el armado dibujado de la losa. */
   | "armado-nervio"
   /** Un casetón de un reticular, de fondo del armado en barras. */
-  | "armado-caseton";
+  | "armado-caseton"
+  /** VC2: la deformada en planta y en alzado (las barras, el borde de las losas y los muros, y los nudos de los pilares). */
+  | "deformada"
+  | "deformada-lamina"
+  | "deformada-nudo";
 
 export type Primitiva =
   /** Polígono con huecos: el primer anillo es el contorno (relleno par-impar). `relleno` sustituye al del estilo. */

@@ -130,6 +130,9 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "armado-critico-sin": { stroke: "#a3aab5", sw: 0.9, dash: "2 3" },
   "armado-nervio": { stroke: "#8fa27a", sw: 0.9 },
   "armado-caseton": { fill: "#e8ecf1", stroke: "#b9c3d0", sw: 0.6 },
+  deformada: { stroke: "#6d28d9", sw: 2.2 },
+  "deformada-lamina": { stroke: "#8b5cf6", sw: 1 },
+  "deformada-nudo": { fill: "#6d28d9", stroke: "#6d28d9", sw: 1 },
 };
 
 /** Número en px con un decimal, sin «-0» ni «.0». */

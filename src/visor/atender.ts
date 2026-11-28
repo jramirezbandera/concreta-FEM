@@ -197,7 +197,7 @@ export class Atendedor {
         return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "alzado": {
-        const r = s.alzado(p.plano, p.diagramas, p.reacciones, p.cargas);
+        const r = s.alzado(p.plano, p.diagramas, p.reacciones, p.cargas, p.deformada);
         return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "elegir":
