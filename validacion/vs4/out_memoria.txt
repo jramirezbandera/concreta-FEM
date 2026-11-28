@@ -1,38 +1,38 @@
-# VS4: la memoria de la app en Chrome con el sismo del programa (2026-11-07; edificio objetivo de losas, 7 plantas)
+# VS4: la memoria de la app en Chrome con el sismo del programa (2026-11-28; edificio objetivo de losas, 7 plantas)
 
 Tras recoger la basura en cada destino. «Worker»: el montón de JavaScript del worker de sesión (los resultados y las consultas); «página», el del hilo principal; «otros», los demás workers. «Proceso mayor», la memoria privada del renderer de la pestaña, y «todos», la de los procesos de este Chrome (cuántos). El tiempo de cada paso, desde la navegación (abrir y calcular) o desde el clic, sólo como información.
 
 Edificio | Paso | s | Worker MiB | Página MiB | Otros MiB | Proceso mayor MiB | Todos MiB
 ---|---|---|---|---|---|---|---
-sin | abrir y calcular | 7.1 | 234 | 9 | 0 | 646 | 1081 (12)
-sin | Resultados · Modal | 0.2 | 236 | 24 | 0 | 653 | 1119 (12)
-sin | Resultados · Losas, M11 | 0.4 | 291 | 13 | 0 | 711 | 1183 (12)
-sin | Resultados · Armado | 1.3 | 519 | 11 | 0 | 1011 | 1488 (12)
-sin | Resultados · Losas, M11, planta de debajo | 0.6 | 571 | 16 | 0 | 1101 | 1592 (13)
-sin | Resultados · Armado, planta de debajo | 0.7 | 608 | 11 | 0 | 1152 | 1631 (12)
-sin | Resultados · Pilares | 0.2 | 624 | 12 | 0 | 1180 | 1647 (12)
-con | abrir y calcular | 10.8 | 607 | 9 | 0 | 1141 | 1526 (10)
-con | Resultados · Modal | 0.3 | 608 | 27 | 0 | 1166 | 1596 (10)
-con | Resultados · Losas, M11 | 1.6 | 739 | 14 | 0 | 1480 | 1910 (10)
-con | Resultados · Armado | 4.2 | 1157 | 12 | 0 | 2066 | 2449 (8)
-con | Resultados · Losas, M11, planta de debajo | 1.7 | 1240 | 17 | 0 | 2161 | 2534 (8)
-con | Resultados · Armado, planta de debajo | 3.5 | 1345 | 12 | 0 | 2370 | 2726 (8)
-con | Resultados · Pilares | 1.0 | 1384 | 13 | 0 | 2347 | 2713 (8)
+sin | abrir y calcular | 12.0 | 284 | 10 | 0 | 739 | 1202 (13)
+sin | Resultados · Modal | 0.3 | 286 | 24 | 0 | 707 | 1209 (13)
+sin | Resultados · Losas, M11 | 0.5 | 321 | 14 | 0 | 731 | 1280 (13)
+sin | Resultados · Armado | 3.3 | 606 | 12 | 0 | 1124 | 1665 (13)
+sin | Resultados · Losas, M11, planta de debajo | 0.6 | 604 | 16 | 0 | 1140 | 1655 (12)
+sin | Resultados · Armado, planta de debajo | 1.2 | 641 | 12 | 0 | 1170 | 1690 (12)
+sin | Resultados · Pilares | 0.3 | 660 | 13 | 0 | 1206 | 1722 (12)
+con | abrir y calcular | 14.5 | 659 | 10 | 0 | 1224 | 1585 (8)
+con | Resultados · Modal | 0.4 | 661 | 27 | 0 | 1240 | 1641 (8)
+con | Resultados · Losas, M11 | 1.4 | 715 | 16 | 0 | 1288 | 1727 (8)
+con | Resultados · Armado | 5.1 | 1159 | 12 | 0 | 1846 | 2279 (8)
+con | Resultados · Losas, M11, planta de debajo | 1.3 | 1145 | 18 | 0 | 1881 | 2315 (8)
+con | Resultados · Armado, planta de debajo | 3.5 | 1249 | 13 | 0 | 1939 | 2358 (8)
+con | Resultados · Pilares | 3.6 | 1283 | 14 | 0 | 1945 | 2344 (8)
 
 
 ## Edificio sin sismo
-sin | abrir y calcular | 7.1 | 234 | 9 | 0 | 646 | 1081 (12)   [página 9, worker-CAtbH9-y.js 234]
-sin | Resultados · Modal | 0.2 | 236 | 24 | 0 | 653 | 1119 (12)   [página 24, worker-CAtbH9-y.js 236]
-sin | Resultados · Losas, M11 | 0.4 | 291 | 13 | 0 | 711 | 1183 (12)   [página 13, worker-CAtbH9-y.js 291]
-sin | Resultados · Armado | 1.3 | 519 | 11 | 0 | 1011 | 1488 (12)   [página 11, worker-CAtbH9-y.js 519]
-sin | Resultados · Losas, M11, planta de debajo | 0.6 | 571 | 16 | 0 | 1101 | 1592 (13)   [página 16, worker-CAtbH9-y.js 571]
-sin | Resultados · Armado, planta de debajo | 0.7 | 608 | 11 | 0 | 1152 | 1631 (12)   [página 11, worker-CAtbH9-y.js 608]
-sin | Resultados · Pilares | 0.2 | 624 | 12 | 0 | 1180 | 1647 (12)   [página 12, worker-CAtbH9-y.js 624]
+sin | abrir y calcular | 12.0 | 284 | 10 | 0 | 739 | 1202 (13)   [página 10, worker-DwAFmDbV.js 284]
+sin | Resultados · Modal | 0.3 | 286 | 24 | 0 | 707 | 1209 (13)   [página 24, worker-DwAFmDbV.js 286]
+sin | Resultados · Losas, M11 | 0.5 | 321 | 14 | 0 | 731 | 1280 (13)   [página 14, worker-DwAFmDbV.js 321]
+sin | Resultados · Armado | 3.3 | 606 | 12 | 0 | 1124 | 1665 (13)   [página 12, worker-DwAFmDbV.js 606]
+sin | Resultados · Losas, M11, planta de debajo | 0.6 | 604 | 16 | 0 | 1140 | 1655 (12)   [página 16, worker-DwAFmDbV.js 604]
+sin | Resultados · Armado, planta de debajo | 1.2 | 641 | 12 | 0 | 1170 | 1690 (12)   [página 12, worker-DwAFmDbV.js 641]
+sin | Resultados · Pilares | 0.3 | 660 | 13 | 0 | 1206 | 1722 (12)   [página 13, worker-DwAFmDbV.js 660]
 ## Edificio con sismo
-con | abrir y calcular | 10.8 | 607 | 9 | 0 | 1141 | 1526 (10)   [página 9, worker-CAtbH9-y.js 607]
-con | Resultados · Modal | 0.3 | 608 | 27 | 0 | 1166 | 1596 (10)   [página 27, worker-CAtbH9-y.js 608]
-con | Resultados · Losas, M11 | 1.6 | 739 | 14 | 0 | 1480 | 1910 (10)   [página 14, worker-CAtbH9-y.js 739]
-con | Resultados · Armado | 4.2 | 1157 | 12 | 0 | 2066 | 2449 (8)   [página 12, worker-CAtbH9-y.js 1157]
-con | Resultados · Losas, M11, planta de debajo | 1.7 | 1240 | 17 | 0 | 2161 | 2534 (8)   [página 17, worker-CAtbH9-y.js 1240]
-con | Resultados · Armado, planta de debajo | 3.5 | 1345 | 12 | 0 | 2370 | 2726 (8)   [página 12, worker-CAtbH9-y.js 1345]
-con | Resultados · Pilares | 1.0 | 1384 | 13 | 0 | 2347 | 2713 (8)   [página 13, worker-CAtbH9-y.js 1384]
+con | abrir y calcular | 14.5 | 659 | 10 | 0 | 1224 | 1585 (8)   [página 10, worker-DwAFmDbV.js 659]
+con | Resultados · Modal | 0.4 | 661 | 27 | 0 | 1240 | 1641 (8)   [página 27, worker-DwAFmDbV.js 661]
+con | Resultados · Losas, M11 | 1.4 | 715 | 16 | 0 | 1288 | 1727 (8)   [página 16, worker-DwAFmDbV.js 715]
+con | Resultados · Armado | 5.1 | 1159 | 12 | 0 | 1846 | 2279 (8)   [página 12, worker-DwAFmDbV.js 1159]
+con | Resultados · Losas, M11, planta de debajo | 1.3 | 1145 | 18 | 0 | 1881 | 2315 (8)   [página 18, worker-DwAFmDbV.js 1145]
+con | Resultados · Armado, planta de debajo | 3.5 | 1249 | 13 | 0 | 1939 | 2358 (8)   [página 13, worker-DwAFmDbV.js 1249]
+con | Resultados · Pilares | 3.6 | 1283 | 14 | 0 | 1945 | 2344 (8)   [página 14, worker-DwAFmDbV.js 1283]

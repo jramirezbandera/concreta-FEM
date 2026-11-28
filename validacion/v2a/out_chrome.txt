@@ -1,15 +1,15 @@
 Criterio 5 · edificio objetivo (7 plantas, 80 pilares)
   pilares en la tabla de la planta activa: 80
-BIEN  escribir una celda: el dibujo de la versión nueva sale en 0.29 s (≤ 1,5 s)
-  escribir una celda: los diagnósticos, tras compilar, en 2.89 s (información)
+BIEN  escribir una celda: el dibujo de la versión nueva sale en 0.38 s (≤ 1,5 s)
+  escribir una celda: los diagnósticos, tras compilar, en 4.09 s (información)
 BIEN  escribir una celda: tareas largas > 50 ms en el hilo principal: 0 (máx. 0 ms)
 BIEN  pegar 80 filas: «Pegadas 80 filas.»
-BIEN  pegar 80 filas: el dibujo sale en 0.25 s (≤ 1,5 s)
-  pegar 80 filas: los diagnósticos, tras compilar, en 2.94 s (información)
+BIEN  pegar 80 filas: el dibujo sale en 0.31 s (≤ 1,5 s)
+  pegar 80 filas: los diagnósticos, tras compilar, en 4.27 s (información)
 BIEN  pegar 80 filas: tareas largas > 50 ms: 0 (máx. 0 ms)
-BIEN  guardar: 30 ms (≤ 0,5 s)
+BIEN  guardar: 36 ms (≤ 0,5 s)
 BIEN  guardar: tareas largas > 50 ms: 0 (máx. 0 ms)
-BIEN  lo guardado tiene la huella que enseña la página (4a0eea6c)
+BIEN  lo guardado tiene la huella que enseña la página (2c0a507a)
 BIEN  lo guardado está en el formato canónico
 BIEN  lo guardado lleva lo pegado (giro 90 en los 80 pilares)
 Criterio 4 · cambio en el disco con cambios sin guardar (ejemplo)

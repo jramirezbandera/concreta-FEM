@@ -222,10 +222,12 @@ try {
   // P3: Tab dos veces (derecha, el eje propuesto por P2) a 0 y abajo a 6,25; un clic en otro sitio
   await pagina(`__c.ev("pointermove", [5.1, 6.2]); __c.tecla("Tab"); __c.tecla("Tab"); await __c.teclear("0"); await __c.teclear("6,25"); __c.clic([3, 3]); await __c.fotograma();`);
   await error();
-  // P4: Tab cuatro veces (arriba, desde P3) a 0 y, ya activa la de la izquierda, a 0 del eje 1
-  await pagina(`__c.ev("pointermove", [0.2, 6]); for (let k = 0; k < 4; k++) __c.tecla("Tab"); await __c.fotograma();`);
+  // P4: Tab cuatro veces (arriba, desde P3) a 0 y, ya activa la de la izquierda, a 0 del eje 1. El
+  // cursor, lejos del cruce 1-B (0; 6,25): con el encuadre de UI2-9 (márgenes mayores, menos px/m) el
+  // radio de enganche llegaba desde (0,2; 6) y el cruce ganaba a las cotas
+  await pagina(`__c.ev("pointermove", [0.4, 5.6]); for (let k = 0; k < 4; k++) __c.tecla("Tab"); await __c.fotograma();`);
   const pie4 = await pagina<string>(`return document.querySelector("[data-cursor]")?.textContent ?? "";`);
-  comprobar(/Cota arriba, desde P3/.test(pie4), `cuatro Tab llegan a la de arriba, desde P3: «${pie4}»`);
+  comprobar(/Cota arriba, desde (P3|eje B)/.test(pie4), `cuatro Tab llegan a la de arriba, desde P3 o el eje B (a la misma cota): «${pie4}»`);
   await pagina(`await __c.teclear("0"); __c.ev("pointermove", [0.4, 5.5]); await __c.fotograma();`);
   await captura("2-una-fijada");
   await pagina(`await __c.teclear("0"); __c.tecla("Enter"); await __c.fotograma();`);

@@ -308,7 +308,12 @@ export class Vista2D extends Vista {
       const [dx, dy] = [Math.max(0, ENCUADRE_MINIMO - (x1 - x0)) / 2, Math.max(0, ENCUADRE_MINIMO - (y1 - y0)) / 2];
       [x0, y0, x1, y1] = [x0 - dx, y0 - dy, x1 + dx, y1 + dy];
     }
-    const m = this.margenes;
+    // En una vista baja o estrecha (el panel de abajo abierto a 1366 × 768), los márgenes para lo que
+    // flota no se comen más del 30 % del lado: mejor algo bajo un chip que un dibujo diminuto
+    const m0 = this.margenes;
+    const fy = Math.min(1, (0.3 * this.rect.h) / Math.max(1, m0.arriba + m0.abajo));
+    const fx = Math.min(1, (0.3 * this.rect.w) / Math.max(1, m0.izq + m0.der));
+    const m = { izq: m0.izq * fx, der: m0.der * fx, arriba: m0.arriba * fy, abajo: m0.abajo * fy };
     const w = Math.max(20, this.rect.w - m.izq - m.der);
     const h = Math.max(20, this.rect.h - m.arriba - m.abajo);
     this.s = Math.min(w / Math.max(1e-6, x1 - x0), h / Math.max(1e-6, y1 - y0));
@@ -530,7 +535,7 @@ export class Vista2D extends Vista {
       ctx.font = fuente(p.tam, !!p.t.negrita);
       ctx.textAlign = p.ancla === "inicio" ? "left" : p.ancla === "medio" ? "center" : "right";
       const elegido = p.t.objeto !== undefined && this.elegidos.has(p.t.objeto);
-      textoConHalo(ctx, p.t.texto, 0, 0, elegido ? col.seleccion : (p.t.color ?? col.texto), col.fondo);
+      textoConHalo(ctx, p.t.texto, 0, 0, elegido ? col.seleccion : p.t.color ? legible(p.t.color, col.fondo) : col.texto, col.fondo);
       ctx.restore();
     }
     // Las marcas de la pantalla (el punto pulsado en Losas…)
@@ -864,4 +869,17 @@ function etiqueta(ctx: CanvasRenderingContext2D, texto: string, x: number, y: nu
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(texto, x0 + w / 2, y + 0.5);
+}
+
+/**
+ * El color de un rótulo que trae el suyo de la escena (los picos del armado en azul o rojo oscuros),
+ * legible sobre el fondo: en el tema oscuro, un color oscuro se aclara hacia el blanco (como hace el 3D
+ * con sus rótulos); en el claro, tal cual.
+ */
+function legible(color: string, fondo: string): string {
+  const lum = (c: Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  const f = new Color(fondo);
+  if (lum(f) > 0.4) return color;
+  const c = new Color(color);
+  return lum(c) >= 0.45 ? color : `#${c.lerp(new Color("#ffffff"), 0.55).getHexString()}`;
 }

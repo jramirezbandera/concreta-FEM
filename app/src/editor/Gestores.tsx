@@ -412,7 +412,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
               <CamposSeccion form={form} errores={errores} setForm={setForm} />
               <label className="campo">
                 <span>
-                  material <Ayuda texto="Da E, G y γ: la rigidez y el peso propio de la sección. Un típico que aún no está en el proyecto se añade con la sección." />
+                  Material <Ayuda texto="Da E, G y γ: la rigidez y el peso propio de la sección. Un típico que aún no está en el proyecto se añade con la sección." />
                 </span>
                 <select className="sel" value={form.material} aria-label="Material de la sección" data-error={!!errores.material} onChange={(e) => setForm({ ...form, material: e.target.value })}>
                   {!form.material && <option value="">(ninguno)</option>}
@@ -486,7 +486,7 @@ function CamposSeccion({ form, errores, setForm }: { form: FormSeccion; errores:
     return (
       <>
         <label className="campo">
-          <span>serie</span>
+          <span>Serie</span>
           <select className="sel" value={serie} aria-label="Serie del perfil" onChange={(e) => setForm({ ...form, campos: { serie: e.target.value, tamano: String(PERFILES.find((x) => x.serie === e.target.value && x.tamano >= Number(form.campos.tamano || 0))?.tamano ?? PERFILES.find((x) => x.serie === e.target.value)?.tamano ?? "") } })}>
             {!serie && <option value="">{form.perfilBase ? "(fuera del catálogo)" : "(elija)"}</option>}
             {SERIES_PERFILES.map((s) => (
@@ -496,7 +496,7 @@ function CamposSeccion({ form, errores, setForm }: { form: FormSeccion; errores:
         </label>
         {serie && (
           <label className="campo">
-            <span>tamaño</span>
+            <span>Tamaño</span>
             <select className="sel" value={form.campos.tamano ?? ""} aria-label="Tamaño del perfil" data-error={!!errores.tamano} onChange={(e) => poner("tamano", e.target.value)}>
               {tamanos.map((t) => (
                 <option key={t.tamano} value={t.tamano}>

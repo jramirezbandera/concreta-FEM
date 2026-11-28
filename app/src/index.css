@@ -228,6 +228,9 @@ body {
   color: var(--color-text-secondary);
 }
 .sec > span + span { font-weight: 400; font-size: 11px; font-family: var(--font-mono); color: var(--color-text-tertiary); }
+/* El título no se parte por un guion («Extremos de CUB-↵S»): cede lo de la derecha, que se parte a su lado */
+.sec > span:first-child { flex-shrink: 0; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec > span + span { min-width: 0; text-align: right; }
 .panel-cuerpo > section:first-child > .sec, .panel-cuerpo > .nota:first-child + section > .sec, .dock-cuerpo > section:first-child > .sec { border-top: 0; }
 
 .fila {
@@ -328,6 +331,8 @@ html[data-theme="dark"] .seg > button[data-on="true"] { background: var(--color-
 .campo input, .campo select, .gp-campo input, .gp-campo select { width: 100%; }
 .campo select, .gp-campo select { font-family: var(--font-sans); }
 .sel.denso { height: 24px; padding: 0 6px; font-size: 12px; }
+/* Un texto corriente (el nombre y la descripción de la obra), en la letra de la interfaz, no en la de los números */
+.sel.texto { font-family: var(--font-sans); }
 input.sel:hover, textarea.sel:hover, .campo input:hover:not(:read-only), .campo select:hover, .gp-campo input:hover, .gp-campo select:hover { border-color: var(--color-border-strong); }
 input.sel:focus, textarea.sel:focus, .campo input:focus:not(:read-only), .campo select:focus-visible, .gp-campo input:focus, .gp-campo select:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-ring); }
 .sel[data-error="true"], .campo input[data-error="true"], .campo select[data-error="true"], .gp-campo input[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
@@ -655,6 +660,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .btn-buscar:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .btn-buscar-texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 .btn-buscar-atajo { flex-shrink: 0; }
+/* En un portátil no cabe «Buscar u ordenar…» y salía «Bus…»: allí, «Buscar…» */
+.btn-buscar-corto { display: none; }
 /* UI-7: en un portátil la barra superior no cabía y la página se desplazaba de lado. Por debajo de
    1500 px, los botones sólo con su icono (el texto queda en el título); por debajo de 1100 px, lo de
    la derecha en el menú «⋯» */
@@ -662,6 +669,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 @media (max-width: 1499.98px) {
   .barra-sup .et { display: none; }
   .barra-sup .btn { padding-inline: 8px; }
+  .btn-buscar-largo, .btn-buscar-atajo { display: none; }
+  .btn-buscar-corto { display: inline; }
 }
 @media (max-width: 1099.98px) {
   .barra-sup .ancho-1100 { display: none; }

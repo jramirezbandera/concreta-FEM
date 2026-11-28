@@ -260,7 +260,11 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
   const viento = usePedido(proyecto.cliente, { tipo: "viento" });
   const sismo = usePedido(proyecto.cliente, { tipo: "sismo" });
   const segundoOrden = usePedido(proyecto.cliente, { tipo: "segundo-orden" });
-  const cambiado = JSON.stringify("valor" in acciones ? (acciones.valor ?? {}) : null) !== JSON.stringify(a);
+  // La ficha recién abierta, sin tocar, preguntaba «¿Cerrar sin aplicar?»: se compara sin contar el
+  // orden de las claves y con la zona eólica escrita que es la de la provincia quitada, como hace el
+  // formulario (calcula lo mismo; en los ejemplos, `"zona": "A"` en Málaga)
+  const guardado = a.viento?.zona && !zonaInicial ? { ...a, viento: (({ zona: _z, ...v }) => v)(a.viento) } : a;
+  const cambiado = jsonOrdenado("valor" in acciones ? (acciones.valor ?? {}) : null) !== jsonOrdenado(guardado);
 
   // La nieve de lo escrito, al momento (no pide nada al worker), y el caso que pide su altitud
   const modeloAhora = ed.proyecto.modelo;
@@ -864,5 +868,12 @@ function ResumenSismo({ d, aplicado }: { d: DatosSismo | null; aplicado: boolean
       )}
       {d.motivo && <p className="nota acc-nota">{textoApp(d.motivo)}</p>}
     </div>
+  );
+}
+
+/** JSON con las claves de cada objeto ordenadas, para comparar dos valores sin contar su orden. */
+function jsonOrdenado(v: unknown): string {
+  return JSON.stringify(v, (_, x: unknown) =>
+    x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0))) : x,
   );
 }

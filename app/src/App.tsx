@@ -423,7 +423,10 @@ export function App() {
             <span className="flex-1" />
             <button type="button" className="btn-buscar" onClick={() => setPaleta(true)} title="Buscar u ordenar: la paleta de órdenes (Ctrl+K)" aria-label="Buscar u ordenar (Ctrl+K)">
               <Search size={14} aria-hidden="true" />
-              <span className="btn-buscar-texto">Buscar u ordenar…</span>
+              <span className="btn-buscar-texto">
+                <span className="btn-buscar-largo">Buscar u ordenar…</span>
+                <span className="btn-buscar-corto">Buscar…</span>
+              </span>
               <span className="kbd btn-buscar-atajo" aria-hidden="true">Ctrl K</span>
             </button>
             <span className="flex-1" />

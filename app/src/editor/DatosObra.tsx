@@ -199,9 +199,9 @@ export function DatosObra({ pedido }: { pedido: PedidoGestor }) {
           <Etiqueta htmlFor="o-nombre" ayuda={AYUDA.nombre}>
             Nombre
           </Etiqueta>
-          <input id="o-nombre" className="sel w-full" value={nombre} placeholder="Nombre de la obra" onChange={(x) => setNombre(x.target.value)} />
+          <input id="o-nombre" className="sel texto w-full" value={nombre} placeholder="Nombre de la obra" onChange={(x) => setNombre(x.target.value)} />
           <Etiqueta htmlFor="o-desc">Descripción</Etiqueta>
-          <textarea id="o-desc" className="sel w-full" rows={2} value={descripcion} placeholder="Descripción" onChange={(x) => setDescripcion(x.target.value)} />
+          <textarea id="o-desc" className="sel texto w-full" rows={2} value={descripcion} placeholder="Descripción" onChange={(x) => setDescripcion(x.target.value)} />
           <Etiqueta htmlFor="o-uso" ayuda={AYUDA.uso}>
             Uso del edificio
           </Etiqueta>

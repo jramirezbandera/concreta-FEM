@@ -321,3 +321,26 @@ Lo que quedaba a mano del punto 2 y el arranque del punto 3. Tres de estos cambi
 - **Sin comprobar:** los avisos en los paneles (Cargas, Modal, Losas, Plantillas), la ficha de acciones, el tema oscuro, 1366 px y los bancos de Chrome.
 - **Sin hacer:** la unidad «(m)» en la etiqueta de tres campos (dos pruebas los buscan por ese texto), `.acc-form` y `.campos-lado` siguen siendo dos clases, y las etiquetas de un `.campo` dentro de un gestor no llevan la mayúscula inicial.
 - **Lo que queda del punto 2:** las cajas con leyenda de Obra y Acciones, los segmentados sueltos y la escala de espacios.
+
+### 7.5 Los bancos de Chrome, el tema oscuro y 1366 × 768 (2026-11-28)
+
+Los 22 bancos y el de la PWA, por primera vez desde la auditoría, uno detrás de otro; los que fallaron, repetidos en calma (sin el navegador de la revisión ni el servidor de desarrollo). La vivienda, recorrida en oscuro a 1366 × 768: los cinco espacios, Viento y sismo, Datos de la obra, Secciones, Revisión, el 3D, Pilares, Armado y Diagramas.
+
+- **Pasan 21 de 23** (con la PWA). De los que fallaron en la primera tanda:
+  - **i1 y v1, una regresión de verdad:** tareas largas de 105–172 ms al entrar en Resultados · Pilares. Era `TablaEnColumnas` (2026-11-24): medía el ancho natural del cuadro de pilares dos veces al montarse (el efecto y la primera llamada del observador) y otra cada vez que cambiaba de alto, y cada medida maqueta la tabla entera dentro del script. Ahora se mide una vez por contenido y el observador sólo reparte cuando cambia el ancho. En calma, i1 y v1 sin tareas largas;
+  - **v2c y ct, los bancos:** el cursor caía a la misma distancia de dos enganches (el centro y la esquina de un pilar; las cotas y un cruce de ejes), y cuál ganaba dependía de la escala del encuadre, que cambió con los márgenes de UI2-9. El cursor, donde no hay empate; en ct, la cota de arriba vale desde P3 o desde el eje B, que están a la misma cota;
+  - **al, el banco:** buscaba la descripción en el navegador, que desde DO2 (2026-11-08) se escribe en «Datos de la obra»;
+  - **ab:** no llegó a correr (la compilación cayó con un fichero a medio editar); en calma, pasa. **f:** 3,06 s frente a 3 s con la máquina cargada; en calma, pasa.
+- **Fallan, y no son de la interfaz:**
+  - **v2b:** una tarea larga de 60–73 ms al escribir una celda en el reticular de 7 plantas (durante los 6,7 s de recompilar). Medido alternando con un árbol de trabajo en `5480d1b`, el commit anterior a esta auditoría: 60 y 62 ms antes, 73 y 64 ms ahora. Ya estaba; sin investigar;
+  - **co6:** busca Comprobación como modo de Resultados; es un espacio propio desde el 2026-11-23 («sin adaptar» en `CLAUDE.md`).
+- **Arreglado del repaso en oscuro y a 1366 px:**
+  - **el encuadre en una vista baja:** con el panel de abajo abierto (Comprobación a 1366 × 768, ~300 px de vista) los márgenes de UI2-9 dejaban el dibujo en un 40 % del alto; ahora no pasan del 30 % de cada lado (`vista2d.ts`);
+  - **el buscador** salía «Bus…» por debajo de 1500 px: allí dice «Buscar…», sin el atajo (sigue en su pista);
+  - **los grupos de casos del programa** («Imperfección del programa · 8») se cortaban sin «…» en el navegador: cede «del programa», no la cuenta;
+  - **los títulos de sección** se partían por un guion («Extremos de CUB-↵S»): el título no se parte y cede lo de la derecha;
+  - **los rótulos con color propio** (los picos del mapa de armado, en azul o rojo oscuros) apenas se leían en oscuro sobre su caja: se aclaran hacia el blanco cuando el fondo es oscuro, como ya hacía el 3D;
+  - **Viento y sismo preguntaba «¿Cerrar sin aplicar los cambios?» recién abierta, sin tocar nada:** comparaba con `JSON.stringify`, que cuenta el orden de las claves, y el formulario quita la zona eólica escrita que es la de la provincia (los ejemplos llevan `"zona": "A"` en Málaga). Se compara sin el orden y con esa zona quitada; prueba en `fichaAcciones.test.tsx`;
+  - **en los gestores,** «material», «serie» y «tamaño» con mayúscula (la regla de CSS no llega a un `<span>` que es un contenedor flexible); **el nombre y la descripción de la obra,** en la letra de la interfaz.
+- **Visto y sin tocar:** las propiedades de una viga en Diagramas dan cada combinación entera en su expresión (párrafos de seis líneas; es UI2-21); las vistas planas se dibujan bajo los chips de arriba cuando la vista es baja (el precio del 30 %); el informe de Revisión dice los estados en minúscula y sin píldora (es el HTML de `fem revisar`, byte a byte). La recarga que abortó una vez la propuesta de armado («el proyecto cambió mientras se proponía») era el servidor de desarrollo, recargando por los cambios de otra sesión.
+- **Pruebas:** las de `app/` (178, con la nueva), `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` sin errores. Las salidas `out_*.txt` de los bancos son las de su última pasada.

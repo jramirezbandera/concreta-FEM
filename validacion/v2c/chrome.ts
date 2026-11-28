@@ -564,8 +564,10 @@ try {
   await pagina(`for (let k = 0; k <= 120; k++) { __c.ev("pointermove", [-1 + 56 * k / 120, -1 + 37 * ((k * 7) % 120) / 120]); await __c.fotograma(); }`);
   const largas = await pagina<{ ms: number }[]>(`return window.__largas;`);
   comprobar(!largas.some((x) => x.ms > 50), `120 movimientos con un fotograma cada uno: ${largas.length} tareas largas (> 50 ms) ${largas.length ? `(${largas.map((x) => x.ms.toFixed(0)).join(", ")} ms)` : ""}`);
-  // Una viga a medio dibujar: el borrador, el marcador del centro del pilar y su resaltado
-  await pagina(`__c.clic([0, 5]); __c.ev("pointermove", [18.08, 5.12]); await __c.fotograma(); await __c.fotograma();`);
+  // Una viga a medio dibujar: el borrador, el marcador del centro del pilar y su resaltado. El cursor,
+  // claramente junto al centro: en (18,08; 5,12) quedaba a la misma distancia de la esquina (18,2; 5,2),
+  // y cuál ganaba dependía de la escala del encuadre (cambió con los márgenes de UI2-9)
+  await pagina(`__c.clic([0, 5]); __c.ev("pointermove", [18.04, 5.03]); await __c.fotograma(); await __c.fotograma();`);
   const pie = await pagina<string>(`return document.querySelector("[data-cursor]")?.textContent ?? "";`);
   comprobar(pie.includes("Centro (P-x18-y5)"), `con la viga en curso, el cursor junto al pilar dice su enganche: «${pie}»`);
   await captura("5-viga-en-curso");

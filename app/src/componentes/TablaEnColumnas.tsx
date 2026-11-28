@@ -28,22 +28,18 @@ export function TablaEnColumnas({ children, filasMinimas = 6, maxColumnas = 4 }:
   useLayoutEffect(() => {
     const el = caja.current;
     if (!el) return;
+    // Medir el ancho natural obliga a maquetar la tabla entera dentro de este script (en el cuadro de
+    // pilares del edificio de 7 plantas, tareas de 100–170 ms): se mide una vez por contenido, y el
+    // observador sólo vuelve a repartir cuando cambia el ancho, no el alto (que cambia al partirla)
+    let natural = 0;
+    let anchoVisto = -1;
     const calcular = () => {
       const W = el.clientWidth;
+      if (W === anchoVisto) return;
       const tablas = [...el.querySelectorAll<HTMLTableElement>(":scope > table")];
       if (!W || !tablas.length) return;
-      // El ancho natural: el de su contenido sin partir líneas, el mayor de las columnas que haya ahora
-      let natural = 0;
-      for (const t of tablas) {
-        const [w, mw, fx] = [t.style.width, t.style.minWidth, t.style.flex];
-        t.style.width = "max-content";
-        t.style.minWidth = "0";
-        t.style.flex = "none";
-        natural = Math.max(natural, t.getBoundingClientRect().width);
-        t.style.width = w;
-        t.style.minWidth = mw;
-        t.style.flex = fx;
-      }
+      anchoVisto = W;
+      if (!natural) natural = medirNatural(tablas);
       const cabe = Math.floor((W + HUECO) / (Math.max(natural, 320) + HUECO));
       setK(Math.max(1, Math.min(limite, cabe)));
     };
@@ -76,4 +72,20 @@ export function TablaEnColumnas({ children, filasMinimas = 6, maxColumnas = 4 }:
       })}
     </div>
   );
+}
+
+/** El ancho natural (su contenido sin partir líneas): el mayor de las tablas que haya ahora. */
+function medirNatural(tablas: readonly HTMLTableElement[]): number {
+  let natural = 0;
+  for (const t of tablas) {
+    const [w, mw, fx] = [t.style.width, t.style.minWidth, t.style.flex];
+    t.style.width = "max-content";
+    t.style.minWidth = "0";
+    t.style.flex = "none";
+    natural = Math.max(natural, t.getBoundingClientRect().width);
+    t.style.width = w;
+    t.style.minWidth = mw;
+    t.style.flex = fx;
+  }
+  return natural;
 }

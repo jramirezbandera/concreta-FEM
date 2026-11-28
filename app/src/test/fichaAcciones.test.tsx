@@ -51,6 +51,11 @@ describe("VS4: el emplazamiento común en la ficha «Viento y sismo»", () => {
     });
   });
 
+  it("recién abierta, sin tocar, no tiene nada sin aplicar (la zona escrita que es la de la provincia y el orden de las claves no cuentan)", () => {
+    montar({ emplazamiento: { ine: "29008", municipio: "Alhaurín el Grande", altitud: 240 }, viento: { zona: "A", aspereza: "III" }, sismo: { terreno: "II", mu: 2 } });
+    expect(screen.queryByText(/pulse «Aplicar» para ver lo de estos datos/)).toBeNull();
+  });
+
   it("la provincia da la zona eólica; forzada, se escribe", () => {
     const { escrito } = montar(undefined);
     fireEvent.change(screen.getByLabelText("Provincia"), { target: { value: "11" } });

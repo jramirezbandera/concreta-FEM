@@ -163,14 +163,15 @@ try {
   comprobar(cache.sha === sha && cache.bytes > 0, `calculado al abrir; en la caché: ${cache.bytes} bytes con el sha256 de la app (${sha.slice(0, 12)})`);
 
   // ─── 6. Un cambio se guarda solo ────────────────────────────────────────────────────────────
+  // La descripción se escribe en «Datos de la obra» (DO2, 2026-11-08; antes, en el navegador)
   await pagina(`
-    const t = await __c.esperar(() => document.querySelector('textarea[aria-label="Descripción del proyecto"]'));
-    t.focus();
+    const enlace = await __c.esperar(() => [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Datos de la obra…"));
+    enlace.click();
+    const t = await __c.esperar(() => document.getElementById("o-desc"));
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(t, "Descrito en el banco de AL");
     t.dispatchEvent(new Event("input", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 0));
-    // Sin foco en la página (headless), blur() no avisa: el focusout que escucha React, a mano
-    t.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    [...document.querySelectorAll(".dialogo button")].find((b) => b.textContent.trim() === "Aplicar").click();
     `);
   const g0 = performance.now();
   const tras = await pagina<boolean>(`
@@ -183,7 +184,13 @@ try {
   await pagina(`await __c.esperar(() => __c.estado() === "calculado");`);
   const tReabrir = performance.now() - r0;
   const re = await pagina<{ origen: string; sha: string; huella: string; desc: string }>(`
-    return { origen: document.querySelector("[data-sha]").dataset.origen, sha: document.querySelector("[data-sha]").dataset.sha, huella: __c.huella(), desc: document.querySelector('textarea[aria-label="Descripción del proyecto"]')?.value ?? "" };`);
+    return { origen: document.querySelector("[data-sha]").dataset.origen, sha: document.querySelector("[data-sha]").dataset.sha, huella: __c.huella(), desc: await (async () => {
+      [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Datos de la obra…").click();
+      const t = await __c.esperar(() => document.getElementById("o-desc"));
+      const v = t.value;
+      [...document.querySelectorAll(".dialogo button")].find((b) => b.textContent.trim() === "Cancelar").click();
+      return v;
+    })() };`);
   comprobar(re.desc === "Descrito en el banco de AL", "recargar abre el proyecto con el cambio");
   comprobar(re.origen === "guardados" && re.sha === sha && re.huella === HUELLA, `recargar no recalcula: resultados de la caché con el mismo sha256 (${re.origen}, ${(tReabrir / 1000).toFixed(2)} s hasta calculado)`);
   const versiones = await pagina<number>(`return (await __c.bd("versiones")).filter((v) => v.proyecto === ${JSON.stringify(id)}).length;`);

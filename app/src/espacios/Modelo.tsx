@@ -896,8 +896,11 @@ function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => vo
                 }
               >
                 <ChevronRight size={14} className="giro" aria-hidden="true" />
-                <span>{NOMBRE_PROGRAMA[g.programa]}</span>
-                <span className="n">del programa · {g.casos.length}</span>
+                {/* Con el navegador estrecho, lo que cede es «del programa», con «…», y no la cuenta */}
+                <span className="truncate">
+                  {NOMBRE_PROGRAMA[g.programa]} <span className="text-[12px] text-text-tertiary">del programa</span>
+                </span>
+                <span className="n">{g.casos.length}</span>
               </button>
               {abierto &&
                 g.casos.map((c) => (
