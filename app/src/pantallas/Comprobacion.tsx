@@ -32,7 +32,8 @@ import type { ArmadoForjado, ArmadoVanoViga, CercosForjado, DatosArmado, Refuerz
 import { armadoDeBorrador, armadoParcial, borradorArmado, DIAMETROS_BARRA, elementoDeId, gruposArmado, idElemento, ponerArmado, sinElemento, type GrupoArmado } from "../../../src/editor/armadoBarras.ts";
 import { conElemento, conZona } from "../../../src/editor/refuerzosPlanta.ts";
 import type { CaraDibujada } from "../../../src/visor/armadoPlanta.ts";
-import type { DatosArmar, DatosEsfuerzosArmado, FichaComprobacion, FilaModulo, ParteComprobada, TipoComprobacion } from "../../../src/visor/comprobaciones.ts";
+import { COLOR_APROVECHAMIENTO, type DatosArmar, type DatosEsfuerzosArmado, type FichaComprobacion, type FilaModulo, type ParteComprobada, type TipoComprobacion } from "../../../src/visor/comprobaciones.ts";
+import { CLASES } from "../../../src/visor/comprobacionVistas.ts";
 import type { TipoElegible } from "../../../src/visor/protocolo.ts";
 import { ALTO_DOCK_MINIMIZADO, altoMedioDock, Chip, Disposicion, Herramienta, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { Situacion } from "../armazon/Situacion.tsx";
@@ -53,7 +54,8 @@ import { EXTREMOS_TRAMO, TERNAS, TITULO_PESIMOS } from "./Ternas.tsx";
 import { Dialogo } from "../editor/Dialogos.tsx";
 import { EditorRefuerzos, type NuevoElemento } from "../dibujo/refuerzos.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { Fuente3DModelo, FuenteEscena, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
+import type { EstadoVista } from "../vistas/estado.ts";
+import { Fuente3DModelo, FuenteEscena, planoAlzado, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
 import { Vacio } from "../componentes/Vacio.tsx";
 import { Grupo } from "../componentes/Grupo.tsx";
 
@@ -196,6 +198,23 @@ function Punzonamiento3D({ armado, datos }: { armado: ArmadoProyecto | undefined
   const { proyecto } = useVisor();
   const r = usePedido(proyecto.cliente, { tipo: "punzonamiento-3d", ...(armado ? { armado } : {}), datos });
   return <Fuente3DModelo elegibles={ELEGIBLES.punzonamiento} resultados={{ diagramas: r.datos, leyenda: r.datos ? { leyenda: r.datos.leyenda, tituloLeyenda: "Punzonamiento", notas: r.datos.notas } : null, cargando: r.cargando }} />;
+}
+
+const COLORES_CLASES = CLASES.map((c) => COLOR_APROVECHAMIENTO[c]);
+const SIN_CLASES = new Uint8Array(0);
+
+/**
+ * VC3: el 3D de pilares, vigas y losas: el sólido con cada tramo, vano o losa del color de su
+ * aprovechamiento (los colores de la planta) y lo demás, tenue. En alámbrico no se ve el color.
+ */
+function Comprobacion3D({ tipo, armado, datos }: { tipo: Exclude<TipoComprobacion, "punzonamiento">; armado: ArmadoProyecto | undefined; datos: DatosArmado }) {
+  const { proyecto } = useVisor();
+  const r = usePedido(proyecto.cliente, { tipo: "comprobacion-solido", de: tipo, ...(armado ? { armado } : {}), datos });
+  const clases = useMemo(
+    () => (r.datos ? { clase: r.datos.clase, colores: COLORES_CLASES, leyenda: { leyenda: r.datos.leyenda, tituloLeyenda: r.datos.tituloLeyenda, notas: [...r.datos.notas, "El color va en el sólido: en alámbrico no se ve."] } } : { clase: SIN_CLASES, colores: COLORES_CLASES, leyenda: { leyenda: [], notas: [] }, cargando: r.cargando }),
+    [r.datos, r.cargando],
+  );
+  return <Fuente3DModelo elegibles={ELEGIBLES[tipo]} clases={clases} />;
 }
 
 function estadoDe(p: ParteComprobada): {
@@ -1651,7 +1670,10 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
               ...(tipo === "losas" && dibujo === "armado" && !proponiendose ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
               ...(tipo === "punzonamiento" && !proponiendose ? { tresD: () => <Punzonamiento3D armado={armado} datos={datosObra} /> } : {}),
-              // VC1: en pilares y vigas el 3D no dibuja la comprobación: sin fuente, lo dice y lleva a la planta (lo elegible va por la celda).
+              // VC3: pilares, vigas y losas (sin el armado dibujado), el sólido del color de su aprovechamiento
+              ...(tipo !== "punzonamiento" && !(tipo === "losas" && dibujo === "armado") && !proponiendose ? { tresD: () => <Comprobacion3D tipo={tipo} armado={armado} datos={datosObra} /> } : {}),
+              // VC3: en el alzado, lo que el plano ve de cada parte, del color de su aprovechamiento (mientras se propone, el modelo)
+              alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), ...(!proponiendose ? { comprobacion: { de: tipo, ...(armado ? { armado } : {}), datos: datosObra } } : {}) } : null} elegibles={elegibles} />,
               // Mientras se propone, el modelo, para no enseñar lo de antes
               ...(proponiendose ? { tresD: () => <Fuente3DModelo elegibles={elegibles} /> } : {}),
               // (mientras se propone el armado de lo que se mira, la planta del modelo: la de su armado sale al acabar)

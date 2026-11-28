@@ -347,6 +347,8 @@ export class Vista3D extends Vista {
   private temaColores: string | null = null;
   // I3: el sólido, sus aristas, los filtros y la caja de sección
   private sol: Solido | null = null;
+  /** VC3: el color propio de cada triángulo del sólido (la clase de aprovechamiento de la comprobación: 0, ninguno, en gris), y los colores de cada clase. */
+  private clasesSol: { clase: Uint8Array; colores: readonly string[] } | null = null;
   private malla: Mesh<BufferGeometry, MeshLambertMaterial> | null = null;
   private bordes: LineSegments<BufferGeometry, LineBasicMaterial> | null = null;
   private filtro: FiltroVista = {};
@@ -420,6 +422,19 @@ export class Vista3D extends Vista {
     if (x) this.fijarOrigen(x.origen);
     // En su propia tarea: con el reticular grande son 300 000 triángulos
     this.enTarea("solido", () => this.construirSolido());
+  }
+
+  /**
+   * VC3: cada triángulo del sólido del color de su clase (`clase[t]` − 1 en `colores`; 0, en gris
+   * tenue), en lugar del de su material: la comprobación. Sólo se aplica al sólido del que sale (mismo
+   * número de triángulos). null, el color de siempre.
+   */
+  ponerClasesSolido(clase: Uint8Array | null, colores: readonly string[] | null): void {
+    const nuevo = clase && colores ? { clase, colores } : null;
+    if (nuevo?.clase === this.clasesSol?.clase && nuevo?.colores.join() === this.clasesSol?.colores.join()) return;
+    this.clasesSol = nuevo;
+    this.colores();
+    this.entorno.pintar();
   }
 
   /** Los filtros y la caja de sección (I3). */
@@ -1247,11 +1262,16 @@ export class Vista3D extends Vista {
       const [baseB, baseTB, plB, plTB, acB] = [base.map(bytes), baseT.map(bytes), porPlanta.map(bytes), porPlantaT.map(bytes), bytes(acento)];
       const [casB, casTB] = [bytes(rgb(c.caseton)), bytes(tenue(rgb(c.caseton)))];
       const planta = this.color === "planta";
+      // VC3: con las clases de la comprobación, cada triángulo de una parte del color de su clase y lo demás, tenue
+      const cl = this.clasesSol && this.clasesSol.clase.length === x.objeto.length ? this.clasesSol : null;
+      const clB = cl ? cl.colores.map((s) => bytes(rgb(s))) : [];
+      const clTB = cl ? cl.colores.map((s) => bytes(tenue(rgb(s)))) : [];
       for (let t = 0; t < x.objeto.length; t++) {
         const o = x.objeto[t]!;
         const p = x.planta[t]!;
         const fuera = ia >= 0 && p !== ia;
-        const cc = elegido[o] ? acB : x.caseton[t] ? (fuera ? casTB : casB) : planta && x.objetos[o]!.tipo !== "apoyo" ? (fuera ? plTB[p]! : plB[p]!) : fuera ? baseTB[o]! : baseB[o]!;
+        const k = cl ? cl.clase[t]! : 0;
+        const cc = elegido[o] ? acB : k ? (fuera ? clTB[k - 1]! : clB[k - 1]!) : cl ? baseTB[o]! : x.caseton[t] ? (fuera ? casTB : casB) : planta && x.objetos[o]!.tipo !== "apoyo" ? (fuera ? plTB[p]! : plB[p]!) : fuera ? baseTB[o]! : baseB[o]!;
         for (let v = 0; v < 9; v += 3) {
           C[9 * t + v] = cc[0]!;
           C[9 * t + v + 1] = cc[1]!;

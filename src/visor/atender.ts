@@ -14,6 +14,7 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
 import { alambrico } from "./alambrico.ts";
 import { punzonamiento3D } from "./armadoPlanta.ts";
+import { clasesSolido } from "./comprobacionVistas.ts";
 import { armadoLosas3D } from "./armadoLosas3d.ts";
 import { datosArmado, datosFranja } from "./franjas.ts";
 import type { Pedido, Respuestas } from "./protocolo.ts";
@@ -88,6 +89,16 @@ export class Atendedor {
         return this.conAlDia(s, p.datos, p.de, p.armado, () => de(datosComprobacion(s, p.de, p.clave, p.armado)));
       case "punzonamiento-3d":
         return this.conAlDia(s, p.datos, "punzonamiento", p.armado, () => de(punzonamiento3D(s, p.armado)));
+      case "comprobacion-solido":
+        return this.conAlDia(s, p.datos, p.de, p.armado, () => de(clasesSolido(s, p.de, p.armado, s.solido(p.casetones !== false))));
+      case "alzado": {
+        const c = p.comprobacion;
+        if (!c) return null;
+        return this.conAlDia(s, c.datos, c.de, c.armado, () => {
+          const r = s.alzado(p.plano, p.diagramas, p.reacciones, p.cargas, p.deformada, c);
+          return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
+        });
+      }
       case "escena": {
         const v = p.vista;
         if (v.vista !== "comprobacion") return null;
@@ -197,7 +208,7 @@ export class Atendedor {
         return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "alzado": {
-        const r = s.alzado(p.plano, p.diagramas, p.reacciones, p.cargas, p.deformada);
+        const r = s.alzado(p.plano, p.diagramas, p.reacciones, p.cargas, p.deformada, p.comprobacion);
         return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "elegir":
@@ -296,6 +307,7 @@ export class Atendedor {
       case "comprobaciones":
       case "comprobacion":
       case "punzonamiento-3d":
+      case "comprobacion-solido":
       case "armar":
         // (son tareas: no llegan aquí)
         return sin("No hay resultados de esta huella.");

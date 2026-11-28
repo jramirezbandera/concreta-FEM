@@ -858,10 +858,10 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
   // La clave estable: el objeto cambia en cada render
   const clave = JSON.stringify(fuente);
   const fu = useMemo(() => (clave === "null" ? null : (JSON.parse(clave) as FuenteEscena)), [clave]);
-  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}), ...(fu.reacciones ? { reacciones: fu.reacciones } : {}), ...(fu.deformada ? { deformada: fu.deformada } : {}) }) : null);
+  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}), ...(fu.reacciones ? { reacciones: fu.reacciones } : {}), ...(fu.deformada ? { deformada: fu.deformada } : {}), ...(fu.comprobacion ? { comprobacion: fu.comprobacion } : {}) }) : null);
   const { eventos, resaltado } = useEleccionEscena(fu, elegibles);
   // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
-  const resultados = fu?.tipo === "alzado" && (!!fu.diagramas || !!fu.deformada);
+  const resultados = fu?.tipo === "alzado" && (!!fu.diagramas || !!fu.deformada || !!fu.comprobacion);
   // M-25: la planta del modelo o de las cargas sólo necesita el modelo físico (AL-4): tras editar
   // con Elegir (estirar, un pinzamiento, Propiedades) no se vela, como al dibujar; sale la nueva en
   // cuanto el worker la abre. Antes se atenuaba con lo de antes hasta entonces.
@@ -921,15 +921,18 @@ interface PropsFuente3D extends Resultados3D {
   eventos?: Eventos3D;
   /** Sólo se eligen las piezas de estos tipos (`Vista3D.tiposElegibles`). */
   elegibles?: readonly string[];
+  /** VC3: el color de cada triángulo del sólido por su clase (`Vista3D.ponerClasesSolido`). */
+  clases?: { clase: Uint8Array; colores: readonly string[] } | null;
 }
 
 /** Un 3D en la vista de la celda. */
-export function Fuente3D({ alambrico, solido = null, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, cargas = null, leyenda = null, alPasar, sonda = null, elegibles }: PropsFuente3D) {
+export function Fuente3D({ alambrico, solido = null, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, cargas = null, leyenda = null, alPasar, sonda = null, elegibles, clases = null }: PropsFuente3D) {
   const { vista, v, varias, i } = useCelda();
   const { poner } = useVistas();
   const x = vista instanceof Vista3D ? vista : null;
   useEffect(() => x?.ponerAlambrico(alambrico), [x, alambrico]);
   useEffect(() => x?.ponerSolido(solido), [x, solido]);
+  useEffect(() => x?.ponerClasesSolido(clases?.clase ?? null, clases?.colores ?? null), [x, clases]);
   useEffect(() => x?.ponerFiltro(v.filtro), [x, v.filtro]);
   useEffect(() => x?.ponerColor(v.color3d ?? "material"), [x, v.color3d]);
   const filtro = useRef(v.filtro);
@@ -967,7 +970,7 @@ export function Fuente3D({ alambrico, solido = null, analitico = null, deformada
 }
 
 /** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir; con resultados (I4) o con las cargas de un caso, encima. */
-export function Fuente3DModelo({ deformada, modo, resultados, cargas, casetones, elegibles }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D; cargas?: { datos: Cargas3D | null; aviso?: ReactNode; cargando?: boolean }; /** false: el sólido de los reticulares, sin sus casetones. */ casetones?: boolean; /** Sólo se eligen las piezas de estos tipos (Comprobación: las de su pestaña); lo de los diagramas, siempre. */ elegibles?: readonly string[] }) {
+export function Fuente3DModelo({ deformada, modo, resultados, cargas, casetones, elegibles, clases }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D; cargas?: { datos: Cargas3D | null; aviso?: ReactNode; cargando?: boolean }; /** false: el sólido de los reticulares, sin sus casetones. */ casetones?: boolean; /** Sólo se eligen las piezas de estos tipos (Comprobación: las de su pestaña); lo de los diagramas, siempre. */ elegibles?: readonly string[]; /** VC3: el sólido, con cada parte del color de su clase (la comprobación), y su leyenda; no lo pasa a alámbrico. */ clases?: { clase: Uint8Array; colores: readonly string[]; leyenda: ContenidoLeyenda; cargando?: boolean } | null }) {
   const { proyecto, elegidos, setElegidos } = useVisor();
   const { v } = useCelda();
   const e = proyecto.estado!;
@@ -1001,8 +1004,9 @@ export function Fuente3DModelo({ deformada, modo, resultados, cargas, casetones,
       eventos={eventos}
       {...(elegibles ? { elegibles } : {})}
       {...(cargas ? { cargas: cargas.datos, leyenda: cargas.datos, aviso: cargas.aviso } : {})}
+      {...(clases ? { clases, leyenda: clases.leyenda } : {})}
       {...resultados}
-      cargando={alamb.cargando || (quiereSolido && sol.cargando) || (quiereAnalitico && geo.cargando) || !!resultados?.cargando || !!cargas?.cargando}
+      cargando={alamb.cargando || (quiereSolido && sol.cargando) || (quiereAnalitico && geo.cargando) || !!resultados?.cargando || !!cargas?.cargando || !!clases?.cargando}
     />
   );
 }

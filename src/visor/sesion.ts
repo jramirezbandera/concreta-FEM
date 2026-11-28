@@ -20,6 +20,7 @@
  */
 import { vistaArmadoBarras, type CaraDibujada } from "./armadoPlanta.ts";
 import { vistaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
+import { vistaAlzadoComprobacion } from "./comprobacionVistas.ts";
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
@@ -119,6 +120,14 @@ export interface ReaccionesAlzado {
   escala?: number;
 }
 
+/** VC3: la comprobación de un tipo en un alzado, con su armado (como la vista `comprobacion` de la planta). */
+export interface ComprobacionAlzado {
+  de: TipoComprobacion;
+  armado?: ArmadoProyecto;
+  /** Los datos de armado de la obra, si han cambiado desde que se abrió (`Sesion.datosArmado`). */
+  datos?: DatosArmadoObra;
+}
+
 /** VC2: una deformada en planta o en alzado: la de una combinación (una sola) o la forma de un modo, por la escala. */
 export type DeformadaPedido = ({ combinaciones: EleccionCombinaciones } | { modo: number }) & { escala: number };
 
@@ -130,7 +139,7 @@ export interface CargasAlzado {
 }
 
 /** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado (con diagramas o reacciones, en I4; con las cargas de un caso, tras I4). */
-export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido };
+export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido; comprobacion?: ComprobacionAlzado };
 
 /** Los diagramas de las barras en el 3D (I4). */
 export interface PedidoDiagramas3D {
@@ -730,9 +739,9 @@ export class Sesion {
   }
 
   /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico (también con las cargas); con diagramas o reacciones (I4), el cálculo. */
-  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado, deformada?: DeformadaPedido): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado, deformada?: DeformadaPedido, comprobacion?: ComprobacionAlzado): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
     const f = this.proyecto.modelo;
-    const clave = JSON.stringify(["alzado", p, diagramas ?? null, ...(reacciones ? [reacciones] : []), ...(cargas ? [{ cargas }] : []), ...(deformada ? [{ deformada }] : [])]);
+    const clave = JSON.stringify(["alzado", p, diagramas ?? null, ...(reacciones ? [reacciones] : []), ...(cargas ? [{ cargas }] : []), ...(deformada ? [{ deformada }] : []), ...(comprobacion ? [{ comprobacion }] : [])]);
     const hecha = this.escenas.get(clave);
     if (hecha) return { valido: true, valor: hecha };
     let plano: PlanoAlzado | null;
@@ -764,6 +773,11 @@ export class Sesion {
       const def = this.deformadaDibujo(deformada);
       if (!def.valido) return def;
       e = vistaAlzadoDeformada(rr, plano, def.valor, d, modo);
+    } else if (comprobacion) {
+      if (comprobacion.datos !== undefined) this.datosArmado = comprobacion.datos;
+      const c = vistaAlzadoComprobacion(this, plano, comprobacion.de, comprobacion.armado, d, base);
+      if (!c.valido) return c;
+      e = c.valor;
     } else if (cargas) {
       const fp = this.fisicoCargas;
       if (!fp.casos.some((c) => c.id === cargas.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${cargas.caso} no existe.` }] };
@@ -773,8 +787,8 @@ export class Sesion {
     return { valido: true, valor: e };
   }
 
-  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado, deformada?: DeformadaPedido): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
-    const e = this.alzadoA4(p, diagramas, reacciones, cargas, deformada);
+  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado, deformada?: DeformadaPedido, comprobacion?: ComprobacionAlzado): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const e = this.alzadoA4(p, diagramas, reacciones, cargas, deformada, comprobacion);
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
@@ -895,7 +909,7 @@ export class Sesion {
   }
 
   escenaDe(fu: FuenteEscena): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
-    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas, fu.reacciones, fu.cargas, fu.deformada);
+    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas, fu.reacciones, fu.cargas, fu.deformada, fu.comprobacion);
   }
 
   /**

@@ -26,7 +26,8 @@ import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { CaraDibujada } from "./armadoPlanta.ts";
 import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, PedidoArmar, ProgresoTarea, TipoComprobacion } from "./comprobaciones.ts";
 import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
-import type { CargasAlzado, DeformadaPedido, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
+import type { ClasesSolido } from "./comprobacionVistas.ts";
+import type { CargasAlzado, ComprobacionAlzado, DeformadaPedido, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 /**
  * Lo único que se puede elegir en una planta (Comprobación: sólo lo de la pestaña; antes se cogía sin
@@ -47,7 +48,7 @@ export type Pedido =
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
   /** Un alzado; con `diagramas`, los de las barras del plano, y con `reacciones`, las de sus objetos (I4); con `cargas`, las de un caso. */
-  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido }
+  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido; comprobacion?: ComprobacionAlzado }
   /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
   | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[]; elegibles?: TipoElegible[] }
   /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */
@@ -89,6 +90,8 @@ export type Pedido =
   | { tipo: "armado-losas-3d"; planta: string | null; armado?: ArmadoProyecto; cara?: CaraDibujada; /** También la armadura base (por defecto, no). */ base?: boolean; datos?: DatosArmadoObra }
   /** CO6 (§8.21): el punzonamiento en el 3D: el perímetro crítico y los de cercos de cada unión, en todas las plantas. */
   | { tipo: "punzonamiento-3d"; armado?: ArmadoProyecto; datos?: DatosArmadoObra }
+  /** VC3: la clase de aprovechamiento de cada triángulo del sólido (el del pedido `solido` con los mismos `casetones`). */
+  | { tipo: "comprobacion-solido"; de: Exclude<TipoComprobacion, "punzonamiento">; armado?: ArmadoProyecto; datos?: DatosArmadoObra; casetones?: false }
   /** `provisional`: sin el peso propio calculado, para enseñarla antes (luego se pide sin él). */
   | { tipo: "revision"; provisional?: boolean }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
@@ -148,6 +151,7 @@ export interface Respuestas {
   armado3d: Armado3D;
   "armado-losas-3d": Diagramas3D;
   "punzonamiento-3d": Diagramas3D;
+  "comprobacion-solido": ClasesSolido;
   "valor-armado": ValorArmado | FueraArmado;
   revision: DatosRevision;
   precalentar: null;

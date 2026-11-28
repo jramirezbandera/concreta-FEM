@@ -77,7 +77,7 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 
 1. **VC1, el contrato** (CV-1, CV-3, CV-7). Pequeño; arregla lo del usuario. **Hecho el 2026-11-28** (§6).
 2. **VC2, la deformada en el alzado y en la planta** (CV-2; **hecho el 2026-11-28**, §7): la deformada del analítico en el plano del pórtico, con su escala y los desplomes de cada planta rotulados (los de `fem consultar desplomes`), y en la planta el diafragma desplazado; lo mismo para los modos en Modal. Con el sismo del programa, como en el 3D: sin deformada de la combinación (VS-o).
-3. **VC3, Comprobación en el alzado y el color en el 3D** (CV-4).
+3. **VC3, Comprobación en el alzado y el color en el 3D** (CV-4; **hecho el 2026-11-28**, §8).
 4. **VC4, Pilares y muros en el alzado** (CV-5).
 5. **VC5, el valor bajo el cursor en las vistas planas** (CV-6).
 6. **VC6, aislar y ocultar en planta y alzado** (CV-8), si después de lo demás sigue haciendo falta.
@@ -103,3 +103,17 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 - **Prueba** (`src/visor/deformada.test.ts`, con el edificio de A2): con escala 0, la deformada del alzado es el modelo analítico sin deformar; en planta, las cabezas de los pilares se mueven como el diafragma de la consulta de la planta (u = u_m + rz × (r − r_m), a la precisión de Float32); el mayor d/h rotulado de cada planta es el de `deriva`. El caso del modo sólo comprueba el error, porque ese edificio no tiene modal (en la app, con la vivienda, sí se ve).
 - **Comprobado en la app** con la vivienda: el alzado del eje 2 (la flecha de la losa entre D y G, δ y d/h), la planta CUB con el d/h de cada pilar y la planta de Modal con el diafragma girado.
 - **Bancos de Chrome:** i1, i4 y vs4 piden ahora el 3D al entrar en Deformada y Modal (lo hacía la pantalla); no se han pasado.
+
+## 8. VC3 hecho (2026-11-28)
+
+- **Alzado** (`vistaAlzadoComprobacion`, `src/visor/comprobacionVistas.ts`): sobre el alzado del modelo en gris, lo que el plano ve de cada parte de la pestaña, con los colores de la planta (CO6-d) y su aprovechamiento rotulado:
+  - un tramo de pilar, de su base a su cabeza, con el ancho que se ve de su huella;
+  - un vano de viga, con su canto, entre las caras de sus apoyos (si la viga cruza el plano, su sección, cuando el cruce cae en el vano);
+  - una losa, su corte;
+  - una unión del punzonamiento, la losa cortada a 2·d de las caras del pilar.
+- **El pedido:** `comprobacion` en el alzado (`ComprobacionAlzado`: el tipo, el armado y los datos de armado de la obra), que es una tarea como la planta de la comprobación (pone al día lo comprobado por pasos). Se elige en él lo de la pestaña, como en la planta.
+- **3D** (`clasesSolido`, pedido `comprobacion-solido`): la clase de cada triángulo del sólido de la sesión: el de un tramo de pilar (por el pilar y la planta de su cabeza), el de un vano de viga (el vano más cercano a su centroide a lo largo de la viga: lo de sobre un apoyo va con el de al lado) o el de una losa; lo demás, 0. La app (`Vista3D.ponerClasesSolido`) lo pinta con los colores de la planta y lo demás, tenue; sólo se aplica al sólido del que sale (mismo número de triángulos). No pasa el 3D a alámbrico, y en alámbrico no se ve (lo dice la leyenda).
+- **Comprobación:** pilares, vigas y losas (con «Aprovechamiento») dan este 3D; losas con «Armado» y el punzonamiento siguen con el suyo (los refuerzos y los perímetros). El alzado, en las cuatro pestañas; mientras se propone el armado, el modelo.
+- **Prueba** (`src/visor/comprobacionVistas.test.ts`, edificio objetivo de losas de 2 × 2 × 2 con el armado propuesto): en el alzado de dos ejes, cada polígono coloreado es de una parte de la tabla y lleva el color de su clase, los aprovechamientos rotulados son los de la tabla y salen todos los tramos de los pilares del plano; en el 3D, cada triángulo de un pilar, una viga o una losa lleva la clase de su parte (cada tramo de pilar, entero de la de su ficha) y los demás, 0.
+- **Comprobado en la app** con la vivienda: el alzado del eje 2 en las cuatro pestañas (P10 0,88 y P2 0,94; el vano de Z-CUB-8; P2 0,26 en el punzonamiento, que se elige con un clic) y el 3D de pilares, vigas y losas.
+- **No probado:** los bancos de Chrome.
