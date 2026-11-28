@@ -342,7 +342,9 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     await waitFor(() => expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular"));
     // I1, criterio 3: sin cálculo de esta huella no se entra en Resultados ni en Revisión
     expect(screen.getByRole("button", { name: "Resultados" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByRole("button", { name: "Revisión" }).hasAttribute("disabled")).toBe(true);
+    // El informe de revisión no tiene pestaña: sale del menú de «Calculado», que sin cálculo no existe
+    expect(screen.queryByRole("button", { name: "Revisión" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Calculado/ })).toBeNull();
     // AL-b: un proyecto nuevo es del navegador y se guarda solo
     await waitFor(() => expect(screen.getByRole("status", { name: "Estado del guardado" }).textContent).toMatch(/Guardado/));
 

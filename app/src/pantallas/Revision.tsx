@@ -6,6 +6,7 @@
  * programa. El informe es la revisión de sensatez del modelo y de sus resultados.
  */
 import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import type { Bloque } from "../../../src/agente/informe.ts";
 import { Disposicion } from "../armazon/Disposicion.tsx";
 import { IcInforme } from "../armazon/iconos.tsx";
@@ -132,7 +133,7 @@ const TONO = { bien: "ok", avisos: "warn", "no-aplica": "neu", pendiente: "neu" 
 const TEXTO = { bien: "Bien", avisos: "Avisos", "no-aplica": "No aplica", pendiente: "Calculando…" } as const;
 
 export function EspacioRevision() {
-  const { proyecto } = useVisor();
+  const { proyecto, irA } = useVisor();
   const pan = usePaneles("revision", { nav: true, props: true });
   const e = proyecto.estado!;
   // Primero sin el peso propio calculado (una compilación más, ~2 s en un edificio grande) y luego
@@ -145,7 +146,12 @@ export function EspacioRevision() {
   const resumen = !x ? null : x.avisos ? { tono: "warn", texto: `${x.avisos} aviso${x.avisos === 1 ? "" : "s"} de sensatez` } : { tono: "ok", texto: "Sin avisos de sensatez" };
   const herramientas = (
     <span className="flex items-center gap-2 px-2 text-[13px] text-text-secondary">
+      {/* Sin pestaña propia en la barra superior: se entra desde «Calculado» y se vuelve desde aquí */}
+      <button type="button" className="btn" onClick={() => irA("resultados")} title="Cerrar el informe y volver a Resultados">
+        <ArrowLeft size={15} /> Resultados
+      </button>
       <IcInforme size={20} />
+      <span className="font-medium text-text-primary">Informe de revisión</span>
       {resumen ? <span className={`pill ${resumen.tono}`}>{resumen.texto}</span> : "Revisando…"}
       {x?.pendiente && <span className="text-[12px] text-text-muted">Calculando el peso propio…</span>}
     </span>

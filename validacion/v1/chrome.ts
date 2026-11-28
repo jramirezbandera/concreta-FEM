@@ -236,7 +236,7 @@ try {
   await medir("pantalla desplomes (3D y deformada)", pantalla("Desplomes"), `document.querySelector('.celda[data-tipo="3d"]')`);
   pasos.push(["girar el 3D", await pagina<number>(`return performance.now();`)]);
   cambios.push(["girar el 3D (40 pasos)", await pagina<number>(`const t0 = performance.now(); ${girar} return performance.now() - t0;`)]);
-  await medir("pantalla revisión", pantalla("Revisión"), `document.querySelector("article")`);
+  await medir("pantalla revisión", `__v1.boton("Calculado", document.querySelector("header")).click(); __v1.boton("Informe de revisión").click()`, `document.querySelector("article")`);
   await medir("pantalla modelo", pantalla("Modelo"));
   await medir("3D del modelo", `__v1.boton("3D").click()`, `document.querySelector('.celda[data-tipo="3d"]')`);
   cambios.push(["girar el 3D del modelo (40 pasos)", await pagina<number>(`const t0 = performance.now(); ${girar} return performance.now() - t0;`)]);

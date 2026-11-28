@@ -222,14 +222,14 @@ try {
   await medir("modo Deformada", `__i1.boton("Deformada").click(); { const s = document.querySelector('.celda[data-activa="true"] select[aria-label="Tipo de vista"]') ?? document.querySelector('select[aria-label="Tipo de vista"]'); if (s && s.value !== "3d") { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, "3d"); s.dispatchEvent(new Event("change", { bubbles: true })); } }`, `document.querySelector('.celda[data-tipo="3d"]')`, "10-resultados-deformada");
   await medir("plegar las propiedades", `__i1.boton("Plegar propiedades").click()`);
   await medir("abrir las propiedades", `__i1.boton("Abrir propiedades").click()`);
-  await medir("espacio Revisión", espacio("Revisión"), `document.querySelector("article")`, "11-revision");
+  await medir("espacio Revisión", `__i1.boton("Calculado", document.querySelector("header")).click(); __i1.boton("Informe de revisión").click()`, `document.querySelector("article")`, "11-revision");
   await medir("Revisión con el peso propio calculado", "", `!document.body.innerText.includes("Calculando el peso propio")`);
   await medir("paleta", `document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`, `document.querySelector(".paleta")`);
   await medir("buscar en la paleta", `const i = document.querySelector(".paleta input"); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(i, "P-x24"); i.dispatchEvent(new Event("input", { bubbles: true }))`, `document.querySelector(".paleta li")`, "12-paleta");
   await medir("elegir desde la paleta", `document.querySelector(".paleta input").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`, `!document.querySelector(".paleta")`);
   await medir("espacio Modelo", espacio("Modelo"));
-  await medir("tema oscuro", `__i1.boton("Tema oscuro").click()`, "true", "13-modelo-oscuro");
-  await medir("tema claro", `__i1.boton("Tema claro").click()`);
+  await medir("tema oscuro", `__i1.boton("Más", document.querySelector("header")).click(); __i1.boton("Tema oscuro").click()`, "true", "13-modelo-oscuro");
+  await medir("tema claro", `__i1.boton("Más", document.querySelector("header")).click(); __i1.boton("Tema claro").click()`);
   const largas = await pagina<{ t: number; ms: number }[]>(`return window.__largas;`);
   for (const [que, t0, ms] of pasos) log(`  ${que}: ${ms.toFixed(0)} ms${largas.some((l) => l.t >= t0 && l.t < t0 + ms + 50) ? ` · tareas largas: ${largas.filter((l) => l.t >= t0 && l.t < t0 + ms + 50).map((l) => l.ms.toFixed(0)).join(", ")} ms` : ""}`);
   const peor = Math.max(0, ...largas.map((l) => l.ms));

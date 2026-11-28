@@ -360,6 +360,10 @@ input.sel:focus, textarea.sel:focus, .campo input:focus:not(:read-only), .campo 
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px;
   font: 500 12px var(--font-sans); white-space: nowrap;
 }
+/* La píldora del estado como botón de su menú («Calculado ▾», en la barra superior) */
+.pill-menu { border: 0; cursor: pointer; gap: 4px; padding-right: 6px; }
+.pill-menu:hover, .pill-menu[aria-expanded="true"] { filter: brightness(1.08) saturate(1.15); }
+.pill-menu:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-accent); }
 .pill.ok { background: var(--color-tint-ok); color: var(--color-state-ok-text); }
 .pill.warn { background: var(--color-tint-warn); color: var(--color-state-warn-text); }
 .pill.fail { background: var(--color-tint-fail); color: var(--color-state-fail-text); }
@@ -680,7 +684,6 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 /* UI-7: en un portátil la barra superior no cabía y la página se desplazaba de lado. Por debajo de
    1500 px, los botones sólo con su icono (el texto queda en el título); por debajo de 1100 px, lo de
    la derecha en el menú «⋯» */
-.solo-1100 { display: none; }
 @media (max-width: 1499.98px) {
   .barra-sup .et { display: none; }
   .barra-sup .btn { padding-inline: 8px; }
@@ -688,8 +691,6 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
   .btn-buscar-corto { display: inline; }
 }
 @media (max-width: 1099.98px) {
-  .barra-sup .ancho-1100 { display: none; }
-  .barra-sup .solo-1100 { display: inline-flex; }
   /* La paleta, sólo con la lupa */
   .btn-buscar { flex: 0 0 30px; min-width: 30px; justify-content: center; padding: 0; }
   .btn-buscar-texto, .btn-buscar-atajo { display: none; }
@@ -709,7 +710,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .menu-flotante > button[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent-text); }
 .menu-flotante > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
 .menu-flotante .herr { flex-direction: row; justify-content: flex-start; gap: 10px; width: 100%; min-width: 0; height: 32px; margin: 0; padding: 0 10px; font-size: 13px; }
-.menu-flotante .herr-sep { width: auto; height: 1px; margin: 4px 6px; }
+.menu-flotante .herr-sep { display: block; width: auto; height: 1px; margin: 4px 6px; }
 .menu-flotante .kbd { margin-left: 12px; }
 .espacios { display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--color-bg-elevated); flex-shrink: 0; }
 .espacios > button {

@@ -13,11 +13,12 @@
  * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, FolderInput, FolderOpen, History, Moon, MoreHorizontal, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2, X } from "lucide-react";
+import { Check, ChevronDown, Download, FolderInput, FolderOpen, History, Moon, MoreHorizontal, Play, Redo2, RefreshCw, Save, Search, Settings, Sun, Undo2, X } from "lucide-react";
 import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
 import { MenuFlotante, ejeVecino } from "./armazon/Disposicion.tsx";
 import { Paleta, type Orden } from "./armazon/Paleta.tsx";
+import { IcInforme } from "./armazon/iconos.tsx";
 import { AvanceTareas } from "./componentes/AvanceTareas.tsx";
 import { DialogoVersiones } from "./armazon/Versiones.tsx";
 import { GestorAbierto } from "./editor/Gestores.tsx";
@@ -38,12 +39,17 @@ import { ContextoVistas, DISPOSICIONES, useEstadoVistas } from "./vistas/estado.
 import { encuadrarActiva } from "./vistas/Zona.tsx";
 import { useTheme } from "./tema/useTheme.ts";
 
-const ESPACIOS: { id: Espacio; nombre: string; calculo: boolean }[] = [
+/**
+ * `pestana: false`: sin pestaña en la barra. El informe de revisión se abre desde el menú del estado
+ * del cálculo («Calculado ▾») y desde la paleta: no pesa tanto como para ocupar una (decisión del
+ * usuario, 2026-11-28).
+ */
+const ESPACIOS: { id: Espacio; nombre: string; calculo: boolean; pestana?: false }[] = [
   { id: "modelo", nombre: "Modelo", calculo: false },
   { id: "cargas", nombre: "Cargas", calculo: false },
   { id: "resultados", nombre: "Resultados", calculo: true },
   { id: "comprobacion", nombre: "Comprobación", calculo: true },
-  { id: "revision", nombre: "Revisión", calculo: true },
+  { id: "revision", nombre: "Informe de revisión", calculo: true, pestana: false },
 ];
 
 /** `claves`: lo que se busca en la paleta sin estar en el nombre (UI-41: «flecha», «axil», «momento»). */
@@ -72,10 +78,31 @@ function inicial(): { espacio: Espacio; modo: ModoResultados } {
   return { espacio: ESPACIOS.some((x) => x.id === espacio) ? espacio : "modelo", modo: MODOS.some((x) => x.id === modo) ? modo : "losas" };
 }
 
-function Estado({ p }: { p: ProyectoAbierto }) {
+function Estado({ p, onRevision }: { p: ProyectoAbierto; onRevision: () => void }) {
+  const e = p.estado;
+  // Calculado y en reposo: la píldora es un menú con lo que se hace con un cálculo (el informe y recalcular)
+  const conMenu = !!e?.calculado && !p.desactualizado && p.fase !== "calculando" && p.fase !== "error" && !e.compilando && e.compila;
   return (
-    <span data-estado={p.desactualizado ? "desactualizado" : p.fase === "error" ? "error" : !p.estado ? "vacio" : p.estado.compilando ? "compilando" : !p.estado.compila ? "no-compila" : p.estado.calculado ? "calculado" : "sin-calcular"} data-huella={p.estado?.huella ?? ""}>
-      <TextoEstado p={p} />
+    <span className="flex shrink-0 items-center" data-estado={p.desactualizado ? "desactualizado" : p.fase === "error" ? "error" : !p.estado ? "vacio" : p.estado.compilando ? "compilando" : !p.estado.compila ? "no-compila" : p.estado.calculado ? "calculado" : "sin-calcular"} data-huella={p.estado?.huella ?? ""}>
+      {conMenu ? (
+        <MenuFlotante
+          etiqueta="Cálculo"
+          boton={({ abierto, alternar, ref }) => (
+            <button ref={ref} type="button" className="pill ok pill-menu" aria-haspopup="menu" aria-expanded={abierto} title={`Calculado: el informe de revisión y recalcular. Versión del modelo ${e!.huella.slice(0, 8)}`} onClick={alternar}>
+              Calculado <ChevronDown size={12} aria-hidden="true" />
+            </button>
+          )}
+        >
+          <button type="button" role="menuitem" onClick={onRevision}>
+            <IcInforme size={15} /> Informe de revisión
+          </button>
+          <button type="button" role="menuitem" onClick={p.recalcular} title="De nuevo, sin usar los resultados guardados">
+            <RefreshCw size={15} /> Recalcular
+          </button>
+        </MenuFlotante>
+      ) : (
+        <TextoEstado p={p} />
+      )}
     </span>
   );
 }
@@ -411,7 +438,7 @@ export function App() {
               </span>
             )}
             <nav className="espacios" aria-label="Espacios de trabajo">
-              {ESPACIOS.map((x) => (
+              {ESPACIOS.filter((x) => x.pestana !== false).map((x) => (
                 <button key={x.id} type="button" aria-current={espacioValido === x.id ? "page" : undefined} disabled={x.calculo && !e?.calculado && espacioValido !== x.id} title={x.calculo && !e?.calculado ? "Necesita el cálculo" : undefined} onClick={() => irA(x.id)}>
                   {x.nombre}
                 </button>
@@ -472,69 +499,59 @@ export function App() {
                     {ed.sinGuardar && <span aria-label="sin guardar">●</span>}
                   </button>
                 )}
-                {navegador && (
-                  <button type="button" className="ib ancho-1100" onClick={abrirVersiones} aria-label="Versiones anteriores" title="Versiones anteriores">
-                    <History size={16} />
-                  </button>
-                )}
-                <button type="button" className="ib ancho-1100" onClick={ed.exportar} aria-label="Exportar el proyecto (.json)" title="Exportar el proyecto: descarga su .json, con el nombre del proyecto">
-                  <Download size={16} />
-                </button>
-                {ed.aCarpeta && (
-                  <button type="button" className="ib ancho-1100" onClick={pasarACarpeta} aria-label="Pasar a una carpeta" title="Pasar a una carpeta del disco, para trabajar con el agente: desde ahí se guarda en su proyecto.json y lo que cambie el agente se ve aquí">
-                    <FolderInput size={16} />
-                  </button>
-                )}
               </>
             ) : (
               <span className="pill neu" title="Este fichero no es un proyecto válido: no se puede editar">
                 SÓLO LECTURA
               </span>
             )}
-            <Estado p={proyecto} />
+            <Estado p={proyecto} onRevision={() => irA("revision")} />
             <BotonCancelar p={proyecto} />
             {ed && e?.compila && !e.calculado && !proyecto.desactualizado ? (
               <button type="button" className="btn btn-p" onClick={proyecto.calcular} disabled={proyecto.fase === "calculando"} title="Calcular esta versión del proyecto">
                 <Play size={15} /> {proyecto.fase === "calculando" ? "Calculando…" : "Calcular"}
               </button>
-            ) : (
-              <button type="button" className="btn" onClick={proyecto.recalcular} disabled={!e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado)} title="Recalcular: de nuevo, sin usar los resultados guardados">
-                <RefreshCw size={15} /> <span className="et">Recalcular</span>
+            ) : !ed && e?.compila && !e.calculado ? (
+              // Sólo lectura y sin calcular: no hay «Calcular» del editor
+              <button type="button" className="btn" onClick={proyecto.recalcular} disabled={proyecto.fase === "calculando"} title="Calcular este proyecto">
+                <Play size={15} /> Calcular
               </button>
-            )}
-            <button type="button" className="btn ancho-1100" onClick={() => location.assign(location.pathname)} title="Mis proyectos: abrir otro">
-              <FolderOpen size={15} /> <span className="et">Proyectos</span>
-            </button>
-            <button type="button" className="ib ancho-1100" onClick={toggleTheme} aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"} title={theme === "dark" ? "Tema claro" : "Tema oscuro"}>
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            {/* UI-7: por debajo de 1100 px, lo de la derecha en un menú (la página nunca se desplaza de lado) */}
+            ) : null}
+            {/* Lo que se hace de vez en cuando con el proyecto, en un menú: la barra se queda con los espacios,
+                la paleta, deshacer, el guardado y el cálculo */}
             <MenuFlotante
-              etiqueta="Más órdenes del proyecto"
+              etiqueta="Proyecto y preferencias"
               boton={({ abierto, alternar, ref }) => (
-                <button ref={ref} type="button" className="ib solo-1100" aria-haspopup="menu" aria-expanded={abierto} aria-label="Más" title="Versiones, exportar, otros proyectos y el tema" onClick={alternar}>
+                <button ref={ref} type="button" className="ib" aria-haspopup="menu" aria-expanded={abierto} aria-label="Más" title="Más: datos de la obra, versiones, exportar, otros proyectos y el tema" onClick={alternar}>
                   <MoreHorizontal size={16} />
                 </button>
               )}
             >
+              {ed && (
+                <button type="button" role="menuitem" onClick={() => abrirGestor({ coleccion: "obra" })}>
+                  <Settings size={15} /> Datos de la obra…
+                </button>
+              )}
               {ed && navegador && (
                 <button type="button" role="menuitem" onClick={abrirVersiones}>
-                  <History size={15} /> Versiones anteriores
+                  <History size={15} /> Versiones anteriores…
                 </button>
               )}
               {ed && (
-                <button type="button" role="menuitem" onClick={ed.exportar}>
-                  <Download size={15} /> Exportar el proyecto (descargarlo)
+                <button type="button" role="menuitem" aria-label="Exportar el proyecto (.json)" onClick={ed.exportar} title="Descarga su .json, con el nombre del proyecto">
+                  <Download size={15} /> Exportar el proyecto (.json)
                 </button>
               )}
               {ed?.aCarpeta && (
                 <button type="button" role="menuitem" onClick={pasarACarpeta}>
-                  <FolderInput size={15} /> Pasar a una carpeta (para el agente)
+                  <FolderInput size={15} /> Pasar a una carpeta (para el agente)…
                 </button>
               )}
+              {ed && <span className="herr-sep" role="separator" />}
               <button type="button" role="menuitem" onClick={() => location.assign(location.pathname)}>
-                <FolderOpen size={15} /> Mis proyectos
+                <FolderOpen size={15} /> Mis proyectos (abrir otro)
               </button>
+              <span className="herr-sep" role="separator" />
               <button type="button" role="menuitem" onClick={toggleTheme}>
                 {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />} {theme === "dark" ? "Tema claro" : "Tema oscuro"}
               </button>
