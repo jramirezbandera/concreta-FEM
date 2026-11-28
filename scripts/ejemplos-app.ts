@@ -105,6 +105,9 @@ const EJEMPLOS: Record<string, { de: string; poner: (p: J) => void }> = {
       sinCasos(m, ["V"]);
       // Los cuatro pilares que caían en las esquinas del núcleo: allí está el muro
       m.pilares = m.pilares.filter((x: J) => !((x.x === 6 || x.x === 12) && (x.y === 5 || x.y === 10)));
+      // El hueco, el núcleo entero hasta el eje de su muro (era de 4,8 × 4,2 m a 40–60 cm del muro, con
+      // un zuncho en cada lado libre y tiras de losa entre ellos y el muro)
+      for (const l of m.losas) l.huecos = [[[6, 5], [12, 5], [12, 10], [6, 10]]];
       m.casos = [
         { id: "G", nombre: "Peso propio", pesoPropio: true, accion: { tipo: "G" } },
         { id: "CM", nombre: "Cargas muertas", accion: { tipo: "G" } },
