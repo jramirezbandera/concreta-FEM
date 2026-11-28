@@ -738,9 +738,10 @@ describe("A4, criterio 2: determinismo", () => {
 });
 
 // Regenerados el 2026-11-07: los ejes se dibujan alargados más allá del borde de la losa (`ejesVistos`);
-// el 2026-11-22: la dirección de una losa maciza, en cruz (las dos direcciones de armado)
-const SVG_CONGELADO = "8282fbff1938aeeb10d584cc6d70b261f6dd9adac724478926ae9ee26acbd6cb";
-const PNG_CONGELADO = "628fbd1619a485456bade966b845d4a5ba05010d3a6481d1b90166de7b4eb791";
+// el 2026-11-22: la dirección de una losa maciza, en cruz (las dos direcciones de armado);
+// el 2026-11-28: el rótulo del muro, «NUCLEO · muro 25», en el centro de su tramo más largo
+const SVG_CONGELADO = "ac52a900d87866cf92e2cc4fdb8d764e41b361c844392f45a666ee017aeb5610";
+const PNG_CONGELADO = "cc1c3c2548c55d7f000b8ca2386fef5b7092c55e5522f4733db2820f28f55b73";
 
 describe("A4, criterio 3: tamaño de la imagen y del texto", () => {
   it(`el lado mayor no pasa de ${LADO_MAXIMO} px y ningún texto baja de 11 px, en todas las vistas`, () => {

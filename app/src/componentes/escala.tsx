@@ -61,9 +61,16 @@ export function SeccionEscala({ mapa, unidad, elegida, onCambio, lados = "dos" }
     </label>
   );
   const MODOS = [
-    { id: "completa", nombre: "Completa", title: "Del mínimo al máximo del mapa" },
-    { id: "sin-picos", nombre: "Sin picos", title: lados === "dos" ? "Sin el 1 % del área por cada lado: un pico local no deja el resto en una o dos bandas" : "Sin el 1 % del área de los valores más altos: un pico local no deja el resto en una o dos bandas" },
-    { id: "manual", nombre: "Manual", title: "Mínimo, máximo y paso dados" },
+    { id: "completa", nombre: "Completa", title: "Escala completa: los colores van del valor más bajo al más alto del mapa" },
+    {
+      id: "sin-picos",
+      nombre: "Sin picos",
+      title:
+        lados === "dos"
+          ? "Escala sin picos: los colores dejan fuera los valores más altos y los más bajos, los de un 1 % del área por cada lado. Así, un pico muy localizado (junto a un pilar o en una esquina) no deja todo lo demás en una o dos bandas. Lo que queda fuera se ve rayado"
+          : "Escala sin picos: los colores dejan fuera los valores más altos, los de un 1 % del área. Así, un pico muy localizado (junto a un pilar o en una esquina) no deja todo lo demás en una o dos bandas. Lo que queda fuera se ve rayado",
+    },
+    { id: "manual", nombre: "Manual", title: "Escala manual: el mínimo, el máximo y el paso de los colores se escriben a mano" },
   ] as const;
   const area = lados === "dos" ? "2 %" : "1 %";
   return (

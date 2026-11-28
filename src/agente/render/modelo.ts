@@ -341,9 +341,18 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   for (const { m, llega } of pl.muros()) {
     for (const q of huellaMuro(m.puntos, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: est(llega ? "muro-llega" : "muro-arranca"), objeto: m.id });
     if (llega) for (const h of huecosEnPiso(pl, m)) for (const q of huellaMuro(h, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: est("muro-hueco"), objeto: m.id });
-    const { p, d } = puntoEnPolilinea(m.puntos, longitud(m.puntos) / 2);
+    // El rótulo, en el centro del tramo más largo (el centro de la polilínea de un núcleo cerrado cae en una esquina)
+    let largo = 0;
+    let sm = 0;
+    let acum = 0;
+    for (let i = 1; i < m.puntos.length; i++) {
+      const l = Math.hypot(m.puntos[i]![0] - m.puntos[i - 1]![0], m.puntos[i]![1] - m.puntos[i - 1]![1]);
+      if (l > largo) [largo, sm] = [l, acum + l / 2];
+      acum += l;
+    }
+    const { p, d } = puntoEnPolilinea(m.puntos, m.puntos.length > 1 ? sm : longitud(m.puntos) / 2);
     const al = alLado(p, d, m.espesor);
-    texto(al.p, m.id, 40, al.opciones);
+    texto(al.p, `${m.id} · muro ${rotulo(m.espesor * 100)}`, 40, al.opciones);
   }
 
   // Pilares
