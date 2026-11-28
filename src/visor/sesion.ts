@@ -21,7 +21,8 @@
 import { vistaArmadoBarras, type CaraDibujada } from "./armadoPlanta.ts";
 import { vistaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
 import { vistaAlzadoComprobacion } from "./comprobacionVistas.ts";
-import { vistaAlzadoMuros, vistaAlzadoPilares } from "./alzadoResultados.ts";
+import { laminaMuroEn, vistaAlzadoMuros, vistaAlzadoPilares } from "./alzadoResultados.ts";
+import { canonico3D, tramosEspacio } from "../agente/render/diagramas.ts";
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
@@ -148,6 +149,18 @@ export interface ExtrasAlzado {
   pilares?: PilaresAlzado;
   muros?: MurosAlzado;
 }
+
+/**
+ * VC5: lo que hay bajo el cursor de una planta o un alzado con resultados, como el del 3D
+ * (`Objetivo3D` de la app): una barra con su estación (Diagramas), la lámina de un muro con el punto
+ * en el espacio (el mapa de los muros de un alzado), el tramo de un pilar (Pilares: el que llega a
+ * `planta`) o el objeto de una reacción.
+ */
+export type Objetivo2D =
+  | { tipo: "barra"; pieza: string; s: number; p: [number, number, number] }
+  | { tipo: "lamina"; lamina: number; p: [number, number, number] }
+  | { tipo: "pilar"; pilar: string; planta: string }
+  | { tipo: "reaccion"; objeto: string };
 
 /** VC2: una deformada en planta o en alzado: la de una combinación (una sola) o la forma de un modo, por la escala. */
 export type DeformadaPedido = ({ combinaciones: EleccionCombinaciones } | { modo: number }) & { escala: number };
@@ -961,6 +974,59 @@ export class Sesion {
     const conj = this.conjunto(p.combinaciones, "desplazamientos");
     if (!conj.valido) return conj;
     return { valido: true, valor: { u: d.valor.u, escala: p.escala, etiqueta: d.valor.etiqueta, factores: conj.valor.factores[0]!, comb: d.valor.comb } };
+  }
+
+  /** El plano de un alzado pedido, o null. */
+  private planoDe(p: PlanoPedido): PlanoAlzado | null {
+    if ("eje" in p) return planoDeEje(this.proyecto.modelo, p.eje, p.profundidad);
+    return p.desde[0] === p.hasta[0] && p.desde[1] === p.hasta[1] ? null : { desde: p.desde, hasta: p.hasta, ...(p.profundidad !== undefined ? { profundidad: p.profundidad } : {}) };
+  }
+
+  /** VC5: lo que hay bajo un punto de una escena plana con resultados (`Objetivo2D`), o null. */
+  objetivo(fu: FuenteEscena, punto: readonly [number, number], radio: number): Objetivo2D | null {
+    const rr = this.rr;
+    if (!rr) return null;
+    const q: Vec2 = [punto[0], punto[1]];
+    const plano = fu.tipo === "alzado" ? this.planoDe(fu.plano) : null;
+    if (fu.tipo === "alzado" && fu.muros) return plano ? (s => (s ? { tipo: "lamina", ...s } : null))(laminaMuroEn(rr, plano, q)) : null;
+    const diagramas = fu.tipo === "alzado" ? !!fu.diagramas : fu.vista.vista === "vigas";
+    const pilares = fu.tipo === "alzado" ? !!fu.pilares : fu.vista.vista === "pilares-n";
+    const reacciones = fu.tipo === "alzado" ? !!fu.reacciones : fu.vista.vista === "reacciones";
+    if (!diagramas && !pilares && !reacciones) return null;
+    const el = this.elegir(fu, punto, radio, undefined, pilares ? ["pilar"] : undefined);
+    if (!el) return null;
+    const id = el.objeto;
+    if (reacciones) return { tipo: "reaccion", objeto: id };
+    if (pilares) {
+      if (fu.tipo === "planta") return { tipo: "pilar", pilar: id, planta: fu.planta };
+      // En el alzado, el tramo de la cota del punto: la planta de su cabeza
+      const pl = this.proyecto.modelo.plantas;
+      const cotas = cotasPlantas(pl);
+      for (let k = 0; k < pl.length; k++) {
+        const [z1, z0] = [cotas[k], cotas[k + 1]];
+        if (z1 !== null && z1 !== undefined && z0 !== null && z0 !== undefined && q[1] > z0 && q[1] <= z1 + 1e-9) return { tipo: "pilar", pilar: id, planta: pl[k]!.id };
+      }
+      return null;
+    }
+    // Diagramas: la estación de la pieza más cercana al punto, por el eje de sus tramos en la vista
+    const a2 = (v: readonly number[]): Vec2 => {
+      if (!plano) return [v[0]!, v[1]!];
+      const L = Math.hypot(plano.hasta[0] - plano.desde[0], plano.hasta[1] - plano.desde[1]);
+      return [((v[0]! - plano.desde[0]) * (plano.hasta[0] - plano.desde[0]) + (v[1]! - plano.desde[1]) * (plano.hasta[1] - plano.desde[1])) / L, v[2]!];
+    };
+    let mejor: { d: number; s: number; p: [number, number, number] } | null = null;
+    for (const tr of tramosEspacio(rr, id, canonico3D)) {
+      if (fu.tipo === "planta" && tr.planta !== fu.planta) continue;
+      const [a, b] = [a2(tr.a), a2(tr.b)];
+      const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+      const l2 = dx * dx + dy * dy;
+      // Un pilar en planta es un punto: no tiene estación que leer
+      if (l2 < 1e-12) continue;
+      const f = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2));
+      const d = Math.hypot(a[0] + f * dx - q[0], a[1] + f * dy - q[1]);
+      if (!mejor || d < mejor.d) mejor = { d, s: tr.t.s0 + f * (tr.t.s1 - tr.t.s0), p: [tr.a[0] + f * (tr.b[0] - tr.a[0]), tr.a[1] + f * (tr.b[1] - tr.a[1]), tr.a[2] + f * (tr.b[2] - tr.a[2])] };
+    }
+    return mejor ? { tipo: "barra", pieza: id, s: mejor.s, p: mejor.p } : null;
   }
 
   /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */

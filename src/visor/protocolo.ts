@@ -27,7 +27,7 @@ import type { CaraDibujada } from "./armadoPlanta.ts";
 import type { DatosArmar, DatosComprobaciones, DatosEsfuerzosArmado, DatosPortico, FichaComprobacion, PedidoArmar, ProgresoTarea, TipoComprobacion } from "./comprobaciones.ts";
 import type { DatosModal, DatosSegundoOrden, DatosSismo, DatosViento } from "./programa.ts";
 import type { ClasesSolido } from "./comprobacionVistas.ts";
-import type { CargasAlzado, ComprobacionAlzado, ExtrasAlzado, DeformadaPedido, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
+import type { CargasAlzado, ComprobacionAlzado, ExtrasAlzado, Objetivo2D, DeformadaPedido, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 /**
  * Lo único que se puede elegir en una planta (Comprobación: sólo lo de la pestaña; antes se cogía sin
@@ -50,6 +50,8 @@ export type Pedido =
   /** Un alzado; con `diagramas`, los de las barras del plano, y con `reacciones`, las de sus objetos (I4); con `cargas`, las de un caso. */
   | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado; deformada?: DeformadaPedido; comprobacion?: ComprobacionAlzado } & ExtrasAlzado
   /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
+  /** VC5: lo que hay bajo el cursor de una planta o un alzado con resultados. */
+  | { tipo: "objetivo"; fuente: FuenteEscena; punto: readonly [number, number]; radio: number }
   | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[]; elegibles?: TipoElegible[] }
   /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */
   | { tipo: "ventana"; fuente: FuenteEscena; caja: [number, number, number, number]; modo: "dentro" | "toca"; elegibles?: TipoElegible[] }
@@ -134,6 +136,7 @@ export interface Respuestas {
   piezas: PiezaListada[];
   viga: DatosViga;
   estacion: DatosEstacion;
+  objetivo: Objetivo2D | null;
   pilares: DatosPilares;
   pilar: { combinaciones: Combinaciones; filas: FilaPilar[] };
   armado: DatosArmado;

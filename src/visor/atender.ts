@@ -211,6 +211,8 @@ export class Atendedor {
         const r = s.alzado(p.plano, p.diagramas, p.reacciones, p.cargas, p.deformada, p.comprobacion, { ...(p.pilares ? { pilares: p.pilares } : {}), ...(p.muros ? { muros: p.muros } : {}) });
         return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
+      case "objetivo":
+        return bien("objetivo", s.objetivo(p.fuente, p.punto, p.radio));
       case "elegir":
         return bien("elegir", s.elegir(p.fuente, p.punto, p.radio, p.objetos, p.elegibles));
       case "ventana":

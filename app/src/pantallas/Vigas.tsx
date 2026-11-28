@@ -34,7 +34,7 @@ import { fmt, coma } from "../fmt.ts";
 import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { conMalla, Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { conMalla, Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, useSondaObjetivo, ZonaVistas, type SondaObjetivo } from "../vistas/Zona.tsx";
 import { COLUMNAS_BARRA, COLUMNAS_VANO, FILAS_BARRA, FILAS_VANO, NOTA_EXTREMOS, TablaExtremos } from "./Extremos.tsx";
 import { NOTA_TERNAS, TablaTernas } from "./Ternas.tsx";
 import { useEleccion } from "./useEleccion.ts";
@@ -57,7 +57,20 @@ function PlantaDiagramas({ planta, vista, id, cargando }: { planta: string; vist
     if (o && ((m?.vigas ?? []).some((v) => v.id === o) || (m?.barras ?? []).some((b) => b.id === o) || o.includes(":v") || !proyecto.edicion)) setSeleccion(o);
   };
   const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : escena.diagnosticos ? <Aviso tono="fail">{escena.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !escena.datos && escena.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
-  return <Fuente2D escena={proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={escena.cargando || cargando} />;
+  // VC5: la estación bajo el cursor, con las líneas de la sonda del 3D
+  const texto = useSondaObjetivo(fuente, vista.vista === "vigas" ? sondaBarra(proyecto.cliente, vista.esfuerzo, vista.combinaciones) : undefined, escena.datos);
+  return <Fuente2D escena={proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={escena.cargando || cargando} sonda={texto} claveSonda={JSON.stringify(fuente)} />;
+}
+
+/** VC5: las líneas de la estación de una barra bajo el cursor (la consulta de la sonda del 3D). */
+function sondaBarra(cliente: ReturnType<typeof useVisor>["proyecto"]["cliente"], esfuerzo: Esfuerzo, eleccion: EleccionCombinaciones): SondaObjetivo | undefined {
+  if (!cliente) return undefined;
+  const unidad = ESFUERZOS.find((x) => x.id === esfuerzo)!.unidad;
+  return async (o) => {
+    if (o.tipo !== "barra") return null;
+    const r = await sinObsoleto(cliente.pedir({ tipo: "estacion", id: o.pieza, esfuerzo, combinaciones: eleccion, s: o.s }));
+    return r?.ok ? lineasEstacion(o.pieza, r.valor as DatosEstacion, esfuerzo, unidad) : null;
+  };
 }
 
 const ESFUERZOS: { id: Esfuerzo; unidad: string; abajo: boolean; plano: EsfuerzoPlano; title: string }[] = [
@@ -281,7 +294,7 @@ export function ModoDiagramas() {
           </Chip>
         ),
         tresD: (x) => <TresDDiagramas planta={x.planta} esfuerzo={esfuerzo} eleccion={eleccion} piezas={piezas3D} escala={Number(escala)} />,
-        alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: planoAlzado(x.eje, x), diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} />,
+        alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: planoAlzado(x.eje, x), diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} sonda={sondaBarra(proyecto.cliente, esfuerzo, eleccion)} />,
         cabecera3D: () => (
           <>
             <Chip acento title={v ? coma(v.combinaciones.etiquetas.join("\n")) : undefined}>

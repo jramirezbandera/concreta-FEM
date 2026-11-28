@@ -80,13 +80,20 @@ function resumenBase(armado: ArmadoProyecto | undefined, losas: readonly string[
 }
 
 /** El mapa de una planta: un clic da el valor del punto y elige su franja. */
-function EscenaArmado({ fuente, objetos, marcas, onPunto }: { fuente: FuenteEscena | null; objetos: ReadonlySet<string> | null; marcas: Marca[]; onPunto: (p: Vec2, planta: string) => void }) {
+function EscenaArmado({ fuente, objetos, marcas, onPunto, sondaPunto }: { fuente: FuenteEscena | null; objetos: ReadonlySet<string> | null; marcas: Marca[]; onPunto: (p: Vec2, planta: string) => void; /** VC5: las líneas del valor de un punto (las de la sonda del 3D). */ sondaPunto: (p: Vec2, planta: string) => Promise<string[] | null> }) {
   const { proyecto, seleccion } = useVisor();
   const pedido = !fuente || proyecto.desactualizado || fuente.tipo !== "planta" ? null : { tipo: "escena" as const, planta: fuente.planta, vista: fuente.vista };
   const d = usePedido(proyecto.cliente, pedido);
   const resaltado = useEleccion(fuente, seleccion && objetos?.has(seleccion) ? seleccion : null);
   const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
-  return <Fuente2D escena={proyecto.desactualizado ? null : d.datos} resaltado={resaltado} marcas={marcas} eventos={{ clic: (p) => fuente?.tipo === "planta" && onPunto(p, fuente.planta) }} aviso={aviso} cargando={d.cargando} />;
+  const planta = fuente?.tipo === "planta" ? fuente.planta : null;
+  return <Fuente2D escena={proyecto.desactualizado ? null : d.datos} resaltado={resaltado} marcas={marcas} eventos={{ clic: (p) => fuente?.tipo === "planta" && onPunto(p, fuente.planta) }} aviso={aviso} cargando={d.cargando} sonda={planta && !proyecto.desactualizado ? (o) => sondaPunto(o.p, planta) : null} claveSonda={JSON.stringify(fuente)} />;
+}
+
+/** Las líneas de la sonda del valor de un punto del mapa de armado (en el 3D y en la planta). */
+function lineasValorArmado(v: ValorArmado | FueraArmado | null): string[] {
+  if (esFueraArmado(v)) return [`sin valor · ${v.corto}`];
+  return v ? [`${fmt(v.valor, 1)} ${U}${v.exceso !== null ? ` (${v.exceso > 0 ? "+" : ""}${fmt(v.exceso, 1)} sobre la base)` : ""}`, `${v.franja} · s = ${fmt(v.s, 2)} m · ${v.comb}`] : ["fuera de las franjas"];
 }
 
 /** El armado en un 3D: el de la planta de su cabecera o el de todas; bajo el cursor, el valor del punto. */
@@ -104,9 +111,7 @@ function TresDArmado({ planta, armadura, eleccion, op }: { planta: string | null
           const pl = datos.plantas[o.lamina];
           if (!pl) return null;
           const r = await cliente.pedir({ tipo: "valor-armado", planta: pl, armadura, combinaciones: eleccion, x: o.p[0], y: o.p[1], ...(armado ? { armado } : {}) });
-          const v = r.ok ? (r.valor as ValorArmado | FueraArmado) : null;
-          if (esFueraArmado(v)) return [`sin valor · ${v.corto}`];
-          return v ? [`${fmt(v.valor, 1)} ${U}${v.exceso !== null ? ` (${v.exceso > 0 ? "+" : ""}${fmt(v.exceso, 1)} sobre la base)` : ""}`, `${v.franja} · s = ${fmt(v.s, 2)} m · ${v.comb}`] : ["fuera de las franjas"];
+          return lineasValorArmado(r.ok ? (r.valor as ValorArmado | FueraArmado) : null);
         }
       : null,
     JSON.stringify([planta, armadura, eleccion, op, datos?.plantas]),
@@ -617,6 +622,12 @@ export function ModoArmado() {
     setPunto({ p, v, planta: pl, clave: clave(pl) });
     setSeleccion(v ? (v.franja ?? null) : null);
   };
+  // VC5: al pasar, el valor del punto (lo mismo que el clic, sin fijarlo)
+  const sondaPunto = async (p: Vec2, pl: string): Promise<string[] | null> => {
+    if (!proyecto.cliente) return null;
+    const x = await sinObsoleto(proyecto.cliente.pedir({ tipo: "valor-armado", planta: pl, armadura, combinaciones: eleccion, x: p[0], y: p[1], ...(armado ? { armado } : {}) }));
+    return x ? lineasValorArmado(x.ok ? (x.valor as ValorArmado | FueraArmado) : null) : null;
+  };
   const puntoValido = punto && planta && punto.planta === planta && punto.clave === clave(planta) ? punto : null;
 
   const herramientas = (
@@ -663,7 +674,7 @@ export function ModoArmado() {
         planta: (v) => {
           const pl = v.planta;
           const marcas: Marca[] = punto && pl && punto.planta === pl && punto.clave === clave(pl) ? [{ p: punto.p, texto: esFueraArmado(punto.v) ? (punto.v.corto.startsWith("fuera") ? punto.v.corto : `fuera · ${punto.v.corto}`) : punto.v ? `${fmt(punto.v.valor, 1)} ${U}` : "fuera" }] : [];
-          return <EscenaArmado fuente={pl ? { tipo: "planta", planta: pl, vista: conMalla({ vista: "armado" as const, combinaciones: eleccion, armadura, ...op }, v) } : null} objetos={objetos} marcas={marcas} onPunto={(p, x) => void clic(p, x)} />;
+          return <EscenaArmado fuente={pl ? { tipo: "planta", planta: pl, vista: conMalla({ vista: "armado" as const, combinaciones: eleccion, armadura, ...op }, v) } : null} objetos={objetos} marcas={marcas} onPunto={(p, x) => void clic(p, x)} sondaPunto={sondaPunto} />;
         },
         cabeceraPlanta: (v, i) => cabecera(v, i),
         malla: true,

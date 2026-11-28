@@ -24,6 +24,9 @@ import { BufferAttribute, BufferGeometry, Color, Group, LineSegments, Orthograph
 import type { Texto, Vec2 } from "../../../src/agente/render/escena.ts";
 import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import { RADIO_CLIC, type Eleccion, type EscenaPreparada, type Glifo } from "../../../src/visor/escena.ts";
+
+/** VC5: lo que el cursor tiene que estar quieto para buscar lo que hay debajo (ms), como en el 3D. */
+const PAUSA_SONDA = 90;
 import { engancharEscena, medir, type ModoMedir } from "../../../src/visor/medir.ts";
 import type { TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import { marcador } from "../dibujo/marcador.ts";
@@ -43,6 +46,8 @@ export interface Marca {
 export interface Eventos2D {
   /** Un clic (o doble clic) en el punto p (m), con la tolerancia de elegir en m. */
   clic?: (p: Vec2, radio: number, ctrl: boolean, doble: boolean) => void;
+  /** VC5: el cursor quieto en p (m), con la tolerancia de elegir; null, cuando sale de la vista. Quien lo recibe da la sonda (`ponerSonda`). */
+  pasar?: (p: Vec2 | null, radio: number) => void;
   /** Una ventana de elegir, en m. */
   ventana?: (caja: [number, number, number, number], modo: "dentro" | "toca", ctrl: boolean) => void;
 }
@@ -126,6 +131,9 @@ export class Vista2D extends Vista {
   private resaltadoG: Group | null = null;
   private readonly matResaltado = MATERIALES;
   private marcas: Marca[] = [];
+  /** VC5: lo que dice el punto bajo el cursor quieto, como la sonda del 3D. */
+  private sonda: { p: Vec2; lineas: string[] } | null = null;
+  private pausaSonda = 0;
   private elegidos: ReadonlySet<string> = new Set();
   private cx = 0;
   private cy = 0;
@@ -246,6 +254,13 @@ export class Vista2D extends Vista {
     if (r === this.resaltado) return;
     this.resaltado = r;
     this.reconstruirResaltado();
+    this.entorno.pintar();
+  }
+
+  /** VC5: la sonda (un punto y sus líneas) o ninguna. */
+  ponerSonda(s: { p: Vec2; lineas: string[] } | null): void {
+    if (s === this.sonda) return;
+    this.sonda = s;
     this.entorno.pintar();
   }
 
@@ -390,6 +405,13 @@ export class Vista2D extends Vista {
   }
 
   protected override pasar(x: number, y: number, e?: PointerEvent): void {
+    // VC5: con el cursor quieto, lo que hay debajo (no mientras se mide o se dibuja)
+    if (this.eventos.pasar && !this.medirModo && !this.dibujo && this.s > 0) {
+      clearTimeout(this.pausaSonda);
+      const q = this.aModelo(x, y);
+      const radio = RADIO_CLIC / this.s;
+      this.pausaSonda = window.setTimeout(() => this.eventos.pasar?.(q, radio), PAUSA_SONDA);
+    }
     if (this.medirModo) {
       if (this.s <= 0 || !this.escena) return;
       this.medirCursor = this.puntoMedir(x, y, !!e?.shiftKey);
@@ -410,6 +432,9 @@ export class Vista2D extends Vista {
   }
 
   override salir(): void {
+    clearTimeout(this.pausaSonda);
+    if (this.eventos.pasar) this.eventos.pasar(null, 0);
+    if (this.sonda) this.ponerSonda(null);
     if (this.medirModo) {
       this.medirCursor = null;
       this.entorno.pintar();
@@ -418,6 +443,42 @@ export class Vista2D extends Vista {
     if (!this.dibujo) return;
     this.dibujo.salir();
     this.entorno.pintar();
+  }
+
+  /** VC5: la sonda, como la del 3D: un punto y un recuadro con sus líneas, dentro de la vista. */
+  private dibujarSonda(ctx: CanvasRenderingContext2D): void {
+    const so = this.sonda;
+    if (!so || !so.lineas.length) return;
+    const q = this.aPx(so.p);
+    const col = this.entorno.colores();
+    const anchos = so.lineas.map((t, i) => this.entorno.medir(t, 11, i === 0));
+    const [w, h] = [Math.max(...anchos) + 16, so.lineas.length * 15 + 8];
+    let [bx, by] = [q[0] + 12, q[1] - h - 8];
+    if (bx + w > this.rect.w - 4) bx = q[0] - 12 - w;
+    if (by < 4) by = q[1] + 12;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(q[0], q[1], 3.5, 0, 2 * Math.PI);
+    ctx.fillStyle = col.acento;
+    ctx.fill();
+    ctx.strokeStyle = col.fondo;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = col.panel;
+    ctx.globalAlpha = 0.96;
+    ctx.fillRect(bx, by, w, h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = col.borde;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, w - 1, h - 1);
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    so.lineas.forEach((t, i) => {
+      ctx.font = fuente(11, i === 0);
+      ctx.fillStyle = i === 0 ? col.texto : col.textoSuave;
+      ctx.fillText(t, bx + 8, by + 4 + 7.5 + 15 * i);
+    });
+    ctx.restore();
   }
 
   /** Pinta en el siguiente fotograma (el dibujo cambia sin un evento de la vista: una tecla). */
@@ -538,6 +599,7 @@ export class Vista2D extends Vista {
       textoConHalo(ctx, p.t.texto, 0, 0, elegido ? col.seleccion : p.t.color ? legible(p.t.color, col.fondo) : col.texto, col.fondo);
       ctx.restore();
     }
+    this.dibujarSonda(ctx);
     // Las marcas de la pantalla (el punto pulsado en Losas…)
     for (const m of this.marcas) {
       const [x, y] = this.aPx(m.p);

@@ -10,15 +10,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { reticulaConNucleo } from "../../validacion/c3/modelos.ts";
+import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { VERSION_ESQUEMA } from "../agente/proyecto.ts";
 import { planoDeEje } from "../agente/render/alzado.ts";
 import type { Escena, Primitiva } from "../agente/render/escena.ts";
 import { valoresCampo, type ResultadosRender } from "../agente/render/resultados.ts";
+import { cotasPlantas } from "../compilador/cotas.ts";
 import { ejesDe } from "../compilador/ejes.ts";
 import type { AccionCaso, ModeloFisico } from "../compilador/fisico.ts";
 import { sha256 } from "../compilador/huella.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { Atendedor } from "./atender.ts";
+import { laminaMuroEnPlano } from "./alzadoResultados.ts";
 import { pilares3D, SIN_BANDA, type MagnitudPilares } from "./pilares3d.ts";
 import type { Sesion } from "./sesion.ts";
 
@@ -52,7 +55,7 @@ describe("VC4: pilares y muros en el alzado", () => {
     const D = { tipo: "defecto" } as const;
     let vistos = 0;
     for (const magnitud of ["N", "nu"] as MagnitudPilares[]) {
-      const conj = valido((s as unknown as { conjunto: (e: typeof D, p: string) => never }).conjunto(D, "esfuerzos"));
+      const conj = valido((s as unknown as { conjunto: (e: typeof D, p: string) => { valido: true; valor: ConjuntoCombinaciones } }).conjunto(D, "esfuerzos"));
       const todo = pilares3D(rr(), [0, 0, 0], magnitud, conj, null);
       for (const eje of ejesDe(modelo).ejes) {
         const plano = planoDeEje(modelo, eje.id)!;
@@ -122,6 +125,60 @@ describe("VC4: pilares y muros en el alzado", () => {
     }
     expect(conMapa).toBeGreaterThan(0);
     expect(sinMapa).toBeGreaterThan(0);
+  }, 600_000);
+
+  it("VC5: lo que hay bajo el cursor de la planta y del alzado (`objetivo`)", async () => {
+    const D = { tipo: "defecto" } as const;
+    const ejes = ejesDe(modelo).ejes;
+    // Diagramas en planta: la estación de la viga bajo el punto, con el punto en su eje
+    const vb = s.objetivo({ tipo: "planta", planta: "N1", vista: { vista: "vigas", esfuerzo: "My", combinaciones: D } }, [9, 0.1], 0.2);
+    expect(vb?.tipo).toBe("barra");
+    if (vb?.tipo === "barra") {
+      expect(vb.pieza).toBe("X0-N1");
+      expect(Math.abs(vb.p[0] - 9)).toBeLessThan(1e-9);
+      expect(Math.abs(vb.p[1] - 0.1)).toBeLessThan(1e-9);
+      const r = await at.atender({ tipo: "estacion", id: vb.pieza, esfuerzo: "My", combinaciones: D, s: vb.s });
+      expect(r.ok).toBe(true);
+    }
+    // Pilares en planta: el pilar y la planta de la vista; en el alzado, la planta del tramo de la cota
+    expect(s.objetivo({ tipo: "planta", planta: "N1", vista: { vista: "pilares-n", combinaciones: D } }, [0, 5], 0.2)).toEqual({ tipo: "pilar", pilar: "P0-5", planta: "N1" });
+    const ejeX0 = ejes.find((e) => { const pl = planoDeEje(modelo, e.id)!; return Math.abs(pl.desde[0] - pl.hasta[0]) < 1e-9 && Math.abs(pl.desde[0]) < 1e-9; });
+    expect(ejeX0).toBeDefined();
+    const plano = planoDeEje(modelo, ejeX0!.id)!;
+    const L = Math.hypot(plano.hasta[0] - plano.desde[0], plano.hasta[1] - plano.desde[1]);
+    const cotas = cotasPlantas(modelo.plantas) as number[];
+    const u5 = ((0 - plano.desde[0]) * (plano.hasta[0] - plano.desde[0]) + (5 - plano.desde[1]) * (plano.hasta[1] - plano.desde[1])) / L;
+    expect(s.objetivo({ tipo: "alzado", plano: { eje: ejeX0!.id }, pilares: { magnitud: "N", combinaciones: D } }, [u5, (cotas[0]! + cotas[1]!) / 2], 0.2)).toEqual({ tipo: "pilar", pilar: "P0-5", planta: "N1" });
+    // Reacciones: el objeto bajo el punto
+    const re = s.objetivo({ tipo: "planta", planta: "C", vista: { vista: "reacciones", combinaciones: D } }, [0, 5], 0.3);
+    expect(re).toEqual({ tipo: "reaccion", objeto: "P0-5" });
+    // Muros en el alzado: una lámina del muro del plano, con el punto en él; fuera de los muros, nada
+    let vistos = 0;
+    for (const eje of ejes) {
+      const pl = planoDeEje(modelo, eje.id)!;
+      const en = laminaMuroEnPlano(rr(), pl);
+      const c = rr().c;
+      const l = c.modelo.laminas!.findIndex((_, i) => en(i));
+      if (l < 0) {
+        expect(s.objetivo({ tipo: "alzado", plano: { eje: eje.id }, muros: { campo: "m11", combinaciones: D } }, [1, 1], 0.2)).toBeNull();
+        continue;
+      }
+      const ns = c.modelo.laminas![l]!.nudos.map((n) => c.modelo.nudos[n]!);
+      const Lp = Math.hypot(pl.hasta[0] - pl.desde[0], pl.hasta[1] - pl.desde[1]);
+      const uu = (x: number, y: number) => ((x - pl.desde[0]) * (pl.hasta[0] - pl.desde[0]) + (y - pl.desde[1]) * (pl.hasta[1] - pl.desde[1])) / Lp;
+      const cu = ns.reduce((a, n) => a + uu(n.x, n.y), 0) / 4;
+      const cz = ns.reduce((a, n) => a + n.z, 0) / 4;
+      const o = s.objetivo({ tipo: "alzado", plano: { eje: eje.id }, muros: { campo: "m11", combinaciones: D } }, [cu, cz], 0.2);
+      expect(o?.tipo).toBe("lamina");
+      if (o?.tipo === "lamina") {
+        expect(en(o.lamina)).toBe(true);
+        expect(Math.abs(uu(o.p[0], o.p[1]) - cu)).toBeLessThan(1e-9);
+        const r = await at.atender({ tipo: "valor-lamina", campo: "m11", combinaciones: D, envolvente: "max", lamina: o.lamina, punto: o.p });
+        expect(r.ok).toBe(true);
+      }
+      vistos++;
+    }
+    expect(vistos).toBeGreaterThan(0);
   }, 600_000);
 
   it("por el atendedor: el pedido del alzado con pilares y con muros", async () => {

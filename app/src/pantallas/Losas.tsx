@@ -39,7 +39,7 @@ import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe, type EstadoVista } from "../vistas/estado.ts";
 import type { Marca } from "../vistas/vista2d.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas, type SondaObjetivo } from "../vistas/Zona.tsx";
 
 type Punto = { p: Vec2; v: ValorPunto | null; planta: string; clave: string };
 
@@ -72,7 +72,15 @@ function PlantaLosas({ planta, campo, eleccion, escala, envolvente, punto, onPun
   const d = usePedido(proyecto.cliente, { tipo: "losas", planta, campo, combinaciones: eleccion, envolvente, ...(escala ? { escala } : {}), ...(malla ? { malla } : {}) });
   const marcas: Marca[] = punto && punto.planta === planta ? [{ p: punto.p, texto: punto.v ? textoValor(campo, punto.v.valor, dec, unidad) : "sin mapa" }] : [];
   const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Suavizando los campos…</Aviso> : null;
-  return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} marcas={marcas} eventos={{ clic: (p) => onPunto(p, planta) }} aviso={aviso} cargando={d.cargando} />;
+  // VC5: al pasar, el valor del punto (el del clic, sin fijarlo), con las líneas de la sonda del 3D
+  const sonda = async (o: { p: Vec2 }) => {
+    const cliente = proyecto.cliente;
+    if (!cliente) return null;
+    const r = await sinObsoleto(cliente.pedir({ tipo: "valor-punto", planta, campo, combinaciones: eleccion, envolvente, x: o.p[0], y: o.p[1], ...(escala ? { escala } : {}) }));
+    const v = r?.ok ? (r.valor as ValorPunto | null) : null;
+    return v ? [textoValor(campo, v.valor, dec, v.unidad), `${v.losa} · ${planta} · ${v.comb}`] : r ? ["sin mapa"] : null;
+  };
+  return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} marcas={marcas} eventos={{ clic: (p) => onPunto(p, planta) }} aviso={aviso} cargando={d.cargando} sonda={proyecto.desactualizado ? null : sonda} claveSonda={JSON.stringify([planta, campo, eleccion, escala, envolvente])} />;
 }
 
 /** El mapa en un 3D (I4): el de la planta de su cabecera, o los de todas; bajo el cursor, el valor del punto. */
@@ -257,6 +265,15 @@ export function ModoLosas() {
   };
 
   const unidad = UNIDADES_CAMPO[campo];
+  // VC5: en el alzado, el valor de la lámina de muro bajo el cursor (la consulta de la sonda del 3D), en la combinación o la envolvente del mapa
+  const sondaMuro: SondaObjetivo = async (o, esc) => {
+    const cliente = proyecto.cliente;
+    const m = esc?.mapa;
+    if (!cliente || o.tipo !== "lamina" || !m) return null;
+    const r = await sinObsoleto(cliente.pedir({ tipo: "valor-lamina", campo, combinaciones: eleccion, ...(m.envolvente ? { envolvente: m.envolvente } : { nombre: m.combinacion ?? "" }), lamina: o.lamina, punto: o.p }));
+    const v = r?.ok ? (r.valor as { valor: number; unidad: string; objeto: string; planta: string; comb: string } | null) : null;
+    return v ? [textoValor(campo, v.valor, dec, v.unidad), `${v.objeto} · ${v.planta} · ${v.comb}`] : r ? ["sin mapa"] : null;
+  };
   const resumenComb = queCombinaciones(x ? { descripcion: x.combinaciones.descripcion, n: x.combinaciones.nombres.length } : undefined, x?.dibujada?.nombre);
   /** La envolvente, dicha: en uz, la de la flecha o la de lo que sube. */
   const textoEnv = campo === "uz" ? (envolvente === "min" ? "envolvente de la flecha" : "envolvente hacia arriba") : envolvente === "max" ? "envolvente máxima" : "envolvente mínima";
@@ -311,7 +328,7 @@ export function ModoLosas() {
         ),
         tresD: (v) => <TresDLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} envolvente={envolvente} superficies={superficies} dec={dec} />,
         // VC4: en el alzado, el mapa de los muros del plano (el de las losas, en la planta y el 3D)
-        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), muros: { campo, combinaciones: eleccion, envolvente, ...(escala ? { escala } : {}) } } : null} elegibles={["muro"]} />,
+        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), muros: { campo, combinaciones: eleccion, envolvente, ...(escala ? { escala } : {}) } } : null} elegibles={["muro"]} sonda={sondaMuro} />,
         cabeceraAlzado: () => (
           <Chip acento title={resumenComb}>
             {nombreCampo} · {unidad} · muros del plano

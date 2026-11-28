@@ -33,7 +33,7 @@ import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas } from "../vistas/estado.ts";
 import { useSonda } from "../vistas/sonda.ts";
-import { conMalla, Fuente2D, Fuente3DModelo, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { conMalla, Fuente2D, Fuente3DModelo, planoAlzado, useSondaObjetivo, ZonaVistas, type SondaObjetivo } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
@@ -125,7 +125,7 @@ function TresDReacciones({ d, aviso, cargando }: { d: Reacciones3D | null; aviso
  * Las reacciones en una escena 2D (la planta o el alzado de una vista): un clic elige el objeto (si
  * tiene reacción), y lo elegido se resalta.
  */
-function EscenaReacciones({ fuente, objetos }: { fuente: FuenteEscena | null; objetos: ReadonlySet<string> | null }) {
+function EscenaReacciones({ fuente, objetos, datos }: { fuente: FuenteEscena | null; objetos: ReadonlySet<string> | null; /** VC5: las del 3D, para la sonda. */ datos: Reacciones3D | null }) {
   const { proyecto, seleccion, setSeleccion } = useVisor();
   const pedido = !fuente || proyecto.desactualizado ? null : fuente.tipo === "planta" ? { tipo: "escena" as const, planta: fuente.planta, vista: fuente.vista } : { tipo: "alzado" as const, plano: fuente.plano, ...(fuente.reacciones ? { reacciones: fuente.reacciones } : {}) };
   const d = usePedido(proyecto.cliente, pedido);
@@ -139,7 +139,14 @@ function EscenaReacciones({ fuente, objetos }: { fuente: FuenteEscena | null; ob
     setSeleccion(o && objetos?.has(o) ? o : null);
   };
   const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
-  return <Fuente2D escena={proyecto.desactualizado ? null : d.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} />;
+  // VC5: la flecha bajo el cursor, con las líneas de la sonda del 3D
+  const sonda: SondaObjetivo | undefined = datos ? (o) => {
+    if (o.tipo !== "reaccion") return null;
+    const x = datos.objetos.find((y) => y.id === o.objeto && (fuente?.tipo !== "planta" || y.planta === fuente.planta)) ?? datos.objetos.find((y) => y.id === o.objeto);
+    return x ? lineasReaccion(x) : null;
+  } : undefined;
+  const texto = useSondaObjetivo(fuente, sonda, d.datos);
+  return <Fuente2D escena={proyecto.desactualizado ? null : d.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} sonda={texto} claveSonda={JSON.stringify(fuente)} />;
 }
 
 /** En la cabecera de una planta sin apoyos: a cuáles ir (las plantas con reacciones). */
@@ -199,9 +206,9 @@ export function ModoReacciones() {
       fuentes={{
         dibuja: "Las reacciones",
         tresD: () => <TresDReacciones d={d} aviso={aviso} cargando={r.cargando} />,
-        planta: (v) => <EscenaReacciones fuente={v.planta ? { tipo: "planta", planta: v.planta, vista: conMalla({ vista: "reacciones" as const, combinaciones: eleccion, escala: Number(escala) }, v) } : null} objetos={ids} />,
+        planta: (v) => <EscenaReacciones fuente={v.planta ? { tipo: "planta", planta: v.planta, vista: conMalla({ vista: "reacciones" as const, combinaciones: eleccion, escala: Number(escala) }, v) } : null} objetos={ids} datos={d} />,
         malla: true,
-        alzado: (v) => <EscenaReacciones fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), reacciones: { combinaciones: eleccion, escala: Number(escala) } } : null} objetos={ids} />,
+        alzado: (v) => <EscenaReacciones fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), reacciones: { combinaciones: eleccion, escala: Number(escala) } } : null} objetos={ids} datos={d} />,
         cabecera3D: () => cabecera,
         cabeceraPlanta: (v, i) => (
           <>

@@ -79,7 +79,7 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 2. **VC2, la deformada en el alzado y en la planta** (CV-2; **hecho el 2026-11-28**, §7): la deformada del analítico en el plano del pórtico, con su escala y los desplomes de cada planta rotulados (los de `fem consultar desplomes`), y en la planta el diafragma desplazado; lo mismo para los modos en Modal. Con el sismo del programa, como en el 3D: sin deformada de la combinación (VS-o).
 3. **VC3, Comprobación en el alzado y el color en el 3D** (CV-4; **hecho el 2026-11-28**, §8).
 4. **VC4, Pilares y muros en el alzado** (CV-5; **hecho el 2026-11-28**, §9).
-5. **VC5, el valor bajo el cursor en las vistas planas** (CV-6).
+5. **VC5, el valor bajo el cursor en las vistas planas** (CV-6; **hecho el 2026-11-28**, §10).
 6. **VC6, aislar y ocultar en planta y alzado** (CV-8), si después de lo demás sigue haciendo falta.
 
 ## 6. VC1 hecho (2026-11-28)
@@ -128,4 +128,18 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 - **La app:** Pilares da el alzado, con el selector N/ν y la combinación en su cabecera, y en él sólo se eligen pilares; Losas da en el alzado el mapa de los muros del plano con el campo, la envolvente y la escala de la planta (en él se eligen muros). El panel de la escala sigue siendo el de la planta: sus picos y su rango son los de la planta, no los del alzado.
 - **Prueba** (`src/visor/alzadoResultados.test.ts`, la retícula con núcleo de C3): en cada eje, los tramos de los pilares del plano salen uno a uno con el color y el valor del 3D, y el extremo de N es la mayor compresión de lo que se ve; el mínimo y el máximo del mapa de uz, M11 y F22 son los de las láminas de los muros del plano en la combinación dibujada, calculados aparte, y un eje sin muros no tiene mapa; el pedido, por el atendedor.
 - **Comprobado en la app** con el ejemplo del núcleo: el alzado del eje 1 en Pilares (N de cada tramo, P0-5 −273 kN) y el del eje 2 en Losas (la envolvente máxima de M11 en el muro del núcleo, 12,4 kN·m/m con su combinación).
+- **No probado:** los bancos de Chrome.
+
+## 10. VC5 hecho (2026-11-28)
+
+- **La regla:** en las plantas y los alzados con resultados, como en el 3D, el cursor quieto (90 ms) da el valor de lo que hay debajo en una sonda (un punto y un recuadro con sus líneas); el clic sigue eligiendo y, en Losas y Armado, fija el punto en Propiedades. Mientras se mide o se dibuja, no hay sonda.
+- **El worker** (`Sesion.objetivo`, pedido `objetivo`): lo que hay bajo un punto de una escena plana (`Objetivo2D`), lo mismo que dice el 3D (`Objetivo3D`):
+  - Diagramas (la planta de las vigas y el alzado con diagramas): la pieza elegida y su estación, por la proyección del punto en el eje de sus tramos (`tramosEspacio`) en la vista;
+  - Pilares: el pilar y la planta de la cabeza de su tramo (en planta, la de la vista; en el alzado, la de la cota del punto);
+  - Reacciones: el objeto;
+  - el mapa de los muros del alzado (VC4): la lámina del muro del plano bajo el punto (`laminaMuroEn`) y ese punto en el espacio.
+- **La app:** `Vista2D` avisa con el cursor quieto (`Eventos2D.pasar`) y pinta la sonda (`ponerSonda`), con el dibujo de la del 3D; `Fuente2D` la conecta (`sonda`, `useSonda2D`) y `FuenteEscena` con el `objetivo` del worker (`useSondaObjetivo`). Cada modo da las líneas con la función de su sonda del 3D: `lineasEstacion` (la consulta `estacion`), `lineasTramo` (los tramos de `pilares3d`), `lineasReaccion`, `valor-lamina` y, en las plantas de Losas y Armado, el pedido de su clic (`valor-punto`, `valor-armado`).
+- **Prueba** (`src/visor/alzadoResultados.test.ts`, la retícula con núcleo): una viga en planta da su pieza con el punto en su eje y su estación vale para `estacion`; un pilar, en planta y en el alzado, su tramo; una reacción, su objeto; un muro del alzado, su lámina con el punto en ella, y fuera de los muros, nada.
+- **Comprobado en la app** con el ejemplo del núcleo: la planta de Pilares (P0-5, N −272,9 kN en la base, con su combinación), la de Diagramas (VX5 en s = 3,02 m: My máx. 69,7 kN·m, el rotulado) y la de Losas (↓ 1,87 mm junto a la flecha máxima).
+- **Sin sonda todavía:** Deformada y Modal (no la tienen tampoco en el 3D) y Comprobación (su clic abre el armado de la pieza).
 - **No probado:** los bancos de Chrome.

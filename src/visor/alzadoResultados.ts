@@ -130,6 +130,55 @@ export function vistaAlzadoPilares(r: ResultadosRender, plano: PlanoAlzado, magn
 
 // ─── Muros ──────────────────────────────────────────────────────────────────────────────────────
 
+/** ¿Es la lámina `l` de un muro paralelo al plano y a menos de su profundidad? (Las que dibuja el mapa.) */
+export function laminaMuroEnPlano(r: ResultadosRender, plano: PlanoAlzado): (l: number) => boolean {
+  const c = r.c;
+  const { nor, ww, prof } = ejesPlano(plano);
+  return (l) => {
+    if (!c.mapeo.laminas?.[l]?.muro) return false;
+    const lam = c.modelo.laminas![l]!;
+    if (lam.eje1 && Math.abs(lam.eje1[0] * nor[0] + lam.eje1[1] * nor[1]) >= SENO_PARALELO) return false;
+    return lam.nudos.every((n) => Math.abs(ww([c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y])) <= prof);
+  };
+}
+
+/**
+ * VC5: la lámina de un muro del plano bajo un punto (u, z) del alzado, y ese punto en el espacio (en el
+ * plano del muro), o null. La de un mapa de `vistaAlzadoMuros`.
+ */
+export function laminaMuroEn(r: ResultadosRender, plano: PlanoAlzado, q: Vec2): { lamina: number; p: [number, number, number] } | null {
+  const c = r.c;
+  const { dir, uu, ww } = ejesPlano(plano);
+  const en = laminaMuroEnPlano(r, plano);
+  let mejor: { lamina: number; p: [number, number, number]; w: number } | null = null;
+  for (const p of r.q.fisico.plantas)
+    for (const l of r.laminas(p.id, "muros").laminas) {
+      if (!en(l)) continue;
+      const ns = c.modelo.laminas![l]!.nudos.map((n) => c.modelo.nudos[n]!);
+      const pts = ns.map((n): Vec2 => [uu([n.x, n.y]), n.z]);
+      if (!dentroCuadrilatero(pts, q)) continue;
+      // En el plano del muro: su w medio (la lámina más cercana al plano, si hay dos)
+      const w = ns.reduce((s, n) => s + ww([n.x, n.y]), 0) / ns.length;
+      if (mejor && Math.abs(w) >= Math.abs(mejor.w)) continue;
+      const nor: Vec2 = [-dir[1], dir[0]];
+      const x = plano.desde[0] + q[0] * dir[0] + w * nor[0];
+      const y = plano.desde[1] + q[0] * dir[1] + w * nor[1];
+      mejor = { lamina: l, p: [x, y, q[1]], w };
+    }
+  return mejor ? { lamina: mejor.lamina, p: mejor.p } : null;
+}
+
+/** ¿Cae q en el cuadrilátero (convexo o no: por los dos triángulos)? */
+function dentroCuadrilatero(p: readonly Vec2[], q: Vec2): boolean {
+  const en = (a: Vec2, b: Vec2, c: Vec2) => {
+    const d = (u: Vec2, v: Vec2) => (v[0] - u[0]) * (q[1] - u[1]) - (v[1] - u[1]) * (q[0] - u[0]);
+    const [x, y, z] = [d(a, b), d(b, c), d(c, a)];
+    const e = 1e-12;
+    return (x >= -e && y >= -e && z >= -e) || (x <= e && y <= e && z <= e);
+  };
+  return en(p[0]!, p[1]!, p[2]!) || en(p[0]!, p[2]!, p[3]!);
+}
+
 export interface OpcionesMurosAlzado extends Pick<OpcionesAlzado, "modo" | "analitico"> {
   escala?: EscalaMapa;
   envolvente?: Envolvente;
@@ -140,7 +189,7 @@ export function vistaAlzadoMuros(r: ResultadosRender, plano: PlanoAlzado, campo:
   const f = r.q.fisico;
   const c = r.c;
   const base = vistaAlzado(f, plano, d, { ...(o.modo ? { modo: o.modo } : {}), ...(o.analitico !== undefined ? { analitico: o.analitico } : {}), atenuado: true });
-  const { nor, uu, ww, prof } = ejesPlano(plano);
+  const { uu } = ejesPlano(plano);
   const u = UNIDADES_CAMPO[campo];
   const notas: string[] = [];
   const cabeceraVista = `Mapa de ${NOMBRES_CAMPO[campo]} en los muros del plano (${u})`;
@@ -149,11 +198,7 @@ export function vistaAlzadoMuros(r: ResultadosRender, plano: PlanoAlzado, campo:
     return sobreBase(base, { cabecera: cabeceraVista, primitivas: [], leyenda: [], tituloLeyenda: `${NOMBRES_CAMPO[campo]} · ${u}`, notas, extremos: [], puntos: [] });
   }
   // Las láminas de muro paralelas al plano y a menos de su profundidad, por planta
-  const enPlano = (l: number) => {
-    const lam = c.modelo.laminas![l]!;
-    if (lam.eje1 && Math.abs(lam.eje1[0] * nor[0] + lam.eje1[1] * nor[1]) >= SENO_PARALELO) return false;
-    return lam.nudos.every((n) => Math.abs(ww([c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y])) <= prof);
-  };
+  const enPlano = laminaMuroEnPlano(r, plano);
   const plantas = f.plantas.map((p) => p.id).filter((p) => r.laminas(p, "muros").laminas.some(enPlano));
   const env = o.envolvente && conjunto.factores.length > 1 ? o.envolvente : null;
   const filtra = (x: { laminas: number[]; v: Float64Array; comb?: Int32Array }) => {

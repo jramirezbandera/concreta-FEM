@@ -25,7 +25,8 @@ import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import { sinEjes, type Eleccion, type EscenaPreparada } from "../../../src/visor/escena.ts";
 import { IcEjes } from "../armazon/iconos.tsx";
-import type { FuenteEscena, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
+import type { FuenteEscena, Objetivo2D, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
+import { useSonda2D, type PuntoSonda } from "./sonda.ts";
 import type { TipoElegible } from "../../../src/visor/protocolo.ts";
 import { Chip, Desplegable, SelectorEje, SelectorPlanta, useEstrecha } from "../armazon/Disposicion.tsx";
 import { Aviso, AvisoDesactualizado } from "../componentes/comunes.tsx";
@@ -759,10 +760,14 @@ interface PropsFuente2D {
   dibujo?: Dibujo2D | null;
   /** V2c-4: la plantilla DXF de la planta. */
   plantilla?: GeometriaPlantilla | null;
+  /** VC5: las líneas de la sonda del punto bajo el cursor quieto (las del 3D del mismo modo). */
+  sonda?: ((o: PuntoSonda) => Promise<string[] | null> | string[] | null) | null;
+  /** Lo que, si cambia, deja vieja la sonda (lo que se ve). */
+  claveSonda?: string;
 }
 
 /** Una escena 2D en la vista de la celda. */
-export function Fuente2D({ escena: escenaEntera, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor, dibujo = null, plantilla = null }: PropsFuente2D) {
+export function Fuente2D({ escena: escenaEntera, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor, dibujo = null, plantilla = null, sonda: textoSonda = null, claveSonda = "" }: PropsFuente2D) {
   const { vista, varias, v: estado } = useCelda();
   const v = vista instanceof Vista2D ? vista : null;
   // El botón «Ejes» de la barra de la vista
@@ -772,9 +777,12 @@ export function Fuente2D({ escena: escenaEntera, resaltado = null, marcas, event
   useEffect(() => v?.ponerPlantilla(plantilla), [v, plantilla]);
   useEffect(() => v?.ponerResaltado(resaltado), [v, resaltado]);
   useEffect(() => v?.ponerMarcas(marcas), [v, marcas]);
+  // VC5: el valor bajo el cursor, como en el 3D
+  const { alPasar, sonda } = useSonda2D(textoSonda, claveSonda);
+  useEffect(() => v?.ponerSonda(sonda), [v, sonda]);
   useEffect(() => {
     if (!v) return;
-    v.eventos = eventos ?? {};
+    v.eventos = { ...(eventos ?? {}), ...(textoSonda ? { pasar: (p: Vec2 | null, radio: number) => alPasar(p ? { p, radio } : null) } : {}) };
     v.dibujo = dibujo;
     if (formatoCursor) v.formatoCursor = formatoCursor;
   });
@@ -849,7 +857,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null, elegibles?: reado
  * Una escena del modelo (una planta en una vista, o un alzado), con elegir. Con `dibujando` (V2c, una
  * herramienta de dibujo activa) no se vela la planta mientras compila lo dibujado: se sigue dibujando.
  */
-export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantilla = null, elegibles }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean; plantilla?: GeometriaPlantilla | null; /** Sólo se eligen objetos de estos tipos (Comprobación: los de su pestaña). */ elegibles?: readonly TipoElegible[] }) {
+export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantilla = null, elegibles, sonda }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean; plantilla?: GeometriaPlantilla | null; /** Sólo se eligen objetos de estos tipos (Comprobación: los de su pestaña). */ elegibles?: readonly TipoElegible[]; /** VC5: las líneas de lo que hay bajo el cursor quieto (`objetivo` del worker), las del 3D del mismo modo. */ sonda?: SondaObjetivo }) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion;
   // VC1: sin elegibles propios, los de la celda (los del modo, en los tres tipos de vista)
@@ -878,7 +886,28 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
     <Aviso>{fu?.tipo === "alzado" && fu.diagramas ? "Preparando los diagramas…" : "Preparando la vista…"}</Aviso>
   ) : null;
   const cursor = useMemo(() => (fu?.tipo === "alzado" ? (q: Vec2) => `u ${fmt(q[0], 3)} · z ${fmt(q[1], 3)} m` : undefined), [fu?.tipo]);
-  return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} dibujo={dibujo} plantilla={plantilla} />;
+  const textoSonda = useSondaObjetivo(fu, sonda, escena.datos);
+  return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} dibujo={dibujo} plantilla={plantilla} sonda={textoSonda} claveSonda={clave} />;
+}
+
+/** VC5: las líneas de la sonda de lo que hay bajo el cursor de una escena plana (con su escena, para leer su mapa). */
+export type SondaObjetivo = (o: Objetivo2D, escena: EscenaPreparada | null) => Promise<string[] | null> | string[] | null;
+
+/** VC5: la sonda de una escena plana: el worker dice qué hay bajo el cursor (`objetivo`) y la pantalla, sus líneas. */
+export function useSondaObjetivo(fu: FuenteEscena | null, sonda: SondaObjetivo | undefined, escena: EscenaPreparada | null): ((o: PuntoSonda) => Promise<string[] | null>) | null {
+  const { proyecto } = useVisor();
+  const cliente = proyecto.cliente;
+  return useMemo(
+    () =>
+      cliente && fu && sonda && !proyecto.desactualizado
+        ? async (o: PuntoSonda) => {
+            const r = await sinObsoleto(cliente.pedir({ tipo: "objetivo", fuente: fu, punto: o.p, radio: o.radio }));
+            const x = r?.ok ? (r.valor as Objetivo2D | null) : null;
+            return x ? sonda(x, escena) : null;
+          }
+        : null,
+    [cliente, fu, sonda, escena, proyecto.desactualizado],
+  );
 }
 
 /** Las vistas de planta de Modelo: la planta con lo que se dibuja (modelo, diagnósticos o malla). */

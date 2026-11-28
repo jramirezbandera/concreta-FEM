@@ -30,12 +30,12 @@ import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe, type EstadoVista } from "../vistas/estado.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, useSondaObjetivo, ZonaVistas, type SondaObjetivo } from "../vistas/Zona.tsx";
 import { LIMITE_NU, NOTA_TERNAS, TablaTernas } from "./Ternas.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 /** El axil de los tramos que llegan a una planta, en una vista: un clic elige el pilar. */
-function PlantaPilares({ planta, eleccion, id, malla }: { planta: string; eleccion: EleccionCombinaciones; id: string | null; malla?: boolean }) {
+function PlantaPilares({ planta, eleccion, id, malla, sonda }: { planta: string; eleccion: EleccionCombinaciones; id: string | null; malla?: boolean; sonda: SondaObjetivo | undefined }) {
   const { proyecto, setSeleccion } = useVisor();
   const d = usePedido(proyecto.cliente, { tipo: "pilares", planta, combinaciones: eleccion, ...(malla ? { malla } : {}) });
   const vista: VistaPlanta = { vista: "pilares-n", combinaciones: eleccion };
@@ -51,7 +51,8 @@ function PlantaPilares({ planta, eleccion, id, malla }: { planta: string; elecci
     setSeleccion(o && filas?.some((f) => f.pilar === o) ? o : null);
   };
   const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
-  return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} />;
+  const texto = useSondaObjetivo(fuente, sonda, d.datos?.escena ?? null);
+  return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} sonda={texto} claveSonda={JSON.stringify(fuente)} />;
 }
 
 const MAGNITUDES: { id: MagnitudPilares; nombre: string; title: string }[] = [
@@ -166,6 +167,10 @@ export function ModoPilares() {
   const id = filas.some((f) => f.pilar === seleccion) || (obj.datos?.id === seleccion && obj.datos.tipo === "pilar") ? seleccion : null;
   const pilar = usePedido(proyecto.cliente, id ? { tipo: "pilar", id, combinaciones: eleccion } : null);
   const pasan = filas.filter((f) => (f.nu?.nu ?? 0) > LIMITE_NU).length;
+  // VC5: el tramo bajo el cursor en la planta y el alzado, con las líneas de la sonda del 3D (sus valores, los del 3D)
+  const p3 = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "pilares3d", magnitud, combinaciones: eleccion, planta: null });
+  const tramos3D = proyecto.desactualizado ? null : p3.datos;
+  const sondaPilar: SondaObjetivo | undefined = tramos3D ? (o) => (o.tipo === "pilar" ? lineasTramo(tramos3D, tramos3D.tramos.findIndex((t) => t.pilar === o.pilar && t.planta === o.planta)) : null) : undefined;
 
   const herramientas = (
     <>
@@ -182,7 +187,7 @@ export function ModoPilares() {
     <ZonaVistas
       fuentes={{
         dibuja: "El axil de los pilares",
-        planta: (v) => (v.planta ? <PlantaPilares planta={v.planta} eleccion={eleccion} id={id} malla={!!v.malla} /> : null),
+        planta: (v) => (v.planta ? <PlantaPilares planta={v.planta} eleccion={eleccion} id={id} malla={!!v.malla} sonda={sondaPilar} /> : null),
         malla: true,
         cabeceraPlanta: (v) => (
           <Chip acento title={v.planta === planta ? d.datos?.combinaciones.descripcion : undefined}>
@@ -191,7 +196,7 @@ export function ModoPilares() {
         ),
         tresD: (v) => <TresDPilares planta={v.planta} magnitud={magnitud} eleccion={eleccion} />,
         // VC4: los tramos de los pilares del plano, con los valores y los colores del 3D
-        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), pilares: { magnitud, combinaciones: eleccion } } : null} elegibles={["pilar"]} />,
+        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), pilares: { magnitud, combinaciones: eleccion } } : null} elegibles={["pilar"]} sonda={sondaPilar} />,
         cabeceraAlzado: () => (
           <>
             <Desplegable etiqueta="Magnitud de los pilares" valor={magnitud} onCambio={setMagnitud} opciones={MAGNITUDES} />
