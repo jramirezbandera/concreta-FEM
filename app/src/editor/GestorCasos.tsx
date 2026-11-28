@@ -125,7 +125,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
         fondoCierra={false}
         pie={
           <>
-            <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("casos"))} title="Para cambiar muchos a la vez o pegar de Excel">
+            <button type="button" className="btn btn-q" onClick={() => (cerrarGestor(), pedirTabla("casos"))} title="Para cambiar muchos a la vez o pegar de Excel">
               <Table2 size={14} />
               Abrir la tabla
             </button>
@@ -134,6 +134,11 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
                 Borrar
               </button>
             )}
+            {/* UI2-19: el mismo pie en todos los diálogos: lo de la pieza a la izquierda y «Cancelar» junto al principal */}
+            <span className="mr-auto" />
+            <button type="button" className="btn" onClick={cerrarGestor}>
+              Cancelar
+            </button>
             {actual &&
               (pedido.alElegir && !cambiado ? (
                 <button type="button" className="btn btn-p" onClick={() => terminar(actual.id, [], "")}>

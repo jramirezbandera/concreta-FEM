@@ -323,10 +323,9 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-[3px]" checked={amplificar} onChange={(e) => setAmplificar(e.target.checked)} />
             <span>
-              Segundo orden global (P-Δ): amplificar las hipótesis horizontales por su coeficiente de estabilidad global
+              <Ayuda texto={AYUDA.amplificar}>Segundo orden global (P-Δ)</Ayuda>: amplificar las hipótesis horizontales por su coeficiente de estabilidad global
               <span className="block text-[12px] text-text-secondary">En cada combinación, el factor del viento o del sismo va multiplicado por γz = 1 / (1 − Q). Con ello, los pilares se comprueban con β = 1 (intraslacionales).</span>
             </span>
-            <Ayuda texto={AYUDA.amplificar} />
           </label>
           <div className="campos-lado">
             <Etiqueta htmlFor="so-m" ayuda={AYUDA.multiplicador}>
@@ -341,10 +340,9 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
           <label className="mt-2 flex items-start gap-2 border-t border-border-main pt-3">
             <input type="checkbox" className="mt-[3px]" checked={conImperfeccion} onChange={(e) => setConImperfeccion(e.target.checked)} />
             <span>
-              Imperfección geométrica global: una inclinación de toda la estructura, como fuerzas horizontales
+              <Ayuda texto={AYUDA.imperfeccion}>Imperfección geométrica global</Ayuda>: una inclinación de toda la estructura, como fuerzas horizontales
               <span className="block text-[12px] text-text-secondary">De cada caso vertical salen dos casos del programa (según X y según Y) que entran en las combinaciones de ELU. La pide el Código Estructural (Anejo 19 §5.2).</span>
             </span>
-            <Ayuda texto={AYUDA.imperfeccion} />
           </label>
           <div className="campos-lado">
             <Etiqueta htmlFor="ig-theta" ayuda={AYUDA.inclinacion}>
@@ -489,8 +487,9 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
           )}
           <div className="acc-caso">
             <span className="acc-etq">
-              <b>Caso de nieve</b>
-              <Ayuda texto={AYUDA.casoNieve} />
+              <b>
+                <Ayuda texto={AYUDA.casoNieve}>Caso de nieve</Ayuda>
+              </b>
             </span>
             {!casoNieve ? (
               <span className="text-text-secondary">Con la altitud del emplazamiento se sabe qué ψ lleva.</span>
@@ -623,9 +622,8 @@ export function FichaAcciones({ onCerrar, pestana: inicial = "viento", activar =
                 <span />
                 <span className="flex items-center gap-2">
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={nieve} onChange={(e) => setNieve(e.target.checked)} /> La nieve permanece más de 30 días al año
+                    <input type="checkbox" checked={nieve} onChange={(e) => setNieve(e.target.checked)} /> <Ayuda texto={AYUDA.nieve}>La nieve permanece más de 30 días al año</Ayuda>
                   </label>
-                  <Ayuda texto={AYUDA.nieve} />
                 </span>
               </div>
               <ResumenSismo d={sismo.datos ?? null} aplicado={!cambiado} />

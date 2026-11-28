@@ -384,3 +384,17 @@ El punto 5 de §6, en parte. **UI2-35, decidida por el usuario el 2026-11-28:** 
 - **No hecho:** UI2-37 (los chips de cada vista), UI2-20 (lo elegido) y el encuadre de Armado: están en `vistas/Zona.tsx` y `vista3d.ts`, que otra sesión tenía sin commit.
 - **Pruebas:** las de `app/` (185), `src/agente/render`, `src/comprobaciones`, `estilos.test.ts` y `textos.test.ts`, en verde; en `src/agente` y `src/visor`, todas salvo la de VC5 en `alzadoResultados.test.ts`, que la otra sesión estaba escribiendo. `tsc` de la app sin errores. Comprobado en la app con la vivienda: Pilares y Vigas de Comprobación en planta, con zoom, y la flecha de Losas.
 - **Sin comprobar:** el tema claro y 1366 px.
+
+### 7.9 Diálogos y gestores (2026-11-28)
+
+El punto 6 de §6 (UI2-19), salvo el gestor de plantas: lo estaba rehaciendo otra sesión a la vez (de la prueba de uso del mismo día: filas con el nombre, el control y una nota corta, y una frase con lo que va a pasar), que propone llevar ese patrón a los demás gestores después de su commit.
+
+- **El título, en el mismo sitio:** los diálogos ya no van centrados en la pantalla sino colgados a la misma altura (`--dlg-arriba`, el 9 % del alto entre 16 y 96 px); centrados, el título saltaba de 282 a 339 px de un gestor a otro. Los que ocupan casi toda la pantalla (figura, armado, capas) siguen centrados.
+- **Los gestores, del mismo alto:** 640 px (o lo que quepa); antes, de 414 a 528 según el contenido, y el pie saltaba con el título. Medido a 1000 × 720: Secciones, Materiales y Plantas, arriba a 65 px y 639 de alto los tres.
+- **Un pie:** lo de la pieza a la izquierda («Abrir la tabla», «Borrar», «Duplicar») y, a la derecha, «Cancelar» junto al principal, como ya tenían Datos de la obra y Viento y sismo. Secciones, Materiales y Casos no tenían «Cancelar»: con «Aplicar» apagado sólo se salía por la X.
+- **Una sección:** las cajas con leyenda de Datos de la obra y del emplazamiento (también en Viento y sismo) pasan al estilo de las de los gestores: el título encima y una raya entre una y otra. En los gestores, los títulos de grupo del formulario iban 14 px más adentro que sus campos (Casos); ahora, alineados.
+- **Sin «?» por campo** (el resto de UI2-12): la ayuda va en el nombre del campo, con su subrayado de puntos, en el emplazamiento, Viento y sismo y los gestores de secciones y materiales. Las casillas largas («Segundo orden global (P-Δ): amplificar…») la llevan en su nombre corto. «tipo» del gestor de materiales, «Tipo».
+- **Materiales de la obra:** los desplegables, al ancho del formulario (iban a su ancho natural, con 400 px vacíos a la derecha); «Cambiar también las piezas existentes», debajo.
+- **Queda:** el encabezado «Datos · casos» del formulario dentro del gestor de casos (la otra sesión añade a `FormularioObjeto` la opción `sinTitulo`), el gestor de plantas y el patrón de filas en los demás gestores, y los diálogos pequeños de `Dialogos.tsx` (borrar, copiar, renumerar, ábacos, alinear), con su `.dlg-et` de título.
+- **Pruebas:** las de `app/` (190, con una puesta al día: las ayudas de la ficha de acciones se cuentan en el nombre de cada campo), `estilos.test.ts` y `textos.test.ts`, en verde; `tsc` de la app sin errores. Comprobado en la app con la vivienda a 1000 × 720 en tema oscuro: Secciones, Materiales, Plantas, Casos, Datos de la obra y Viento y sismo.
+- **Sin comprobar:** el tema claro y los bancos de Chrome.

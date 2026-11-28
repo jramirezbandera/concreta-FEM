@@ -345,7 +345,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
         fondoCierra={false}
         pie={
           <>
-            <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("secciones"))} title="Para cambiar muchas a la vez o pegar de Excel">
+            <button type="button" className="btn btn-q" onClick={() => (cerrarGestor(), pedirTabla("secciones"))} title="Para cambiar muchas a la vez o pegar de Excel">
               <Table2 size={14} />
               Abrir la tabla
             </button>
@@ -359,6 +359,11 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
                 </button>
               </>
             )}
+            {/* UI2-19: el mismo pie en todos los diálogos: lo de la pieza a la izquierda y «Cancelar» junto al principal */}
+            <span className="mr-auto" />
+            <button type="button" className="btn" onClick={cerrarGestor}>
+              Cancelar
+            </button>
             {primaria}
           </>
         }
@@ -404,7 +409,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
               </p>
               <label className="campo">
                 <span>
-                  id <Ayuda texto="El nombre con que la eligen pilares y vigas. Vacío, el propuesto, que dice su forma y sus medidas (P30x30, V30x50)." />
+                  <Ayuda texto="El nombre con que la eligen pilares y vigas. Vacío, el propuesto, que dice su forma y sus medidas (P30x30, V30x50).">id</Ayuda>
                 </span>
                 <input value={form.id} placeholder={propuesto} aria-label="id de la sección" onChange={(e) => setForm({ ...form, id: e.target.value })} />
                 {!actual && igual && <p>{`Ya hay una igual: se usará ${igual.id}.`}</p>}
@@ -412,7 +417,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
               <CamposSeccion form={form} errores={errores} setForm={setForm} />
               <label className="campo">
                 <span>
-                  Material <Ayuda texto="Da E, G y γ: la rigidez y el peso propio de la sección. Un típico que aún no está en el proyecto se añade con la sección." />
+                  <Ayuda texto="Da E, G y γ: la rigidez y el peso propio de la sección. Un típico que aún no está en el proyecto se añade con la sección.">Material</Ayuda>
                 </span>
                 <select className="sel" value={form.material} aria-label="Material de la sección" data-error={!!errores.material} onChange={(e) => setForm({ ...form, material: e.target.value })}>
                   {!form.material && <option value="">(ninguno)</option>}
@@ -471,9 +476,8 @@ function CamposSeccion({ form, errores, setForm }: { form: FormSeccion; errores:
   const campo = (k: string, unidad: string, ayuda: string) => (
     <label key={k} className="campo">
       <span>
-        {k}
+        <Ayuda texto={ayuda}>{k}</Ayuda>
         <small>{unidad}</small>
-        <Ayuda texto={ayuda} />
       </span>
       <input value={form.campos[k] ?? ""} inputMode="decimal" aria-label={`${k} de la sección, ${unidad}`} data-error={!!errores[k]} aria-invalid={!!errores[k]} onChange={(e) => poner(k, e.target.value)} />
       {errores[k] && <p className="error">{errores[k]}</p>}
@@ -873,7 +877,7 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
         fondoCierra={false}
         pie={
           <>
-            <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("materiales"))}>
+            <button type="button" className="btn btn-q" onClick={() => (cerrarGestor(), pedirTabla("materiales"))}>
               <Table2 size={14} />
               Abrir la tabla
             </button>
@@ -882,6 +886,11 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
                 Borrar
               </button>
             )}
+            {/* UI2-19: el mismo pie en todos los diálogos: lo de la pieza a la izquierda y «Cancelar» junto al principal */}
+            <span className="mr-auto" />
+            <button type="button" className="btn" onClick={cerrarGestor}>
+              Cancelar
+            </button>
             {primaria}
           </>
         }
@@ -931,7 +940,7 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
               )}
               <label className="campo">
                 <span>
-                  id <Ayuda texto="El nombre con que lo eligen las secciones, los forjados y los muros. Vacío, el propuesto (HA-30 para un hormigón de fck 30)." />
+                  <Ayuda texto="El nombre con que lo eligen las secciones, los forjados y los muros. Vacío, el propuesto (HA-30 para un hormigón de fck 30).">id</Ayuda>
                 </span>
                 <input value={form.id} placeholder={propuesto} aria-label="id del material" data-error={!!errores.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
                 {renombrar && !hay.has(renombrar) && (
@@ -945,7 +954,7 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
               </label>
               <div className="campo">
                 <span>
-                  tipo <Ayuda texto="Hormigón: E sale de fck (el Ecm del Código Estructural). Acero: E = 210 000 MPa; el grado sólo da el nombre, porque el cálculo es elástico. General: E, G y γ a mano." />
+                  <Ayuda texto="Hormigón: E sale de fck (el Ecm del Código Estructural). Acero: E = 210 000 MPa; el grado sólo da el nombre, porque el cálculo es elástico. General: E, G y γ a mano.">Tipo</Ayuda>
                 </span>
                 <Grupo rol="radiogroup" etiqueta="Tipo de material" className="seg">
                   {(["hormigon", "acero", "general"] as const).map((t) => (
@@ -958,9 +967,8 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
               {CAMPOS_MATERIAL[form.tipo].map(([k, u, a]) => (
                 <label key={k} className="campo">
                   <span>
-                    {k === "nu" ? "ν" : k === "peso" ? "γ" : k}
+                    <Ayuda texto={a}>{k === "nu" ? "ν" : k === "peso" ? "γ" : k}</Ayuda>
                     {u && <small>{u}</small>}
-                    <Ayuda texto={a} />
                   </span>
                   {/* Vacío vale lo que dice su ayuda («vacío, 0,2»): se ve en gris, como en el inspector */}
                   <input value={form.campos[k] ?? ""} placeholder={/vacío, ([\d ,]+)/.exec(a)?.[1]?.trim()} inputMode="decimal" aria-label={`${k} del material${u ? `, ${u}` : ""}`} data-error={!!errores[k]} aria-invalid={!!errores[k]} onChange={(e) => setForm({ ...form, campos: { ...form.campos, [k]: e.target.value } })} />

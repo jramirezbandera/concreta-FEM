@@ -30,12 +30,11 @@ export const AYUDA_EMPLAZAMIENTO = {
 const numeroOpcional = (t: string): number | undefined | string => (t.trim() === "" ? undefined : leerNumero(t));
 const texto = (v: number | undefined): string => (v === undefined ? "" : String(v).replace(".", ","));
 
-/** Etiqueta de una fila del formulario, con su «?». */
+/** Etiqueta de una fila del formulario; la ayuda, en su nombre (UI2-12: sin un «?» por campo). */
 export function Etiqueta({ htmlFor, children, ayuda }: { htmlFor: string; children: ReactNode; ayuda?: string }) {
   return (
     <span className="acc-etq">
-      <label htmlFor={htmlFor}>{children}</label>
-      {ayuda && <Ayuda texto={ayuda} />}
+      <label htmlFor={htmlFor}>{ayuda ? <Ayuda texto={ayuda}>{children}</Ayuda> : children}</label>
     </span>
   );
 }

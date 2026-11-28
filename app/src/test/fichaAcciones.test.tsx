@@ -2,7 +2,7 @@
  * VS4 · DOM: la ficha «Viento y sismo» con el emplazamiento común (de la prueba de uso del
  * 2026-11-07): la provincia da la zona eólica del viento y el municipio, ab y K del sismo; un fichero
  * de antes (el municipio en el sismo, la altitud en el viento) pasa al emplazamiento al aplicar sin
- * cambiar lo que se calcula; cada campo lleva su «?».
+ * cambiar lo que se calcula; cada campo lleva su ayuda, en su nombre.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -105,16 +105,18 @@ describe("VS4: el emplazamiento común en la ficha «Viento y sismo»", () => {
     expect(escrito()).toEqual({ emplazamiento: { provincia: "29", municipio: "Pueblo inventado" }, sismo: { ab: 0.05, K: 1, terreno: "II", mu: 2 } });
   });
 
-  it("cada campo lleva su «?»", () => {
+  it("cada campo lleva su ayuda, en su nombre (UI2-12: sin un «?» aparte)", () => {
     montar({ emplazamiento: { provincia: "29" }, viento: { aspereza: "IV" }, sismo: { terreno: "II", mu: 2 } });
+    const ayudas = () => document.querySelectorAll(".dialogo .campo-ayuda").length;
+    expect(screen.queryAllByRole("button", { name: "Ayuda" })).toHaveLength(0);
     // Emplazamiento (3) y viento (4)
-    expect(screen.getAllByRole("button", { name: "Ayuda" })).toHaveLength(7);
+    expect(ayudas()).toBe(7);
     fireEvent.click(screen.getByRole("tab", { name: "Sismo" }));
     // Emplazamiento (3) y sismo (10, con la nieve)
-    expect(screen.getAllByRole("button", { name: "Ayuda" })).toHaveLength(13);
+    expect(ayudas()).toBe(13);
     fireEvent.click(screen.getByRole("tab", { name: "Nieve" }));
     // Emplazamiento (3), nieve (3) y el caso de nieve
-    expect(screen.getAllByRole("button", { name: "Ayuda" })).toHaveLength(7);
+    expect(ayudas()).toBe(7);
   });
 });
 

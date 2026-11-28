@@ -241,7 +241,7 @@ export function DatosObra({ pedido }: { pedido: PedidoGestor }) {
                   {NOMBRE_TIPO_OBRA[t][0]!.toUpperCase() + NOMBRE_TIPO_OBRA[t].slice(1)}
                 </Etiqueta>
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <select id={`o-mat-${t}`} className="sel" value={materiales[t] ?? ""} onChange={(x) => setMateriales((v) => ({ ...v, [t]: x.target.value || undefined }))}>
+                  <select id={`o-mat-${t}`} className="sel w-full" value={materiales[t] ?? ""} onChange={(x) => setMateriales((v) => ({ ...v, [t]: x.target.value || undefined }))}>
                     <option value="">El más usado</option>
                     {opciones.map(({ material, nuevo }) => (
                       <option key={material.id} value={material.id}>
