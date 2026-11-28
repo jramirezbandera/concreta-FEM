@@ -242,7 +242,7 @@ Entre corchetes, el hallazgo de `auditoria-ui-2/codigo.md` que da el fichero y l
 
 ## 7. Correcciones (2026-11-27)
 
-El punto 1 de §6, lo roto a la vista. Sin commit todavía.
+El punto 1 de §6, lo roto a la vista.
 
 - **UI2-1:** en Cargas, los casos del usuario van uno por fila con el id sin partir, y los del programa, en tres grupos plegados («Viento», «Imperfección», «Sismo · del programa · n») que se abren con un clic o al estar activo uno de sus casos (`NavCargas`, `espacios/Modelo.tsx`).
 - **UI2-2:** el «Perfil del maestro» tiene márgenes para sus rótulos y arranca en la base, que no se mueve (`pantallas/Desplomes.tsx`).
@@ -260,7 +260,7 @@ El punto 1 de §6, lo roto a la vista. Sin commit todavía.
 
 ### 7.1 Los cimientos (2026-11-27)
 
-El punto 2 de §6, en parte. Sin commit todavía.
+El punto 2 de §6, en parte.
 
 - **UI2-16, las escalas, con su prueba** (`src/pruebas/estilos.test.ts`):
   - letra: 11, 12, 13, 15 y 18 px. Lo que se salía pasa al paso más cercano (11,5 → 12; 10,5, 10 y 9,5 → 11; 12,5 → 13; 14 y 16 → 15), en las hojas de estilo y en las clases de los `.tsx`;
@@ -278,7 +278,7 @@ El punto 2 de §6, en parte. Sin commit todavía.
 
 ### 7.2 Estados, teclas, vacíos y pestañas (2026-11-27)
 
-Otra tanda del punto 2 de §6. Sin commit todavía.
+Otra tanda del punto 2 de §6.
 
 - **UI2-18, los estados:** la píldora (`.pill`) va en la letra de la interfaz y sus textos, con mayúscula inicial: «Calculado», «Sin calcular», «No compila», «Calculando · …» en la barra; «Error», «Aviso» y «Nota» en Diagnósticos; «Bien», «Avisos» y «No aplica» en Revisión. En las tablas de Comprobación el estado es la misma píldora que en Propiedades y en el banco.
 - **UI2-26 (en parte):** en esas tablas, «Armado» y «Manda» van a la izquierda, con su cabecera. **Queda** el ancho de la tabla.
@@ -305,8 +305,6 @@ Lo que quedaba a mano del punto 2 y el arranque del punto 3. Tres de estos cambi
 - **Lo que queda del punto 2:** el `Campo` único (seis disposiciones), las cajas con leyenda de Obra y Acciones, los nueve avisos, los segmentados sueltos y la escala de espacios.
 
 ### 7.4 Avisos y campos (2026-11-28)
-
-Sin commit todavía.
 
 - **UI2-15, los avisos (E-19):** de nueve maneras a cuatro, cada una con su sitio:
   - `.msj` con su tono (`ok`, `warn`, `fail` o `neu`): el aviso dentro de un panel o de un diálogo, una caja con el fondo de su tono. Sustituye a `.ges-aviso`, `.ges-error`, `.ayuda-sin`, `.aviso-proponer`, el de Inicio hecho con utilidades y los 50 párrafos `.nota` o sueltos que sólo cambiaban el color del texto (57 sitios en 23 ficheros);
