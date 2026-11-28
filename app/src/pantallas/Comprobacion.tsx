@@ -1634,7 +1634,8 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
         vista={
           <ZonaVistas
             fuentes={!modo ? {
-              // Sin pestaña, el modelo: se elige cualquier pieza que se comprueba
+              // Sin pestaña, el modelo: se elige cualquier pieza que se comprueba (VC1: en los tres tipos de vista)
+              elegibles: ELEGIBLES_TODO,
               tresD: () => <Fuente3DModelo elegibles={ELEGIBLES_TODO} />,
               planta: (v) => (!v.planta ? null : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} elegibles={ELEGIBLES_TODO} />),
               cabeceraPlanta: () => (
@@ -1643,10 +1644,15 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
                 </Chip>
               ),
             } : {
+              // VC1: lo de su pestaña se elige en los tres tipos de vista, también en el alzado (que dibuja el modelo)
+              dibuja: "La comprobación",
+              elegibles,
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
               ...(tipo === "losas" && dibujo === "armado" && !proponiendose ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
               ...(tipo === "punzonamiento" && !proponiendose ? { tresD: () => <Punzonamiento3D armado={armado} datos={datosObra} /> } : {}),
-              ...((tipo === "pilares" || tipo === "vigas") || proponiendose ? { tresD: () => <Fuente3DModelo elegibles={elegibles} /> } : {}),
+              // VC1: en pilares y vigas el 3D no dibuja la comprobación: sin fuente, lo dice y lleva a la planta (lo elegible va por la celda).
+              // Mientras se propone, el modelo, para no enseñar lo de antes
+              ...(proponiendose ? { tresD: () => <Fuente3DModelo elegibles={elegibles} /> } : {}),
               // (mientras se propone el armado de lo que se mira, la planta del modelo: la de su armado sale al acabar)
               planta: (v) => (!v.planta ? null : proponiendose ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} elegibles={elegibles} /> : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} elegibles={elegibles} />),
               cabeceraPlanta: () => (

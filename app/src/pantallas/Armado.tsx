@@ -659,6 +659,7 @@ export function ModoArmado() {
   const vista = (
     <ZonaVistas
       fuentes={{
+        dibuja: "El armado",
         planta: (v) => {
           const pl = v.planta;
           const marcas: Marca[] = punto && pl && punto.planta === pl && punto.clave === clave(pl) ? [{ p: punto.p, texto: esFueraArmado(punto.v) ? (punto.v.corto.startsWith("fuera") ? punto.v.corto : `fuera · ${punto.v.corto}`) : punto.v ? `${fmt(punto.v.valor, 1)} ${U}` : "fuera" }] : [];

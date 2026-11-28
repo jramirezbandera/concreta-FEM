@@ -181,6 +181,7 @@ export function ModoPilares() {
   const vistaPlanta = (
     <ZonaVistas
       fuentes={{
+        dibuja: "El axil de los pilares",
         planta: (v) => (v.planta ? <PlantaPilares planta={v.planta} eleccion={eleccion} id={id} malla={!!v.malla} /> : null),
         malla: true,
         cabeceraPlanta: (v) => (

@@ -280,6 +280,7 @@ export function ModoLosas() {
   const vista = (
     <ZonaVistas
       fuentes={{
+        dibuja: "El mapa",
         planta: (v) => (v.planta ? <PlantaLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} envolvente={envolvente} punto={punto && punto.clave === claveDe(v.planta) ? punto : null} onPunto={(p, pl) => void clic(p, pl)} dec={dec} unidad={unidad} malla={!!v.malla} /> : null),
         malla: true,
         cabeceraPlanta: (v, i) => (

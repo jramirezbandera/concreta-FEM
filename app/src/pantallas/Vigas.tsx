@@ -272,6 +272,7 @@ export function ModoDiagramas() {
   const vistaPlanta = (
     <ZonaVistas
       fuentes={{
+        dibuja: "Los diagramas",
         planta: (x) => (x.planta ? <PlantaDiagramas planta={x.planta} vista={conMalla(vista, x)} id={id} cargando={x.planta === planta && viga.cargando} /> : null),
         malla: true,
         cabeceraPlanta: () => (

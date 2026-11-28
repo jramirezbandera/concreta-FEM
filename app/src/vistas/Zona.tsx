@@ -50,6 +50,8 @@ interface Celda {
   varias: boolean;
   v: EstadoVista;
   vista: Vista | null;
+  /** Lo que se elige en esta celda (`FuentesVistas.elegibles`): lo toman las fuentes que no dicen otra cosa. */
+  elegibles?: readonly TipoElegible[];
 }
 
 /**
@@ -125,6 +127,46 @@ export interface FuentesVistas {
   verPlantillaAqui?: (planta: string, nombre: string) => void;
   /** V2c: el ortogonal y los enganches al dibujar, en la barra de las plantas (Modelo y Cargas, con el editor). */
   enganches?: () => ReactNode;
+  /**
+   * VC1 (`docs/fem3d/coherencia-vistas.md`): lo que dibuja el modo, con artículo («La deformada»).
+   * Con él, un tipo de vista para el que el modo no da fuente lo dice («… no se dibuja en planta») y
+   * ofrece la que sí lo tiene, en vez de enseñar el modelo sin más.
+   */
+  dibuja?: string;
+  /**
+   * VC1: sólo se eligen objetos de estos tipos, en los tres tipos de vista (Comprobación: los de su
+   * pestaña). Lo aplica la celda, también a lo que cae en el modelo por defecto.
+   */
+  elegibles?: readonly TipoElegible[];
+  /** VC1: si la herramienta activa no va en este tipo de vista, lo que hay que decir (si no, null). */
+  herramientaFuera?: (tipo: TipoVista) => string | null;
+}
+
+const NOMBRE_EN: Record<TipoVista, string> = { planta: "planta", alzado: "alzado", "3d": "3D" };
+
+/** VC1: el tipo de vista en el que el modo dibuja lo suyo, para ofrecerlo desde uno en el que no (el 3D, si lo tiene). */
+export function tipoQueDibuja(fuentes: FuentesVistas, tipo: TipoVista): TipoVista | null {
+  const tiene: Record<TipoVista, boolean> = { planta: !!fuentes.planta, alzado: !!fuentes.alzado, "3d": !!fuentes.tresD };
+  if (!fuentes.dibuja || tiene[tipo]) return null;
+  return (["3d", "planta", "alzado"] as const).find((t) => tiene[t]) ?? null;
+}
+
+/** VC1: el chip de un tipo de vista en el que el modo no dibuja lo suyo, con el botón a la que sí. */
+function NoSeDibuja({ fuentes, tipo, onTipo }: { fuentes: FuentesVistas; tipo: TipoVista; onTipo: (t: TipoVista) => void }) {
+  if (!fuentes.dibuja || (tipo === "planta" ? fuentes.planta : tipo === "alzado" ? fuentes.alzado : fuentes.tresD)) return null;
+  const otra = tipoQueDibuja(fuentes, tipo);
+  return (
+    <span className="chip seg-chip" data-no-se-dibuja={tipo}>
+      <span title={`Aquí, sólo el modelo${otra ? `: ${fuentes.dibuja.toLowerCase()} se ve en ${NOMBRE_EN[otra]}` : ""}`}>
+        {fuentes.dibuja} no se dibuja en {NOMBRE_EN[tipo]}
+      </span>
+      {otra && (
+        <button type="button" data-acento="" onClick={() => onTipo(otra)}>
+          Ver en {NOMBRE_EN[otra]}
+        </button>
+      )}
+    </span>
+  );
 }
 
 /** La vista de resultados de una planta con la malla encima si la celda la pide. */
@@ -282,7 +324,10 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   const eje = e.ejes.some((x) => x.id === v.eje) ? v.eje! : ejePorDefecto(e.ejes, vistas.vistas.slice(0, i).filter((x) => x.tipo === "alzado").length);
   const modoAlzado = modoAlzadoVisto(v.modoAlzado, !!fuentes.cabecera3D, e.compila);
   const vv = useMemo(() => ({ ...v, planta, eje, modoAlzado }), [v, planta, eje, modoAlzado]);
-  const celda = useMemo(() => ({ i, varias, v: vv, vista }), [i, varias, vv, vista]);
+  const clavesElegibles = fuentes.elegibles?.join(",") ?? "";
+  const celda = useMemo(() => ({ i, varias, v: vv, vista, ...(clavesElegibles ? { elegibles: clavesElegibles.split(",") as TipoElegible[] } : {}) }), [i, varias, vv, vista, clavesElegibles]);
+  const fuera = fuentes.herramientaFuera?.(tipo) ?? null;
+  const noSeDibuja = <NoSeDibuja fuentes={fuentes} tipo={tipo} onTipo={(t) => poner(i, { tipo: t })} />;
 
   const contenido = tipo === "planta" ? (fuentes.planta?.(vv, i) ?? <FuenteEscena fuente={planta ? { tipo: "planta", planta, vista: { vista: "modelo" } } : null} />) : tipo === "alzado" ? (fuentes.alzado?.(vv, i) ?? <FuenteEscena fuente={eje ? { tipo: "alzado", plano: planoAlzado(eje, vv) } : null} />) : (fuentes.tresD?.(vv, i) ?? <Fuente3DModelo />);
 
@@ -299,7 +344,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         {tipo === "planta" && (
           <>
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => p && poner(i, { planta: p })} />
-            {fuentes.cabeceraPlanta?.(vv, i)}
+            {fuentes.planta || !fuentes.dibuja ? fuentes.cabeceraPlanta?.(vv, i) : noSeDibuja}
             {planta && !fuentes.plantilla?.(planta) && fuentes.verPlantillaAqui && (() => {
               const otra = fuentes.plantillaEnOtras?.(planta);
               return otra ? (
@@ -340,8 +385,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           />
         )}
         {tipo === "alzado" && eje && fuentes.cabeceraAlzado?.(vv, i)}
-        {/* R-30: en un modo de Resultados que no se dibuja en alzado, decirlo (se veía el modelo solo, sin explicación) */}
-        {tipo === "alzado" && eje && !fuentes.alzado && !fuentes.cabeceraAlzado && (fuentes.cabecera3D || fuentes.malla) && <Chip title="Este resultado se ve en planta y en 3D; aquí, sólo el modelo">Este modo no se dibuja en alzado</Chip>}
+        {/* R-30 y VC1: en un modo que no se dibuja en alzado, decirlo (se veía el modelo solo, sin explicación) */}
+        {tipo === "alzado" && eje && noSeDibuja}
         {tipo === "3d" && (
           <>
             <Desplegable
@@ -356,9 +401,14 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
               }))}
             />
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna={fuentes.cabecera3D ? "Todas las plantas" : "Sin resaltar"} />
-            {fuentes.cabecera3D?.(vv, i) ?? fuentes.cabecera3DModelo?.(vv, i)}
+            {fuentes.tresD || !fuentes.dibuja ? (fuentes.cabecera3D?.(vv, i) ?? fuentes.cabecera3DModelo?.(vv, i)) : noSeDibuja}
             <ChipsFiltro filtro={v.filtro} onCambio={(f) => poner(i, { filtro: f })} />
           </>
+        )}
+        {fuera && (tipo !== "alzado" || eje) && (
+          <Chip title="Las herramientas de dibujo van en la vista que las admite; en ésta, un clic elige">
+            <span data-herramienta-fuera="">{fuera}</span>
+          </Chip>
         )}
       </div>
       <div className="vista-barra" role="toolbar" aria-label="Barra de la vista">
@@ -802,6 +852,9 @@ export function useEleccionEscena(fuente: FuenteEscena | null, elegibles?: reado
 export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantilla = null, elegibles }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean; plantilla?: GeometriaPlantilla | null; /** Sólo se eligen objetos de estos tipos (Comprobación: los de su pestaña). */ elegibles?: readonly TipoElegible[] }) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion;
+  // VC1: sin elegibles propios, los de la celda (los del modo, en los tres tipos de vista)
+  const celda = useContext(ContextoCelda);
+  elegibles ??= celda?.elegibles;
   // La clave estable: el objeto cambia en cada render
   const clave = JSON.stringify(fuente);
   const fu = useMemo(() => (clave === "null" ? null : (JSON.parse(clave) as FuenteEscena)), [clave]);
@@ -893,7 +946,8 @@ export function Fuente3D({ alambrico, solido = null, analitico = null, deformada
   useEffect(() => x?.ponerProyeccion(v.proyeccion), [x, v.proyeccion]);
   useEffect(() => x?.ponerPlantaActiva(v.planta), [x, v.planta]);
   useEffect(() => x?.ponerSonda(sonda), [x, sonda]);
-  const clavesElegibles = elegibles?.join(",") ?? "";
+  const celda = useCelda();
+  const clavesElegibles = (elegibles ?? celda.elegibles)?.join(",") ?? "";
   useEffect(() => {
     if (x) x.tiposElegibles = clavesElegibles ? new Set(clavesElegibles.split(",")) : null;
     return () => {

@@ -137,6 +137,7 @@ export function ModoDeformada() {
   const vista = (
     <ZonaVistas
       fuentes={{
+        dibuja: "La deformada",
         tresD: () =>
           proyecto.desactualizado ? (
             <div className="velo">

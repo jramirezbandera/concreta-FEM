@@ -50,7 +50,7 @@ import { tipoPieza } from "../../../src/editor/cargasPieza.ts";
 import { NavVistas } from "../armazon/VistasGuardadas.tsx";
 import { Situacion } from "../armazon/Situacion.tsx";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, type DibujoPlanta, type EstadoVista } from "../vistas/estado.ts";
+import { useVistas, type DibujoPlanta, type EstadoVista, type TipoVista } from "../vistas/estado.ts";
 import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
 import { usePedido } from "../sesion/usePedido.ts";
 import type { NombreHerramienta, Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
@@ -565,6 +565,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               cabecera3DModelo: cabeceraEscala,
             }
           : {}),
+        // VC1: una herramienta de dibujo que no va en esta vista lo dice (en el alzado sólo dibuja Barra; en el 3D, ninguna)
+        ...(ed && dibujando ? { herramientaFuera: (t: TipoVista) => (t === "planta" || (t === "alzado" && !cargas && foto.herramienta === "barraNiveles") ? null : foto.herramienta === "barraNiveles" && !cargas ? "Barra dibuja en planta y en alzado; aquí, un clic elige" : "Esta herramienta dibuja en planta; aquí, un clic elige") } : {}),
+        ...(cargas && casoValido ? { dibuja: "Las cargas" } : {}),
         ...(ed && !cargas ? { dibujarEjes: () => foto.herramienta !== "ejes" && elegirHerramienta("ejes") } : {}),
         cabeceraPlanta: (v, i) =>
           cargas ? (

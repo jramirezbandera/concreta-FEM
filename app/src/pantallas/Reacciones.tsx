@@ -197,6 +197,7 @@ export function ModoReacciones() {
   const vista = (
     <ZonaVistas
       fuentes={{
+        dibuja: "Las reacciones",
         tresD: () => <TresDReacciones d={d} aviso={aviso} cargando={r.cargando} />,
         planta: (v) => <EscenaReacciones fuente={v.planta ? { tipo: "planta", planta: v.planta, vista: conMalla({ vista: "reacciones" as const, combinaciones: eleccion, escala: Number(escala) }, v) } : null} objetos={ids} />,
         malla: true,

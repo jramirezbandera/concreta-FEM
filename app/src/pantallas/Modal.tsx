@@ -100,6 +100,7 @@ export function ModoModal() {
   const vista = (
     <ZonaVistas
       fuentes={{
+        dibuja: "La forma del modo",
         tresD: () =>
           proyecto.desactualizado ? (
             <div className="velo">
