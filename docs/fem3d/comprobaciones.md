@@ -1191,6 +1191,16 @@ En el empalme, el área capaz no baja: con el solape de 1,5·lb, entre las dos p
 
 **Confirmada por el usuario el 2026-11-28:** la cara traccionada es la de mayor momento de ELU en la estación (con Wood–Armer las dos caras pueden tener momento: se toma la dominante, no la concomitante de la combinación del cortante). **Por confirmar:** la tabla de cercos de las losas.
 
+### 8.30 CO2-l: sin flecha en las vigas sobre una losa de cimentación (2026-11-28)
+
+Decidido por el usuario. Una viga dibujada sobre una losa de cimentación (una viga de atado o el nervio de una losa nervada) se calcula como cualquier otra unida a una losa por sus caras (LV), y el terreno bajo su ancho apoya en los nudos de su eje (LC-g). Su flecha a L/300 y L/400 no tiene sentido (la viga va sobre el terreno) y podía dar un «no cumple» falso.
+
+- **Demandas** (`sobreCimentacion` en `demandas/vigas.ts`): un vano cuyos tramos flexibles tienen todos los nudos con el muelle de una losa de cimentación (`mapeo.cimentacion`, área > 0) lleva `sobreCimentacion` con la losa, `flecha: null` y sin `sinFlecha`. Si algún nudo no lo tiene (un vuelo fuera de la losa), la flecha se pide como antes.
+- **Comprobar:** en lugar de `flecha-total` y `flecha-activa`, la fila informativa `flecha-no-aplica` (aprovechamiento 0); el vano no queda pendiente y cumple con lo demás.
+- **Lo demás no cambia:** flexión, cortante, torsión y fisuración, como en una viga de forjado (la exposición XC2 por defecto es la de un elemento enterrado). Sin losas de cimentación, los mismos bits; las referencias congeladas no tienen ninguna viga sobre una.
+- **Validación:** `src/comprobaciones/vigasCimentacion.test.ts` (el vano sobre la losa, el vuelo fuera de ella y la misma viga en una losa normal).
+- **Fuera:** las vigas de cimentación y las riostras sin losa sobre balasto, y las centradoras; van con las zapatas como apoyo elástico (CO5, `cimentacion-y-arriostramientos.md` §2.6).
+
 ## 9. Fuera de esta fase
 
 - Lo de CO-b: acero, muros, viguetas, encepados y zapatas combinadas.

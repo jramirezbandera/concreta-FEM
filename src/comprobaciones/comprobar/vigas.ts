@@ -444,6 +444,19 @@ export function comprobarVano(d: DemandasViga, v: DemandasVano, a: ArmadoViga): 
 
   // ─── Flecha (CO-k) ───────────────────────────────────────────────────────────────────────────
   if (v.sinFlecha) pendiente(v.sinFlecha);
+  if (v.sobreCimentacion) {
+    const fila: CheckRow = {
+      id: "flecha-no-aplica",
+      description: `Flecha (no se comprueba): la viga va sobre la losa de cimentación ${v.sobreCimentacion}`,
+      value: "apoya en el terreno",
+      limit: "—",
+      utilization: 0,
+      status: "neutral",
+      neutral: true,
+      article: "CTE DB-SE 4.3.3.1",
+    };
+    anotar(fila.id, fila, "inferior", fila.description);
+  }
   const fl = flechaVano(g, a, v);
   if (fl && v.flecha) {
     const luz = v.flecha.luz;

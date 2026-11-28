@@ -102,6 +102,12 @@ export interface DemandasVano {
   /** null si no se puede: sin combinaciones de ELS o sin ningún apoyo (`sinFlecha` dice por qué). */
   flecha: FlechaVano | null;
   sinFlecha?: string;
+  /**
+   * La losa de cimentación sobre la que va el vano entero (todos los nudos de sus tramos flexibles
+   * llevan su muelle, LC-g): la viga apoya en el terreno y su flecha no tiene sentido (no se pide:
+   * `flecha` es null y no queda pendiente).
+   */
+  sobreCimentacion?: string;
 }
 
 export interface DemandasViga {
@@ -142,6 +148,37 @@ function continuidad(q: Consultas, viga: string, vano: number): [boolean, boolea
   if (!p || !v) return [false, false];
   const lado = (l: 0 | 1) => v.apoyos[l] !== null && p.vanos.some((w) => w !== v && w.apoyos[1 - l] === v.apoyos[l]);
   return v.invertida ? [lado(1), lado(0)] : [lado(0), lado(1)];
+}
+
+/** Los nudos con muelle de cada losa de cimentación, por consultas. */
+const NUDOS_CIMENTACION = new WeakMap<Consultas, Map<number, string>>();
+
+/**
+ * La losa de cimentación sobre la que va entero el tramo [desde, hasta] de la viga: todos los nudos de
+ * sus tramos flexibles llevan el muelle de una losa de cimentación (los del eje lo llevan por el ancho de la viga,
+ * LC-g). Si algún nudo no lo lleva (un vano que sale de la losa), null: su flecha se comprueba.
+ */
+export function sobreCimentacion(q: Consultas, id: string, desde: number, hasta: number): string | null {
+  const cim = q.mapeo.cimentacion;
+  if (!cim) return null;
+  let nudos = NUDOS_CIMENTACION.get(q);
+  if (!nudos) {
+    nudos = new Map();
+    for (const [losa, c] of Object.entries(cim)) c.nudos.forEach((n, k) => (c.areas[k]! > 0 ? nudos!.set(n, losa) : undefined));
+    NUDOS_CIMENTACION.set(q, nudos);
+  }
+  const barras = q.modelo.barras ?? [];
+  const ts = q.esfuerzosPiezas.tramos(id).filter((t) => t.s1 > desde + 1e-9 && t.s0 < hasta - 1e-9);
+  let losa: string | null = null;
+  for (const t of ts) {
+    for (const n of barras[t.barra]!.nudos) {
+      const l = nudos.get(n);
+      if (l === undefined) return null;
+      // Por la junta de dos losas de cimentación, la primera
+      losa ??= l;
+    }
+  }
+  return losa;
 }
 
 function calcularDemandasViga(q: Consultas, id: string, situaciones: readonly Situacion[]): Respuesta<DemandasViga> {
@@ -265,7 +302,10 @@ function calcularDemandasViga(q: Consultas, id: string, situaciones: readonly Si
     let sinFlecha: string | undefined;
     const voladizo = !va.apoyoInicio && !va.apoyoFin ? undefined : !va.apoyoInicio ? ("inicio" as const) : !va.apoyoFin ? ("fin" as const) : null;
     const L = va.hasta - va.desde;
-    if (voladizo === undefined) sinFlecha = "la viga no tiene apoyos (pilares, muros, apoyos u otras vigas en sus extremos): su flecha no se comprueba";
+    const cimentacion = sobreCimentacion(q, id, va.desde, va.hasta);
+    if (cimentacion) {
+      // Sobre el terreno: ni flecha ni pendiente
+    } else if (voladizo === undefined) sinFlecha = "la viga no tiene apoyos (pilares, muros, apoyos u otras vigas en sus extremos): su flecha no se comprueba";
     else if (!cp || !car) sinFlecha = "sin combinaciones de ELS (casos sin su acción) no hay flecha";
     else if (!(L > 0)) sinFlecha = "el vano no tiene longitud";
     else {
@@ -310,6 +350,7 @@ function calcularDemandasViga(q: Consultas, id: string, situaciones: readonly Si
       empotramiento,
       flecha,
       ...(sinFlecha ? { sinFlecha } : {}),
+      ...(cimentacion ? { sobreCimentacion: cimentacion } : {}),
     });
   }
   return { valido: true, valor: { viga: id, seccion, material, axilSinValor: v.valor.axilSinValor, situaciones: [...situaciones], combinaciones: elu.valor.factores.length, vanos }, diagnosticos };
