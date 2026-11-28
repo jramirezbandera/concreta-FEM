@@ -419,7 +419,7 @@ function TablaFilas({ ficha, ancha }: { ficha: FichaComprobacion; ancha?: boolea
   const filas = [...ficha.filas].sort((a, b) => peso(b) - peso(a));
   if (!filas.length) return null;
   const valor = (f: FilaModulo) => (f.informativa ? "dato" : f.aprovechamiento === null ? (f.estado === "fail" ? "no" : "sí") : aprov(f.aprovechamiento));
-  return (
+  const tabla = (
     <table className="tb" data-filas-modulo data-ancha={ancha || undefined}>
       <thead>
         <tr>
@@ -436,7 +436,11 @@ function TablaFilas({ ficha, ancha }: { ficha: FichaComprobacion; ancha?: boolea
               {textoApp(f.descripcion)}
               <small>{ancha ? f.articulo : [f.articulo, lugarDe(f)].filter(Boolean).join(" · ")}</small>
             </td>
-            {ancha && <td className="txt">{[f.lugar, f.s !== undefined ? `s = ${fmt(f.s, 2)} m` : undefined].filter(Boolean).join(" · ") || "—"}</td>}
+            {ancha && (
+              <td className="txt">
+                <span className="donde-fila">{[f.lugar, f.s !== undefined ? `s = ${fmt(f.s, 2)} m` : undefined].filter(Boolean).join(" · ") || "—"}</span>
+              </td>
+            )}
             {ancha && (
               <td className="txt mono">
                 {f.comb ?? "—"}
@@ -456,6 +460,8 @@ function TablaFilas({ ficha, ancha }: { ficha: FichaComprobacion; ancha?: boolea
       </tbody>
     </table>
   );
+  // En el banco, a todo su ancho: las filas de una losa (cientos) en dos columnas si caben
+  return ancha ? <TablaEnColumnas maxColumnas={2}>{tabla}</TablaEnColumnas> : tabla;
 }
 
 /** Lo que no se ha comprobado de una parte, y las hipótesis de partida de su comprobación (el punzonamiento). */
@@ -703,6 +709,8 @@ function BancoArmado({
         {portico ?? (sinLosa ? null : <Croquis ficha={ficha} armado={dibujado} activo={activo} grande {...(esfuerzos && tipo === "pilares" ? { esfuerzos } : {})} />)}
         {tipo === "pilares" && esfuerzos?.ternas && <TernasTramo t={esfuerzos.ternas} combinaciones={esfuerzos.combinaciones} />}
       </div>
+      {/* En una losa, el armado y sus comprobaciones van uno encima de otro a la derecha del dibujo, a todo su ancho (en las demás, `display: contents`: tres columnas) */}
+      <div className="banco-lado">
       <div className="banco-form">
         {noAplica ? (
           <p className="nota" data-no-aplica style={{ color: "var(--color-text-primary)" }}>
@@ -767,6 +775,7 @@ function BancoArmado({
             <Hipotesis ficha={ficha} />
           </div>
         ) : null}
+      </div>
       </div>
     </div>
   );

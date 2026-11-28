@@ -1427,7 +1427,12 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 /* El banco de armado (Comprobación, panel de abajo): arriba, la pieza y los botones; debajo, a lo ancho, su dibujo, su armado y sus comprobaciones */
 .banco-armado { display: grid; grid-template-columns: minmax(0, 1.5fr) 300px minmax(0, 1fr); grid-template-areas: "cab cab cab" "avisos avisos avisos" "dibujo form comp"; grid-template-rows: auto auto 1fr; align-items: start; min-height: 100%; }
 .banco-armado[data-tipo="punzonamiento"] { grid-template-columns: 340px 300px minmax(0, 1fr); }
-.banco-armado[data-tipo="losas"] { grid-template-columns: 300px minmax(0, 1fr) minmax(0, 380px); }
+/* Una losa: el dibujo a la izquierda y, a su derecha y a todo lo ancho, el armado (la base y los refuerzos, uno al lado del otro) y debajo sus comprobaciones, que en una columna estrecha no cabían */
+.banco-lado { display: contents; }
+.banco-armado[data-tipo="losas"] { grid-template-columns: 300px minmax(0, 1fr); grid-template-areas: "cab cab" "avisos avisos" "dibujo lado"; }
+.banco-armado[data-tipo="losas"] > .banco-lado { grid-area: lado; display: block; min-width: 0; align-self: stretch; border-left: 1px solid var(--color-border-sub); }
+.banco-armado[data-tipo="losas"] .banco-form { border-left: 0; }
+.banco-armado[data-tipo="losas"] .banco-comprobaciones { border-left: 0; border-top: 1px solid var(--color-border-sub); }
 .banco-armado[data-tipo="vigas"] { grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "cab cab" "avisos avisos" "dibujo form" "comp form"; grid-template-rows: auto auto auto 1fr; }
 .banco-cabecera { grid-area: cab; position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 14px; border-bottom: 1px solid var(--color-border-sub); background: var(--color-bg-primary); }
 .banco-texto { font-size: 12px; color: var(--color-text-primary); }
@@ -1446,20 +1451,27 @@ html[data-theme="dark"] .herr-seg button[data-on="true"] { background: var(--col
 /* Con sitio para las tres columnas, cada una se desplaza por su cuenta: el dibujo sigue a la vista al bajar por las comprobaciones */
 @media (min-width: 1501px) {
   .banco-armado:not([data-tipo="vigas"]) { height: 100%; min-height: 0; grid-template-rows: auto auto minmax(0, 1fr); }
-  .banco-armado:not([data-tipo="vigas"]) > .banco-dibujo, .banco-armado:not([data-tipo="vigas"]) > .banco-form, .banco-armado:not([data-tipo="vigas"]) > .banco-comprobaciones { max-height: 100%; overflow-y: auto; }
+  .banco-armado:not([data-tipo="vigas"]) > .banco-dibujo, .banco-armado:not([data-tipo="vigas"]) .banco-form, .banco-armado:not([data-tipo="vigas"]) .banco-comprobaciones { max-height: 100%; overflow-y: auto; }
+  /* En una losa, el armado y sus comprobaciones se desplazan juntos */
+  .banco-armado[data-tipo="losas"] > .banco-lado { max-height: 100%; overflow-y: auto; }
+  .banco-armado[data-tipo="losas"] .banco-form, .banco-armado[data-tipo="losas"] .banco-comprobaciones { max-height: none; overflow-y: visible; }
 }
 @media (max-width: 1500px) {
   .banco-armado, .banco-armado[data-tipo="punzonamiento"] { grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "cab cab" "avisos avisos" "dibujo form" "comp comp"; grid-template-rows: auto; }
-  .banco-armado[data-tipo="losas"] { grid-template-columns: 300px minmax(0, 1fr); grid-template-areas: "cab cab" "avisos avisos" "dibujo form" "comp comp"; grid-template-rows: auto; }
+  .banco-armado[data-tipo="losas"] { grid-template-columns: 300px minmax(0, 1fr); grid-template-areas: "cab cab" "avisos avisos" "dibujo lado"; grid-template-rows: auto; }
   .banco-comprobaciones { border-left: 0; border-top: 1px solid var(--color-border-sub); }
 }
 @media (max-width: 1000px) {
   .banco-armado, .banco-armado[data-tipo] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "cab" "avisos" "dibujo" "form" "comp"; grid-template-rows: auto; }
+  .banco-armado[data-tipo="losas"] { grid-template-areas: "cab" "avisos" "dibujo" "lado"; }
+  .banco-armado[data-tipo="losas"] > .banco-lado { border-left: 0; border-top: 1px solid var(--color-border-sub); }
   .banco-form { border-left: 0; border-top: 1px solid var(--color-border-sub); }
 }
 /* La tabla de comprobaciones del banco: la que manda, marcada, y el aprovechamiento dibujado */
 .tb[data-ancha] tr[data-manda] td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
 .tb[data-ancha] td:last-child { white-space: nowrap; }
+/* «Dónde» parte en dos líneas (la fila ya tiene dos, por la referencia de la norma): así la tabla de una losa cabe en dos columnas */
+.tb[data-ancha] .donde-fila { display: inline-block; max-width: 200px; white-space: normal; }
 .barra-aprov { display: inline-block; width: 54px; height: 6px; margin-right: 7px; border-radius: 4px; background: var(--color-border-sub); vertical-align: middle; overflow: hidden; }
 .barra-aprov i { display: block; height: 100%; border-radius: 4px; background: #16a34a; }
 .barra-aprov[data-estado="warn"] i { background: #d97706; }
