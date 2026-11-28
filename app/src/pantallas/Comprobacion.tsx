@@ -158,6 +158,25 @@ const enFoco = () => {
  * viga o la losa). En el 3D, también lo que tapa otra pieza; en el punzonamiento, el pilar de la unión.
  */
 const ELEGIBLES: Record<TipoComprobacion, TipoElegible[]> = { pilares: ["pilar"], vigas: ["viga"], losas: ["losa"], punzonamiento: ["pilar"] };
+/** Sin tipo elegido: cualquier pieza que se comprueba; al elegirla, su tipo. */
+const ELEGIBLES_TODO: TipoElegible[] = ["pilar", "viga", "losa"];
+
+/**
+ * El tipo de comprobación de lo elegido en una vista: un pilar, sus tramos; una viga, sus vanos; una
+ * losa, o un refuerzo, unos cercos o un ábaco suyos («L1/R3»), la losa; la unión de un pilar con la losa
+ * de una planta («P1/N2», del 3D del punzonamiento), su punzonamiento. Lo demás (muros, barras,
+ * cargas…), ninguno.
+ */
+export function tipoDeElegido(id: string | undefined, m: { pilares?: readonly { id: string }[]; vigas?: readonly { id: string }[]; losas?: readonly { id: string }[] } | undefined): TipoComprobacion | null {
+  if (!id || !m) return null;
+  if (m.pilares?.some((p) => p.id === id)) return "pilares";
+  if (m.vigas?.some((v) => v.id === id)) return "vigas";
+  const barra = id.indexOf("/");
+  const base = barra < 0 ? id : id.slice(0, barra);
+  if (m.losas?.some((l) => l.id === base)) return "losas";
+  if (barra >= 0 && m.pilares?.some((p) => p.id === base)) return "punzonamiento";
+  return null;
+}
 
 const aprov = (x: number | null) => (x === null ? "—" : fmt(x, 2));
 
@@ -880,7 +899,15 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     pv.poner({ dock: true, max: false, alto: altoMedioDock(window.innerHeight) });
   }, []);
   const proceso = useProceso();
-  const [tipo, setTipo] = useState<TipoComprobacion>("pilares");
+  /**
+   * Lo que se comprueba (la pestaña de la barra). Sin ella (por defecto) se elige cualquier pieza, y al
+   * elegir una se pasa a su tipo; pulsar la pestaña activa la suelta. Se entra con lo elegido en otro
+   * espacio: en su tipo, con su comprobación.
+   */
+  const [modo, setModo] = useState<TipoComprobacion | null>(() => tipoDeElegido(elegidos[elegidos.length - 1], proyecto.edicion?.proyecto.modelo));
+  /** El tipo de los pedidos: sin pestaña, el de los pilares (su tabla, sólo para proponer al entrar lo que falta, §8.14). */
+  const tipo: TipoComprobacion = modo ?? "pilares";
+  const elegibles = modo ? ELEGIBLES[modo] : ELEGIBLES_TODO;
   const [clave, setClave] = useState<string | null>(null);
   const [peores, setPeores] = useState(false);
   const [dibujo, setDibujo] = useState<Dibujo>("armado");
@@ -966,8 +993,19 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
   const elegidoVista = elegidos[elegidos.length - 1];
   const elemento = tipo === "losas" && elegidoVista ? elementoDeId(elegidoVista) : null;
   const ultimo = elemento?.losa ?? elegidoVista;
+  // Sin pestaña, lo que se elige en una vista lleva a su tipo (con una, sólo se eligen los suyos)
+  const modeloVivo = ed?.proyecto.modelo;
   useEffect(() => {
-    if (!d || !ultimo) return;
+    if (modo) return;
+    const t = tipoDeElegido(elegidoVista, modeloVivo);
+    if (!t) return;
+    setModo(t);
+    setClave(null);
+    setPropuesta(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- al cambiar lo elegido (y al llegar el modelo, si se entra antes)
+  }, [elegidoVista, !!modeloVivo]);
+  useEffect(() => {
+    if (!modo || !d || !ultimo) return;
     // §8.21: elegida en el 3D por su clave (la unión de un pilar con la losa de una planta)
     const porClave = d.partes.find((p) => p.clave === ultimo);
     if (porClave) {
@@ -985,7 +1023,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
       if (pan.pestana !== "avisos") pan.abrirPestana("armado");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al cambiar lo elegido o la tabla
-  }, [ultimo, d]);
+  }, [ultimo, d, modo]);
 
   // §8.12: los refuerzos y los cercos de las losas, con el ratón en la planta
   const losasModelo = ed?.proyecto.modelo.losas;
@@ -1061,6 +1099,17 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     setAvisoPlanta(null);
     repintarVistas();
   }, [anadir, editable, er]);
+
+  /** La pestaña de la barra; sin ella, también sin nada elegido (si no, lo elegido volvería a llevar a su tipo). */
+  const ponerModo = (t: TipoComprobacion | null) => {
+    setModo(t);
+    setClave(null);
+    setPropuesta(null);
+    if (t) return;
+    setElegidos([]);
+    // El banco de armado se queda sin pieza: abajo, qué comprobar
+    if (pan.dock && pan.pestana === "armado") pan.abrirPestana("tabla");
+  };
 
   const elegir = (p: ParteComprobada) => {
     setClave(p.clave);
@@ -1245,18 +1294,14 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
             key={t.id}
             icono={t.icono}
             nombre={t.nombre}
-            title={t.title}
-            activa={tipo === t.id}
-            onClick={() => {
-              setTipo(t.id);
-              setClave(null);
-              setPropuesta(null);
-            }}
+            title={modo === t.id ? `${t.title}. Otro clic la suelta: sin pestaña se elige cualquier pieza` : t.title}
+            activa={modo === t.id}
+            onClick={() => ponerModo(modo === t.id ? null : t.id)}
           />
         ))}
       </div>
       <Separador />
-      <Segmentado etiqueta="En planta" opciones={DIBUJOS} valor={dibujo} onCambio={setDibujo} />
+      {modo && <Segmentado etiqueta="En planta" opciones={DIBUJOS} valor={dibujo} onCambio={setDibujo} />}
       {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Se ve" opciones={CARAS} valor={cara} onCambio={setCara} />}
       {tipo === "losas" && dibujo === "armado" && <Segmentado etiqueta="Base" opciones={BASE} valor={base ? "si" : "no"} onCambio={(v) => setBase(v === "si")} />}
       {tipo === "losas" && dibujo === "armado" && hayReticular && <Segmentado etiqueta="Retícula" opciones={RETICULA} valor={reticula ? "si" : "no"} onCambio={(v) => setReticula(v === "si")} />}
@@ -1353,10 +1398,30 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     </div>
   );
 
+  // Sin pestaña: qué comprobar, y lo que hace el programa al entrar (proponer lo que falta)
+  const tablaLibre = (
+    <Seccion titulo="Comprobación">
+      {avances}
+      {resumenPropuesta}
+      <div data-comprobacion-libre>
+        <Vacio titulo="Elija qué comprobar">Un pilar, una viga o una losa en la planta o en el 3D: se abre su comprobación. O una pestaña de la barra, con todas las de su tipo.</Vacio>
+        <div role="group" aria-label="Comprobar por tipo" className="flex flex-wrap justify-center gap-1.5 pb-3">
+          {TIPOS.map((t) => (
+            <button key={t.id} type="button" className="btn" onClick={() => ponerModo(t.id)} title={t.title}>
+              {t.nombre}
+            </button>
+          ))}
+        </div>
+      </div>
+    </Seccion>
+  );
+
   const tabla = !activo ? (
     <div className="p-3">
       <AvisoDesactualizado que="estas comprobaciones" />
     </div>
+  ) : !modo ? (
+    tablaLibre
   ) : r.diagnosticos ? (
     <p className="msj fail">{r.diagnosticos.map((x) => textoApp(x.mensaje)).join(" ")}</p>
   ) : !d ? (
@@ -1465,12 +1530,14 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     />
   );
 
-  const avisos = d && d.diagnosticos.length > 0 ? <ListaDiagnosticos ds={d.diagnosticos} onObjeto={(id) => setElegidos([id])} /> : <Vacio titulo="Sin avisos" />;
+  const avisos = !modo ? <Vacio titulo="Sin pestaña">Los avisos son los de lo que se comprueba: elija una pieza o una pestaña.</Vacio> : d && d.diagnosticos.length > 0 ? <ListaDiagnosticos ds={d.diagnosticos} onObjeto={(id) => setElegidos([id])} /> : <Vacio titulo="Sin avisos" />;
 
   const banco = !activo ? (
     <div className="p-3">
       <AvisoDesactualizado que="este armado" />
     </div>
+  ) : !modo ? (
+    <Vacio titulo="Nada elegido">Elija un pilar, una viga o una losa en la planta o en el 3D: aquí se dibuja a escala y se cambia su armado.</Vacio>
   ) : !elegida ? (
     <p className="nota">
       Elija {uno === "losa" ? "una losa" : `un ${uno === "unión" ? "pilar" : uno}`} en la planta o en la tabla: aquí se dibuja a escala{tipo === "vigas" ? ", con el despiece de su pórtico (la alineación entera de la que forma parte)," : ""} y se cambia su armado.
@@ -1493,8 +1560,12 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
     />
   );
 
-  const propiedades =
-    elegida && ficha ? (
+  const propiedades = !modo ? (
+    <>
+      <Cabecera icono={IcComprobacion} tipo="Comprobación" titulo="Sin pestaña" detalle="Se elige cualquier pieza" />
+      <p className="nota">Elija un pilar, una viga o una losa en la planta o en el 3D y se abre su comprobación, en la pestaña de su tipo. Con una pestaña sólo se eligen las piezas de su tipo; otro clic en ella la suelta.</p>
+    </>
+  ) : elegida && ficha ? (
       <Ficha key={`${tipo}/${ficha.clave}`} tipo={tipo} ficha={ficha} cargando={f.cargando} editar={() => pan.abrirPestana("armado")} />
     ) : (
       <>
@@ -1562,13 +1633,22 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
         herramientas={herramientas}
         vista={
           <ZonaVistas
-            fuentes={{
+            fuentes={!modo ? {
+              // Sin pestaña, el modelo: se elige cualquier pieza que se comprueba
+              tresD: () => <Fuente3DModelo elegibles={ELEGIBLES_TODO} />,
+              planta: (v) => (!v.planta ? null : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} elegibles={ELEGIBLES_TODO} />),
+              cabeceraPlanta: () => (
+                <Chip acento>
+                  <span data-chip-libre>Comprobación · elija un pilar, una viga o una losa</span>
+                </Chip>
+              ),
+            } : {
               // CO6-d: la planta, con cada parte del color de su aprovechamiento (la escena del worker)
               ...(tipo === "losas" && dibujo === "armado" && !proponiendose ? { tresD: () => <Armado3DLosas armado={armado} cara={cara} datos={datosObra} base={base} reticula={reticula} /> } : {}),
               ...(tipo === "punzonamiento" && !proponiendose ? { tresD: () => <Punzonamiento3D armado={armado} datos={datosObra} /> } : {}),
-              ...((tipo === "pilares" || tipo === "vigas") || proponiendose ? { tresD: () => <Fuente3DModelo elegibles={ELEGIBLES[tipo]} /> } : {}),
+              ...((tipo === "pilares" || tipo === "vigas") || proponiendose ? { tresD: () => <Fuente3DModelo elegibles={elegibles} /> } : {}),
               // (mientras se propone el armado de lo que se mira, la planta del modelo: la de su armado sale al acabar)
-              planta: (v) => (!v.planta ? null : proponiendose ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} elegibles={ELEGIBLES[tipo]} /> : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} elegibles={ELEGIBLES[tipo]} />),
+              planta: (v) => (!v.planta ? null : proponiendose ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "modelo" } }} dibujo={null} elegibles={elegibles} /> : <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: { vista: "comprobacion", de: tipo, ...(armado ? { armado } : {}), datos: datosObra, ...(dibujo === "armado" ? { dibujo, ...(tipo === "losas" && cara !== "todas" ? { cara } : {}), ...(tipo === "losas" && !reticula ? { reticula: false } : {}), ...(tipo === "losas" && base ? { base: true } : {}) } : {}) } }} dibujo={editable ? er.adaptador(v.planta) : null} elegibles={elegibles} />),
               cabeceraPlanta: () => (
                 <>
                   <Chip acento>
@@ -1597,7 +1677,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           {
             id: "tabla",
             titulo: "Comprobaciones",
-            insignia: d ? (d.resumen.noCumplen ? `${d.resumen.noCumplen} ✕` : "✓") : undefined,
+            insignia: modo && d ? (d.resumen.noCumplen ? `${d.resumen.noCumplen} ✕` : "✓") : undefined,
             contenido: tabla,
           },
           { id: "armado", titulo: tipo === "vigas" ? "Armado · pórtico" : "Armado", contenido: banco },
@@ -1605,7 +1685,7 @@ export function ModoComprobacion({ automatico = true }: { /** §8.14: proponer s
           {
             id: "avisos",
             titulo: "Avisos",
-            insignia: d?.diagnosticos.length || undefined,
+            insignia: (modo && d?.diagnosticos.length) || undefined,
             contenido: avisos,
           },
         ]}

@@ -9,7 +9,7 @@ import { barrasDe } from "../../../src/comprobaciones/armado.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 import { edificioObjetivoLosas } from "../../../validacion/c2/modelos.ts";
 import { VERSION_ESQUEMA, type Proyecto } from "../../../src/agente/proyecto.ts";
@@ -25,7 +25,7 @@ import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { ContextoPaneles, useAlmacenPaneles } from "../armazon/paneles.ts";
 import { ContextoVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
-import { ModoComprobacion } from "../pantallas/Comprobacion.tsx";
+import { ModoComprobacion, tipoDeElegido } from "../pantallas/Comprobacion.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
@@ -85,12 +85,17 @@ interface Registro {
   ediciones: { op: Operacion; etiqueta: string }[];
   elegidos: string[][];
   proyecto: Proyecto;
+  /** Lo elegido al entrar (en otro espacio). */
+  entrada?: string[];
+  /** Elegir como en una vista. */
+  elegir?: (ids: string[]) => void;
 }
 
 /** La pantalla con un proyecto que se edita de verdad (la operación `armado` del editor). */
 function Montada({ reg }: { reg: Registro }) {
   const [p, setP] = useState(reg.proyecto);
-  const [elegidos, setEl] = useState<string[]>([]);
+  const [elegidos, setEl] = useState<string[]>(reg.entrada ?? []);
+  reg.elegir = (ids) => act(() => setEl(ids));
   const [cliente] = useState(
     () =>
       ({
@@ -143,8 +148,9 @@ function Montada({ reg }: { reg: Registro }) {
   );
 }
 
-function montar(automatico = false): Registro & { desmontar: () => void } {
-  const reg: Registro & { desmontar: () => void } = { automatico, pedidos: [], ediciones: [], elegidos: [], proyecto: inicial, desmontar() {} };
+/** `pestana`: la que se pulsa al entrar (por defecto, Pilares; null, ninguna: se elige cualquier pieza). */
+function montar(automatico = false, pestana: string | null = "Pilares", entrada?: string[]): Registro & { desmontar: () => void } {
+  const reg: Registro & { desmontar: () => void } = { automatico, pedidos: [], ediciones: [], elegidos: [], proyecto: inicial, desmontar() {}, ...(entrada ? { entrada } : {}) };
   // El panel de abajo recuerda su pestaña: cada prueba empieza en la tabla
   localStorage.clear();
   const { unmount } = render(
@@ -155,11 +161,53 @@ function montar(automatico = false): Registro & { desmontar: () => void } {
     </ThemeProvider>,
   );
   reg.desmontar = unmount;
+  if (pestana) fireEvent.click(within(screen.getByRole("group", { name: "Qué se comprueba" })).getByRole("button", { name: pestana }));
   return reg;
 }
 
 const filasTabla = () => within(document.querySelector("[data-tabla-comprobacion]")!).getAllByRole("row").slice(1);
 const celdas = (tr: HTMLElement) => within(tr).getAllByRole("cell").map((c) => c.textContent);
+
+describe("Comprobación sin pestaña", () => {
+  const pulsada = (nombre: string) => within(screen.getByRole("group", { name: "Qué se comprueba" })).getByRole("button", { name: nombre }).getAttribute("aria-pressed");
+
+  it("tipoDeElegido: pilar, viga, losa (y sus refuerzos), la unión de un pilar con una losa; lo demás, ninguno", () => {
+    const m = { pilares: [{ id: "P1" }], vigas: [{ id: "V1" }], losas: [{ id: "L1" }] };
+    expect(tipoDeElegido("P1", m)).toBe("pilares");
+    expect(tipoDeElegido("V1", m)).toBe("vigas");
+    expect(tipoDeElegido("L1", m)).toBe("losas");
+    expect(tipoDeElegido("L1/R3", m)).toBe("losas");
+    expect(tipoDeElegido("P1/N2", m)).toBe("punzonamiento");
+    expect(tipoDeElegido("M1", m)).toBeNull();
+    expect(tipoDeElegido(undefined, m)).toBeNull();
+  });
+
+  it("por defecto ninguna pestaña; elegir una pieza lleva a la suya, y otro clic en ella la suelta (y lo elegido)", async () => {
+    const reg = montar(false, null);
+    for (const t of ["Pilares", "Vigas", "Losas", "Punzonamiento"]) expect(pulsada(t)).toBe("false");
+    expect(document.querySelector("[data-comprobacion-libre]")).not.toBeNull();
+    expect(document.querySelector("[data-tabla-comprobacion]")).toBeNull();
+    const viga = inicial.modelo.vigas![0]!.id;
+    reg.elegir!([viga]);
+    await waitFor(() => expect(pulsada("Vigas")).toBe("true"));
+    await waitFor(() => expect(document.querySelector("[data-tabla-comprobacion] th")!.textContent).toBe("Viga"), { timeout: 60_000 });
+    // Su comprobación, abierta en el banco de armado
+    await waitFor(() => expect(reg.pedidos.some((x) => x.tipo === "comprobacion" && x.de === "vigas" && x.clave.startsWith(`${viga}`))).toBe(true), { timeout: 60_000 });
+    fireEvent.click(within(screen.getByRole("group", { name: "Qué se comprueba" })).getByRole("button", { name: "Vigas" }));
+    expect(pulsada("Vigas")).toBe("false");
+    expect(reg.elegidos.at(-1)).toEqual([]);
+    expect(document.querySelector("[data-comprobacion-libre]")).not.toBeNull();
+    reg.desmontar();
+  }, 120_000);
+
+  it("se entra con lo elegido en otro espacio: en su pestaña y con su comprobación", async () => {
+    const pilar = inicial.modelo.pilares![0]!.id;
+    const reg = montar(false, null, [pilar]);
+    expect(pulsada("Pilares")).toBe("true");
+    await waitFor(() => expect(reg.pedidos.some((x) => x.tipo === "comprobacion" && x.de === "pilares" && x.clave.startsWith(`${pilar}`))).toBe(true), { timeout: 60_000 });
+    reg.desmontar();
+  }, 120_000);
+});
 
 describe("CO6 · DOM: Comprobación", () => {
   it("§8.14: al entrar, lo que no tiene armado se propone solo en toda la obra (un paso de deshacer), una vez por cálculo", async () => {
