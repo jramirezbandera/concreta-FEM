@@ -78,7 +78,7 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 1. **VC1, el contrato** (CV-1, CV-3, CV-7). Pequeño; arregla lo del usuario. **Hecho el 2026-11-28** (§6).
 2. **VC2, la deformada en el alzado y en la planta** (CV-2; **hecho el 2026-11-28**, §7): la deformada del analítico en el plano del pórtico, con su escala y los desplomes de cada planta rotulados (los de `fem consultar desplomes`), y en la planta el diafragma desplazado; lo mismo para los modos en Modal. Con el sismo del programa, como en el 3D: sin deformada de la combinación (VS-o).
 3. **VC3, Comprobación en el alzado y el color en el 3D** (CV-4; **hecho el 2026-11-28**, §8).
-4. **VC4, Pilares y muros en el alzado** (CV-5).
+4. **VC4, Pilares y muros en el alzado** (CV-5; **hecho el 2026-11-28**, §9).
 5. **VC5, el valor bajo el cursor en las vistas planas** (CV-6).
 6. **VC6, aislar y ocultar en planta y alzado** (CV-8), si después de lo demás sigue haciendo falta.
 
@@ -116,4 +116,16 @@ Lo que está bien y se queda: medir sólo en las vistas planas, la caja de secci
 - **Comprobación:** pilares, vigas y losas (con «Aprovechamiento») dan este 3D; losas con «Armado» y el punzonamiento siguen con el suyo (los refuerzos y los perímetros). El alzado, en las cuatro pestañas; mientras se propone el armado, el modelo.
 - **Prueba** (`src/visor/comprobacionVistas.test.ts`, edificio objetivo de losas de 2 × 2 × 2 con el armado propuesto): en el alzado de dos ejes, cada polígono coloreado es de una parte de la tabla y lleva el color de su clase, los aprovechamientos rotulados son los de la tabla y salen todos los tramos de los pilares del plano; en el 3D, cada triángulo de un pilar, una viga o una losa lleva la clase de su parte (cada tramo de pilar, entero de la de su ficha) y los demás, 0.
 - **Comprobado en la app** con la vivienda: el alzado del eje 2 en las cuatro pestañas (P10 0,88 y P2 0,94; el vano de Z-CUB-8; P2 0,26 en el punzonamiento, que se elige con un clic) y el 3D de pilares, vigas y losas.
+- **No probado:** los bancos de Chrome.
+
+## 9. VC4 hecho (2026-11-28)
+
+- **El worker** (`src/visor/alzadoResultados.ts`, puro), sobre el alzado del modelo en gris:
+  - **Pilares** (`vistaAlzadoPilares`): cada tramo de un pilar del plano, de su base a su cabeza y con el ancho que se ve de su huella, del color de la banda de su N o su ν, rotulado con su valor. Los valores, las bandas, los colores y la leyenda son los de `pilares3D` con todos los tramos del edificio (el 3D de Pilares y el cuadro), así que el alzado y el 3D se leen con la misma escala. Los extremos rotulados, los de lo que se ve.
+  - **Muros** (`vistaAlzadoMuros`): el mapa de un campo en las láminas de los muros paralelos al plano y a menos de su profundidad, en (u, z), con los valores de `valoresCampo` o, con varias combinaciones y envolvente, de `envolventeCampo` (los del 3D de Losas con «Muros»). Sin envolvente, la combinación del mayor |valor| en lo que se ve, como en una planta; los límites, la paleta, lo de fuera de la escala, los picos y los extremos, como `vistaCampo`. σ no tiene mapa en el alzado (sólo la tienen las losas de cimentación), y un plano sin muros paralelos lo dice.
+  - `anchoPilarEnPlano`, compartido con el alzado de Comprobación (VC3).
+- **El pedido:** `pilares` (`PilaresAlzado`: magnitud y combinaciones) y `muros` (`MurosAlzado`: campo, combinaciones, escala y envolvente) en el alzado (`ExtrasAlzado`). `TipoElegible` admite «muro».
+- **La app:** Pilares da el alzado, con el selector N/ν y la combinación en su cabecera, y en él sólo se eligen pilares; Losas da en el alzado el mapa de los muros del plano con el campo, la envolvente y la escala de la planta (en él se eligen muros). El panel de la escala sigue siendo el de la planta: sus picos y su rango son los de la planta, no los del alzado.
+- **Prueba** (`src/visor/alzadoResultados.test.ts`, la retícula con núcleo de C3): en cada eje, los tramos de los pilares del plano salen uno a uno con el color y el valor del 3D, y el extremo de N es la mayor compresión de lo que se ve; el mínimo y el máximo del mapa de uz, M11 y F22 son los de las láminas de los muros del plano en la combinación dibujada, calculados aparte, y un eje sin muros no tiene mapa; el pedido, por el atendedor.
+- **Comprobado en la app** con el ejemplo del núcleo: el alzado del eje 1 en Pilares (N de cada tramo, P0-5 −273 kN) y el del eje 2 en Losas (la envolvente máxima de M11 en el muro del núcleo, 12,4 kN·m/m con su combinación).
 - **No probado:** los bancos de Chrome.

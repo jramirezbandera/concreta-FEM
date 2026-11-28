@@ -16,11 +16,12 @@
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { cantoSeccion, intervalosRecta, PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type OpcionesAlzado, type PlanoAlzado } from "../agente/render/alzado.ts";
 import { cajaDe, numeroFijo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva } from "../agente/render/escena.ts";
-import { anchoViga, huellaSeccion, porId, type DatosVista } from "../agente/render/modelo.ts";
+import { anchoViga, porId, type DatosVista } from "../agente/render/modelo.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { desnivelesVigasFisico } from "../compilador/desniveles.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
+import { anchoPilarEnPlano } from "./alzadoResultados.ts";
 import { alDia, claseAprovechamiento, COLOR_APROVECHAMIENTO, TEXTO_CLASE, type ClaseAprovechamiento, type FichaComprobacion, type TipoComprobacion } from "./comprobaciones.ts";
 import type { Sesion } from "./sesion.ts";
 import type { Solido } from "./solido.ts";
@@ -95,15 +96,7 @@ export function vistaAlzadoComprobacion(s: Sesion, plano: PlanoAlzado, tipo: Tip
     if (p.aprovechamiento !== null) extremos.push(extremo(p, donde));
   };
   // El ancho que el plano ve de la huella de un pilar en un tramo (u), o null
-  const anchoPilar = (id: string, cabeza: string): [number, number] | null => {
-    const p = f.pilares?.find((x) => x.id === id);
-    if (!p || Math.abs(ww([p.x, p.y])) > prof) return null;
-    const h = huellaSeccion(p, seccion(p.tramos?.find((t) => t.planta === cabeza)?.seccion ?? p.seccion));
-    if (!h) return null;
-    if ("radio" in h) return [uu(h.centro) - h.radio, uu(h.centro) + h.radio];
-    const us = h.anillo.map(uu);
-    return [Math.min(...us), Math.max(...us)];
-  };
+  const anchoPilar = (id: string, cabeza: string) => anchoPilarEnPlano(f, plano, id, cabeza);
   // Las losas de una planta cortadas por el plano: [a, b] en u, cara superior y espesor
   const cortesLosas = (planta: string, id?: string) =>
     porId(f.losas ?? [])

@@ -858,10 +858,10 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
   // La clave estable: el objeto cambia en cada render
   const clave = JSON.stringify(fuente);
   const fu = useMemo(() => (clave === "null" ? null : (JSON.parse(clave) as FuenteEscena)), [clave]);
-  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}), ...(fu.reacciones ? { reacciones: fu.reacciones } : {}), ...(fu.deformada ? { deformada: fu.deformada } : {}), ...(fu.comprobacion ? { comprobacion: fu.comprobacion } : {}) }) : null);
+  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}), ...(fu.reacciones ? { reacciones: fu.reacciones } : {}), ...(fu.deformada ? { deformada: fu.deformada } : {}), ...(fu.comprobacion ? { comprobacion: fu.comprobacion } : {}), ...(fu.pilares ? { pilares: fu.pilares } : {}), ...(fu.muros ? { muros: fu.muros } : {}) }) : null);
   const { eventos, resaltado } = useEleccionEscena(fu, elegibles);
   // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
-  const resultados = fu?.tipo === "alzado" && (!!fu.diagramas || !!fu.deformada || !!fu.comprobacion);
+  const resultados = fu?.tipo === "alzado" && (!!fu.diagramas || !!fu.deformada || !!fu.comprobacion || !!fu.pilares || !!fu.muros);
   // M-25: la planta del modelo o de las cargas sólo necesita el modelo físico (AL-4): tras editar
   // con Elegir (estirar, un pinzamiento, Propiedades) no se vela, como al dibujar; sale la nueva en
   // cuanto el worker la abre. Antes se atenuaba con lo de antes hasta entonces.

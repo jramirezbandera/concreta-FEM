@@ -36,10 +36,10 @@ import { useVisor } from "../contexto.ts";
 import { fmt, mm, textoApp, coma } from "../fmt.ts";
 import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, vistasDe } from "../vistas/estado.ts";
+import { useVistas, vistasDe, type EstadoVista } from "../vistas/estado.ts";
 import type { Marca } from "../vistas/vista2d.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
 
 type Punto = { p: Vec2; v: ValorPunto | null; planta: string; clave: string };
 
@@ -310,6 +310,15 @@ export function ModoLosas() {
           </>
         ),
         tresD: (v) => <TresDLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} envolvente={envolvente} superficies={superficies} dec={dec} />,
+        // VC4: en el alzado, el mapa de los muros del plano (el de las losas, en la planta y el 3D)
+        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), muros: { campo, combinaciones: eleccion, envolvente, ...(escala ? { escala } : {}) } } : null} elegibles={["muro"]} />,
+        cabeceraAlzado: () => (
+          <Chip acento title={resumenComb}>
+            {nombreCampo} · {unidad} · muros del plano
+            {varias && ` · ${textoEnv}`}
+            {!varias && eleccion.tipo === "combinacion" && ` · ${eleccion.nombre}`}
+          </Chip>
+        ),
         cabecera3D: () => (
           <>
             <Desplegable etiqueta="Superficies del mapa" valor={superficies} onCambio={setSuperficies} opciones={SUPERFICIES} />

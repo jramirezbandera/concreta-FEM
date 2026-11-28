@@ -28,9 +28,9 @@ import { useVisor } from "../contexto.ts";
 import { fmt, plural } from "../fmt.ts";
 import { sinObsoleto, usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, vistasDe } from "../vistas/estado.ts";
+import { useVistas, vistasDe, type EstadoVista } from "../vistas/estado.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
 import { LIMITE_NU, NOTA_TERNAS, TablaTernas } from "./Ternas.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
@@ -190,6 +190,14 @@ export function ModoPilares() {
           </Chip>
         ),
         tresD: (v) => <TresDPilares planta={v.planta} magnitud={magnitud} eleccion={eleccion} />,
+        // VC4: los tramos de los pilares del plano, con los valores y los colores del 3D
+        alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), pilares: { magnitud, combinaciones: eleccion } } : null} elegibles={["pilar"]} />,
+        cabeceraAlzado: () => (
+          <>
+            <Desplegable etiqueta="Magnitud de los pilares" valor={magnitud} onCambio={setMagnitud} opciones={MAGNITUDES} />
+            <Chip acento>{queCombinaciones(d.datos ? { descripcion: d.datos.combinaciones.descripcion, n: d.datos.combinaciones.nombres.length } : undefined, d.datos?.combinaciones.nombres[0])}</Chip>
+          </>
+        ),
         cabecera3D: () => (
           <>
             <Desplegable etiqueta="Magnitud de los pilares" valor={magnitud} onCambio={setMagnitud} opciones={MAGNITUDES} />
