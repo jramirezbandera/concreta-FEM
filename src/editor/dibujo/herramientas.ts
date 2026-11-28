@@ -98,6 +98,8 @@ export interface Plantillas {
 export interface PuntoDibujo {
   p: Vec2;
   pilar?: string;
+  /** V2c-3 en un alzado: el punto del modelo del enganche (su planta y su (x, y)). */
+  modelo?: PuntoModelo;
 }
 
 export interface EstadoHerramienta {
@@ -569,7 +571,7 @@ export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas 
   if (h === "barraNiveles") return ayudaBarra(e, t, alzado);
   if (esPieza(h)) return ayudaPieza(h, e, t);
   if (esCarga(h)) return ayudaCarga(h, e, t);
-  if (esEditar(h)) return ayudaEditar(h, e, t);
+  if (esEditar(h)) return ayudaEditar(h, e, t, alzado);
   if (esPlantillaDxf(h)) return ayudaPlantillaDxf(h, e, t);
   if (h === "ejes") return e.puntos.length ? "Eje: el segundo punto. Esc anula." : "Eje: el primer punto (clic, o «x; y» e Intro). Esc vuelve a Elegir.";
   if (h === "pilar") {

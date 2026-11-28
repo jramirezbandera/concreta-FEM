@@ -34,7 +34,8 @@
  * BN3 (`docs/fem3d/barras.md` §6): con Barra, los alzados también dibujan (`adaptadorAlzado`), con el
  * índice de enganches del plano en (u, z) (`src/editor/dibujo/alzado.ts`). El «lugar» del cursor es
  * entonces la clave del alzado en vez de una planta. El primer extremo de una barra es del modelo:
- * no se anula al pasar a otra vista, se ve en todas y el segundo clic puede ir en cualquiera. Con las
+ * no se anula al pasar a otra vista, se ve en todas y el segundo clic puede ir en cualquiera. Mover y
+ * Copiar también van en un alzado (a lo largo del plano y de planta en planta, `editar.ts`). Con las
  * demás herramientas, un alzado sigue como siempre (elegir).
  */
 import { nombreAbaco } from "../../../src/editor/abacos.ts";
@@ -227,8 +228,8 @@ export class ControladorDibujo {
     if (h === this.herramienta) return;
     this.herramienta = h;
     this.estado = ESTADO_INICIAL;
-    // Sólo Barra dibuja en un alzado: las demás empiezan sin lugar hasta que el cursor entre en una planta
-    if (h !== "barraNiveles" && esAlzado(this.planta)) [this.planta, this.cursorQ] = [null, null];
+    // Sólo Barra, Mover y Copiar (y las demás de editar, que lo dicen) van en un alzado: las demás empiezan sin lugar hasta que el cursor entre en una planta
+    if (h !== "barraNiveles" && !esEditar(h) && esAlzado(this.planta)) [this.planta, this.cursorQ] = [null, null];
     this.apunte = null;
     this.estirado = null;
     this.ladoPilar = null;
@@ -452,8 +453,9 @@ export class ControladorDibujo {
   }
 
   /**
-   * BN3: lo que se da a una vista de alzado del eje `eje` (con su profundidad). Sólo dibuja con Barra;
-   * con las demás herramientas, sus clics y ventanas van a elegir, como siempre.
+   * BN3: lo que se da a una vista de alzado del eje `eje` (con su profundidad). Dibuja con Barra y
+   * edita con Mover y Copiar (V2c-3 en el alzado: Girar y Simetría dicen que van en planta); con las
+   * demás herramientas, sus clics y ventanas van a elegir, como siempre.
    */
   adaptadorAlzado(eje: string, profundidad?: number): Dibujo2D {
     const clave = `${ALZADO}${eje}\u0000${profundidad ?? ""}`;
@@ -461,20 +463,22 @@ export class ControladorDibujo {
     if (a) return a;
     this.alzados.set(clave, { eje, ...(profundidad !== undefined ? { profundidad } : {}) });
     const barra = () => this.herramienta === "barraNiveles";
+    const activa = () => barra() || esEditar(this.herramienta);
     a = {
       pasar: (p, radio, mayus, cliente) => {
-        if (!barra()) return this.salir(clave);
+        if (!activa()) return this.salir(clave);
         this.conCotas = false;
         this.conPlantilla = false;
         this.pasar(clave, p, radio, mayus, cliente);
       },
       salir: () => this.salir(clave),
-      clic: (p, radio, ctrl, doble) => barra() && this.clic(clave, p, radio, doble, ctrl),
-      ventana: () => barra(),
-      derecho: () => barra() && this.derecho(),
-      cursor: () => (barra() ? this.cursor(clave) : null),
+      // Mover y Copiar esperando elección: el clic y la ventana eligen (devuelven false)
+      clic: (p, radio, ctrl, doble) => activa() && this.clic(clave, p, radio, doble, ctrl),
+      ventana: (caja, ctrl) => barra() || (esEditar(this.herramienta) && this.ventana(clave, caja, !!ctrl)),
+      derecho: () => activa() && this.derecho(),
+      cursor: () => (activa() ? this.cursor(clave) : null),
       pintar: (ctx, aPx, c) => {
-        if (barra()) this.pintar(clave, ctx, aPx, c, false);
+        if (activa()) this.pintar(clave, ctx, aPx, c, false);
       },
       enganche: (p, radio, ultimo, mayus) => {
         this.conPlantilla = false;
@@ -1112,7 +1116,7 @@ export class ControladorDibujo {
     else if (a?.orto) partes.push("Ortogonal");
     const c = this.cotaActiva();
     if (c) partes.push(`Cota ${nombreCota(c)}: ${c.texto}`);
-    const medida = esEditar(this.herramienta) ? medidaEditar(this.herramienta, this.estado, a?.p ?? this.cursorQ) : null;
+    const medida = esEditar(this.herramienta) ? medidaEditar(this.herramienta, this.estado, a?.p ?? this.cursorQ, this.indice(planta)?.alzado) : null;
     if (medida) partes.push(medida);
     // BN3: dónde quedaría el extremo de la barra (su planta y su x, y)
     const ix = this.herramienta === "barraNiveles" && this.modelo ? this.indice(planta) : null;

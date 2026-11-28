@@ -62,6 +62,46 @@ export interface OpcionesTransformar {
   conVigas?: boolean;
   /** AC: la distancia por debajo de la cual dos ábacos se unen (la mitad del tamaño de malla del proyecto). */
   toleranciaAbacos?: number;
+  /**
+   * Mover o copiar desde un alzado: lo elegido sube (positivo) o baja tantas plantas, además de la
+   * transformación en planta. Cambian la planta de lo que es de una planta, la base, la cabeza y los
+   * tramos de pilares y muros y las plantas de los extremos de las barras; los ejes no. Con `plantas`
+   * no se usa. Por defecto, 0.
+   */
+  niveles?: number;
+}
+
+/**
+ * Lo elegido llevado `k` plantas arriba (negativo, abajo): sus campos de planta (planta, base y cabeza
+ * de pilares y muros, sus tramos, los extremos de las barras). Un texto si alguna se sale del edificio.
+ */
+function subirPlantas(m: ModeloFisico, c: Coleccion, o: Objeto, k: number): Objeto | string {
+  if (!k || c === "ejes") return o;
+  const orden = m.plantas.map((p) => p.id);
+  let fuera = false;
+  const subir = (p: string): string => {
+    const i = orden.indexOf(p);
+    const j = i - k;
+    if (i < 0 || j < 0 || j >= orden.length) {
+      fuera = true;
+      return p;
+    }
+    return orden[j]!;
+  };
+  const n: Record<string, unknown> = { ...o };
+  if (typeof n.planta === "string") n.planta = subir(n.planta);
+  if (c === "pilares" || c === "muros") {
+    n.desde = subir(n.desde as string);
+    n.hasta = subir(n.hasta as string);
+    if (Array.isArray(n.tramos)) n.tramos = (n.tramos as { planta: string }[]).map((t) => ({ ...t, planta: subir(t.planta) }));
+  }
+  if (c === "barras") {
+    const b = o as unknown as Barra;
+    n.inicio = { ...b.inicio, planta: subir(b.inicio.planta) };
+    n.fin = { ...b.fin, planta: subir(b.fin.planta) };
+  }
+  if (fuera) return `${o.id} se saldría del edificio: no hay ${Math.abs(k) > 1 ? `${Math.abs(k)} plantas` : "una planta"} ${k > 0 ? "encima" : "debajo"} de ${c === "pilares" || c === "muros" ? (k > 0 ? (o.hasta as string) : (o.desde as string)) : "la suya"}.`;
+  return n as Objeto;
 }
 
 /**
@@ -426,6 +466,8 @@ export function transformar(m: ModeloFisico, ids: readonly string[], t: Transfor
   const tr = new Transformador(t);
   const idx = indiceIds(m);
   const avisos: string[] = [];
+  // Con las plantas de destino dadas, no se sube ni se baja
+  if (o.plantas?.length && o.niveles) o = { ...o, niveles: 0 };
   const elegidos: { c: Coleccion; o: Objeto }[] = [];
   const vistos = new Set<string>();
   for (const id of ids) {
@@ -443,6 +485,7 @@ export function transformar(m: ModeloFisico, ids: readonly string[], t: Transfor
   // AC: los ábacos elegidos, salvo los de una losa que también se elige (van con ella)
   const abacos = [...new Set(ids)].filter((id) => !idx.has(id)).map((id) => ({ id, x: leerIdAbaco(m, id) })).filter((a) => a.x && !vistos.has(a.x.losa.id)) as { id: string; x: NonNullable<ReturnType<typeof leerIdAbaco>> }[];
   if (!elegidos.length && !abacos.length) return { ok: false, mensaje: ids.length ? "Lo elegido no tiene geometría que mover (elija pilares, vigas, forjados, ábacos, muros, apoyos, cargas o ejes)." : "No hay nada elegido." };
+  if (abacos.length && o.niveles) return { ok: false, mensaje: "Los ábacos no cambian de planta: van en su forjado." };
   let rAbacos: ResultadoAbacos | null = null;
   if (abacos.length) {
     const tol = o.toleranciaAbacos ?? TOLERANCIA_ABACOS;
@@ -463,7 +506,7 @@ export function transformar(m: ModeloFisico, ids: readonly string[], t: Transfor
     const todas = [...elegidos, ...acompanan.map((x) => ({ c: "cargas" as Coleccion, o: x }))];
     rPiezas = o.copiar ? copiar(m, tr, todas, enElegidos, o, avisos) : mover(m, tr, todas, o, avisos);
   }
-  if (!rAbacos) return rPiezas ?? { ok: false, mensaje: tr.identidad ? (o.copiar ? "El destino es el punto base: la copia caería encima de lo copiado." : tr.t.tipo === "mover" ? "El destino es el punto base: no se mueve nada." : "Un giro de 0° no mueve nada.") : "La transformación no cambia nada." };
+  if (!rAbacos) return rPiezas ?? { ok: false, mensaje: tr.identidad && !o.niveles ?(o.copiar ? "El destino es el punto base: la copia caería encima de lo copiado." : tr.t.tipo === "mover" ? "El destino es el punto base: no se mueve nada." : "Un giro de 0° no mueve nada.") : "La transformación no cambia nada." };
   if (!rAbacos.ok) return rPiezas?.ok ? rPiezas : { ok: false, mensaje: rAbacos.mensaje };
   const ops = [...(rPiezas?.ok ? [rPiezas.operacion] : []), rAbacos.operacion];
   const nuevos = [...(rPiezas?.ok ? rPiezas.nuevos : []), ...(o.copiar ? rAbacos.elegidos : [])];
@@ -478,15 +521,19 @@ export function transformar(m: ModeloFisico, ids: readonly string[], t: Transfor
 }
 
 function mover(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Objeto }[], o: OpcionesTransformar, avisos: string[]): ResultadoTransformar {
-  if (tr.identidad) return { ok: false, mensaje: tr.t.tipo === "mover" ? "El destino es el punto base: no se mueve nada." : "Un giro de 0° no mueve nada." };
+  const k = o.niveles ?? 0;
+  if (tr.identidad && !k) return { ok: false, mensaje: tr.t.tipo === "mover" ? "El destino es el punto base: no se mueve nada." : "Un giro de 0° no mueve nada." };
   const ops: Operacion[] = [];
   const movidos = new Set(todas.map((x) => x.o.id));
   for (const { c, o: x } of todas) {
-    const n = transformado(m, tr, c, x, avisos);
+    const n = subirPlantas(m, c, transformado(m, tr, c, x, avisos), k);
+    if (typeof n === "string") return { ok: false, mensaje: n };
     if (cambia(x, n)) ops.push({ op: "cambiar", coleccion: c, id: x.id, objeto: n });
   }
-  // V2c-d: las vigas no elegidas que acaban en el punto fijo de un pilar que se mueve
+  // V2c-d: las vigas no elegidas que acaban en el punto fijo de un pilar que se mueve (si cambia de
+  // plantas, no: se quedan en las suyas)
   const pilares = todas.filter((x) => x.c === "pilares").map((x) => x.o as unknown as Pilar);
+  if (k && pilares.length) o = { ...o, conVigas: false };
   if (pilares.length) {
     const nuevas = new Map<string, Vec2[]>();
     const quedan = new Set<string>();
@@ -533,6 +580,10 @@ function copiar(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Ob
   const plantas = new Set(m.plantas.map((p) => p.id));
   for (const p of o.plantas ?? []) if (!plantas.has(p)) return { ok: false, mensaje: `No hay ninguna planta «${p}».` };
   const destinos = o.plantas?.length ? o.plantas : null;
+  const sube = o.niveles ?? 0;
+  /** La planta de la copia de lo que es de la planta `p`, subida `sube` (null si se sale del edificio). */
+  const orden = m.plantas.map((p) => p.id);
+  const subida = (p: string): string | null => orden[orden.indexOf(p) - sube] ?? null;
   const idx = indiceIds(m);
   const ocupados = new Set<string>();
   const nuevoId = (c: Coleccion) => {
@@ -548,10 +599,17 @@ function copiar(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Ob
   const piezas = todas.filter((x) => x.c !== "cargas");
   /** Las copias de cada objeto, por planta (la de su copia, o "" sin planta). */
   const copias = new Map<string, Map<string, string>>();
+  let error: string | null = null;
   const crear = (c: Coleccion, x: Objeto, planta: string | null) => {
     let n = transformado(m, tr, c, x, avisos);
     // La copia en su sitio (desplazamiento nulo en su planta) caería encima
-    if (tr.identidad && (planta === null || planta === plantaDe(c, x))) return saltados.push(x.id);
+    if (tr.identidad && (planta === null ? !sube || c === "ejes" : planta === plantaDe(c, x))) return saltados.push(x.id);
+    // Lo que no es de una planta (pilares, muros, barras), subido
+    if (planta === null) {
+      const s = subirPlantas(m, c, n, sube);
+      if (typeof s === "string") return void (error ??= s);
+      n = s;
+    }
     let id: string;
     if (c === "ejes") {
       const nombre = nombreEje(m, n.desde as Vec2, n.hasta as Vec2, nombresEjes);
@@ -571,11 +629,19 @@ function copiar(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Ob
     k.set(planta ?? "", id);
     copias.set(x.id, k);
   };
+  /** Las plantas de las copias de lo que es de la planta `propia` (null si se sale del edificio). */
+  const plantasCopia = (id: string, propia: string): readonly string[] | null => {
+    if (destinos) return destinos;
+    const s = subida(propia);
+    if (s === null) error ??= `${id} se saldría del edificio: no hay ${Math.abs(sube) > 1 ? `${Math.abs(sube)} plantas` : "una planta"} ${sube > 0 ? "encima" : "debajo"} de ${propia}.`;
+    return s === null ? null : [s];
+  };
   for (const { c, o: x } of piezas) {
     const propia = plantaDe(c, x);
     if (propia === null) crear(c, x, null);
-    else for (const p of destinos ?? [propia]) crear(c, x, p);
+    else for (const p of plantasCopia(x.id, propia) ?? []) crear(c, x, p);
   }
+  if (error) return { ok: false, mensaje: error };
   for (const { o: x } of cargas) {
     const carga = x as unknown as CargaFisica;
     const soporte = soporteDe(carga);
@@ -593,13 +659,14 @@ function copiar(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Ob
       }
     } else if (soporte && !elegidos.has(soporte)) {
       // Una zona de carga sobre un forjado que no se copia: sólo en su planta
-      if (destinos && destinos.some((p) => p !== propia)) return { ok: false, mensaje: `${x.id} va sobre ${soporte}, que no se copia: no se puede llevar a otras plantas sin él (elíjalo también).` };
+      if ((destinos && destinos.some((p) => p !== propia)) || (!destinos && sube)) return { ok: false, mensaje: `${x.id} va sobre ${soporte}, que no se copia: no se puede llevar a otras plantas sin él (elíjalo también).` };
       crear("cargas", x, propia);
     } else if (!soporte) {
       if (propia === null) crear("cargas", x, null);
-      else for (const p of destinos ?? [propia]) crear("cargas", x, p);
+      else for (const p of plantasCopia(x.id, propia) ?? []) crear("cargas", x, p);
     }
   }
+  if (error) return { ok: false, mensaje: error };
   if (saltados.length) avisos.push(`${listaIds(saltados)} no se ${saltados.length > 1 ? "copian" : "copia"}: la copia caería encima (destino en el punto base y en su planta).`);
   if (!ops.length) return { ok: false, mensaje: tr.identidad ? "El destino es el punto base: la copia caería encima de lo copiado." : "No hay nada que copiar." };
   return { ok: true, operacion: ops.length === 1 ? ops[0]! : { op: "lote", operaciones: ops }, avisos, nuevos };

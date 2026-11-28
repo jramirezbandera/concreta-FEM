@@ -565,8 +565,18 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               cabecera3DModelo: cabeceraEscala,
             }
           : {}),
-        // VC1: una herramienta de dibujo que no va en esta vista lo dice (en el alzado sólo dibuja Barra; en el 3D, ninguna)
-        ...(ed && dibujando ? { herramientaFuera: (t: TipoVista) => (t === "planta" || (t === "alzado" && !cargas && foto.herramienta === "barraNiveles") ? null : foto.herramienta === "barraNiveles" && !cargas ? "Barra dibuja en planta y en alzado; aquí, un clic elige" : "Esta herramienta dibuja en planta; aquí, un clic elige") } : {}),
+        // VC1: una herramienta de dibujo que no va en esta vista lo dice (en el alzado sólo dibuja Barra y editan Mover y Copiar; en el 3D, ninguna)
+        ...(ed && dibujando
+          ? {
+              herramientaFuera: (t: TipoVista) => {
+                const h = foto.herramienta;
+                const enAlzado = h === "barraNiveles" || h === "mover" || h === "copiar";
+                if (t === "planta" || (t === "alzado" && !cargas && enAlzado)) return null;
+                if (enAlzado && !cargas) return `${h === "barraNiveles" ? "Barra dibuja" : h === "mover" ? "Mover va" : "Copiar va"} en planta y en alzado; aquí, un clic elige`;
+                return h === "girar" || h === "simetria" ? "Esta herramienta va en planta; aquí, un clic elige" : "Esta herramienta dibuja en planta; aquí, un clic elige";
+              },
+            }
+          : {}),
         ...(cargas && casoValido ? { dibuja: "Las cargas" } : {}),
         ...(ed && !cargas ? { dibujarEjes: () => foto.herramienta !== "ejes" && elegirHerramienta("ejes") } : {}),
         cabeceraPlanta: (v, i) =>
